@@ -5,6 +5,7 @@ import {
   cookieName,
   fallbackLng,
   languages,
+  normalizeLanguage,
 } from '@gitroom/react/translation/i18n.config';
 import i18next from 'i18next';
 import useCookie from 'react-use-cookie';
@@ -27,7 +28,6 @@ const getCountryCodeForFlag = (languageCode: string) => {
   if (languageCode === 'es') return 'ES';
   if (languageCode === 'ar') return 'SA';
   if (languageCode === 'zh') return 'CN';
-  if (languageCode === 'he') return 'IL';
   if (languageCode === 'ja') return 'JP';
   if (languageCode === 'ko') return 'KR';
   if (languageCode === 'vi') return 'VN';
@@ -62,18 +62,18 @@ const getCountryCodeForFlag = (languageCode: string) => {
 };
 
 export const ChangeLanguageComponent = () => {
-  const currentLanguage = i18next.resolvedLanguage || fallbackLng;
+  const currentLanguage = normalizeLanguage(i18next.resolvedLanguage);
   const availableLanguages = languages;
   const [_, setCookie] = useCookie(cookieName, currentLanguage || fallbackLng);
   const modals = useModals();
   const t = useT();
 
   const handleLanguageChange = (language: string) => {
-    setCookie(language);
-    i18next.changeLanguage(language);
+    const nextLanguage = normalizeLanguage(language);
+    setCookie(nextLanguage);
+    i18next.changeLanguage(nextLanguage);
     modals.closeCurrent();
-    const rtlLanguages = ['he', 'ar'];
-    const dir = rtlLanguages.includes(language) ? 'rtl' : 'ltr';
+    const dir = nextLanguage === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
   };
 
@@ -123,7 +123,7 @@ export const ChangeLanguageComponent = () => {
 };
 export const LanguageComponent = () => {
   const modal = useModals();
-  const currentLanguage = i18next.resolvedLanguage || fallbackLng;
+  const currentLanguage = normalizeLanguage(i18next.resolvedLanguage);
   const t = useT();
   const openModal = () => {
     modal.openModal({

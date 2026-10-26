@@ -21,3 +21,6 @@ dist
 .git
 .github
 reports
+.local
+**/.env
+**/.env.*

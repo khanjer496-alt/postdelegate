@@ -7,6 +7,7 @@ import {
   cookieName,
   headerName,
   languages,
+  normalizeLanguage,
 } from '@gitroom/react/translation/i18n.config';
 acceptLanguage.languages(languages);
 
@@ -17,12 +18,14 @@ export async function proxy(request: NextRequest) {
     request.cookies.get('auth') ||
     request.headers.get('auth') ||
     nextUrl.searchParams.get('loggedAuth');
-  const lng = request.cookies.has(cookieName)
-    ? acceptLanguage.get(request.cookies.get(cookieName).value)
-    : acceptLanguage.get(
+  const savedLanguage = request.cookies.get(cookieName)?.value;
+  const lng = normalizeLanguage(
+    savedLanguage ||
+      acceptLanguage.get(
         request.headers.get('Accept-Language') ||
           request.headers.get('accept-language')
-      );
+      )
+  );
 
   const requestHeaders = new Headers(request.headers);
   if (lng) {
@@ -37,6 +40,9 @@ export async function proxy(request: NextRequest) {
 
   if (lng) {
     topResponse.headers.set(cookieName, lng);
+  }
+  if (savedLanguage && savedLanguage !== lng) {
+    topResponse.cookies.set(cookieName, lng, { path: '/' });
   }
 
   if (nextUrl.pathname.startsWith('/modal/') && !authCookie) {

@@ -1,6 +1,7 @@
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'PostDelegate' };
 import '../global.scss';
 import 'react-tooltip/dist/react-tooltip.css';
 import '@copilotkit/react-ui/styles.css';
@@ -16,6 +17,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <html>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/postdelegate.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/postdelegate-apple-touch-icon.png" />
       </head>
       <body
         className={clsx(jakartaSans.className, 'dark text-primary !bg-primary')}

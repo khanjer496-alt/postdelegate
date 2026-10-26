@@ -1,7 +1,6 @@
 export const fallbackLng = 'en';
 export const languages = [
   fallbackLng,
-  'he',
   'ru',
   'zh',
   'fr',
@@ -15,6 +14,13 @@ export const languages = [
   'tr',
   'vi',
 ];
+
+export const normalizeLanguage = (language?: string | null) => {
+  const baseLanguage = language?.trim().toLowerCase().split(/[-_]/)[0];
+  return baseLanguage && languages.includes(baseLanguage)
+    ? baseLanguage
+    : fallbackLng;
+};
 
 export const defaultNS = 'translation';
 export const cookieName = 'i18next';

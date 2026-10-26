@@ -29,11 +29,18 @@ export default async function AuthLayout({
         </div>
         <div className="text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center">
           <div className="text-center">
-            Over <span className="text-[42px] text-[#FC69FF]">20,000+</span>{' '}
-            Entrepreneurs use
+            Plan, publish, and grow
             <br />
-            Postiz To Grow Their Social Presence
+            with <span className="text-[#C8FF4D]">PostDelegate</span>
           </div>
+          <a
+            href="https://github.com/gitroomhq/postiz-app"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-[20px] text-[14px] text-gray-400 hover:text-white"
+          >
+            Built on open-source Postiz · From the Postiz community
+          </a>
           <TestimonialComponent />
         </div>
       </div>

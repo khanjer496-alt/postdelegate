@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { ReactNode } from 'react';
 
 export const metadata: Metadata = {
-  title: 'Authorize Application',
+  title: 'PostDelegate - Authorize Application',
 };
 
 export default async function OAuthLayout({

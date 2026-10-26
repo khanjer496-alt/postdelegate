@@ -3,20 +3,23 @@
 import useCookie from 'react-use-cookie';
 import {
   cookieName,
-  fallbackLng,
+  normalizeLanguage,
 } from '@gitroom/react/translation/i18n.config';
 import i18next from 'i18next';
 import { FC, useEffect } from 'react';
 
 export const ChangeDir: FC = () => {
-  const currentLanguage = i18next.resolvedLanguage || fallbackLng;
-  const [language] = useCookie(cookieName, currentLanguage || fallbackLng);
+  const currentLanguage = normalizeLanguage(i18next.resolvedLanguage);
+  const [language, setLanguage] = useCookie(cookieName, currentLanguage);
 
   useEffect(() => {
-    const rtlLanguages = ['he', 'ar'];
-    const dir = rtlLanguages.includes(language) ? 'rtl' : 'ltr';
+    const nextLanguage = normalizeLanguage(language);
+    if (language !== nextLanguage) {
+      setLanguage(nextLanguage);
+    }
+    const dir = nextLanguage === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
-  }, []);
+  }, [language, setLanguage]);
 
   return null;
 };

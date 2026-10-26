@@ -13,7 +13,10 @@ credential_path = config / 'owner-credentials.json'
 if credential_path.exists():
     credentials = json.loads(credential_path.read_text())
 else:
-    credentials = {'email': 'khanjer496@gmail.com', 'password': secrets.token_urlsafe(32)}
+    email = os.environ.get('POSTIZ_OWNER_EMAIL')
+    if not email:
+        raise SystemExit('Set POSTIZ_OWNER_EMAIL when creating the first owner.')
+    credentials = {'email': email, 'password': secrets.token_urlsafe(32)}
     credential_path.write_text(json.dumps(credentials))
     os.chmod(credential_path, 0o600)
 

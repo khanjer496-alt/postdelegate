@@ -1,6 +1,10 @@
 import { SentryComponent } from '@gitroom/frontend/components/layout/sentry.component';
 
 export const dynamic = 'force-dynamic';
+export const metadata = {
+  title: 'PostDelegate',
+  description: 'Plan, publish, and manage your social content with PostDelegate.',
+};
 import '../global.scss';
 import 'react-tooltip/dist/react-tooltip.css';
 import '@copilotkit/react-ui/styles.css';
@@ -18,7 +22,7 @@ import { GoogleTagManagerComponent } from '@gitroom/frontend/components/layout/g
 import { cookies } from 'next/headers';
 import {
   cookieName,
-  fallbackLng,
+  normalizeLanguage,
 } from '@gitroom/react/translation/i18n.config';
 import { HtmlComponent } from '@gitroom/frontend/components/layout/html.component';
 import Script from 'next/script';
@@ -26,7 +30,7 @@ import { ChangeDirClient } from '@gitroom/frontend/components/new-layout/change.
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
-  const language = cookieStore.get(cookieName)?.value || fallbackLng;
+  const language = normalizeLanguage(cookieStore.get(cookieName)?.value);
   const Plausible = !!process.env.STRIPE_PUBLISHABLE_KEY
     ? PlausibleProvider
     : Fragment;
@@ -34,6 +38,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <html>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/postdelegate.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/postdelegate-apple-touch-icon.png" />
         {!!process.env.DATAFAST_WEBSITE_ID && (
           <Script
             data-website-id={process.env.DATAFAST_WEBSITE_ID}

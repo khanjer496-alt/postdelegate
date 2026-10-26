@@ -60,3 +60,14 @@
 - Real browser upload and R2 thumbnails passed. Own test artifacts removed after acceptance; no customer files deleted.
 - Public HTTPS application/API, owner calendar and separate marketing site verified. Old BrightBean containers stopped with restart=no; original volumes/images retained and rollback documented.
 - Private recovery archives copied to mode-600 files in ignored `.local/backups` on this Mac. Final independent infrastructure review found no important remaining defects; live social-provider qualification and custom feature ports remain outside this deployment acceptance.
+
+## User-directed branding and locale follow-up
+
+The user requested PostDelegate branding on Postiz's native UI and removal of Hebrew/Israeli flag UI. Preserve native layout and Arabic support. Build a custom frontend on top of the exact official v2.25.3 image, retaining backend and publishing workers. Offer the exact modified application source through `/source`, without private server operations/configuration.
+
+- [x] Reuse canonical PostDelegate identity assets and accessible purple/lime accents.
+- [x] Remove Hebrew locale, generator target, flag mapping and RTL entry; normalize old he/iw preferences to English.
+- [x] Add page titles, icons, truthful upstream testimonial attribution and Source code link.
+- [ ] Build the custom frontend image and review the source changes.
+- [ ] Deploy the branded image with a rollback path and public source offer.
+- [ ] Verify live branding, language chooser, legacy locale fallback and Arabic RTL; capture updated evidence.

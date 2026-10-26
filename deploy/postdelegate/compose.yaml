@@ -11,7 +11,7 @@ x-service: &service
 services:
   postiz:
     <<: *service
-    image: ghcr.io/gitroomhq/postiz-app:v2.25.3@sha256:1e376ff2cb781022d528f171719cf174cf693a985a30cb40eefb13eae3ddda13
+    image: ${POSTIZ_IMAGE:-ghcr.io/gitroomhq/postiz-app:v2.25.3@sha256:1e376ff2cb781022d528f171719cf174cf693a985a30cb40eefb13eae3ddda13}
     env_file:
       - /etc/postiz/runtime.env
       - /etc/postiz/r2.env
@@ -116,6 +116,7 @@ services:
       - 443:443/udp
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./source:/source:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

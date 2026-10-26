@@ -155,6 +155,12 @@ export const SettingsPopup: FC<{
               <LogoutComponent />
             </div>
           )}
+          <a
+            href="/source"
+            className="mt-4 block text-[14px] text-textItemBlur underline underline-offset-4 hover:text-newTextColor mobile:mt-[8px]"
+          >
+            {t('source_code', 'Source code')}
+          </a>
         </div>
       </div>
       <div className="bg-newBgColorInner flex-1 min-w-0 flex-col flex p-[20px] mobile:p-[12px] gap-[12px]">
