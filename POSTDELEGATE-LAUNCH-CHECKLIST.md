@@ -24,6 +24,8 @@ This is the central list of remaining launch work. An unchecked item means missi
 - [x] Preserve the previous BrightBean deployment, database, media, configuration and rollback artifacts.
 - [x] Install daily local database/configuration backups; restore-test the three initial Postiz/Temporal database dumps.
 - [x] Create a later post-login backup including the published policies and database: `/var/backups/postiz/20261026T165101Z`. This later backup has not had its own full restore test.
+- [x] Rebuild and deploy the public marketing site from this Postiz repository's `site/`, source revision `82677def`, to Cloudflare Pages project `postdelegate`, production branch `main` (deployment `c6a90de9-d246-47a4-a096-54d136167c8a`). The old BrightBean studio marketing source remains unchanged.
+- [x] Verify the 28-page marketing build, responsive layouts and core interactions; independently check eight hosted routes and 16 assets, actual privacy/terms documents and the matching website source archive. See section 9 and the deployment README for the proof boundaries.
 
 Operations evidence and recovery instructions: [deployment README](deploy/postdelegate/README.md).
 
@@ -210,14 +212,21 @@ Record the tested account type, provider products/scopes, release, test time, ac
 
 ## 9. Public website and onboarding — paid-launch blocker
 
-- [ ] Align homepage, pricing, screenshots and trial/renewal promises with the actual plans and enabled networks.
-- [ ] Check AI/autonomy claims carefully: AI providers are inactive and BrightBean-specific autonomy/approval features have not been ported.
-- [ ] Verify marketing signup/login/checkout buttons point to the current Postiz flow and work on mobile.
-- [ ] Audit old BrightBean links, including deletion, security, subprocessors, support and documentation; replace authentication redirects with the intended public page where applicable.
+- [x] Publish the Postiz-inspired marketing redesign with PostDelegate's own identity, current workspace screenshot, illustrative previews and truthful early-access copy. Provider-directory coverage is separated from available hosted connections; no upstream customer counts, testimonials or awards are presented as PostDelegate proof.
+- [x] Remove the old BrightBean pricing/trial/allowance, autonomy/approval, API-endpoint and source-branding promises across the homepage, secondary pages, FAQ, machine-readable facts and metadata. AI/API/MCP pages explain the integration rollout; the pricing page describes use cases without offering unapproved paid packages.
+- [x] Correct signup and login links to the current Postiz flow, legal/support/deletion references and application/website source links. Independent hosted checks covered eight routes and 16 assets; privacy and terms returned their actual documents, rather than a successful authentication-page redirect.
+- [x] Build 28 static pages and verify no horizontal overflow at desktop 1280 px, tablet 1024/768 px and mobile 390/320 px widths. This is responsive-layout evidence, not a full accessibility or paid-customer acceptance audit.
+- [x] Exercise desktop/mobile navigation menus, FAQ disclosures, workflow-preview tabs and the browser-based caption/UTM tools. No social-provider publication or paid checkout is established by these website interaction tests.
+- [x] Publish `/website-source.tar.gz` and independently inspect its 96 members: no secret-bearing files or Mac metadata were found, and the archived homepage matches the deployed source. SHA-256: `35bf00479ffe35a1aa51910b7d1a9fbd659f89a9ef649585481664c04d220b55`.
+- [ ] Replace early-access plan placeholders with final approved prices, allowances, trial/renewal terms and enabled-feature promises when billing is ready. Recheck backend entitlements, checkout and marketing together.
+- [ ] Verify future checkout buttons and the complete paid onboarding flow after payments are configured; the current signup/login link checks do not complete this work.
 - [ ] Complete onboarding that clearly tells customers which account types and permissions each offered network requires.
 - [ ] Show connection/reconnect and publishing failures clearly; avoid offering unconfigured connectors that generate `client_id=undefined`.
+- [ ] Hide unready connectors in the application and verify the resulting Add Channel UI. Truthful rollout notices on the marketing site do not qualify or disable an app connector.
 - [ ] Make plan usage, billing portal/cancellation and support easy to find.
 - [ ] Check the paid customer journey on desktop and mobile, plus the languages/accessibility behavior actually advertised.
+
+Canonical marketing source is now **this repository's `site/`**, not `/Users/naserkhanjar/Projects/postdelegate-studio/site`. Cloudflare Pages production deployment `c6a90de9-d246-47a4-a096-54d136167c8a` serves source `82677def`; preview identifier `f0488ab1`. Marketing-only rollback is available in the Pages dashboard to prior deployment `3b7273f8-1205-4876-b125-5abf57bb2834`. This does not roll back the app, provider setup or customer data.
 
 ## 10. BrightBean migration and differentiated features — decide launch scope
 

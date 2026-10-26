@@ -5,6 +5,18 @@ The separate marketing website remains https://postdelegate.com.
 
 Remaining work before paid customer launch: [PostDelegate launch checklist](../../POSTDELEGATE-LAUNCH-CHECKLIST.md).
 
+## Marketing website: current source and release
+
+The canonical marketing source is [this repository's `site/`](../../site), locally `/Users/naserkhanjar/Documents/Codex/2026-10-26-https-github-com-athcagithub-postiz-leaked/postiz/site`. The old `/Users/naserkhanjar/Projects/postdelegate-studio/site` is preserved unchanged and is no longer the deployment source.
+
+- Cloudflare Pages project: `postdelegate`; production branch: `main`; source revision: `82677def`.
+- Production deployment: `c6a90de9-d246-47a4-a096-54d136167c8a`; preview identifier: `f0488ab1`.
+- The 28-page Astro build presents the current Postiz-based workspace and truthful early-access status. Desktop 1280 px, tablet 1024/768 px and mobile 390/320 px layouts had no horizontal overflow; navigation, FAQ, preview tabs and caption/UTM tools were exercised.
+- Independent hosted verification checked eight routes and 16 assets, confirmed privacy/terms were actual documents, and inspected the 96-member website archive with no secret-bearing files or Mac metadata found. The archived homepage matched the deployed source. These checks do not establish paid checkout or public social publishing.
+- Website source: [postdelegate.com/website-source.tar.gz](https://postdelegate.com/website-source.tar.gz), SHA-256 `35bf00479ffe35a1aa51910b7d1a9fbd659f89a9ef649585481664c04d220b55`. This archive is separate from the modified application's `/source` offer below.
+
+For a marketing-only rollback, open the Cloudflare Pages dashboard, select project `postdelegate`, and roll production back to the preserved deployment `3b7273f8-1205-4876-b125-5abf57bb2834`. Verify the public site and entry links afterwards. No CLI rollback command is assumed; this action does not change the VPS application or its databases.
+
 ## Stack and operating cost
 
 - Existing OVH VPS: 4 vCPU, 8 GB RAM. No new hosting plan was purchased.
