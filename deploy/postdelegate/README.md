@@ -90,7 +90,19 @@ This change deploys Postiz with the completed PostDelegate frontend branding and
 4. Configure email and billing before public customer onboarding. Their secrets were absent from the old VPS configuration and were not invented or silently activated.
 5. Keep the completed branding, upstream attribution and matching public source offer compatible with future upstream upgrades.
 
-Google sign-in/OAuth setup was requested after the branding rollout and is in progress. It is not configured or verified as part of the acceptance evidence above.
+## Google login setup: configured, final signup pending
+
+On 2026-10-26 the owner approved Google's API Services User Data Policy and creation of the web-login client. Google Auth Platform is configured in project `postdelegate`; the `PostDelegate Web` client is enabled with origin `https://app.postdelegate.com` and redirect `https://app.postdelegate.com/integrations/social/youtube`. The external audience remains **Testing**, with the owner's Google account listed as a test user.
+
+Postiz uses `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` for native Google login. They are installed in `/etc/postiz/runtime.env`; protected client JSON copies are `/etc/postiz/google-oauth-client.json` and this checkout's ignored `.local/google-oauth-client.json`, all mode 0600. Keep `POSTIZ_GENERIC_OAUTH` unset. The pre-change runtime is `/etc/postiz/runtime.env.before-google-20261026T160834Z`.
+
+Fresh checks confirmed the authorization URL contains the client ID, exact callback and only profile/email scopes, and sets `oauth_state`. The real browser completed Google's profile/email consent and returned to PostDelegate's company-name signup form. The existing LOCAL owner separately logged in successfully with secure HttpOnly cookies, and worker health returned HTTP 200. **Google account creation and a repeat Google login have not yet been completed.** Native Google signup creates a separate user/workspace rather than automatically linking a LOCAL account by matching email.
+
+The signup form still uses upstream Postiz policy links in the deployed image, and the old PostDelegate `/legal/privacy/` and `/legal/terms/` routes redirect to authentication. Source commit `adbd8662` corrects the form links; replacement image `postdelegate-postiz:brand-adbd8662` built successfully but is **not deployed**. Current production remains `brand-9a302a1a5c1d` and its matching public source archive.
+
+Review drafts are in [legal-public/index.html](legal-public/index.html). They are not published or effective. The owner has been asked to review the privacy/terms drafts and supply the registered address/jurisdiction before final account creation and public signup. The old draft contains BrightBean-specific factual claims, so it was not restored verbatim. Candidate Caddy exact legal handlers and read-only static mount are saved in ignored `.local/legal-rollout`; Caddy validation passed without activating them. A local review server runs only on `127.0.0.1:8188` while review is pending.
+
+`DISABLE_REGISTRATION=true` was restored after the callback test. After the remaining approval/details are resolved, publish final static documents, deploy the prepared frontend with its matching source archive, then set `DISABLE_REGISTRATION=false` to enable **both Google and local email/password signup**. Complete the Google signup, verify `providerName=GOOGLE`, sign out and repeat Google login to the same user/workspace, and separately preserve the LOCAL owner login. Publish the Google audience only after these signup/policy checks; no YouTube publishing permission or channel qualification has been completed by this login setup.
 
 ## References
 
