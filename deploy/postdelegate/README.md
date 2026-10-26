@@ -3,6 +3,8 @@
 Deployment date: 2026-10-26. Application: https://app.postdelegate.com.
 The separate marketing website remains https://postdelegate.com.
 
+Remaining work before paid customer launch: [PostDelegate launch checklist](../../POSTDELEGATE-LAUNCH-CHECKLIST.md).
+
 ## Stack and operating cost
 
 - Existing OVH VPS: 4 vCPU, 8 GB RAM. No new hosting plan was purchased.
