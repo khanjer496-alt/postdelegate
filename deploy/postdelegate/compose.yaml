@@ -117,6 +117,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./source:/source:ro
+      - ./legal-public:/legal-public:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

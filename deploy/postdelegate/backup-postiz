@@ -14,6 +14,9 @@ postiz-compose exec -T temporal-postgresql pg_restore --list < "$target/temporal
 postiz-compose exec -T temporal-postgresql pg_restore --list < "$target/temporal-visibility.dump" > /dev/null
 cp -a /etc/postiz "$target/configuration"
 cp -a /opt/postiz/compose.yaml /opt/postiz/Caddyfile /opt/postiz/dynamicconfig "$target/"
+if [ -d /opt/postiz/legal-public ]; then
+    cp -a /opt/postiz/legal-public "$target/"
+fi
 sha256sum "$target/postiz.dump" "$target/temporal.dump" "$target/temporal-visibility.dump" > "$target/SHA256SUMS"
 printf 'Verified backup created at %s\n' "$target"
 # Retain backups until an off-site restore-tested retention policy is installed.
