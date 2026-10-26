@@ -4,3 +4,4 @@ __pycache__/
 owner-credentials.json
 verification-session.json
 evidence/google-*.jpg
+evidence/linkedin-*.jpg

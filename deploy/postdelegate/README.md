@@ -106,7 +106,9 @@ Public registration is enabled (`DISABLE_REGISTRATION=false`), allowing **both G
 
 ## LinkedIn connection: in progress
 
-The reported LinkedIn authorization URL contained `client_id=undefined` because LinkedIn client credentials were absent from both the current and preserved legacy runtime. The authenticated LinkedIn developer console showed no existing applications. Application setup is now in progress; LinkedIn Page association and acceptance of LinkedIn's terms may require an owner handoff. A LinkedIn connection, granted products/scopes and publishing are not yet verified.
+The reported LinkedIn authorization URL contained `client_id=undefined` because LinkedIn client credentials were absent from both the current and preserved legacy runtime. The authenticated LinkedIn developer console showed no existing applications. A new-app form has the PostDelegate name and published privacy URL prepared; no app, credentials or terms acceptance have been submitted. The operator's LinkedIn company Page association is still required. No PostDelegate Page appeared in the name search, and unrelated Nasida results were not selected. A LinkedIn connection, granted products/scopes and publishing are not yet verified.
+
+The owner clarified that the goal is public customer onboarding and paid publishing through PostDelegate-owned provider apps. Each OAuth customer will authorize their own accounts; these shared application credentials do not replace customer-specific grants. Production platform approvals, Stripe plan configuration/webhooks, tenant isolation checks and end-to-end scheduled publishing remain launch work. Stock Stripe behavior and plan defaults must be reviewed before enabling live billing, including the entitlement effect on existing owner/beta organizations.
 
 ## References
 
