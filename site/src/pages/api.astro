@@ -1,0 +1,17 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+---
+<Doc title="API integration preview — PostDelegate" description="Learn about the Postiz API foundation behind PostDelegate and the status of hosted developer access." h1="Build around your publishing workflow." eyebrow="API preview" lead="The Postiz foundation provides a REST API for connected channels, posts and media. PostDelegate developer access is being qualified for this deployment.">
+  <a slot="actions" href="https://docs.postiz.com/public-api/introduction" class="button" target="_blank" rel="noreferrer">Read the upstream API docs</a>
+  <a slot="actions" href={`mailto:${SITE.email}`} class="button button-outline">Discuss an integration</a>
+  <h2>One interface for your content</h2>
+  <p>The underlying API covers workflows such as discovering connected channels, uploading media, creating drafts and scheduling posts. Each network still has its own content rules and account permissions.</p>
+  <h2>Before connecting a production workflow</h2>
+  <ul><li>Confirm hosted access and the correct endpoint with PostDelegate.</li><li>Check which workspace and channels the credentials can access.</li><li>Begin with a draft, review it in the app, then test the scheduling and error-recovery path.</li></ul>
+  <aside class="doc-note">PostDelegate connection details and usage terms will be published as hosted developer access becomes available. The linked reference explains the upstream Postiz interface.</aside>
+  <h2>Keep credentials out of content</h2>
+  <p>Store integration credentials in your application or agent's secure settings. Do not include them in prompts, public repositories or screenshots.</p>
+  <h2>Explore the interfaces</h2>
+  <p><a href="/mcp">MCP preview</a> · <a href="/agents">Agent overview</a> · <a href="https://docs.postiz.com/public-api/posts/create" target="_blank" rel="noreferrer">Upstream post creation reference</a></p>
+</Doc>

@@ -1,0 +1,16 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+---
+<Doc title="About PostDelegate" description="PostDelegate is an independently operated social publishing workspace built on open-source Postiz." h1="A clearer home for your social content." eyebrow="About PostDelegate" lead="Plan your content, see what is coming next, and keep the work in one place.">
+  <h2>What we are building</h2>
+  <p>PostDelegate brings a visual calendar, post composer and media library together for creators, teams and people working across brands. We are rolling out channel connections and integrations during early access.</p>
+  <h2>Built on Postiz</h2>
+  <p>Our publishing workspace is a modified version of <a href="https://github.com/gitroomhq/postiz-app" target="_blank" rel="noreferrer">Postiz</a>, an open-source social publishing platform. We retain its native workspace and publishing architecture while developing the PostDelegate experience.</p>
+  <p>PostDelegate is independently operated and is not affiliated with or endorsed by Postiz. The modified application's <a href={SITE.source}>source code</a> is available under AGPL-3.0.</p>
+  <h2 id="security">Accounts and your content</h2>
+  <p>Connect social accounts through the sign-in flow offered for that channel. Do not send your social passwords or access tokens to support or paste them into an AI conversation.</p>
+  <p>Read our <a href={SITE.legal.privacy}>privacy policy</a> and <a href={SITE.legal.terms}>terms</a> for the service's data practices and conditions. For account or data requests, <a href="/support#data-requests">contact support</a>.</p>
+  <h2>Who runs PostDelegate</h2>
+  <p>PostDelegate is operated by {SITE.operator}. For questions, feedback or partnership enquiries, email <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
+</Doc>

@@ -1,0 +1,80 @@
+---
+import Base from '../layouts/Base.astro';
+import Faq from '../components/Faq.astro';
+import CtaBand from '../components/CtaBand.astro';
+import NetworkBadge from '../components/NetworkBadge.astro';
+import Icon from '../components/Icon.astro';
+import Doodles from '../components/Doodles.astro';
+import ProductPreview from '../components/ProductPreview.astro';
+import FeatureVisual from '../components/FeatureVisual.astro';
+import { NETWORKS } from '../data/networks';
+import { FAQ } from '../data/faq';
+import { SITE } from '../data/site';
+import '../styles/home.css';
+const faqLd={'@context':'https://schema.org','@type':'FAQPage',mainEntity:FAQ.map(f=>({'@type':'Question',name:f.q,acceptedAnswer:{'@type':'Answer',text:f.a}}))};
+const appLd={'@context':'https://schema.org','@type':'SoftwareApplication',name:'PostDelegate',applicationCategory:'BusinessApplication',operatingSystem:'Web',url:SITE.url,description:'A visual workspace for planning social content, organizing media and managing a publishing calendar. Early access is open; channel connections are rolling out in stages.'};
+const audiences=[
+ {title:'Creators & marketers',copy:'A place for the ideas, drafts and assets that make your next post. Give your content a little more room to come together.',shape:'M12 2C5 2 2 8 3 15s7 9 13 6 7-10 5-15C19 2 15 1 12 2Zm-5 8h.1m8-1h.1M7 15c3 4 7 4 10-1',color:'#da94ef'},
+ {title:'Brands & teams',copy:'Bring a clearer view to your content calendar. Organize your workspace around the brands and channels you manage.',shape:'M5 8h14l2 13H3L5 8Zm3 0V5a4 4 0 0 1 8 0v3',color:'#aa8bff'},
+ {title:'Developers & builders',copy:'An open-source foundation for a more connected workflow. Explore the API and agent connections being prepared for PostDelegate.',shape:'m3 11 9-9 9 9M6 9v13h12V9M10 22v-8h4v8',color:'#9698ff'},
+];
+const integrations=[
+ {name:'Claude',route:'/claude-cowork',style:'claude-card',text:'Turn a rough idea into a thoughtful content plan.',prompt:'Help me plan a week of useful posts for our new launch.',response:'Start with the story, the audience and three ideas worth sharing.',label:'Plan with Claude'},
+ {name:'ChatGPT',route:'/mcp',style:'chatgpt-card',text:'Find the angle. Refine the words. Keep your voice.',prompt:'Give me three different angles for this launch announcement.',response:'Three directions: the problem, the process and the people.',label:'Explore ChatGPT workflows'},
+ {name:'Codex & coding agents',route:'/codex',style:'codex-card',text:'Bring your content workflow closer to the tools you build with.',prompt:'Launch notes → draft ideas',response:'ideas → draft → review → calendar',label:'Explore coding agents'},
+ {name:'Automation tools',route:'/api',style:'automation-card',text:'Create a repeatable path from your ideas to your calendar.',prompt:'New idea → prepare a draft',response:'Review content → choose a channel → pick a time',label:'Explore the API'},
+];
+const features=[
+ {kind:'planning',tag:'PLANNING',title:'See the whole week. Make room for the good stuff.',text:'Bring your content into a visual calendar. Give every idea a place, keep your plans in view, and make the next step easier to see.',theme:'feature-purple',link:SITE.signup,cta:'Explore the calendar'},
+ {kind:'composer',tag:'COMPOSING',title:'One idea. Your own way of telling it.',text:'Shape your content in a composer designed around social publishing. Keep the message together while making room for each channel’s format.',theme:'feature-blue',link:'/platforms',cta:'Explore channel workflows'},
+ {kind:'media',tag:'MEDIA LIBRARY',title:'Your content deserves a place of its own.',text:'Keep your public-use images and assets close to your drafts. Upload, find and organize media without losing your place in the workflow.',theme:'feature-pink',link:SITE.signup,cta:'Open your media library'},
+ {kind:'teams',tag:'WORKSPACES',title:'A little more clarity for every brand.',text:'Start with an organized workspace for your content and channels. Team access and plan allowances will be shared as the public offering opens.',theme:'feature-violet',link:'/about',cta:'Get to know PostDelegate'},
+ {kind:'workflow',tag:'YOUR WORKFLOW',title:'Make a habit of showing up.',text:'Ideas, drafts and a calendar belong together. Build a content routine you can come back to, with channel publishing opening in stages.',theme:'feature-purple',link:'/platforms',cta:'View the channel directory'},
+ {kind:'analytics',tag:'WHAT’S NEXT',title:'Learn from what you put out into the world.',text:'Channel analytics and connected workflows are part of the rollout ahead. Availability will depend on the networks and permissions you connect.',theme:'feature-blue',link:'/support',cta:'Ask about the rollout'},
+];
+---
+<Base title="PostDelegate — Your social media, all in one place" description="Bring your social ideas, media and calendar into one clear workspace. Explore PostDelegate, built on open-source Postiz. Early access is open." jsonLd={[appLd,faqLd]}>
+  <section class="home-hero" aria-labelledby="hero-title">
+    <Doodles kind="star" class="hero-star-one" /><Doodles kind="star" class="hero-star-two" />
+    <svg class="hero-loop" viewBox="0 0 230 185" fill="none" aria-hidden="true"><path d="M-8 19c83-4 111 43 88 72-26 33-89 13-67-18 23-33 121-28 151 26 38 68-12 105-43 71-27-30-9-90 37-95 34-5 48 13 72 27" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <div class="container hero-inner">
+      <a class="hero-kicker" href="/about"><span></span> An open-source foundation. A fresh perspective. <b aria-hidden="true">↗</b></a>
+      <h1 id="hero-title">Your social media,<br/>all in <span class="hero-mark">one place.<Doodles kind="underline" /></span></h1>
+      <p class="hero-description">Bring your ideas, content and calendar together.  A calmer way to plan what comes next.</p>
+      <a class="button hero-cta" href={SITE.signup}>Create your workspace <svg width="21" height="18" viewBox="0 0 21 18" fill="none" aria-hidden="true"><path d="m5 4 5 5-5 5m6-10 5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <div class="hero-networks" aria-label="Explore the social networks in the Postiz-based channel directory">
+        <div class="hero-network-row">{NETWORKS.slice(0,16).map(n=><NetworkBadge n={n} size="sm"/>)}</div>
+        <div class="hero-network-row">{NETWORKS.slice(16).map(n=><NetworkBadge n={n} size="sm"/>)}</div>
+      </div>
+      <p class="availability-note">Early access is open · Channel connections are rolling out in stages</p>
+    </div>
+  </section>
+  <section class="workspace-section" aria-label="Workspace preview">
+    <div class="container">
+      <div class="mode-tabs" role="tablist" aria-label="Choose a workflow preview">
+        <button id="classic-tab" role="tab" aria-selected="true" aria-controls="classic-panel" data-preview-tab="classic">I like a clear calendar</button>
+        <button id="agents-tab" role="tab" aria-selected="false" aria-controls="agents-panel" tabindex="-1" data-preview-tab="agents">I’m exploring AI workflows <span>Preview</span></button>
+      </div>
+      <div role="tabpanel" id="classic-panel" aria-labelledby="classic-tab" data-preview-panel="classic"><ProductPreview id="hero-workspace" /></div>
+      <div role="tabpanel" id="agents-panel" aria-labelledby="agents-tab" data-preview-panel="agents" hidden>
+        <div class="agent-workspace-preview"><div class="agent-preview-sidebar"><img src="/mark.svg" width="34" height="34" alt=""/><b>PostDelegate</b><small>WORKFLOW PREVIEW</small><span>✦ &nbsp; Your ideas</span><span>▦ &nbsp; Calendar</span><span>▧ &nbsp; Media library</span></div><div class="agent-preview-content"><span class="preview-label">Illustrative integration · Connections being prepared</span><h2>A good week starts<br/>with a good idea.</h2><div class="prompt-bubble">Help me turn our launch notes into a week of content.</div><div class="agent-response"><span class="agent-avatar">✦</span><div><strong>Start with a plan you can review.</strong><p>Three angles. A few useful stories. Space to make them your own.</p><div class="draft-pills"><span>Brand story</span><span>Behind the scenes</span><span>Launch day</span></div></div></div><a href="/agents" class="text-link">Explore the integration plans <span>↗</span></a></div></div>
+      </div>
+    </div>
+  </section>
+  <section class="workflow-strip section" aria-labelledby="workflow-title"><div class="container"><p class="section-eyebrow" id="workflow-title">A little less switching. A little more creating.</p><div class="workflow-stages">{['Collect your ideas','Shape your content','Plan your calendar','Find your rhythm'].map((label,i)=><div><span class="step-number">0{i+1}</span><span>{label}</span>{i<3&&<span class="step-arrow" aria-hidden="true">↗</span>}</div>)}</div></div></section>
+  <section class="audience-section section" aria-labelledby="audience-title"><div class="container"><h2 class="section-heading" id="audience-title">Who is PostDelegate for?</h2><div class="audience-grid">{audiences.map(a=><article><svg viewBox="0 0 24 24" fill="none" stroke={a.color} stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={a.shape}/></svg><h3>{a.title}</h3><p>{a.copy}</p></article>)}</div></div></section>
+  <section class="demo-section section" aria-labelledby="demo-title"><div class="container"><h2 id="demo-title" class="section-heading">Meet your new content workspace.</h2><p class="section-intro">A calendar for the big picture.<br/>A home for the details that make it yours.</p><a class="demo-frame" href={SITE.signup} aria-label="Open PostDelegate and explore the workspace"><div class="demo-browser"><span></span><span></span><span></span><span class="demo-address">app.postdelegate.com</span><span class="demo-live">Current workspace</span></div><img src="/images/postdelegate-workspace.jpg" width="1280" height="720" alt="The current PostDelegate calendar workspace, with calendar navigation and channel controls" loading="lazy"/><span class="demo-open"><span>↗</span> Explore the workspace</span></a><p class="demo-caption">The real PostDelegate workspace. Sign in to make it your own.</p></div></section>
+  <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap"><span class="eyebrow">INTEGRATION PREVIEW</span><h2 class="section-heading" id="ai-title">Your ideas. Your tools.<br/>A more connected <span class="ink-circle">workflow.<Doodles kind="circle"/></span></h2><p class="section-intro">Explore the AI and automation workflows we’re preparing.  Work in the web calendar today; connect more of your tools as they open.</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>Example workflow</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">Draft idea</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">Illustrative workflows. Hosted AI and public agent connections are being prepared.</p></div></section>
+  <section class="features-section section" id="features" aria-labelledby="features-title"><div class="container"><div class="features-title"><h2 class="section-heading" id="features-title">Room for your ideas.<br/>Tools for your <span class="ink-underline">everyday.<Doodles kind="underline"/></span></h2><Doodles kind="star" class="features-star"/></div></div><div class="home-wide feature-list">{features.map((f,i)=><article class:list={['feature-row',f.theme,{'feature-reverse':i%2===1}]}><div class="feature-copy"><span class="eyebrow">{f.tag}</span><h3>{f.title}</h3><p>{f.text}</p><a href={f.link} class="feature-link">{f.cta}<span aria-hidden="true">↗</span></a></div><div class="feature-art"><FeatureVisual kind={f.kind as 'planning'|'media'|'teams'|'analytics'|'workflow'|'composer'}/></div></article>)}</div></section>
+  <section class="channels-section section" id="channels" aria-labelledby="channels-title"><div class="container"><h2 class="section-heading" id="channels-title">Your channels.<br/>One place to plan.</h2><p class="section-intro">From the familiar favourites to the next thing you try.  Explore the directory as our publishing connections open.</p><div class="channel-mosaic">{NETWORKS.map((n,i)=><a href={n.scheduler?'/'+n.scheduler:'/platforms'} aria-label={'Explore '+n.name+' connection availability'} style={'--tile-rotate:'+[-5,4,-2,6,0,-4,3,5][i%8]+'deg'}><NetworkBadge n={n} size="lg"/></a>)}</div><a class="button button-outline" href="/platforms">Explore all channels <span aria-hidden="true">↗</span></a><p class="rollout-caption">Directory coverage reflects the Postiz platform. Availability on PostDelegate varies during early access.</p></div></section>
+  <CtaBand />
+  <section class="proof-section section" aria-labelledby="proof-title"><div class="container"><span class="eyebrow">A FOUNDATION YOU CAN EXPLORE</span><h2 class="section-heading" id="proof-title">Make it part of<br/>your own working day.</h2><div class="proof-grid"><a href={SITE.signup}><span class="proof-icon">▦</span><h3>Start with the workspace</h3><p>Open the calendar, explore the media library and find your way around.</p><span class="proof-link">Create a workspace ↗</span></a><a href={SITE.source}><span class="proof-icon">&lt;/&gt;</span><h3>Built on open source</h3><p>Postiz is our foundation. You can inspect the source behind the application.</p><span class="proof-link">View the source ↗</span></a><a href="/support"><span class="proof-icon">↗</span><h3>Know what’s opening next</h3><p>Check connection availability and ask us about the workflows that matter to you.</p><span class="proof-link">Talk to us ↗</span></a></div></div></section>
+  <section class="section home-faq" id="faq"><div class="container"><h2 class="section-heading">Frequently asked <span class="ink-underline">questions.<Doodles kind="underline"/></span></h2><Faq items={FAQ}/></div></section><CtaBand />
+  <a class="support-bubble" href="/support"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v6a3 3 0 0 1-3 3h-4M4 12v5H2v-5h2Zm16 0v5h2v-5h-2Z"/></svg>Support</a>
+</Base>
+<script>
+ const tabs=Array.from(document.querySelectorAll<HTMLButtonElement>('[data-preview-tab]'));
+ const panels=Array.from(document.querySelectorAll<HTMLElement>('[data-preview-panel]'));
+ function selectTab(tab:HTMLButtonElement){tabs.forEach(t=>{const selected=t===tab;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1});panels.forEach(p=>p.hidden=p.dataset.previewPanel!==tab.dataset.previewTab)}
+ tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',e=>{let next:number|undefined;if(e.key==='ArrowRight')next=(i+1)%tabs.length;if(e.key==='ArrowLeft')next=(i+tabs.length-1)%tabs.length;if(e.key==='Home')next=0;if(e.key==='End')next=tabs.length-1;if(next!==undefined){e.preventDefault();selectTab(tabs[next]);tabs[next].focus()}})});
+</script>

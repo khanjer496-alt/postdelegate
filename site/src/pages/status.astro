@@ -1,0 +1,15 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+---
+<Doc title="Service availability — PostDelegate" description="Find the PostDelegate workspace and get help with a service or platform connection problem." h1="Need to check on your workspace?" eyebrow="Service availability" lead="Open the app to check your content, or contact us if something is not working." cta={false}>
+  <a slot="actions" href={SITE.app} class="button">Open the workspace</a>
+  <a slot="actions" href={`mailto:${SITE.email}`} class="button button-outline">Report a problem</a>
+  <h2>The app and this website</h2>
+  <p>The publishing workspace runs at <a href={SITE.app}>{SITE.app}</a>. This page provides links and support information; it is not an automated uptime monitor or incident-history feed.</p>
+  <h2>Channel availability</h2>
+  <p>A workspace can be reachable while a social platform connection is unavailable. Channel access depends on the rollout, account permissions and the platform's own service.</p>
+  <p>Check the status shown in your workspace before retrying a post. A scheduled item is not a confirmation that it has been published.</p>
+  <h2>Report an issue</h2>
+  <p>Send the platform name, error message, time and timezone to <a href={`mailto:${SITE.email}`}>{SITE.email}</a>. Leave out credentials and sensitive account details.</p>
+</Doc>

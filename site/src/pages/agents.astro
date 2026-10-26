@@ -1,0 +1,24 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+const guides = [
+  { title: 'MCP connections', text: 'How compatible AI clients can use the upstream Postiz tool interface.', href: '/mcp' },
+  { title: 'The REST API', text: 'The developer interface behind drafts, media and publishing workflows.', href: '/api' },
+  { title: 'Claude and Cowork', text: 'What to check before connecting a Claude workflow.', href: '/claude-cowork' },
+  { title: 'Codex and coding agents', text: 'Explore CLI and MCP approaches for a coding workflow.', href: '/codex' },
+];
+---
+<Doc title="AI agents and automation — PostDelegate" description="Explore PostDelegate's planned agent integrations, based on Postiz's API, CLI and MCP features." h1="Bring your workflow. Keep your calendar." eyebrow="Integration preview" lead="PostDelegate is built on Postiz, whose API, CLI and MCP interfaces let AI tools work with social content. Our hosted integration rollout is being prepared.">
+  <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
+  <a slot="actions" href="https://docs.postiz.com/mcp/introduction" class="button button-outline" target="_blank" rel="noreferrer">Explore upstream docs</a>
+  <div class="document-grid">
+    {guides.map((guide) => <a href={guide.href} class="document-card"><h2>{guide.title}</h2><p>{guide.text}</p><span>Explore the integration →</span></a>)}
+  </div>
+  <h2>A useful place to start</h2>
+  <p>Prepare a post with your AI tool, then bring the draft and media into the workspace. Review the destination, content and timing before scheduling on an available channel.</p>
+  <h2>What is being prepared</h2>
+  <p>We are checking the hosted connection flow, permissions, media handling and publishing behavior before recommending a PostDelegate endpoint or installation command.</p>
+  <aside class="doc-note">These pages describe integration directions, not a claim that every agent or connector is ready on PostDelegate today.</aside>
+  <h2>For developers</h2>
+  <p>Use the <a href="https://docs.postiz.com/" target="_blank" rel="noreferrer">Postiz documentation</a> to understand the underlying interfaces. Its cloud endpoints, products and directory listings belong to Postiz. Ask <a href="/support">PostDelegate support</a> about our rollout.</p>
+</Doc>

@@ -1,0 +1,40 @@
+---
+import Base from '../layouts/Base.astro';
+import NetworkBadge from '../components/NetworkBadge.astro';
+import PageHero from '../components/PageHero.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { NETWORKS } from '../data/networks';
+import { SITE } from '../data/site';
+---
+<Base title="Platform coverage and channel rollout — PostDelegate" description="Explore the social providers in PostDelegate's Postiz foundation. Hosted connections are rolling out during early access.">
+  <PageHero eyebrow="Platform coverage" title="Your content belongs in one calendar." lead="Explore the networks in our Postiz foundation. PostDelegate connections are being rolled out, with availability confirmed in your workspace.">
+    <a href={SITE.signup} class="button">Create a workspace</a>
+    <a href="/support" class="button button-outline">Ask about a channel</a>
+  </PageHero>
+  <section class="section"><div class="container">
+    <p class="coverage-note muted">Source-provider coverage is not the same as a live connection. Account types, permissions and the channel rollout affect what is available.</p>
+    <ul class="network-grid">
+      {NETWORKS.map((network) => (
+        <li><a href={network.scheduler ? `/${network.scheduler}` : '/support'} class="network-card">
+          <NetworkBadge n={network} size="lg" />
+          <span class="network-copy"><strong>{network.name}</strong><span>In the Postiz foundation</span></span>
+          <span class="rollout-label">Rollout pending</span>
+        </a></li>
+      ))}
+    </ul>
+    <p class="coverage-note muted">A Google login creates access to PostDelegate; it does not connect a YouTube channel or Google Business Profile. Each publishing destination has its own connection flow.</p>
+  </div></section>
+  <CtaBand />
+</Base>
+<style>
+  .coverage-note { max-width: 760px; text-align: center; margin: 0 auto 34px; font-size: 15px; line-height: 1.85; }
+  .network-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; list-style: none; padding: 0; margin: 0 0 35px; }
+  .network-card { height: 100%; padding: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 13px; border: 1px solid #363636; border-radius: 18px; background: #171717; color: #fff; text-decoration: none; transition: border-color .2s; }
+  .network-card:hover { border-color: #888; }
+  .network-copy { display: flex; flex: 1; min-width: 120px; flex-direction: column; gap: 5px; }
+  .network-copy strong { font-size: 15px; font-weight: 750; }
+  .network-copy > span { font-size: 11px; color: #b2b2ba; }
+  .rollout-label { padding: 5px 8px; border: 1px solid #454545; border-radius: 100px; color: #b9b9c0; font-size: 10px; white-space: nowrap; }
+  @media (max-width: 1000px) { .network-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 580px) { .network-grid { grid-template-columns: 1fr; } }
+</style>

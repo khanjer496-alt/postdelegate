@@ -1,0 +1,33 @@
+---
+import Base from '../layouts/Base.astro';
+import Pricing from '../components/Pricing.astro';
+import PageHero from '../components/PageHero.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { SITE } from '../data/site';
+---
+<Base title="Plans and early access — PostDelegate" description="Create a PostDelegate workspace during early access. Paid plans, prices and allowances will be announced before checkout opens.">
+  <PageHero eyebrow="Plans" title="A workspace now. Plans to follow." lead="PostDelegate is in early access. Explore the workspace while we prepare the channel rollout and subscription plans.">
+    <a href={SITE.signup} class="button">Create a workspace</a>
+    <a href="/support" class="button button-outline">Ask a question</a>
+  </PageHero>
+  <section class="section"><div class="container"><Pricing heading={false} /></div></section>
+  <section class="pricing-questions"><div class="container">
+    <h2>Before you get started</h2>
+    <div class="question-grid">
+      <div><h3>Can I subscribe today?</h3><p>Paid checkout is not active. We will publish the price, channel allowance, included features and billing terms before asking you to subscribe.</p></div>
+      <div><h3>Are all channels available?</h3><p>Channel connections are being rolled out. See <a href="/platforms">platform coverage</a> and check the workspace for current availability.</p></div>
+      <div><h3>Is there a trial?</h3><p>No paid trial offer is being advertised at this stage. Early access does not promise a permanent free tier or future plan allowances.</p></div>
+      <div><h3>What about AI and automation?</h3><p>The Postiz foundation includes agent, API and AI features. PostDelegate availability and any included usage will be confirmed separately.</p></div>
+    </div>
+  </div></section>
+  <CtaBand />
+</Base>
+<style>
+  .pricing-questions { padding: 0 0 80px; background: var(--bg, #0d0d0d); }
+  h2 { text-align: center; font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -.04em; margin-bottom: 36px; }
+  .question-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 50px; max-width: 880px; margin: auto; }
+  h3 { font-size: 18px; font-weight: 750; margin-bottom: 10px; }
+  .question-grid p { color: var(--muted, #b9b9b9); font-size: 15px; line-height: 1.85; }
+  .question-grid a { color: var(--text, #fff); text-decoration: underline; text-underline-offset: 4px; }
+  @media (max-width: 600px) { .question-grid { grid-template-columns: 1fr; gap: 26px; } }
+</style>

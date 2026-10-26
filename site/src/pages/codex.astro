@@ -1,0 +1,15 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+---
+<Doc title="Codex integration preview — PostDelegate" description="Explore Codex workflows using the API, CLI and MCP interfaces in PostDelegate's Postiz foundation." h1="Keep content close to your coding workflow." eyebrow="Codex preview" lead="The Postiz foundation has CLI and MCP interfaces that coding agents can use. We are checking the PostDelegate connection and authentication flow before publishing setup commands.">
+  <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
+  <a slot="actions" href="https://docs.postiz.com/cli/introduction" class="button button-outline" target="_blank" rel="noreferrer">Read the upstream CLI guide</a>
+  <h2>A launch post is a good first task</h2>
+  <p>Have your coding tool prepare a short launch announcement and any supporting media. Review the wording in PostDelegate and choose an available channel and time yourself.</p>
+  <h2>When hosted agent access is ready</h2>
+  <p>Start by discovering the workspace and connected accounts, then create one draft. Confirm that the draft arrived before allowing a workflow to schedule content.</p>
+  <h2>Use the right connection instructions</h2>
+  <p>Postiz publishes its own CLI, agent skill and <a href="https://postiz.com/codex" target="_blank" rel="noreferrer">Codex guide</a>. Those names and cloud endpoints belong to the upstream project. We will document the appropriate PostDelegate configuration separately.</p>
+  <p>See the <a href="/agents">agent overview</a>, <a href="/mcp">MCP preview</a> and <a href="/api">API preview</a>.</p>
+</Doc>

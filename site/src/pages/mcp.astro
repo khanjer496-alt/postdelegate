@@ -1,0 +1,16 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+---
+<Doc title="MCP integration preview — PostDelegate" description="Explore MCP support in PostDelegate's Postiz foundation. Hosted client setup is being verified before connection instructions are published." h1="Your AI, connected to your content." eyebrow="MCP preview" lead="MCP gives compatible AI tools a way to work with a publishing workspace. The Postiz foundation supports it; PostDelegate client setup is being verified.">
+  <a slot="actions" href="https://docs.postiz.com/mcp/introduction" class="button" target="_blank" rel="noreferrer">Explore upstream MCP</a>
+  <a slot="actions" href={SITE.signup} class="button button-outline">Open a workspace</a>
+  <h2>From a conversation to a draft</h2>
+  <p>A compatible client can discover the tools a server offers and use them to work with content. The useful starting point is a single draft that you can inspect in the calendar before anything is scheduled.</p>
+  <h2>Connection details are coming</h2>
+  <p>We will publish the PostDelegate server URL, authentication method and supported client instructions after the hosted flow is checked. An upstream Postiz connector or marketplace listing does not automatically connect to this service.</p>
+  <h2>What to verify first</h2>
+  <ol><li>The client is connected to the intended PostDelegate workspace.</li><li>You understand which tools can change or publish content.</li><li>A draft is visible in the app and the destination channel is correct.</li></ol>
+  <aside class="doc-note">Use <a href="https://docs.postiz.com/mcp/setup" target="_blank" rel="noreferrer">Postiz's client setup guide</a> as background. Contact <a href="/support">PostDelegate support</a> before relying on a hosted automation.</aside>
+  <p>Related: <a href="/api">API preview</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude and Cowork</a>.</p>
+</Doc>
