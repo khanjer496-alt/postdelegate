@@ -17,18 +17,29 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TikTokDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
 import { timer } from '@gitroom/helpers/utils/timer';
-import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { createReadStream } from 'fs';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { DashboardFunction } from '@gitroom/nestjs-libraries/integrations/dashboard.function.decorator';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+
+type TikTokCreatorInfo = {
+  creatorUsername: string;
+  creatorNickname: string;
+  privacyLevelOptions: string[];
+  commentDisabled: boolean;
+  duetDisabled: boolean;
+  stitchDisabled: boolean;
+  maxDurationSeconds: number;
+};
 
 @Rules(
   [
     'TikTok can have one video or one picture or multiple pictures, it cannot be without an attachment.',
     'content_posting_method=DIRECT_POST publishes the post to the account. content_posting_method=UPLOAD does NOT publish: it only sends the media to the user inbox of the TikTok app, where the user must manually complete and publish it within 24 hours or it is discarded. Use DIRECT_POST unless the user explicitly asks to review or edit the post inside the TikTok app first.',
-    'With content_posting_method=UPLOAD, TikTok ignores every setting except the title / post content. Never tell the user that video_made_with_ai, privacy_level, duet, stitch, comment, autoAddMusic, brand_content_toggle or brand_organic_toggle will be applied in UPLOAD mode - they are silently discarded. If the user asks for any of those settings, tell them it requires DIRECT_POST.',
-    'video_made_with_ai, duet and stitch apply to video posts only. TikTok has no equivalent field for photo posts, so those settings are discarded when the attachment is a picture.',
+    'With content_posting_method=UPLOAD, video inbox uploads accept only media; the user adds the caption inside TikTok. Photo inbox uploads also accept the photo title and description. Never tell the user that video_made_with_ai, privacy_level, duet, stitch, comment, autoAddMusic, brand_content_toggle or brand_organic_toggle will be applied in UPLOAD mode. Those settings require DIRECT_POST.',
+    'video_made_with_ai, duet and stitch are applied by this integration to video posts only. They are not sent when the attachment is a picture.',
   ].join(' ')
 )
 export class TiktokProvider extends SocialAbstract implements SocialProvider {
@@ -51,6 +62,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     return 2000;
   }
 
+  private isVideo(path: string) {
+    return /\.(mp4|mov|webm)(?:[?#]|$)/i.test(path || '');
+  }
+
   override async checkValidity(
     items: Array<ValidityMedia[]>
   ): Promise<string | true> {
@@ -60,19 +75,19 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     }
     if (
       (firstItems?.length ?? 0) > 1 &&
-      firstItems?.some((p) => (p?.path?.indexOf?.('mp4') ?? -1) > -1)
+      firstItems?.some((p) => this.isVideo(p?.path))
     ) {
       return 'Only pictures are supported when selecting multiple items';
     } else if (
       firstItems?.length !== 1 &&
-      (firstItems?.[0]?.path?.indexOf?.('mp4') ?? -1) > -1
+      this.isVideo(firstItems?.[0]?.path)
     ) {
       return 'You need one media';
     }
 
     // TikTok fails the whole photo post when a single image is oversized, and
     // the status only says `picture_size_check_failed` without naming it.
-    if (firstItems?.every((p) => (p?.path?.indexOf?.('mp4') ?? -1) === -1)) {
+    if (firstItems?.every((p) => !this.isVideo(p?.path))) {
       const dimensions = await Promise.all(
         firstItems?.map((p) => this.getImageDimensions(p?.path)) ?? []
       );
@@ -417,11 +432,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async maxVideoLength(accessToken: string) {
-    const {
-      data: { max_video_post_duration_sec },
-    } = await (
-      await fetch(
+  @DashboardFunction()
+  async creatorInfo(accessToken: string): Promise<TikTokCreatorInfo> {
+    const response = await (
+      await this.fetch(
         'https://open.tiktokapis.com/v2/post/publish/creator_info/query/',
         {
           method: 'POST',
@@ -433,9 +447,86 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       )
     ).json();
 
+    const data = response?.data;
+    if (
+      response?.error?.code !== 'ok' ||
+      !Array.isArray(data?.privacy_level_options) ||
+      !data.privacy_level_options.every(
+        (option: unknown) => typeof option === 'string'
+      ) ||
+      typeof data.comment_disabled !== 'boolean' ||
+      typeof data.duet_disabled !== 'boolean' ||
+      typeof data.stitch_disabled !== 'boolean' ||
+      !Number.isFinite(data.max_video_post_duration_sec) ||
+      data.max_video_post_duration_sec <= 0
+    ) {
+      throw new BadBody(
+        'tiktok-creator-info',
+        '{}',
+        '{}',
+        'Could not load current TikTok account permissions. Reopen the composer and try again.'
+      );
+    }
+
     return {
-      maxDurationSeconds: max_video_post_duration_sec,
+      creatorUsername: data.creator_username || '',
+      creatorNickname: data.creator_nickname || data.creator_username || '',
+      privacyLevelOptions: data.privacy_level_options,
+      commentDisabled: data.comment_disabled,
+      duetDisabled: data.duet_disabled,
+      stitchDisabled: data.stitch_disabled,
+      maxDurationSeconds: data.max_video_post_duration_sec,
     };
+  }
+
+  async maxVideoLength(accessToken: string) {
+    const { maxDurationSeconds } = await this.creatorInfo(accessToken);
+    return {
+      maxDurationSeconds,
+    };
+  }
+
+  private async validateDirectPost(
+    accessToken: string,
+    firstPost: PostDetails<TikTokDto>
+  ) {
+    const creator = await this.creatorInfo(accessToken);
+    const settings = firstPost.settings;
+    const invalid = (message: string) => {
+      throw new BadBody('tiktok-settings', '{}', '{}', message);
+    };
+
+    if (
+      !settings.privacy_level ||
+      !creator.privacyLevelOptions.includes(settings.privacy_level)
+    ) {
+      invalid(
+        'Choose a privacy option currently available for this TikTok account.'
+      );
+    }
+    if (settings.music_usage_consent !== true) {
+      invalid('Accept TikTok Music Usage Confirmation before posting.');
+    }
+    if (creator.commentDisabled && this.assetBoolean(settings.comment)) {
+      invalid('Comments are disabled by this TikTok account.');
+    }
+    const isPhoto = !this.isVideo(firstPost?.media?.[0]?.path);
+    if (!isPhoto && creator.duetDisabled && this.assetBoolean(settings.duet)) {
+      invalid('Duet is disabled by this TikTok account.');
+    }
+    if (!isPhoto && creator.stitchDisabled && this.assetBoolean(settings.stitch)) {
+      invalid('Stitch is disabled by this TikTok account.');
+    }
+    const branded = this.assetBoolean(settings.brand_content_toggle);
+    const ownBrand = this.assetBoolean(settings.brand_organic_toggle);
+    if (settings.disclose && !branded && !ownBrand) {
+      invalid(
+        'Select at least one brand option when commercial content disclosure is enabled.'
+      );
+    }
+    if (branded && settings.privacy_level === 'SELF_ONLY') {
+      invalid('Branded content cannot use private visibility.');
+    }
   }
 
   // Single status check for a publish_id, no loops and no timers: `post` returns
@@ -560,7 +651,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   }
 
   private buildTikokPostInfoBody(firstPost: PostDetails<TikTokDto>) {
-    const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
+    const isPhoto = !this.isVideo(firstPost?.media?.[0]?.path);
     const method = this.contentPostingMethod(firstPost);
 
     if (method === 'DIRECT_POST') {
@@ -573,8 +664,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
             ? { title: firstPost.message }
             : {}),
           ...(isPhoto ? { description: firstPost.message } : {}),
-          privacy_level:
-            firstPost.settings.privacy_level || 'PUBLIC_TO_EVERYONE',
+          privacy_level: firstPost.settings.privacy_level,
           ...(isPhoto
             ? {}
             : { disable_duet: !this.assetBoolean(firstPost.settings.duet) }),
@@ -612,106 +702,20 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       };
     }
 
+    // The video inbox endpoint accepts source_info only. Photo MEDIA_UPLOAD
+    // additionally supports post_info.title and post_info.description.
+    if (!isPhoto) {
+      return {};
+    }
+
     return {
       post_info: {
-        ...(isPhoto && firstPost.settings.title
-          ? { title: firstPost.settings.title }
-          : {}),
-        ...(!isPhoto && firstPost.message ? { title: firstPost.message } : {}),
-        ...(isPhoto ? { description: firstPost.message } : {}),
+        ...(firstPost.settings.title ? { title: firstPost.settings.title } : {}),
+        description: firstPost.message,
       },
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // OLD PULL_FROM_URL IMPLEMENTATION (kept for when the TikTok PULL bug is fixed)
-  // ---------------------------------------------------------------------------
-  // private buildTikokSourceInfoBody(firstPost: PostDetails<TikTokDto>) {
-  //   const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
-  //
-  //   if (isPhoto) {
-  //     return {
-  //       post_mode:
-  //         firstPost?.settings?.content_posting_method === 'DIRECT_POST'
-  //           ? 'DIRECT_POST'
-  //           : 'MEDIA_UPLOAD',
-  //       media_type: 'PHOTO',
-  //       source_info: {
-  //         source: 'PULL_FROM_URL',
-  //         photo_cover_index: 0,
-  //         photo_images: firstPost.media?.map((p) => p.path),
-  //       },
-  //     };
-  //   }
-  //
-  //   return {
-  //     source_info: {
-  //       source: 'PULL_FROM_URL',
-  //       video_url: firstPost?.media?.[0]?.path!,
-  //       ...(firstPost?.media?.[0]?.thumbnailTimestamp!
-  //         ? {
-  //             video_cover_timestamp_ms:
-  //               firstPost?.media?.[0]?.thumbnailTimestamp!,
-  //           }
-  //         : {}),
-  //     },
-  //   };
-  // }
-  //
-  // async post(
-  //   id: string,
-  //   accessToken: string,
-  //   postDetails: PostDetails<TikTokDto>[],
-  //   integration: Integration
-  // ): Promise<PostResponse[]> {
-  //   const [firstPost] = postDetails;
-  //   const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
-  //
-  //   console.log({
-  //     ...this.buildTikokPostInfoBody(firstPost),
-  //     ...this.buildTikokSourceInfoBody(firstPost),
-  //   });
-  //   const {
-  //     data: { publish_id },
-  //   } = await (
-  //     await this.fetch(
-  //       `https://open.tiktokapis.com/v2/post/publish${this.postingMethod(
-  //         firstPost.settings.content_posting_method,
-  //         !hasExtension(firstPost?.media?.[0]?.path, 'mp4')
-  //       )}`,
-  //       {
-  //         method: 'POST',
-  //         headers: {
-  //           'Content-Type': 'application/json; charset=UTF-8',
-  //           Authorization: `Bearer ${accessToken}`,
-  //         },
-  //         body: JSON.stringify({
-  //           ...this.buildTikokPostInfoBody(firstPost),
-  //           ...this.buildTikokSourceInfoBody(firstPost),
-  //         }),
-  //       }
-  //     )
-  //   ).json();
-  //
-  //   const { url, id: videoId } = await this.uploadedVideoSuccess(
-  //     integration.profile!,
-  //     publish_id,
-  //     accessToken
-  //   );
-  //
-  //   return [
-  //     {
-  //       id: firstPost.id,
-  //       releaseURL: url,
-  //       postId: String(videoId),
-  //       status: 'success',
-  //     },
-  //   ];
-  // }
-
-  // ---------------------------------------------------------------------------
-  // NEW FILE_UPLOAD IMPLEMENTATION (no PULL_FROM_URL for videos)
-  // ---------------------------------------------------------------------------
   // TikTok video chunk constraints: a chunk must be between 5MB and 64MB.
   // When the whole file fits in a single chunk (<= 64MB) we upload it in one
   // request; otherwise we split it into 10MB chunks (the final chunk carries
@@ -818,7 +822,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     firstPost: PostDetails<TikTokDto>,
     videoSize?: number
   ) {
-    const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
+    const isPhoto = !this.isVideo(firstPost?.media?.[0]?.path);
 
     // TikTok photo posts only support PULL_FROM_URL, there is no FILE_UPLOAD
     // path for photos, so this branch keeps pulling from the URL.
@@ -833,6 +837,16 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
           source: 'PULL_FROM_URL',
           photo_cover_index: 0,
           photo_images: firstPost.media?.map((p) => p.path),
+        },
+      };
+    }
+
+    const videoPath = firstPost?.media?.[0]?.path;
+    if (/^https?:\/\//i.test(videoPath || '')) {
+      return {
+        source_info: {
+          source: 'PULL_FROM_URL',
+          video_url: videoPath,
         },
       };
     }
@@ -856,15 +870,50 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     integration: Integration
   ): Promise<PostResponse[]> {
     const [firstPost] = postDetails;
-    const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
+    const isPhoto = !this.isVideo(firstPost?.media?.[0]?.path);
     const videoPath = firstPost?.media?.[0]?.path!;
+    const hostedVideo = !isPhoto && /^https?:\/\//i.test(videoPath || '');
 
-    // For videos we only need the total size up front (HEAD / statSync) so we
-    // can init the upload; the bytes themselves are streamed later, never fully
-    // loaded into memory.
-    const videoSize = isPhoto
-      ? undefined
-      : await this.mediaSize(videoPath, 'tiktok-error-upload');
+    if (this.contentPostingMethod(firstPost) === 'DIRECT_POST') {
+      await this.validateDirectPost(accessToken, firstPost);
+    }
+
+    // TikTok pulls media already hosted by the app. Require public HTTPS URLs
+    // (including every photo), and reject embedded credentials. TikTok also
+    // requires domain/prefix ownership verification in the developer console.
+    const hostedPaths = isPhoto
+      ? firstPost.media?.map((media) => media.path) || []
+      : hostedVideo
+      ? [videoPath]
+      : [];
+    for (const path of hostedPaths) {
+      let url: URL;
+      try {
+        url = new URL(path);
+      } catch {
+        throw new BadBody(
+          'tiktok-media-url',
+          '{}',
+          '{}',
+          'TikTok media must have a public HTTPS URL.'
+        );
+      }
+      if (url.username || url.password || !(await isSafePublicHttpsUrl(path))) {
+        throw new BadBody(
+          'tiktok-media-url',
+          '{}',
+          '{}',
+          'TikTok media must have a public HTTPS URL without embedded credentials.'
+        );
+      }
+    }
+
+    // Local files still use TikTok's streaming FILE_UPLOAD fallback. Hosted
+    // videos need neither HEAD nor an application-side download/upload.
+    const videoSize =
+      isPhoto || hostedVideo
+        ? undefined
+        : await this.mediaSize(videoPath, 'tiktok-error-upload');
 
     const {
       data: { publish_id, upload_url },
@@ -895,7 +944,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
           upload_url,
           videoPath,
           videoSize,
-          'video/mp4'
+          /\.mov(?:[?#]|$)/i.test(videoPath)
+            ? 'video/quicktime'
+            : /\.webm(?:[?#]|$)/i.test(videoPath)
+            ? 'video/webm'
+            : 'video/mp4'
         );
       } catch (err) {
         // An explicit rejection from TikTok: the post won't publish, fail it

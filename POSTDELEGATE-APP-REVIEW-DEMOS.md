@@ -12,6 +12,9 @@ User-supplied script pack: [PostDelegate launch review pack](https://postdelegat
 - A fresh database query found **zero active social-channel connections**.
 - No review recording, successful social test post or review submission was produced by these checks.
 - The pack describes a second Google project/client (`postdelegate-app`, prefix `790268112731-`). Reconcile ownership, branding, callbacks and scopes before replacing the working production credentials. Postiz currently shares the YouTube credential variables with native Google login.
+- Execution has started: TikTok composer/provider corrections and narrower YouTube scopes are implemented and undergoing final release verification. See the [scope map](deploy/postdelegate/review/oauth-scope-map.md). These source and isolated-test results are separate from a live provider connection or audit approval.
+- Original test media is ready and was uploaded through the real PostDelegate media library to R2. The 12-second H.264/AAC clip is 720×1280; the app-compressed image is 800×1000. The downloaded hosted video matches the local SHA-256. These files are upload fixtures, **not review screen recordings**.
+- Facebook, Pinterest and TikTok developer consoles are signed out in the available Chrome session. Their login tabs are prepared; the owner chose to sign into Facebook later. The approved five-scope Google declaration and truthful justification were saved successfully in project `postdelegate`. YouTube Analytics API was enabled with owner-approved terms, and the dashboard shows **Enabled**. These steps are not a customer authorization or verification approval.
 
 **Next milestone:** complete a real tester connection and successful test post, then record that working flow. Use developer/tester/sandbox permissions where the platform supports them before public-access approval.
 
@@ -24,7 +27,7 @@ User-supplied script pack: [PostDelegate launch review pack](https://postdelegat
 - [ ] Prepare a Facebook test user/Page and eligible Instagram professional account; accept any Instagram/Threads tester invitations.
 - [ ] Add an eligible private TikTok account as a sandbox target user for first-time review.
 - [ ] Prepare a YouTube channel and Google test account for the chosen project; prepare an existing Pinterest test board/account for the Pinterest flow.
-- [ ] Prepare an original image and a short original MP4 clip that can be posted to the authorized test destinations. These upload assets are separate from the screen-recording videos submitted to reviewers.
+- [x] Prepare an original image and a short original MP4 clip that can be posted to the authorized test destinations. Local files are in ignored `.local/review-media/`; regenerate with `deploy/postdelegate/review/create-demo-media.py`. These upload assets are separate from the screen-recording videos submitted to reviewers.
 - [ ] Complete required business/identity checks and usable API access or funding where necessary. Follow the actual dashboard; do not treat a US-phone claim or payment/auto-recharge recommendation in the pack as a universal requirement or spending authorization.
 - [ ] Fix the source issues in section 3 and verify each demo feature before recording it.
 
@@ -39,7 +42,7 @@ This is a recommended concise recording script, not a universal provider duratio
 5. Select the intended account, Page, channel or board and show it connected in PostDelegate.
 6. Compose an original test post, choose its destination/settings and use **Post now**. Demonstrate a video upload when requesting a video-specific capability; an image Pin is sufficient for a Pinterest action demonstration.
 7. Open the provider and show the resulting post, destination and visibility. A successful status label in PostDelegate alone is insufficient evidence of publication.
-8. Demonstrate every additional requested feature/permission that is actually implemented, such as an optional first comment or available analytics. Do not invent results or imply that a local edit changed the remote post.
+8. Demonstrate every additional requested feature/permission that is actually implemented, such as a first comment on a provider that supports it or available analytics. YouTube's provider does not insert comments. Do not invent results or imply that a local edit changed the remote post.
 9. Provide written reviewer steps and any required private demo access. Use readable English UI/narration and keep the relevant browser URL visible.
 
 Suggested separate flows are Facebook Pages, the selected Instagram login route, Threads, TikTok, YouTube and Pinterest. Record both Instagram routes only if both are being submitted. Follow the review form if it requests combined or separate clips for particular permissions.
@@ -55,19 +58,20 @@ Suggested separate flows are Facebook Pages, the selected Instagram login route,
 
 ## 3. Correct the supplied script pack before filming
 
-The following are **static source findings**, not successful runtime demonstrations. They concern application code unchanged by the marketing-site deployment.
+The findings below led to source corrections in this review-preparation work. Checked implementation items have focused regression coverage; real provider demonstrations remain pending.
 
 ### TikTok: product work required before Direct Post audit
 
-- [ ] Use fresh creator information for nickname, available privacy choices, disabled interactions and duration limits.
-- [ ] Remove the UI's public-visibility preselection and backend public fallback; require explicit user privacy selection from the current creator's options.
-- [ ] Start interaction choices unchecked and disable those the creator cannot use. Do not show Duet/Stitch for photo posts.
-- [ ] Show the required music/other applicable consent for ordinary as well as commercial posts.
-- [ ] Enforce commercial-disclosure choices and branded-content/private-visibility restrictions, with appropriate labels and explicit upload consent.
-- [ ] Review media transfer: current video publishing uses `FILE_UPLOAD`; TikTok requires `PULL_FROM_URL` for media already stored on the API client's servers. Verify the actual serving domain, such as `media.postdelegate.com`, rather than assuming apex-domain verification covers it.
+- [x] Use fresh creator information for nickname, available privacy choices, disabled interactions and duration limits. The composer checks browser video metadata against the current account limit; the backend independently refreshes permissions before Direct Post.
+- [x] Remove the UI's public-visibility preselection and backend public fallback; require explicit user privacy selection from the current creator's options.
+- [x] Start interaction choices unchecked and disable those the creator cannot use. Do not show Duet/Stitch for photo posts.
+- [x] Require explicit music/upload consent for ordinary as well as commercial Direct Posts.
+- [x] Enforce commercial choices, correct labels and branded-content/private restrictions. Disable actual publishing controls when prerequisites are incomplete, preserving draft/update-only operations.
+- [x] Use `PULL_FROM_URL` for hosted media with public HTTPS validation; retain streaming `FILE_UPLOAD` for local video files. Video inbox uploads send only supported `source_info`, while photo uploads retain their supported title/description.
+- [ ] Verify the actual serving domain `media.postdelegate.com` in the TikTok developer app; do not assume apex-domain verification covers it.
 - [ ] Verify processing/status feedback and successful private sandbox publication.
 
-Source pointers: [TikTok composer](apps/frontend/src/components/new-launch/providers/tiktok/tiktok.provider.tsx), especially privacy at lines 140–142, comments at 262–264 and consent at 349–377; [TikTok provider](libraries/nestjs-libraries/src/integrations/social/tiktok.provider.ts), creator-info handling at 420–438, public fallback at 576–577 and file upload around 844.
+Source pointers: [TikTok composer](apps/frontend/src/components/new-launch/providers/tiktok/tiktok.provider.tsx), [TikTok provider](libraries/nestjs-libraries/src/integrations/social/tiktok.provider.ts), and [focused review tests](deploy/postdelegate/review/tests). Duration inspection on the backend is not implemented; the composer enforces the current creator duration limit using browser metadata.
 
 The pack's separate **upload to TikTok inbox** step is supported in source through the `UPLOAD` path, subject to actual `video.upload` authorization and testing. Show the real inbox receipt/completion if retaining that permission. It is not the same as Direct Post and does not apply all Direct Post settings.
 
@@ -75,10 +79,10 @@ The pack's separate **upload to TikTok inbox** step is supported in source throu
 
 The pack proposes changing an already-published YouTube title through PostDelegate. No remote `videos.update` implementation was found. The provider creates new uploads, and a local post update does not establish an update to the existing YouTube video. Remove that demo/justification or implement and test it first.
 
-- [ ] Review the actual eight requested YouTube scopes, including broad `youtube` and `youtubepartner`, against necessary implemented operations.
-- [ ] Narrow scopes and update the provider's expected-scope checks together where appropriate; changing only a console setting can break authorization.
+- [x] Map actual YouTube operations to required scopes; remove unused broad `youtube`, `youtube.force-ssl` and `youtubepartner`.
+- [x] Use the same five-scope list for authorization and granted-scope checks. See the [scope map](deploy/postdelegate/review/oauth-scope-map.md).
 - [ ] Keep native Google login working while reconciling the two Google clients.
-- [ ] Demonstrate upload, custom thumbnail, optional comment and analytics only where actually working and requested.
+- [ ] Demonstrate upload, optional custom thumbnail, channel/video reads and analytics. Do not demonstrate comment insertion or published-video editing; neither is implemented by this provider.
 
 Source: [YouTube provider](libraries/nestjs-libraries/src/integrations/social/youtube.provider.ts), scopes at 65–74 and new upload at 602–624; [post service](libraries/nestjs-libraries/src/database/prisma/posts/posts.service.ts), local update handling around 1210–1216. Check current line positions when editing.
 
@@ -88,7 +92,7 @@ The pack proposes showing a member's incoming LinkedIn comment inside PostDelega
 
 ### Pinterest: existing board picker, not board creation
 
-The current composer selects existing boards and directs users to create one first if none exist. The provider fetches boards; no create-board operation was found. Use a pre-created test board in the recording. Review the requested `boards:write` permission and its justification, or implement and verify board creation before claiming it.
+The current composer selects existing boards and directs users to create one first if none exist. Use a pre-created test board in the recording. Pinterest's current official API specification requires **`boards:write` for `POST /pins` even with an existing board**, so that permission is retained. Its presence is not a board-creation feature. The authorization URL and checks now derive from one scope list; see the [scope map](deploy/postdelegate/review/oauth-scope-map.md).
 
 ## 4. Submit only after the working flow is proven
 
@@ -100,7 +104,7 @@ The current composer selects existing boards and directs users to create one fir
 - [ ] Reviewer login/access and links work; recordings are accessible and contain no passwords, API secrets or access tokens.
 - [ ] Submit the correct review/audit stage and record its actual status. Preparing a script or uploading a recording is not approval.
 
-No review submission, test post or payment was made while producing this plan.
+No review submission, social test post or payment has been made during this preparation. Uploading fixtures to PostDelegate/R2 does not establish social publication.
 
 ## Primary references checked
 

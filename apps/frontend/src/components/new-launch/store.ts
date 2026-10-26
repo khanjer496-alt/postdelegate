@@ -43,8 +43,10 @@ interface StoreState {
   current: string;
   comments: boolean | 'no-media';
   locked: boolean;
+  publishBlocked: Record<string, boolean>;
   hide: boolean;
   setLocked: (locked: boolean) => void;
+  setPublishBlocked: (integrationId: string, blocked: boolean) => void;
   integrations: Integrations[];
   selectedIntegrations: SelectedIntegrations[];
   global: Values[];
@@ -156,6 +158,7 @@ const initialState = {
   isCreateSet: false,
   current: 'global',
   locked: false,
+  publishBlocked: {} as Record<string, boolean>,
   hide: false,
   integrations: [] as Integrations[],
   selectedIntegrations: [] as SelectedIntegrations[],
@@ -533,6 +536,17 @@ export const useLaunchStore = create<StoreState>()((set) => ({
     set((state) => ({
       locked: locked,
     })),
+  setPublishBlocked: (integrationId: string, blocked: boolean) =>
+    set((state) =>
+      !!state.publishBlocked[integrationId] === blocked
+        ? state
+        : {
+            publishBlocked: {
+              ...state.publishBlocked,
+              [integrationId]: blocked,
+            },
+          }
+    ),
   setHide: (hide: boolean) =>
     set((state) => ({
       hide: hide,

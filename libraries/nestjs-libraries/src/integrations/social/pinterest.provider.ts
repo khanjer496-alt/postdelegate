@@ -56,6 +56,7 @@ export class PinterestProvider
   isBetweenSteps = false;
   scopes = [
     'boards:read',
+    // Pinterest requires this for POST /pins, including existing boards.
     'boards:write',
     'pins:read',
     'pins:write',
@@ -216,7 +217,7 @@ export class PinterestProvider
       }&redirect_uri=${encodeURIComponent(
         `${process.env.FRONTEND_URL}/integrations/social/pinterest`
       )}&response_type=code&scope=${encodeURIComponent(
-        'boards:read,boards:write,pins:read,pins:write,user_accounts:read'
+        this.scopes.join(',')
       )}&state=${state}`,
       codeVerifier: makeSecureId(10),
       state,

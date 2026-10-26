@@ -160,7 +160,8 @@ export class PublicIntegrationsController {
           : rawBody?.posts,
       },
       org.id,
-      rawBody?.type === 'draft' || true
+      rawBody?.type === 'draft' || true,
+      rawBody?.type
     );
     body.type = rawBody.type;
 
@@ -186,7 +187,8 @@ export class PublicIntegrationsController {
     // readable 400 (see PostValidationExceptionFilter).
     const validation = await this._postsService.validatePosts(
       org.id,
-      body.posts
+      body.posts,
+      body.type
     );
 
     const fail = (item: (typeof validation)[number], error: string) => {

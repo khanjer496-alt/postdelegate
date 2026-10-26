@@ -50,7 +50,11 @@ export class PostContent {
 }
 
 export class Post {
-  type?: string;
+  // Validation previews may identify each channel's eventual operation.
+  // Actual saves normalize this to the request operation before validation.
+  @IsOptional()
+  @IsIn(['draft', 'schedule', 'now', 'update'])
+  type?: 'draft' | 'schedule' | 'now' | 'update';
 
   @IsDefined()
   @Type(() => Integration)

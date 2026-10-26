@@ -1,5 +1,17 @@
 import {
-  IsBoolean, ValidateIf, IsIn, IsString, MaxLength, IsOptional, IsDefined, IsNumber, Min, Max, ValidateNested
+  IsBoolean,
+  ValidateIf,
+  IsIn,
+  IsString,
+  MaxLength,
+  IsOptional,
+  IsDefined,
+  IsNumber,
+  Min,
+  Max,
+  ValidateNested,
+  Equals,
+  ValidateBy,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { JSONSchema } from 'class-validator-jsonschema';
@@ -58,25 +70,54 @@ export class TikTokLocation {
   address?: string;
 }
 
+// The server supplies this ephemeral context from the operation it will
+// execute. Editing saved settings requires ordinary validation, while fresh
+// publishing acknowledgements apply only when scheduling or publishing.
+const requiresDirectPostAcknowledgements = (
+  settings: TikTokDto & { __type?: string; __validationOperation?: string }
+) =>
+  settings.__type === 'tiktok' &&
+  settings.content_posting_method !== 'UPLOAD' &&
+  settings.__validationOperation !== 'draft' &&
+  settings.__validationOperation !== 'update';
+
 // TikTok only honors most of these settings on a DIRECT_POST. With
 // content_posting_method=UPLOAD the media lands in the user's TikTok inbox as a
-// draft, and TikTok's inbox/upload endpoints accept nothing but the title /
-// description - every other field below is silently discarded.
-// video_made_with_ai / duet / stitch are additionally video-only: TikTok's photo
-// post_info has no is_aigc, disable_duet or disable_stitch field.
+// draft. The legacy video inbox endpoint accepts only media; the photo inbox
+// endpoint also accepts title / description. Direct-post settings do not apply.
+// This integration applies video_made_with_ai / duet / stitch to videos only;
+// it does not send those fields for photo posts.
 // music / location are TikTok Business only: the legacy TikTok provider ignores
 // them (its Content Posting API has no music_sound_info / location fields).
-// Fields stay required here (existing clients depend on it); the constraints are
-// documented, not enforced.
+// The legacy provider additionally checks fresh creator permissions at publish
+// time. UI acknowledgement fields below apply only to legacy DIRECT_POST;
+// TikTok Business uses a separate API and retains its existing settings.
 export class TikTokDto {
   @ValidateIf((p) => p.title)
   @MaxLength(90)
   @JSONSchema({
     description:
-      'Used as the title of the post. The only setting TikTok keeps when content_posting_method=UPLOAD.',
+      'Photo post title. Legacy photo UPLOAD keeps the title and description; legacy video UPLOAD accepts no caption metadata, so the user adds it inside TikTok.',
   })
   title: string;
 
+  @ValidateIf(
+    (p) => p.__type !== 'tiktok' || p.content_posting_method !== 'UPLOAD'
+  )
+  @ValidateBy({
+    name: 'brandedContentPrivacy',
+    validator: {
+      validate: (value, args) => {
+        const settings = args.object as TikTokDto & { __type?: string };
+        return (
+          !requiresDirectPostAcknowledgements(settings) ||
+          !settings.brand_content_toggle ||
+          value !== 'SELF_ONLY'
+        );
+      },
+      defaultMessage: () => 'Branded content cannot use private visibility.',
+    },
+  })
   @IsIn([
     'PUBLIC_TO_EVERYONE',
     'MUTUAL_FOLLOW_FRIENDS',
@@ -135,7 +176,7 @@ export class TikTokDto {
   @IsOptional()
   @JSONSchema({
     description:
-      'Labels the post as AI generated. Video posts only, and only when content_posting_method=DIRECT_POST. TikTok has no AI-generated label for photo posts, and discards it on UPLOAD.',
+      'Labels the post as AI generated. This integration applies it to video posts only, and only when content_posting_method=DIRECT_POST. Not sent for photo posts or UPLOAD.',
   })
   video_made_with_ai: boolean;
 
@@ -145,6 +186,50 @@ export class TikTokDto {
       'Applied only when content_posting_method=DIRECT_POST. Ignored by TikTok on UPLOAD.',
   })
   brand_organic_toggle: boolean;
+
+  @ValidateIf(requiresDirectPostAcknowledgements)
+  @IsBoolean()
+  @ValidateBy({
+    name: 'commercialContentSelection',
+    validator: {
+      validate: (value, args) => {
+        const settings = args.object as TikTokDto;
+        return (
+          !value ||
+          settings.brand_content_toggle === true ||
+          settings.brand_organic_toggle === true
+        );
+      },
+      defaultMessage: () =>
+        'Select Your brand or Branded content when commercial disclosure is enabled.',
+    },
+  })
+  @JSONSchema({
+    description:
+      'Legacy TikTok DIRECT_POST only. Commercial content disclosure is enabled; select at least one brand disclosure option.',
+  })
+  disclose?: boolean;
+
+  @ValidateIf(requiresDirectPostAcknowledgements)
+  @Equals(true, {
+    message: 'Accept TikTok Music Usage Confirmation before posting.',
+  })
+  @JSONSchema({
+    description:
+      'Legacy TikTok DIRECT_POST only. Explicit user acceptance of TikTok Music Usage Confirmation; must be true.',
+  })
+  music_usage_consent?: boolean;
+
+  @ValidateIf(requiresDirectPostAcknowledgements)
+  @Equals(true, {
+    message:
+      'Load current TikTok account information and validate the media before posting.',
+  })
+  @JSONSchema({
+    description:
+      'Legacy TikTok DIRECT_POST only. Composer has loaded current creator information and validated the media. The server independently queries creator permissions again.',
+  })
+  creator_info_verified?: boolean;
 
   @Type(() => TikTokMusic)
   @ValidateNested()
@@ -171,7 +256,7 @@ export class TikTokDto {
       'Required. Use "DIRECT_POST" to actually publish the post to TikTok. ' +
       '"UPLOAD" does NOT publish: it only sends the media to the user\'s TikTok app inbox, ' +
       'where they must manually finish and publish it within 24 hours or it is discarded, ' +
-      'and it makes TikTok ignore every other setting here. ' +
+      'Legacy video UPLOAD sends only media; users add caption metadata inside TikTok. Photo UPLOAD also sends title and description. Direct-post settings do not apply. ' +
       'Only use "UPLOAD" when the user explicitly asks to review or edit the post inside the TikTok app before publishing.',
   })
   content_posting_method: 'DIRECT_POST' | 'UPLOAD';

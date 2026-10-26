@@ -104,6 +104,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     integrations,
     setSelectedIntegrations,
     locked,
+    publishBlocked,
     current,
     activateExitButton,
     setHide,
@@ -126,6 +127,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       integrations: state.integrations,
       setSelectedIntegrations: state.setSelectedIntegrations,
       locked: state.locked,
+      publishBlocked: state.publishBlocked,
       activateExitButton: state.activateExitButton,
     }))
   );
@@ -151,6 +153,17 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   // the channel in view, or the one that was opened
   const channel =
     existingPosts.find((p) => p.integration === current) || existingData;
+  const channelPublished =
+    channel.posts?.[0]?.state === 'PUBLISHED' ||
+    (channel.posts?.[0]?.state === 'QUEUE' &&
+      dayjs().isAfter((channelDates[channel.integration] || date).utc()));
+  // Existing posts can save only the channel in view, and published posts
+  // still allow an update that does not publish again.
+  const publishingBlocked = existingData.integration
+    ? !channelPublished && !!publishBlocked[channel.integration]
+    : selectedIntegrations.some(
+        ({ integration }) => publishBlocked[integration.id]
+      );
 
   useEffect(() => {
     if (hide) {
@@ -320,6 +333,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const schedule = useCallback(
     (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
+      // Provider checks can change after the action was rendered, so re-read
+      // the store before starting a publishing request. Drafts remain editable.
+      const state = useLaunchStore.getState();
+      const isBlocked = (ids: string[]) => {
+        const currentState = useLaunchStore.getState();
+        return ids.some((id) => currentState.publishBlocked[id]);
+      };
       let republish = false;
       // the channels saved as another type, the rest are saved as `type`
       const saveAs: Record<string, 'draft' | 'schedule' | 'update'> = {};
@@ -332,6 +352,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             dayjs().isAfter((channelDates[p.integration] || date).utc()))
       );
       const others = existingPosts.filter((p) => p !== channel);
+      if (
+        (type === 'now' || type === 'schedule') &&
+        (existingData.integration
+          ? !published.includes(channel) && isBlocked([channel.integration])
+          : isBlocked(
+              state.selectedIntegrations.map(({ integration }) => integration.id)
+            ))
+      ) {
+        return;
+      }
 
       // another channel whose date already passed would go out right away, it
       // only gets its details saved
@@ -398,6 +428,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             : type === 'now'
             ? t('post_now_all_channels', 'Post all channels now')
             : t('schedule_all_channels', 'Schedule all channels');
+        const allPublishingIds = state.selectedIntegrations
+          .filter(
+            ({ integration }) =>
+              !published.some((p) => p.integration === integration.id) &&
+              ['now', 'schedule'].includes(saveTypeOf(integration.id))
+          )
+          .map(({ integration }) => integration.id);
 
         const whichChannels = await new Promise((resolve) => {
           modal.openModal({
@@ -412,7 +449,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     <Button
                       type="button"
                       className="flex-1"
+                      disabled={isBlocked(allPublishingIds)}
                       onClick={() => {
+                        if (isBlocked(allPublishingIds)) {
+                          return;
+                        }
                         modal.closeById('change-post-channels');
                         resolve('all');
                       }}
@@ -519,7 +560,15 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     <Button
                       type="button"
                       className="flex-1"
+                      disabled={isBlocked(
+                        republishing.map((p) => p.integration)
+                      )}
                       onClick={() => {
+                        if (
+                          isBlocked(republishing.map((p) => p.integration))
+                        ) {
+                          return;
+                        }
                         modal.closeById('republish-post');
                         resolve('republish');
                       }}
@@ -546,6 +595,22 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         if (whatToDo === 'republish') {
           republish = true;
         }
+      }
+
+      // The dialogs may leave sibling channels as drafts or update-only.
+      // Enforce provider blockers only for the channels actually publishing.
+      if (
+        (type === 'now' || type === 'schedule') &&
+        isBlocked(
+          useLaunchStore
+            .getState()
+            .selectedIntegrations.filter(({ integration }) =>
+              ['now', 'schedule'].includes(saveTypeOf(integration.id))
+            )
+            .map(({ integration }) => integration.id)
+        )
+      ) {
+        return;
       }
 
       setLoading(true);
@@ -593,7 +658,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       if (!dummy) {
         const validResponse = await fetch('/posts/valid', {
           method: 'POST',
-          body: JSON.stringify({ type, posts }),
+          body: JSON.stringify({
+            type,
+            posts: posts.map((post: any) => ({
+              ...post,
+              type: saveTypeOf(post.integration.id),
+            })),
+          }),
         });
 
         if (!validResponse.ok) {
@@ -843,6 +914,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         {
           label: scheduleLabel,
           variant: 'primary',
+          disabled: publishingBlocked,
           onClick: schedule('schedule'),
         },
         ...(!dummy
@@ -850,6 +922,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               {
                 label: t('post_now', 'Post Now'),
                 variant: 'secondary' as const,
+                disabled: publishingBlocked,
                 onClick: schedule('now'),
               },
             ]
@@ -1174,7 +1247,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               <div ref={postNowRef} className="group cursor-pointer relative">
                 <button
                   disabled={
-                    selectedIntegrations.length === 0 || loading || locked
+                    selectedIntegrations.length === 0 ||
+                    loading ||
+                    locked ||
+                    publishingBlocked
                   }
                   onClick={schedule('schedule')}
                   className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
@@ -1216,7 +1292,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   <button
                     onClick={schedule('now')}
                     disabled={
-                      selectedIntegrations.length === 0 || loading || locked
+                      selectedIntegrations.length === 0 ||
+                      loading ||
+                      locked ||
+                      publishingBlocked
                     }
                     className={clsx(
                       'rounded-[8px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner',

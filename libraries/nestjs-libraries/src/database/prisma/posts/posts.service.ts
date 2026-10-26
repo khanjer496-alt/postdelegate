@@ -409,15 +409,18 @@ export class PostsService {
   async mapTypeToPost(
     body: CreatePostDto,
     organization: string,
-    replaceDraft: boolean = false
+    replaceDraft: boolean = false,
+    validationOperation?: CreatePostDto['type']
   ): Promise<CreatePostDto> {
     if (!body?.posts?.every((p) => p?.integration?.id)) {
       throw new BadRequestException('All posts must have an integration id');
     }
 
+    const mappedType = replaceDraft ? 'schedule' : body?.type;
+    const operation = validationOperation ?? mappedType;
     const mappedValues = {
       ...body,
-      type: replaceDraft ? 'schedule' : body?.type,
+      type: mappedType,
       posts: await Promise.all(
         body?.posts?.map(async (post) => {
           const integration = await this._integrationService.getIntegrationById(
@@ -432,11 +435,14 @@ export class PostsService {
           }
 
           return {
-            type: replaceDraft ? 'schedule' : body?.type,
             ...post,
+            // Actual saves execute one operation for the whole request. Child
+            // hints are only used by the separate validation-preview endpoint.
+            type: mappedType,
             settings: {
               ...(post.settings || ({} as any)),
               __type: integration.providerIdentifier,
+              __validationOperation: operation,
             },
           };
         }) || []
@@ -451,10 +457,15 @@ export class PostsService {
       },
     });
 
-    return await validationPipe.transform(mappedValues, {
+    const validated = await validationPipe.transform(mappedValues, {
       type: 'body',
       metatype: CreatePostDto,
     });
+    // The trusted operation is validation context, never stored post settings.
+    for (const post of validated.posts) {
+      delete (post.settings as any).__validationOperation;
+    }
+    return validated;
   }
 
   async getPostsRecursively(
@@ -1005,13 +1016,16 @@ export class PostsService {
   async validatePosts(
     orgId: string,
     posts: Array<{
+      type?: CreatePostDto['type'];
       integration: { id: string };
       value: Array<{
         content?: string;
         image?: Array<{ path: string; thumbnail?: string }>;
       }>;
       settings?: any;
-    }>
+    }>,
+    operation: CreatePostDto['type'] = 'schedule',
+    allowPerPostOperation = false
   ) {
     return Promise.all(
       (posts || []).map(async (post) => {
@@ -1039,16 +1053,25 @@ export class PostsService {
           additionalSettings = [];
         }
 
-        const settings = post.settings || {};
+        const settings: Record<string, any> = {
+          ...(post.settings || {}),
+          __type: integration.providerIdentifier,
+        };
+        delete settings.__validationOperation;
+        const validationOperation = allowPerPostOperation
+          ? post.type || operation
+          : operation;
         const media = (post.value || []).map((p) => p.image || []);
 
         // Settings DTO validation — mirrors the client `form.trigger()`.
         let valid = true;
         let settingsError = '';
         if (provider?.dto) {
-          const instance = plainToInstance(provider.dto, settings, {
-            enableImplicitConversion: false,
-          });
+          const instance = plainToInstance(
+            provider.dto,
+            { ...settings, __validationOperation: validationOperation },
+            { enableImplicitConversion: false }
+          );
           const validationErrors = await validate(instance as object, {
             skipMissingProperties: false,
           });
@@ -1154,6 +1177,9 @@ export class PostsService {
     const postList = [];
     const batchId = uuidv4();
     for (const post of body.posts) {
+      // Defensive boundary for internal callers that skip mapTypeToPost.
+      post.settings = { ...post.settings };
+      delete (post.settings as any).__validationOperation;
       if (
         (body.type === 'schedule' || body.type === 'now') &&
         !body.republish &&
@@ -1298,13 +1324,17 @@ export class PostsService {
     });
 
     // Same server-side validation as the dashboard / public create route.
-    const [validation] = await this.validatePosts(orgId, [
-      {
-        integration: { id: integration.id },
-        settings: mergedSettings,
-        value: value.map((p) => ({ content: p.content, image: p.image })),
-      },
-    ]);
+    const [validation] = await this.validatePosts(
+      orgId,
+      [
+        {
+          integration: { id: integration.id },
+          settings: mergedSettings,
+          value: value.map((p) => ({ content: p.content, image: p.image })),
+        },
+      ],
+      'update'
+    );
 
     if (validation.emptyContent) {
       throw new BadRequestException(

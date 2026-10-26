@@ -44,7 +44,7 @@ Operations evidence and recovery instructions: [deployment README](deploy/postde
 
 ## 3. Social API applications and public access — paid-launch blocker
 
-Review recording requirements, a fresh runtime credential/connection check, and corrections to the supplied Grok review scripts are in [the app-review demo plan](POSTDELEGATE-APP-REVIEW-DEMOS.md). TikTok needs composer/media-transfer changes before its audit; several YouTube/LinkedIn/Pinterest script steps do not match current source capabilities.
+Review recording requirements, runtime credential/connection checks, source corrections and the actual remaining handoffs are in [the app-review demo plan](POSTDELEGATE-APP-REVIEW-DEMOS.md). TikTok composer/media-transfer corrections and narrower YouTube permissions are implemented for release verification. Original image/video fixtures were uploaded through the app to R2. Developer-console sign-in, account authorization, successful social test posts, real screen recordings and provider approvals remain pending. The [scope map](deploy/postdelegate/review/oauth-scope-map.md) corrects unsupported YouTube/LinkedIn/Pinterest script claims.
 
 PostDelegate owns the shared developer applications and stores their credentials on the server. Each customer separately authorizes their own accounts, producing a connection associated with their workspace. For OAuth networks, customers should not need to register developer apps or enter PostDelegate's API secrets. Some other connectors use customer-supplied app passwords, API tokens or site credentials instead.
 
