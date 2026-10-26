@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+umask 077
+backup_dir=/var/backups/postiz
+install -d -m 700 "$backup_dir"
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+target="$backup_dir/$stamp"
+install -d -m 700 "$target"
+postiz-compose exec -T postgres pg_dump -U postiz -d postiz -Fc < /dev/null > "$target/postiz.dump"
+postiz-compose exec -T temporal-postgresql pg_dump -U temporal -d temporal -Fc < /dev/null > "$target/temporal.dump"
+postiz-compose exec -T temporal-postgresql pg_dump -U temporal -d temporal_visibility -Fc < /dev/null > "$target/temporal-visibility.dump"
+postiz-compose exec -T postgres pg_restore --list < "$target/postiz.dump" > /dev/null
+postiz-compose exec -T temporal-postgresql pg_restore --list < "$target/temporal.dump" > /dev/null
+postiz-compose exec -T temporal-postgresql pg_restore --list < "$target/temporal-visibility.dump" > /dev/null
+cp -a /etc/postiz "$target/configuration"
+cp -a /opt/postiz/compose.yaml /opt/postiz/Caddyfile /opt/postiz/dynamicconfig "$target/"
+sha256sum "$target/postiz.dump" "$target/temporal.dump" "$target/temporal-visibility.dump" > "$target/SHA256SUMS"
+printf 'Verified backup created at %s\n' "$target"
+# Retain backups until an off-site restore-tested retention policy is installed.

@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+exec docker compose --project-name postdelegate-postiz --env-file /etc/postiz/runtime.env --project-directory /opt/postiz -f /opt/postiz/compose.yaml "$@"

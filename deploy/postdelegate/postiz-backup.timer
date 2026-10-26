@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily PostDelegate Postiz backup
+
+[Timer]
+OnCalendar=*-*-* 02:20:00 UTC
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

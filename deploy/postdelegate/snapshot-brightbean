@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+umask 077
+target="/var/backups/postdelegate/pre-postiz-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 700 "$target"
+pd exec -T postgres pg_dump -U postdelegate -d postdelegate -Fc < /dev/null > "$target/brightbean.dump"
+pd exec -T postgres pg_restore --list < "$target/brightbean.dump" > /dev/null
+docker exec postdelegate-prod-app-1 tar -C /app/media -czf - . < /dev/null > "$target/media.tar.gz"
+tar -tzf "$target/media.tar.gz" > /dev/null
+tar -czf "$target/configuration.tar.gz" -C / \
+  etc/postdelegate usr/local/bin/pd usr/local/bin/pd-deploy \
+  opt/postdelegate/Caddyfile opt/postdelegate/docker-compose.postdelegate.yml
+tar -czf "$target/caddy-data.tar.gz" -C /var/lib/docker/volumes/postdelegate-prod_caddy_data/_data .
+git -C /opt/postdelegate rev-parse HEAD > "$target/source-revision.txt"
+docker inspect postdelegate-prod-app-1 --format '{{.Image}}' > "$target/image-id.txt"
+pd exec -T app python manage.py dumpdata composer.Post composer.PlatformPost --indent 2 < /dev/null > "$target/drafts.json"
+sha256sum "$target"/*.dump "$target"/*.tar.gz "$target/drafts.json" > "$target/SHA256SUMS"
+printf 'BrightBean recovery snapshot verified: %s\n' "$target"
