@@ -7,7 +7,7 @@ app.postdelegate.com {
         Strict-Transport-Security "max-age=31536000"
     }
     handle /source {
-        redir /source/postdelegate-source.tar.gz 302
+        redir * /source/postdelegate-source.tar.gz 302
     }
     handle_path /source/* {
         root * /source

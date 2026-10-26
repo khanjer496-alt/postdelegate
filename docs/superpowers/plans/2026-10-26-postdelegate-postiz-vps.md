@@ -14,7 +14,7 @@
 
 - Preserve both existing source checkouts, all BrightBean data/volumes, configuration, encryption keys and release image.
 - Preserve the separate marketing site at postdelegate.com.
-- Use official upstream source and the version/digest-pinned prebuilt image. No application feature ports in this deployment change.
+- Use official upstream source and the version/digest-pinned prebuilt base. The later user-directed branding layer rebuilds only the frontend; backend and publishing workers remain upstream binaries. No BrightBean application feature ports in this deployment change.
 - Keep application databases, Redis and Temporal off public host ports. Postiz preflight listens only on 127.0.0.1:4007.
 - Secrets are generated/stored in root-only server files, never in git or command output.
 - Keep public registration disabled; bootstrap only the first owner using upstream's first-organization exception.
@@ -68,6 +68,18 @@ The user requested PostDelegate branding on Postiz's native UI and removal of He
 - [x] Reuse canonical PostDelegate identity assets and accessible purple/lime accents.
 - [x] Remove Hebrew locale, generator target, flag mapping and RTL entry; normalize old he/iw preferences to English.
 - [x] Add page titles, icons, truthful upstream testimonial attribution and Source code link.
-- [ ] Build the custom frontend image and review the source changes.
-- [ ] Deploy the branded image with a rollback path and public source offer.
-- [ ] Verify live branding, language chooser, legacy locale fallback and Arabic RTL; capture updated evidence.
+- [x] Build the custom frontend image and review the source changes.
+- [x] Deploy the branded image with a rollback path and public source offer.
+- [x] Verify live branding, language chooser, legacy locale fallback and Arabic RTL; capture updated evidence.
+
+Branding acceptance on 2026-10-26:
+
+- Deployed `postdelegate-postiz:brand-9a302a1a5c1d`, from source revision `9a302a1a5c1d7e05e129d9f76142b6716d39b257`, with healthy backend and publishing worker after rollout.
+- Browser verification passed for the PostDelegate logo, primary accent `#7357ff` and `PostDelegate Calendar` title. The 13-choice language picker has no Hebrew option or Israeli flag; Arabic RTL passed and English was restored. Legacy `he`, `he-IL` and `iw` cookies normalize to `en` with HTTP 200.
+- Browser evidence is saved at `deploy/postdelegate/evidence/postdelegate-live.jpg` and `deploy/postdelegate/evidence/postdelegate-languages.jpg`.
+- The public `/source` endpoint returns HTTP 302 to `/source/postdelegate-source.tar.gz`; the archive returns HTTP 200 and matches 12,949,308 bytes and SHA-256 `b0c4f831111213415bc2154a13835feda19c608f3a7666f3628f8017ff60e1f9`. Its 1,338-entry manifest includes `.env.example` and excludes private configuration/credential paths. Caddy uses the explicit `redir * /source/postdelegate-source.tar.gz 302` form.
+- Stock Postiz rollback snapshots remain `/etc/postiz/runtime.env.before-branding-9a302a1a`, `/opt/postiz/compose.before-branding-9a302a1a.yaml` and `/opt/postiz/Caddyfile.before-branding-9a302a1a`. The saved Compose retains the official digest and the saved runtime has no custom-image override. The operations README documents restoring them and recreating Postiz/Caddy while retaining data; the original BrightBean rollback is also preserved.
+
+## Subsequent Google OAuth request
+
+Google sign-in/OAuth setup is now requested and in progress. It is not yet configured or verified; the branding and source-offer acceptance above does not claim Google client creation, callback acceptance or a completed Google sign-in.

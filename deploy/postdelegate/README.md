@@ -1,4 +1,4 @@
-# PostDelegate on official Postiz
+# PostDelegate on Postiz
 
 Deployment date: 2026-10-26. Application: https://app.postdelegate.com.
 The separate marketing website remains https://postdelegate.com.
@@ -6,7 +6,7 @@ The separate marketing website remains https://postdelegate.com.
 ## Stack and operating cost
 
 - Existing OVH VPS: 4 vCPU, 8 GB RAM. No new hosting plan was purchased.
-- Official Postiz v2.25.3 image, pinned by OCI digest in `compose.yaml`.
+- Deployed image: `postdelegate-postiz:brand-9a302a1a5c1d`, built from source revision `9a302a1a5c1d7e05e129d9f76142b6716d39b257`. It rebuilds the branded frontend on the OCI-digest-pinned official Postiz v2.25.3 base; backend and publishing workers remain upstream binaries.
 - PostgreSQL 17 for Postiz; Redis 7.2; Temporal 1.28.1 with separate PostgreSQL 16 persistence/visibility databases.
 - PostgreSQL Advanced Visibility replaces Elasticsearch. `SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true` prevents Temporal's example attributes consuming PostgreSQL's limited Text slots; Postiz registers `organizationId` and `postId` itself.
 - Caddy serves HTTPS behind the existing Cloudflare proxy. Databases, Redis and Temporal have no published host ports; Postiz's diagnostic port binds only to loopback.
@@ -25,7 +25,7 @@ R2 usage is billed under the account's existing allowances/pricing; this is not 
 - Daily local backups: `postiz-backup.timer`, with output under `/var/backups/postiz`.
 - Manual backup: `sudo backup-postiz`.
 
-Treat application logs as potentially sensitive; do not paste raw logs/configuration into public issues. The image remains pinned, so upgrades require an intentional image version/digest change followed by acceptance checks.
+Treat application logs as potentially sensitive; do not paste raw logs/configuration into public issues. The base image remains pinned, and the custom image tag records its source revision. Upgrades require an intentional release change followed by acceptance checks.
 
 ## Acceptance evidence
 
@@ -38,8 +38,28 @@ Treat application logs as potentially sensitive; do not paste raw logs/configura
 - Cloudflare rejects Python urllib's default User-Agent with error 1010. Descriptive application UA, curl and Node requests succeed; no security controls were disabled. Crawler-header probes are not real social-provider publishing evidence.
 - Postiz, Temporal persistence and Temporal visibility dumps were each restored successfully into isolated verification databases, which were then removed.
 - HTTPS application backend, login and the separate marketing website returned successful responses after cutover.
+- The branded image passed backend and worker health after rollout. The live browser loaded the PostDelegate logo, the `#7357ff` primary accent and the `PostDelegate Calendar` title.
+- The language picker contains 13 choices with no Hebrew option or Israeli flag. Arabic RTL passed in the browser, then English was restored. Requests carrying legacy `he`, `he-IL` and `iw` cookies returned HTTP 200 with the preference normalized to `en`.
+- Browser evidence: [branded calendar](evidence/postdelegate-live.jpg) and [language picker](evidence/postdelegate-languages.jpg).
 
 The first Postiz backup/restore check used `/var/backups/postiz/20261026T143502Z`. BrightBean recovery snapshots are under `/var/backups/postdelegate/pre-postiz-*`; the final frozen-ingress snapshot is `pre-postiz-20261026T143854Z`.
+
+## Public source offer and stock Postiz rollback
+
+The settings Source code link is live: [the source offer](https://app.postdelegate.com/source) returns HTTP 302 to [the application archive](https://app.postdelegate.com/source/postdelegate-source.tar.gz), which returns HTTP 200. Public download verification on 2026-10-26 confirmed 12,949,308 bytes and SHA-256 `b0c4f831111213415bc2154a13835feda19c608f3a7666f3628f8017ff60e1f9`. Its 1,338 archive entries contain the example environment template but no `.local`, `.git`, real environment files, owner credentials or verification-session paths. The modified application source, assets, dependency lockfiles, license and frontend build recipe are included; private server configuration and operations documents are excluded.
+
+The pre-branding stock deployment is preserved at `/etc/postiz/runtime.env.before-branding-9a302a1a`, `/opt/postiz/compose.before-branding-9a302a1a.yaml` and `/opt/postiz/Caddyfile.before-branding-9a302a1a`. The saved Compose file retains the official image digest; the saved runtime has no `POSTIZ_IMAGE` override. To restore stock Postiz while keeping the Postiz databases, uploads and separate R2 credentials:
+
+```sh
+sudo cp -a /etc/postiz/runtime.env /etc/postiz/runtime.env.before-stock-rollback
+sudo cp /etc/postiz/runtime.env.before-branding-9a302a1a /etc/postiz/runtime.env
+sudo cp /opt/postiz/compose.before-branding-9a302a1a.yaml /opt/postiz/compose.yaml
+sudo sh -c 'cat /opt/postiz/Caddyfile.before-branding-9a302a1a > /opt/postiz/Caddyfile'
+sudo postiz-compose --profile edge up -d --wait --force-recreate postiz caddy
+curl --fail --user-agent 'PostDelegate-operations-verification/1.0' https://app.postdelegate.com/api/auth/can-register
+```
+
+The Caddyfile is written through its existing inode and Caddy is recreated so the bind mount and running configuration agree. Confirm owner login, closed registration and worker health after rollback. The runtime restore returns integration settings to their pre-branding state; the first command preserves later settings for deliberate reapplication.
 
 ## BrightBean data and rollback
 
@@ -62,13 +82,15 @@ Daily backups currently stay on the VPS; retention and automated off-site replic
 
 ## Deliberate next migration work
 
-This change deploys official Postiz. It does not port the BrightBean product's custom features.
+This change deploys Postiz with the completed PostDelegate frontend branding and locale changes. It does not port the BrightBean product's custom features.
 
 1. Compare existing Postiz capabilities against the current BrightBean fork at `c3a8298` before rebuilding overlaps.
 2. Port differentiated autonomy/guardrails/undo/crisis pause/audit, client approval and portal workflows, inbox additions, custom onboarding, plans/entitlements, reports and other product-specific flows as separately verified TypeScript changes.
 3. Configure social developer credentials and Postiz callback URLs; the old Django callback paths are different. Real account connection, scheduled publishing and timeout recovery still need provider qualification.
 4. Configure email and billing before public customer onboarding. Their secrets were absent from the old VPS configuration and were not invented or silently activated.
-5. Apply PostDelegate branding to a custom image, update legal/source attribution to the new base, and keep changes compatible with upstream upgrades. The current deployed UI is stock Postiz.
+5. Keep the completed branding, upstream attribution and matching public source offer compatible with future upstream upgrades.
+
+Google sign-in/OAuth setup was requested after the branding rollout and is in progress. It is not configured or verified as part of the acceptance evidence above.
 
 ## References
 
