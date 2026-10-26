@@ -17,14 +17,14 @@
 - Use official upstream source and the version/digest-pinned prebuilt base. The later user-directed branding layer rebuilds only the frontend; backend and publishing workers remain upstream binaries. No BrightBean application feature ports in this deployment change.
 - Keep application databases, Redis and Temporal off public host ports. Postiz preflight listens only on 127.0.0.1:4007.
 - Secrets are generated/stored in root-only server files, never in git or command output.
-- Keep public registration disabled; bootstrap only the first owner using upstream's first-organization exception.
+- Keep registration disabled during the initial owner bootstrap. The later owner-authorized Google rollout enables both native Google and local email/password signup after policy publication and acceptance checks.
 - Missing R2 credentials are a real gate for R2 acceptance. Never claim CORS/domain setup is an upload test.
 
 ## Review Focus
 
 - Recovery: compressed database backup must pass pg_restore --list and media archive must be readable before cutover.
 - Scheduled posts: inspect old queue states; stop the old worker at cutover so two systems cannot publish the same work.
-- Access: bootstrap owner before routing public traffic; a second registration must fail.
+- Initial access gate: bootstrap owner before routing public traffic and verify a second registration fails while disabled. The later Google request explicitly authorizes opening native signup after policy publication and checks.
 - Workflow persistence: verify Temporal health, namespace/search attributes and visibility queries with the SQL store.
 - Media: complete a real multipart PNG upload, verify unauthenticated HTTPS download, and record any credential gate.
 
@@ -80,6 +80,22 @@ Branding acceptance on 2026-10-26:
 - The public `/source` endpoint returns HTTP 302 to `/source/postdelegate-source.tar.gz`; the archive returns HTTP 200 and matches 12,949,308 bytes and SHA-256 `b0c4f831111213415bc2154a13835feda19c608f3a7666f3628f8017ff60e1f9`. Its 1,338-entry manifest includes `.env.example` and excludes private configuration/credential paths. Caddy uses the explicit `redir * /source/postdelegate-source.tar.gz 302` form.
 - Stock Postiz rollback snapshots remain `/etc/postiz/runtime.env.before-branding-9a302a1a`, `/opt/postiz/compose.before-branding-9a302a1a.yaml` and `/opt/postiz/Caddyfile.before-branding-9a302a1a`. The saved Compose retains the official digest and the saved runtime has no custom-image override. The operations README documents restoring them and recreating Postiz/Caddy while retaining data; the original BrightBean rollback is also preserved.
 
-## Subsequent Google OAuth request
+## Google OAuth follow-up: complete
 
-Google sign-in/OAuth setup is now requested and in progress. It is not yet configured or verified; the branding and source-offer acceptance above does not claim Google client creation, callback acceptance or a completed Google sign-in.
+- [x] Configure the native Google client with the production origin/callback and profile/email scopes.
+- [x] Obtain owner approval, publish final privacy/terms dated 26 October 2026 and enable public signup.
+- [x] Deploy `postdelegate-postiz:brand-adbd8662` from source `adbd8662`, correcting signup policy links.
+- [x] Complete Google signup and repeat login to the same activated `GOOGLE` user/organization with `SUPERADMIN` role; counts remain two users and two organizations after repeat login.
+- [x] Recheck the original LOCAL owner's password login and secure HttpOnly cookies.
+- [x] Set Google's external audience to **In production**. This does not qualify YouTube publishing or additional scopes.
+
+The current `/source` offer returns HTTP 302 to `/source/postdelegate-adbd8662.tar.gz`. The versioned archive returned HTTP 200 with 12,949,225 bytes and SHA-256 `6e1dfa5c28d94892d83ea1e5f80346e0221ef8b4f657a383d54d8df81782ea81`. The earlier stable alias temporarily retained an older Cloudflare-cached archive; use the versioned artifact for release verification. The earlier branding evidence above records that rollout's historical image/archive, not the current release.
+
+Both final legal routes returned HTTP 200 without authentication or draft markers. The internal `legal-public/index.html` remains a historical review note and is not published. Public registration is now enabled for Google and local accounts. The pre-rollout backup is `/var/backups/postiz/20261026T163458Z`, and the preserved configuration rollback set is stamped `20261026T163655Z`; no separate restore-test claim is made for this later backup. Original stock-Postiz and BrightBean recovery sets remain retained.
+
+## LinkedIn follow-up: in progress
+
+- [x] Diagnose the reported `client_id=undefined`: LinkedIn credentials are absent from current and preserved legacy runtime.
+- [x] Inspect the authenticated LinkedIn developer console: no existing applications were present.
+- [ ] Complete app creation/configuration; resolve LinkedIn Page association and terms acceptance with an owner handoff if needed.
+- [ ] Verify an actual LinkedIn authorization and channel connection, then qualify relevant products/scopes and publishing separately.
