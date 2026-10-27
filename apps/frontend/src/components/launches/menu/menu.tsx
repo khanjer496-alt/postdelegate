@@ -174,7 +174,10 @@ export const Menu: FC<{
   const deleteChannel = useCallback(async () => {
     if (
       !(await deleteDialog(
-        t('are_you_sure_delete_channel', 'Are you sure you want to delete this channel?'),
+        [
+          t('are_you_sure_delete_channel', 'Are you sure you want to delete this channel?'),
+          findIntegration?.dataDeletionNotice,
+        ].filter(Boolean).join(' '),
         t('delete_channel_title', 'Delete Channel')
       ))
     ) {
@@ -189,6 +192,16 @@ export const Menu: FC<{
     if (deleteIntegration.status === 406) {
       toast.show(
         t('delete_posts_before_channel', 'You have to delete all the posts associated with this channel before deleting it'),
+        'warning'
+      );
+      return;
+    }
+    if (!deleteIntegration.ok) {
+      const response = await deleteIntegration.json().catch(() => ({}));
+      toast.show(
+        typeof response.message === 'string'
+          ? response.message
+          : t('channel_removal_failed', 'Could not remove this channel. Please try again.'),
         'warning'
       );
       return;
@@ -213,10 +226,15 @@ export const Menu: FC<{
         // Silently ignore
       }
     }
-    toast.show(t('channel_deleted', 'Channel Deleted'), 'success');
+    toast.show(
+      findIntegration?.dataDeletionNotice
+        ? t('channel_removal_requested', 'Channel removed. Access revocation and data cleanup are in progress.')
+        : t('channel_deleted', 'Channel Deleted'),
+      'success'
+    );
     setShow(false);
     onChange(true);
-  }, [t, extensionId, id]);
+  }, [t, extensionId, id, findIntegration?.dataDeletionNotice]);
 
   const enableChannel = useCallback(async () => {
     await fetch('/integrations/enable', {

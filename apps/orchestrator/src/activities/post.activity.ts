@@ -107,6 +107,42 @@ export class PostActivity {
     private _subscriptionService: SubscriptionService
   ) {}
 
+  private async activeIntegration(
+    integration: Integration,
+    posts?: Post[],
+    requireReady = true
+  ) {
+    const current = await this._integrationService.getIntegrationById(
+      integration.organizationId,
+      integration.id
+    );
+    if (
+      !current || current.deletedAt ||
+      (requireReady && (current.disabled || current.inBetweenSteps || current.refreshNeeded))
+    ) {
+      throw new BadBody(
+        'channel-unavailable', '{}', '{}',
+        'This channel or post is no longer available.'
+      );
+    }
+    if (posts) {
+      const active = await Promise.all(posts.map((post) =>
+        this._postService.getPostById(post.id, integration.organizationId)
+      ));
+      if (active.some((post) =>
+        !post || post.deletedAt || post.integration?.deletedAt ||
+        post.integrationId !== current.id ||
+        (requireReady && (post.state === State.DRAFT || post.state === State.ERROR))
+      )) {
+        throw new BadBody(
+          'post-unavailable', '{}', '{}',
+          'This channel or post is no longer available.'
+        );
+      }
+    }
+    return current;
+  }
+
   @ActivityMethod()
   async getIntegrationById(orgId: string, id: string) {
     return this._integrationService.getIntegrationById(orgId, id);
@@ -163,7 +199,7 @@ export class PostActivity {
       }
     }
     const post = await this._postService.getPostById(postId, orgId);
-    if (post.deletedAt) {
+    if (!post || post.deletedAt || post.integration?.deletedAt) {
       return false;
     }
 
@@ -216,8 +252,9 @@ export class PostActivity {
     // heartbeatTimeout on this activity - removing the sender would kill
     // them. Under V109+ (no heartbeatTimeout) this is a no-op and can be
     // dropped once all V108 executions have drained
-    return withHeartbeat(() =>
-      this.handleDisconnect(integration, async () => {
+    return withHeartbeat(async () => {
+      integration = await this.activeIntegration(integration, posts);
+      return this.handleDisconnect(integration, async () => {
         const getIntegration = this._integrationManager.getSocialIntegration(
           integration.providerIdentifier
         );
@@ -227,34 +264,38 @@ export class PostActivity {
           posts
         );
 
-        return getIntegration.comment(
+        const mappedPosts = await Promise.all(
+          (newPosts || []).map(async (p) => ({
+            id: p.id,
+            message: stripHtmlValidation(
+              getIntegration.editor,
+              p.content,
+              true,
+              false,
+              !/<\/?[a-z][\s\S]*>/i.test(p.content),
+              getIntegration.mentionFormat
+            ),
+            settings: JSON.parse(p.settings || '{}'),
+            media: await this._postService.updateMedia(
+              p.id,
+              JSON.parse(p.image || '[]'),
+              getIntegration?.convertToJPEG || false
+            ),
+          }))
+        );
+        integration = await this.activeIntegration(integration, posts);
+        const result = await getIntegration.comment(
           integration.internalId,
           postId,
           lastPostId,
           integration.token,
-          await Promise.all(
-            (newPosts || []).map(async (p) => ({
-              id: p.id,
-              message: stripHtmlValidation(
-                getIntegration.editor,
-                p.content,
-                true,
-                false,
-                !/<\/?[a-z][\s\S]*>/i.test(p.content),
-                getIntegration.mentionFormat
-              ),
-              settings: JSON.parse(p.settings || '{}'),
-              media: await this._postService.updateMedia(
-                p.id,
-                JSON.parse(p.image || '[]'),
-                getIntegration?.convertToJPEG || false
-              ),
-            }))
-          ),
+          mappedPosts,
           integration
         );
-      })
-    );
+        await this.activeIntegration(integration, posts, false);
+        return result;
+      });
+    });
   }
 
   @ActivityMethod()
@@ -283,6 +324,9 @@ export class PostActivity {
     try {
       return await func();
     } catch (err) {
+      // Do not serialize a late provider error after its connection was
+      // removed. The replacement failure contains no provider payload.
+      await this.activeIntegration(integration, undefined, false);
       if (err instanceof Disconnect) {
         try {
           await this._integrationService.disconnectChannel(
@@ -310,7 +354,8 @@ export class PostActivity {
             err.postDbId,
             integration.organizationId,
             err.releaseId,
-            err.releaseURL
+            err.releaseURL,
+            integration.id
           );
         } catch (e) {
           /**empty**/
@@ -333,6 +378,7 @@ export class PostActivity {
     posts: Post[],
     allowPending: boolean
   ) {
+    integration = await this.activeIntegration(integration, posts);
     // kept only for in-flight postWorkflowV108 runs, which set a
     // heartbeatTimeout on this activity - removing the sender would kill
     // them. Under V109+ (no heartbeatTimeout) this is a no-op and can be
@@ -397,6 +443,7 @@ export class PostActivity {
     );
 
     setHeartbeatDetails(`${integration.providerIdentifier}: publish`);
+    integration = await this.activeIntegration(integration, posts);
     const postNow =
       allowPending && getIntegration.postPending
         ? await getIntegration.postPending(
@@ -411,6 +458,7 @@ export class PostActivity {
             mappedPosts,
             integration
           );
+    await this.activeIntegration(integration, posts, false);
 
     // The post is already published at this point: the streak is best-effort,
     // failing the activity here would retry it and publish again.
@@ -440,25 +488,31 @@ export class PostActivity {
 
   @ActivityMethod()
   async checkPostStatus(integration: Integration, pendingData: any) {
+    integration = await this.activeIntegration(integration);
     const getIntegration = this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 
-    return this.handleDisconnect(integration, () =>
-      getIntegration.checkPostStatus(integration.token, pendingData, integration)
-    );
+    return this.handleDisconnect(integration, async () => {
+      const result = await getIntegration.checkPostStatus(integration.token, pendingData, integration);
+      await this.activeIntegration(integration, undefined, false);
+      return result;
+    });
   }
 
   @ActivityMethod()
   async finalizePost(integration: Integration, pendingData: any) {
+    integration = await this.activeIntegration(integration);
     const getIntegration = this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 
     return withHeartbeat(() =>
-      this.handleDisconnect(integration, () =>
-        getIntegration.finalizePost(integration.token, pendingData, integration)
-      )
+      this.handleDisconnect(integration, async () => {
+        const result = await getIntegration.finalizePost(integration.token, pendingData, integration);
+        await this.activeIntegration(integration, undefined, false);
+        return result;
+      })
     );
   }
 
@@ -579,6 +633,11 @@ export class PostActivity {
   async refreshToken(
     integration: Integration
   ): Promise<false | AuthTokenDetails> {
+    const current = await this._integrationService.getIntegrationById(
+      integration.organizationId, integration.id
+    );
+    if (!current || current.deletedAt) return false;
+    integration = current;
     const getIntegration = this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
@@ -595,6 +654,10 @@ export class PostActivity {
         await timer(10000);
       }
 
+      const after = await this._integrationService.getIntegrationById(
+        integration.organizationId, integration.id
+      );
+      if (!after || after.deletedAt) return false;
       return refresh;
     } catch (err) {
       await this._refreshIntegrationService.setBetweenSteps(
@@ -610,6 +673,11 @@ export class PostActivity {
     integration: Integration,
     cause: string
   ): Promise<false | AuthTokenDetails> {
+    const current = await this._integrationService.getIntegrationById(
+      integration.organizationId, integration.id
+    );
+    if (!current || current.deletedAt) return false;
+    integration = current;
     const getIntegration = this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
@@ -627,6 +695,10 @@ export class PostActivity {
         await timer(10000);
       }
 
+      const after = await this._integrationService.getIntegrationById(
+        integration.organizationId, integration.id
+      );
+      if (!after || after.deletedAt) return false;
       return refresh;
     } catch (err) {
       await this._refreshIntegrationService.setBetweenSteps(

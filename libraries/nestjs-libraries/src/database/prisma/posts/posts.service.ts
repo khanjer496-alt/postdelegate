@@ -90,13 +90,15 @@ export class PostsService {
     id: string,
     orgId: string,
     releaseId: string,
-    releaseURL: string
+    releaseURL: string,
+    expectedIntegrationId?: string
   ) {
     return this._postRepository.updateResolvedRelease(
       id,
       orgId,
       releaseId,
-      releaseURL
+      releaseURL,
+      expectedIntegrationId
     );
   }
 
@@ -170,6 +172,9 @@ export class PostsService {
 
   async updateReleaseId(orgId: string, postId: string, releaseId: string) {
     const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.deletedAt || !post.integration || post.integration.deletedAt || post.integration.disabled || post.integration.inBetweenSteps) {
+      throw new BadRequestException('Post is no longer available.');
+    }
 
     // the URL is a bonus: connecting must not fail when it cannot be fetched
     let releaseURL: string | undefined;
@@ -191,7 +196,8 @@ export class PostsService {
       postId,
       orgId,
       releaseId,
-      releaseURL
+      releaseURL,
+      post.integration.id
     );
   }
 
@@ -233,7 +239,8 @@ export class PostsService {
       post.id,
       orgId,
       resolved.postId,
-      resolved.releaseURL
+      resolved.releaseURL,
+      post.integration.id
     );
     return {
       releaseId: resolved.postId,
@@ -241,6 +248,20 @@ export class PostsService {
       pending: false,
       unavailable: false,
     };
+  }
+
+  private async canReturnProviderData(
+    orgId: string,
+    postId: string,
+    expectedIntegration: Integration
+  ): Promise<boolean> {
+    const current = await this._postRepository.getPostById(postId, orgId);
+    return !!current && !current.deletedAt &&
+      current.integrationId === expectedIntegration.id &&
+      !!current.integration && !current.integration.deletedAt &&
+      !current.integration.disabled && !current.integration.inBetweenSteps &&
+      !current.integration.refreshNeeded &&
+      current.integration.token === expectedIntegration.token;
   }
 
   async getReleaseURL(
@@ -256,6 +277,9 @@ export class PostsService {
     const post = await this._postRepository.getPostById(postId, orgId);
     if (!post || !post.releaseURL) {
       return { releaseURL: '' };
+    }
+    if (post.deletedAt || !post.integration || post.integration.deletedAt || post.integration.disabled || post.integration.inBetweenSteps) {
+      return { releaseURL: '', unavailable: true };
     }
 
     const integrationProvider = this._integrationManager.getSocialIntegration(
@@ -293,10 +317,16 @@ export class PostsService {
     }
 
     try {
+      if (integrationProvider.authorizationPolicy && !await this.canReturnProviderData(orgId, postId, getIntegration)) {
+        return { releaseURL: '', unavailable: true };
+      }
       const { releaseURL, pending, unavailable } = await this.resolveRelease(
         orgId,
         post
       );
+      if (integrationProvider.authorizationPolicy && !await this.canReturnProviderData(orgId, postId, getIntegration)) {
+        return { releaseURL: '', unavailable: true };
+      }
       return { releaseURL, pending, unavailable };
     } catch (e) {
       console.log(e);
@@ -305,6 +335,9 @@ export class PostsService {
       }
     }
 
+    if (integrationProvider.authorizationPolicy && !await this.canReturnProviderData(orgId, postId, getIntegration)) {
+      return { releaseURL: '', unavailable: true };
+    }
     return { releaseURL: post.releaseURL, pending: true };
   }
 
@@ -316,6 +349,9 @@ export class PostsService {
   ): Promise<AnalyticsData[] | { missing: true }> {
     const post = await this._postRepository.getPostById(postId, orgId);
     if (!post || !post.releaseId) {
+      return [];
+    }
+    if (post.deletedAt || !post.integration || post.integration.deletedAt || post.integration.disabled || post.integration.inBetweenSteps) {
       return [];
     }
 
@@ -358,15 +394,14 @@ export class PostsService {
       }
     }
 
-    // const getIntegrationData = await ioRedis.get(
-    //   `integration:${orgId}:${post.id}:${date}`
-    // );
-    // if (getIntegrationData) {
-    //   return JSON.parse(getIntegrationData);
-    // }
-
     try {
+      if (integrationProvider.authorizationPolicy && !await this.canReturnProviderData(orgId, postId, getIntegration)) {
+        return [];
+      }
       const { releaseId } = await this.resolveRelease(orgId, post);
+      if (integrationProvider.authorizationPolicy && !await this.canReturnProviderData(orgId, postId, getIntegration)) {
+        return [];
+      }
 
       const loadAnalytics = await integrationProvider.postAnalytics(
         getIntegration.internalId,
@@ -374,14 +409,19 @@ export class PostsService {
         releaseId,
         date
       );
-      await ioRedis.set(
-        `integration:${orgId}:${post.id}:${date}`,
-        JSON.stringify(loadAnalytics),
-        'EX',
-        !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
-          ? 1
-          : 3600
-      );
+      if (integrationProvider.authorizationPolicy && !await this.canReturnProviderData(orgId, postId, getIntegration)) {
+        return [];
+      }
+      if (!integrationProvider.authorizationPolicy?.bypassAnalyticsCache) {
+        await ioRedis.set(
+          `integration:${orgId}:${post.id}:${date}`,
+          JSON.stringify(loadAnalytics),
+          'EX',
+          !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+            ? 1
+            : 3600
+        );
+      }
       return loadAnalytics;
     } catch (e) {
       // Retry once with a refreshed token

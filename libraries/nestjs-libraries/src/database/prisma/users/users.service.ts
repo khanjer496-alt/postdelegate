@@ -7,6 +7,7 @@ import { TimezoneDto } from '@gitroom/nestjs-libraries/dtos/users/timezone.dto';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
 @Injectable()
 export class UsersService {
@@ -14,7 +15,8 @@ export class UsersService {
     private _usersRepository: UsersRepository,
     private _organizationRepository: OrganizationRepository,
     private _integrationRepository: IntegrationRepository,
-    private _notificationService: NotificationService
+    private _notificationService: NotificationService,
+    private _authorizationLifecycle: IntegrationAuthorizationLifecycleService
   ) {}
 
   private readonly _logger = new Logger(UsersService.name);
@@ -122,6 +124,16 @@ export class UsersService {
     const deletedOrgs = await this.getOrgsToDeleteForAccount(userId);
     const orgs = await this._organizationRepository.getOrgsByUserId(userId);
 
+    // Capture durable revocation/cleanup work before any legacy hashing can
+    // destroy the credentials it needs. Shared workspaces retain their channels.
+    const lifecycleOwnedIds = new Map<string, string[]>();
+    for (const org of deletedOrgs) {
+      lifecycleOwnedIds.set(
+        org.id,
+        await this._authorizationLifecycle.requestOrganizationDeletion(org.id)
+      );
+    }
+
     for (const org of orgs) {
       if (deletedOrgs.some((deletedOrg) => deletedOrg.id === org.id)) {
         const team = await this._organizationRepository.getTeam(org.id);
@@ -134,7 +146,10 @@ export class UsersService {
           }
         }
 
-        await this._integrationRepository.deleteIntegrationsForAccount(org.id);
+        await this._integrationRepository.deleteIntegrationsForAccount(
+          org.id,
+          lifecycleOwnedIds.get(org.id) || []
+        );
         await this._organizationRepository.deleteOrganization(org.id);
       } else {
         await this._organizationRepository.deleteTeamMember(org.id, userId);

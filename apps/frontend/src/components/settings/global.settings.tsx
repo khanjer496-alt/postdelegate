@@ -21,6 +21,16 @@ export const GlobalSettings = () => {
     <div className="flex flex-col">
       <h3 className="text-[20px]">{t('global_settings', 'Global Settings')}</h3>
       <AuthenticationComponent />
+      <nav aria-label={t('legal_information', 'Legal information')} className="flex flex-wrap gap-[16px] text-[14px] mb-[16px]">
+        <a className="underline hover:text-textItemFocused" href="/legal/privacy/" target="_blank" rel="noopener noreferrer">
+          {t('privacy_policy', 'Privacy Policy')}
+          <span className="sr-only"> ({t('opens_in_new_tab', 'opens in a new tab')})</span>
+        </a>
+        <a className="underline hover:text-textItemFocused" href="/legal/terms/" target="_blank" rel="noopener noreferrer">
+          {t('terms_of_service', 'Terms of Service')}
+          <span className="sr-only"> ({t('opens_in_new_tab', 'opens in a new tab')})</span>
+        </a>
+      </nav>
       <MetricComponent />
       <EmailNotificationsComponent />
       <ShortlinkPreferenceComponent />

@@ -551,6 +551,7 @@ export class PublicIntegrationsController {
     @Param('id') id: string
   ) {
     Sentry.metrics.count('public_api-request', 1);
+    const result = await this._integrationService.deleteChannel(org.id, id);
     const isTherePosts = await this._integrationService.getPostsForChannel(
       org.id,
       id
@@ -561,7 +562,7 @@ export class PublicIntegrationsController {
       }
     }
 
-    return this._integrationService.deleteChannel(org.id, id);
+    return result;
   }
 
   @Get('/integration-settings/:id')

@@ -128,6 +128,7 @@ export class IntegrationsController {
             stripLinks: !!findIntegration?.stripLinks?.(),
             picture: p.picture || '/no-picture.jpg',
             identifier: p.providerIdentifier,
+            dataDeletionNotice: findIntegration.authorizationPolicy?.deletionNotice,
             inBetweenSteps: p.inBetweenSteps,
             refreshNeeded: p.refreshNeeded,
             isCustomFields: !!findIntegration.customFields,
@@ -165,7 +166,7 @@ export class IntegrationsController {
     @Param('id') id: string,
     @Body() body: { name: string; picture: string }
   ) {
-    const integration = await this._integrationService.getIntegrationById(
+    const integration = await this._integrationService.getActiveIntegrationById(
       org.id,
       id
     );
@@ -299,7 +300,7 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
   ) {
-    const getIntegration = await this._integrationService.getIntegrationById(
+    const getIntegration = await this._integrationService.getActiveIntegrationById(
       org.id,
       body.id
     );
@@ -357,7 +358,7 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
   ): Promise<any> {
-    const getIntegration = await this._integrationService.getIntegrationById(
+    const getIntegration = await this._integrationService.getActiveIntegrationById(
       org.id,
       body.id
     );
@@ -452,6 +453,8 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body('id') id: string
   ) {
+    // The lifecycle gate must accept removal before any post is changed.
+    const result = await this._integrationService.deleteChannel(org.id, id);
     const isTherePosts = await this._integrationService.getPostsForChannel(
       org.id,
       id
@@ -462,7 +465,7 @@ export class IntegrationsController {
       }
     }
 
-    return this._integrationService.deleteChannel(org.id, id);
+    return result;
   }
 
   @Get('/plug/list')

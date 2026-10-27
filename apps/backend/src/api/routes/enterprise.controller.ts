@@ -139,6 +139,7 @@ export class EnterpriseController {
         return { success: false };
       }
 
+      await this._integrationService.deleteChannel(org.id, load.id);
       const isTherePosts = await this._integrationService.getPostsForChannel(
         org.id,
         load.id
@@ -149,7 +150,6 @@ export class EnterpriseController {
         }
       }
 
-      await this._integrationService.deleteChannel(org.id, load.id);
       return { success: true };
     } catch (err) {
       return { success: false };

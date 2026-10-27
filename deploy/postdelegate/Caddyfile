@@ -7,6 +7,7 @@ app.postdelegate.com {
         Strict-Transport-Security "max-age=31536000"
     }
     handle /source {
+        header Cache-Control "no-store"
         redir * /source/postdelegate-adbd8662.tar.gz 302
     }
     handle_path /source/* {

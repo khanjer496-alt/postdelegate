@@ -1,5 +1,5 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import dayjs from 'dayjs';
 import { Integration, Prisma } from '@prisma/client';
@@ -7,6 +7,29 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
+import { ProviderAuthorizationCheck } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
+
+const authorizationSelect = {
+  id: true, organizationId: true, providerIdentifier: true, token: true,
+  refreshToken: true, internalId: true, rootInternalId: true, name: true,
+  profile: true, picture: true, disabled: true, refreshNeeded: true,
+  inBetweenSteps: true, deletedAt: true, updatedAt: true,
+} as const;
+
+export const isOwnedIntegrationPicture = (picture: string) => {
+  try {
+    const image = new URL(picture);
+    if (image.username || image.password || image.search || image.hash) return false;
+    return [process.env.CLOUDFLARE_BUCKET_URL, process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/uploads/` : undefined]
+      .filter(Boolean).some((value) => {
+        const base = new URL(value!);
+        const prefix = base.pathname.replace(/\/$/, '') + '/';
+        return image.origin === base.origin && image.pathname.startsWith(prefix) &&
+          /^[A-Za-z0-9_-]+\.(jpe?g|png|gif|webp)$/i.test(image.pathname.slice(prefix.length));
+      });
+  } catch { return false; }
+};
 
 @Injectable()
 export class IntegrationRepository {
@@ -17,8 +40,23 @@ export class IntegrationRepository {
     private _plugs: PrismaRepository<'plugs'>,
     private _exisingPlugData: PrismaRepository<'exisingPlugData'>,
     private _customers: PrismaRepository<'customer'>,
-    private _mentions: PrismaRepository<'mentions'>
+    private _mentions: PrismaRepository<'mentions'>,
+    private _transaction: PrismaTransaction,
+    private _notificationsRepository: NotificationsRepository
   ) {}
+
+  private async lockAuthorizationGrant(tx: Prisma.TransactionClient, provider: string, subject?: string | null) {
+    if (!subject) return;
+    await tx.integration.updateMany({ where: { providerIdentifier: provider, rootInternalId: subject }, data: { rootInternalId: subject } });
+  }
+
+  private async assertNoPendingAuthorizationDeletion(model: Prisma.TransactionClient['integration'], provider: string, subject: string) {
+    const pending = await model.findFirst({
+      where: { providerIdentifier: provider, rootInternalId: subject, deletedAt: { not: null }, disabled: true, refreshNeeded: true, OR: [{ token: { not: '' } }, { refreshToken: { not: '' } }] },
+      select: { id: true },
+    });
+    if (pending) throw new ConflictException('The previous disconnect is still processing remote revocation. Please reconnect after data removal completes.');
+  }
 
   getMentions(platform: string, q: string) {
     return this._mentions.model.mentions.findMany({
@@ -163,16 +201,35 @@ export class IntegrationRepository {
     });
   }
 
-  async updateIntegration(id: string, params: Partial<Integration>) {
+  async updateIntegration(id: string, params: Partial<Integration>, newDeletedGeneration = false, useRemoteAvatar = false) {
+    if (newDeletedGeneration) return this._transaction.model.$transaction(async (tx) => {
+      let source = await tx.integration.findUnique({ where: { id } });
+      if (!source || source.deletedAt) throw new ConflictException('This connection was removed. Please reconnect.');
+      await this.lockAuthorizationGrant(tx, source.providerIdentifier, source.rootInternalId || source.internalId);
+      source = await tx.integration.findUnique({ where: { id } });
+      if (!source || source.deletedAt) throw new ConflictException('This connection was removed. Please reconnect.');
+      await this.assertNoPendingAuthorizationDeletion(tx.integration, source.providerIdentifier, source.rootInternalId || source.internalId);
+      let existing = await tx.integration.findUnique({ where: { organizationId_internalId: { organizationId: params.organizationId!, internalId: params.internalId! } } });
+      if (existing?.deletedAt) {
+        await tx.integration.update({ where: { id: existing.id, deletedAt: { not: null } }, data: { internalId: `retired_${existing.id}_${makeId(10)}` }, select: { id: true } });
+        existing = null;
+      }
+      if (existing && existing.id !== id) {
+        await tx.post.updateMany({ where: { integrationId: id }, data: { deletedAt: new Date() } });
+        await tx.integration.update({ where: { id, deletedAt: null }, data: { internalId: `retired_${id}_${makeId(10)}`, deletedAt: new Date() }, select: { id: true } });
+      }
+      return tx.integration.update({
+        where: { id: existing?.id || id, deletedAt: null },
+        data: { ...params, rootInternalId: source.rootInternalId, refreshToken: source.refreshToken, tokenExpiration: source.tokenExpiration, disabled: false, deletedAt: null, refreshNeeded: false },
+      });
+    });
     if (
-      params.picture &&
-      (params.picture.indexOf(process.env.CLOUDFLARE_BUCKET_URL!) === -1 ||
-        params.picture.indexOf(process.env.FRONTEND_URL!) === -1)
+      params.picture && !useRemoteAvatar && !isOwnedIntegrationPicture(params.picture)
     ) {
       params.picture = await this.storage.uploadSimple(params.picture);
     }
 
-    const existing = await this._integration.model.integration.findUnique({
+    let existing = await this._integration.model.integration.findUnique({
       where: {
         organizationId_internalId: {
           organizationId: params.organizationId!,
@@ -180,6 +237,15 @@ export class IntegrationRepository {
         },
       },
     });
+
+    if (newDeletedGeneration && existing?.deletedAt) {
+      await this._integration.model.integration.update({
+        where: { id: existing.id },
+        data: { internalId: `retired_${existing.id}_${makeId(10)}` },
+        select: { id: true },
+      });
+      existing = null;
+    }
 
     // The page was picked through a fresh login: the row that keeps living
     // must also take that login's identity and refresh token, otherwise the
@@ -219,6 +285,7 @@ export class IntegrationRepository {
     return this._integration.model.integration.update({
       where: {
         ...(existing ? { id: existing.id } : { id }),
+        ...(newDeletedGeneration ? { deletedAt: null } : {}),
       },
       data: {
         ...params,
@@ -236,11 +303,14 @@ export class IntegrationRepository {
     });
   }
 
-  disconnectChannel(org: string, id: string) {
-    return this._integration.model.integration.update({
+  disconnectChannel(org: string, id: string, expectedToken?: string) {
+    return this._integration.model.integration.updateMany({
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
+        refreshNeeded: false,
+        ...(expectedToken ? { token: expectedToken } : {}),
       },
       data: {
         refreshNeeded: true,
@@ -331,7 +401,8 @@ export class IntegrationRepository {
     isBetweenSteps = false,
     refresh?: string,
     timezone?: number,
-    customInstanceDetails?: string
+    customInstanceDetails?: string,
+    newDeletedGeneration = false
   ) {
     const postTimes = timezone
       ? {
@@ -342,7 +413,7 @@ export class IntegrationRepository {
           ]),
         }
       : {};
-    const upsert = await this._integration.model.integration.upsert({
+    const write = {
       where: {
         organizationId_internalId: {
           internalId,
@@ -396,7 +467,20 @@ export class IntegrationRepository {
         deletedAt: null,
         refreshNeeded: false,
       },
-    });
+    };
+    const upsert = newDeletedGeneration
+      ? await this._transaction.model.$transaction(async (tx) => {
+          await this.lockAuthorizationGrant(tx, provider, internalId);
+          await this.assertNoPendingAuthorizationDeletion(tx.integration, provider, internalId);
+          const existing = await tx.integration.findUnique({ where: write.where });
+          if (existing?.deletedAt) {
+            await tx.integration.update({ where: { id: existing.id, deletedAt: { not: null } }, data: { internalId: `retired_${existing.id}_${makeId(10)}` }, select: { id: true } });
+          }
+          return existing && !existing.deletedAt
+            ? tx.integration.update({ where: { id: existing.id, deletedAt: null }, data: write.update })
+            : tx.integration.create({ data: write.create });
+        })
+      : await this._integration.model.integration.upsert(write);
 
     if (oneTimeToken) {
       const rootId =
@@ -443,21 +527,27 @@ export class IntegrationRepository {
     });
   }
 
-  async setBetweenRefreshSteps(id: string) {
-    return this._integration.model.integration.update({
+  async setBetweenRefreshSteps(id: string, expectedToken?: string) {
+    return this._integration.model.integration.updateMany({
       where: {
         id,
+        deletedAt: null,
+        inBetweenSteps: false,
+        ...(expectedToken ? { token: expectedToken } : {}),
       },
       data: {
         inBetweenSteps: true,
       },
     });
   }
-  refreshNeeded(org: string, id: string) {
-    return this._integration.model.integration.update({
+  refreshNeeded(org: string, id: string, expectedToken?: string) {
+    return this._integration.model.integration.updateMany({
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
+        refreshNeeded: false,
+        ...(expectedToken ? { token: expectedToken } : {}),
       },
       data: {
         refreshNeeded: true,
@@ -485,6 +575,7 @@ export class IntegrationRepository {
       where: {
         organizationId: org,
         id,
+        deletedAt: null,
       },
     });
   }
@@ -825,7 +916,7 @@ export class IntegrationRepository {
     });
   }
 
-  async deleteIntegrationsForAccount(org: string) {
+  async deleteIntegrationsForAccount(org: string, lifecycleOwnedIds: string[] = []) {
     const hash = (value: string) =>
       createHash('md5').update(value).digest('hex');
 
@@ -842,6 +933,7 @@ export class IntegrationRepository {
     const integrations = await this._integration.model.integration.findMany({
       where: {
         organizationId: org,
+        id: { notIn: lifecycleOwnedIds },
       },
     });
 
@@ -872,6 +964,112 @@ export class IntegrationRepository {
         },
       });
     }
+  }
+
+  // Private lifecycle reads deliberately include deleted connections. Never
+  // return these rows from a controller: they contain retry credentials.
+  getIntegrationForCleanup(org: string, id: string) {
+    return this._integration.model.integration.findFirst({ where: { organizationId: org, id }, select: authorizationSelect });
+  }
+
+  getAuthorizationIntegrationsForOrganization(org: string) {
+    return this._integration.model.integration.findMany({ where: { organizationId: org }, select: { id: true, providerIdentifier: true } });
+  }
+
+  getAuthorizationIntegrationsPage(cursor?: string) {
+    return this._integration.model.integration.findMany({
+      where: { OR: [{ deletedAt: null }, { deletedAt: { not: null }, disabled: true, refreshNeeded: true }] },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { id: 'asc' }, take: 100, select: authorizationSelect,
+    });
+  }
+
+  findAuthorizationGrantCandidates(subject: string) {
+    return this._integration.model.integration.findMany({ where: { rootInternalId: subject }, select: authorizationSelect });
+  }
+
+  async markAuthorizationDeletionRequested(org: string, id: string, expectedToken?: string) {
+    return this._transaction.model.$transaction(async (tx) => {
+      const where = { organizationId: org, id, ...(expectedToken ? { token: expectedToken } : {}) };
+      let row = await tx.integration.findFirst({ where, select: authorizationSelect });
+      if (!row) return { matched: false };
+      if (row.deletedAt && row.disabled && row.refreshNeeded) return { matched: true };
+      await this.lockAuthorizationGrant(tx, row.providerIdentifier, row.rootInternalId);
+      row = await tx.integration.findFirst({ where, select: authorizationSelect });
+      if (!row) return { matched: false };
+      if (row.deletedAt && row.disabled && row.refreshNeeded) return { matched: true };
+      const changed = await tx.integration.updateMany({ where, data: { deletedAt: row.deletedAt || new Date(), disabled: true, refreshNeeded: true } });
+      return { matched: changed.count > 0 };
+    });
+  }
+
+  touchAuthorizationHistoryWait(org: string, id: string) {
+    return this._integration.model.integration.updateMany({ where: { organizationId: org, id, internalId: `erased_${id}`, deletedAt: { not: null }, token: '', refreshToken: null }, data: { token: '' } });
+  }
+
+  async getAuthorizationPostIds(org: string, id: string) {
+    return (await this._posts.model.post.findMany({ where: { organizationId: org, integrationId: id }, select: { id: true } })).map((post) => post.id);
+  }
+
+  purgeAuthorizationNotifications(org: string, id: string) {
+    return this._notificationsRepository.purgeAuthorizationNotifications(org, id);
+  }
+
+  async updateAuthorizationIfActive(
+    org: string, id: string,
+    credentials?: Extract<ProviderAuthorizationCheck, { status: 'valid' }>['credentials'],
+    identity?: Extract<ProviderAuthorizationCheck, { status: 'valid' }>['identity'],
+    expectedToken?: string,
+    oneTimeToken = false
+  ) {
+    const where = { organizationId: org, id, deletedAt: null, inBetweenSteps: false, ...(expectedToken ? { token: expectedToken } : {}) };
+    const data = {
+        ...(credentials?.accessToken ? { token: credentials.accessToken } : {}),
+        ...(credentials?.refreshToken ? { refreshToken: credentials.refreshToken } : {}),
+        ...(credentials?.expiresIn ? { tokenExpiration: new Date(Date.now() + credentials.expiresIn * 1000) } : {}),
+        ...(identity ? { name: identity.name, ...(identity.profile !== undefined ? { profile: identity.profile } : {}), ...(identity.picture !== undefined ? { picture: identity.picture } : {}) } : {}),
+      };
+    if (!oneTimeToken) return this._integration.model.integration.updateMany({ where, data });
+    // Preserve single-use grant rotation across the connections sharing that
+    // exact credential, while refusing to overwrite a newly reconnected grant.
+    return this._transaction.model.$transaction(async (tx) => {
+      const current = await tx.integration.findFirst({ where, select: { rootInternalId: true } });
+      if (!current) return { count: 0 };
+      const updated = await tx.integration.updateMany({ where, data });
+      if (updated.count && current.rootInternalId && expectedToken) {
+        await tx.integration.updateMany({
+          where: { id: { not: id }, rootInternalId: current.rootInternalId, token: expectedToken, deletedAt: null, inBetweenSteps: false },
+          data,
+        });
+      }
+      return updated;
+    });
+  }
+
+  async hasAvatarReferences(picture: string, excludingIntegrationId: string) {
+    return this._transaction.model.$transaction(async (tx) => {
+      const [integrations, media, posts] = await Promise.all([
+        tx.integration.count({ where: { picture, id: { not: excludingIntegrationId } } }),
+        tx.media.count({ where: { OR: [{ path: picture }, { thumbnail: picture }] } }),
+        tx.post.count({ where: { image: { contains: picture } } }),
+      ]);
+      return integrations + media + posts > 0;
+    });
+  }
+
+  async scrubAuthorizationData(org: string, id: string) {
+    return this._transaction.model.$transaction(async (tx) => {
+      const row = await tx.integration.findFirst({ where: { id, organizationId: org, deletedAt: { not: null }, disabled: true, refreshNeeded: true }, select: { id: true } });
+      if (!row) return { count: 0 };
+      await tx.errors.deleteMany({ where: { organizationId: org, post: { integrationId: id } } });
+      await tx.post.updateMany({ where: { organizationId: org, integrationId: id }, data: { releaseId: null, releaseURL: null, error: null } });
+      await tx.exisingPlugData.deleteMany({ where: { integrationId: id } });
+      await tx.plugs.updateMany({ where: { integrationId: id, organizationId: org }, data: { activated: false, data: '{}' } });
+      return tx.integration.updateMany({
+        where: { id, organizationId: org, deletedAt: { not: null }, disabled: true, refreshNeeded: true },
+        data: { token: '', refreshToken: null, tokenExpiration: null, name: 'Disconnected channel', internalId: `erased_${id}`, rootInternalId: null, profile: null, picture: null, additionalSettings: '[]', customInstanceDetails: null },
+      });
+    });
   }
 
   async checkForDeletedOnceAndUpdate(org: string, page: string) {

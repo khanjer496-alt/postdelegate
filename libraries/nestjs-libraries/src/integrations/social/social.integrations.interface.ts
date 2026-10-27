@@ -5,6 +5,47 @@ export interface ClientInformation {
   client_secret: string;
   instanceUrl: string;
 }
+
+// Private service/activity boundary. Credential updates must be persisted by
+// that caller and must never be included in workflow results or API responses.
+export type ProviderAuthorizationCredentials = {
+  accessToken: string;
+  refreshToken?: string | null;
+  internalId: string;
+  rootInternalId?: string | null;
+};
+
+export type ProviderAuthorizationGrant = {
+  realm: string;
+  subject: string;
+};
+
+export type ProviderAuthorizationCheck =
+  | {
+      status: 'valid';
+      credentials?: {
+        accessToken: string;
+        refreshToken?: string;
+        expiresIn?: number;
+      };
+      identity?: { name: string; profile?: string; picture?: string };
+      grant?: ProviderAuthorizationGrant;
+    }
+  | { status: 'revoked' }
+  | { status: 'unknown' };
+
+export type ProviderAuthorizationRevocation =
+  | { status: 'revoked' }
+  | { status: 'unknown' };
+
+// Only the notice is intended for presentation. The realm identifies the
+// configured grant family; grouping still requires a verified grant descriptor.
+export type ProviderAuthorizationPolicy = {
+  deletionNotice: string;
+  useRemoteAvatar?: boolean;
+  bypassAnalyticsCache?: boolean;
+  authorizationRealm: string;
+};
 export interface IAuthenticator {
   authenticate(
     params: {
@@ -180,6 +221,16 @@ export interface SocialProvider
   extends IAuthenticator,
     ISocialMediaIntegration {
   identifier: string;
+  authorizationPolicy?: ProviderAuthorizationPolicy;
+  checkAuthorization?(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationCheck>;
+  revokeAuthorization?(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationRevocation>;
+  getAuthorizationGrant?(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationGrant | undefined>;
   refreshWait?: boolean;
   convertToJPEG?: boolean;
   stripLinks?: () => boolean;

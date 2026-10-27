@@ -5,6 +5,8 @@ import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prism
 import { TemporalService } from 'nestjs-temporal-core';
 import { TypedSearchAttributes } from '@temporalio/common';
 import { organizationId } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+import { Context } from '@temporalio/activity';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 
 export type NotificationType = 'success' | 'fail' | 'info';
 
@@ -14,8 +16,21 @@ export class NotificationService {
     private _notificationRepository: NotificationsRepository,
     private _emailService: EmailService,
     private _organizationRepository: OrganizationRepository,
-    private _temporalService: TemporalService
+    private _temporalService: TemporalService,
+    private _integrationManager: IntegrationManager
   ) {}
+
+  private activityPostId(): string | null | undefined {
+    try {
+      const workflowId = Context.current().info.workflowExecution.workflowId;
+      if (!workflowId.startsWith('post_')) return undefined;
+      // Publishing and recurring-child IDs are post_<local-id>[_suffix].
+      // An unknown posting context must never fall back to unscoped storage.
+      return workflowId.slice('post_'.length).split('_')[0] || null;
+    } catch {
+      return undefined;
+    }
+  }
 
   getMainPageCount(organizationId: string, userId: string) {
     return this._notificationRepository.getMainPageCount(
@@ -44,9 +59,43 @@ export class NotificationService {
     message: string,
     sendEmail = false,
     digest = false,
-    type: NotificationType = 'success'
+    type: NotificationType = 'success',
+    scope?: { integrationId: string }
   ) {
-    await this._notificationRepository.createNotification(orgId, message);
+    const postId = this.activityPostId();
+    if (postId === null) return;
+    let integrationId = scope?.integrationId;
+    let providerIdentifier: string | undefined;
+    if (postId !== undefined) {
+      const post = await this._notificationRepository.getPostNotificationContext(orgId, postId);
+      if (!post || post.deletedAt || post.integration.deletedAt) return;
+      integrationId = post.integrationId;
+      providerIdentifier = post.integration.providerIdentifier;
+    } else if (integrationId) {
+      const connection = await this._notificationRepository.getIntegrationNotificationContext(orgId, integrationId);
+      if (!connection || connection.deletedAt) return;
+      providerIdentifier = connection.providerIdentifier;
+    }
+
+    if (integrationId && providerIdentifier) {
+      const provider = this._integrationManager.getSocialIntegration(providerIdentifier);
+      if (provider?.authorizationPolicy) {
+        // Do not copy provider URLs, channel identities or raw error messages
+        // into notifications, email queues or a shared digest's history.
+        subject = 'Publishing status update';
+        message = postId === undefined
+          ? 'A connected account needs your attention. Open the calendar to review its status.'
+          : type === 'fail'
+          ? 'A post could not be published. Open the calendar to review it.'
+          : type === 'info'
+          ? 'A post needs your attention. Open the calendar to review its status.'
+          : 'Your post was published. Open the calendar to review it.';
+      }
+      const stored = await this._notificationRepository.createScopedNotification(orgId, integrationId, message, postId);
+      if (!stored) return;
+    } else {
+      await this._notificationRepository.createNotification(orgId, message);
+    }
     if (!sendEmail) {
       return;
     }

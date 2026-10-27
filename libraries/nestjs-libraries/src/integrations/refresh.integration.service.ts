@@ -17,6 +17,8 @@ export class RefreshIntegrationService {
     private _temporalService: TemporalService
   ) {}
   async refresh(integration: Integration, cause = ''): Promise<false | AuthTokenDetails> {
+    const current = await this._integrationService.getActiveIntegrationById(integration.organizationId, integration.id);
+    if (!current || current.token !== integration.token) return false;
     const socialProvider = this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
@@ -27,25 +29,19 @@ export class RefreshIntegrationService {
       return false as const;
     }
 
-    await this._integrationService.createOrUpdateIntegration(
-      undefined,
-      !!socialProvider.oneTimeToken,
-      integration.organizationId,
-      integration.name,
-      integration.picture!,
-      'social',
-      integration.internalId,
-      integration.providerIdentifier,
-      refresh.accessToken,
-      refresh.refreshToken,
-      refresh.expiresIn
-    );
+    const updated = await this._integrationService.persistRefreshedAuthorization(integration, refresh);
+    if (!updated.count) return false;
 
     return refresh;
   }
 
   public async setBetweenSteps(integration: Integration, cause = '') {
-    await this._integrationService.setBetweenRefreshSteps(integration.id);
+    const current = await this._integrationService.getActiveIntegrationById(integration.organizationId, integration.id);
+    if (!current || current.token !== integration.token) return;
+    const changed = await this._integrationService.setBetweenRefreshSteps(integration.id, integration.token);
+    if (!changed.count) return;
+    const after = await this._integrationService.getIntegrationById(integration.organizationId, integration.id);
+    if (!after || after.deletedAt || after.token !== integration.token) return;
     await this._integrationService.informAboutRefreshError(
       integration.organizationId,
       integration,
@@ -82,10 +78,11 @@ export class RefreshIntegrationService {
       });
 
     if (!refresh || !refresh.accessToken) {
+      const current = await this._integrationService.getActiveIntegrationById(integration.organizationId, integration.id);
+      if (!current || current.token !== integration.token) return false;
       if (refreshError) {
         console.error(
-          `Could not refresh ${integration.providerIdentifier} integration ${integration.id}`,
-          refreshError?.response?.data || refreshError?.message || refreshError
+          `Could not refresh ${integration.providerIdentifier} integration ${integration.id}`
         );
       }
 
@@ -93,10 +90,14 @@ export class RefreshIntegrationService {
       // the user, and refreshNeeded sets the same flag disconnectChannel
       // would — calling disconnectChannel here sent a second, cause-less
       // copy of the same email for every failed refresh.
-      await this._integrationService.refreshNeeded(
+      const changed = await this._integrationService.refreshNeeded(
         integration.organizationId,
-        integration.id
+        integration.id,
+        integration.token
       );
+      if (!changed.count) return false;
+      const after = await this._integrationService.getActiveIntegrationById(integration.organizationId, integration.id);
+      if (!after || after.token !== integration.token) return false;
 
       await this._integrationService.informAboutRefreshError(
         integration.organizationId,
@@ -123,8 +124,7 @@ export class RefreshIntegrationService {
       );
     } catch (err: any) {
       console.error(
-        `Could not reconnect ${integration.providerIdentifier} integration ${integration.id} after a successful token refresh`,
-        err?.response?.data || err?.message || err
+        `Could not reconnect ${integration.providerIdentifier} integration ${integration.id} after a successful token refresh`
       );
       throw err;
     }

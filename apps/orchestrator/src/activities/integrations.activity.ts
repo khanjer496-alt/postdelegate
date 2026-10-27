@@ -18,6 +18,16 @@ export class IntegrationsActivity {
   }
 
   async refreshToken(integration: Integration) {
-    return this._refreshIntegrationService.refresh(integration);
+    const current = await this._integrationService.getIntegrationById(
+      integration.organizationId,
+      integration.id
+    );
+    if (!current || current.deletedAt) return false;
+    const result = await this._refreshIntegrationService.refresh(current);
+    const after = await this._integrationService.getIntegrationById(
+      integration.organizationId,
+      integration.id
+    );
+    return after && !after.deletedAt ? result : false;
   }
 }

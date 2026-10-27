@@ -5,10 +5,11 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
+import { IntegrationRepository, isOwnedIntegrationPicture } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   AnalyticsData,
+  AuthTokenDetails,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Integration, Organization } from '@prisma/client';
@@ -28,6 +29,7 @@ import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { TemporalService } from 'nestjs-temporal-core';
+import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
 dayjs.extend(utc);
 
@@ -41,7 +43,8 @@ export class IntegrationService {
     private _notificationService: NotificationService,
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _temporalService: TemporalService
+    private _temporalService: TemporalService,
+    private _authorizationLifecycle: IntegrationAuthorizationLifecycleService
   ) {}
 
   async changeActiveCron(orgId: string) {
@@ -113,14 +116,11 @@ export class IntegrationService {
     timezone?: number,
     customInstanceDetails?: string
   ) {
-    const uploadedPicture = picture
-      ? picture?.indexOf('imagedelivery.net') > -1
-        ? picture
-        : await this.storage.uploadSimple(picture).catch((err) => {
-            console.log('Failed to upload profile picture:', picture, err);
-            return undefined;
-          })
-      : undefined;
+    const policy = this._integrationManager.getSocialIntegration(provider)?.authorizationPolicy;
+    let uploadedPicture = picture;
+    if (picture && !policy?.useRemoteAvatar && !isOwnedIntegrationPicture(picture) && picture.indexOf('imagedelivery.net') === -1) {
+      uploadedPicture = await this.storage.uploadSimple(picture).catch(() => undefined);
+    }
 
     return this._integrationRepository.createOrUpdateIntegration(
       additionalSettings,
@@ -138,7 +138,8 @@ export class IntegrationService {
       isBetweenSteps,
       refresh,
       timezone,
-      customInstanceDetails
+      customInstanceDetails,
+      !!policy
     );
   }
 
@@ -179,6 +180,20 @@ export class IntegrationService {
     return this._integrationRepository.getIntegrationById(org, id);
   }
 
+  async getActiveIntegrationById(org: string, id: string) {
+    const integration = await this.getIntegrationById(org, id);
+    return integration && !integration.deletedAt && !integration.disabled && !integration.inBetweenSteps ? integration : null;
+  }
+
+  persistRefreshedAuthorization(integration: Integration, refresh: AuthTokenDetails) {
+    return this._integrationRepository.updateAuthorizationIfActive(
+      integration.organizationId, integration.id,
+      { accessToken: refresh.accessToken, refreshToken: refresh.refreshToken, expiresIn: refresh.expiresIn },
+      undefined, integration.token,
+      !!this._integrationManager.getSocialIntegration(integration.providerIdentifier)?.oneTimeToken
+    );
+  }
+
   getIntegrationByInternalId(org: string, internalId: string) {
     return this._integrationRepository.getIntegrationByInternalId(
       org,
@@ -202,7 +217,10 @@ export class IntegrationService {
   }
 
   async disconnectChannel(orgId: string, integration: Integration, err = '') {
-    await this._integrationRepository.disconnectChannel(orgId, integration.id);
+    const changed = await this._integrationRepository.disconnectChannel(orgId, integration.id, integration.token);
+    if (!changed.count) return;
+    const current = await this.getActiveIntegrationById(orgId, integration.id);
+    if (!current || current.token !== integration.token) return;
     await this.informAboutRefreshError(orgId, integration, err);
   }
 
@@ -324,54 +342,23 @@ export class IntegrationService {
       `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/launches`,
       true,
       false,
-      'info'
+      'info',
+      { integrationId: integration.id }
     );
   }
 
-  async refreshNeeded(org: string, id: string) {
-    return this._integrationRepository.refreshNeeded(org, id);
+  async refreshNeeded(org: string, id: string, expectedToken?: string) {
+    return this._integrationRepository.refreshNeeded(org, id, expectedToken);
   }
 
-  async setBetweenRefreshSteps(id: string) {
-    return this._integrationRepository.setBetweenRefreshSteps(id);
+  async setBetweenRefreshSteps(id: string, expectedToken?: string) {
+    return this._integrationRepository.setBetweenRefreshSteps(id, expectedToken);
   }
 
   async refreshTokens() {
     const integrations = await this._integrationRepository.needsToBeRefreshed();
     for (const integration of integrations) {
-      const provider = this._integrationManager.getSocialIntegration(
-        integration.providerIdentifier
-      );
-
-      const data = await this.refreshToken(provider, integration.refreshToken!);
-
-      if (!data) {
-        await this.informAboutRefreshError(
-          integration.organizationId,
-          integration
-        );
-        await this._integrationRepository.refreshNeeded(
-          integration.organizationId,
-          integration.id
-        );
-        return;
-      }
-
-      const { refreshToken, accessToken, expiresIn } = data;
-
-      await this.createOrUpdateIntegration(
-        undefined,
-        !!provider.oneTimeToken,
-        integration.organizationId,
-        integration.name,
-        undefined,
-        'social',
-        integration.internalId,
-        integration.providerIdentifier,
-        accessToken,
-        refreshToken,
-        expiresIn
-      );
+      await this._refreshIntegrationService.refresh(integration);
     }
   }
 
@@ -398,7 +385,7 @@ export class IntegrationService {
   }
 
   async deleteChannel(org: string, id: string) {
-    return this._integrationRepository.deleteChannel(org, id);
+    return this._authorizationLifecycle.requestDeletion(org, id);
   }
 
   async disableIntegrations(org: string, totalChannels: number) {
@@ -453,7 +440,7 @@ export class IntegrationService {
       inBetweenSteps: false,
       token: getIntegrationInformation.access_token,
       profile: getIntegrationInformation.username,
-    });
+    }, !!provider.authorizationPolicy, !!provider.authorizationPolicy?.useRemoteAvatar);
 
     return { success: true };
   }
@@ -468,7 +455,7 @@ export class IntegrationService {
     const days = Number(date) > 0 ? Number(date) : 7;
     const getIntegration = await this.getIntegrationById(org.id, integration);
 
-    if (!getIntegration) {
+    if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
       throw new Error('Invalid integration');
     }
 
@@ -505,9 +492,8 @@ export class IntegrationService {
       }
     }
 
-    const getIntegrationData = await ioRedis.get(
-      `integration:${org.id}:${integration}:${days}`
-    );
+    const bypassCache = integrationProvider.authorizationPolicy?.bypassAnalyticsCache;
+    const getIntegrationData = bypassCache ? undefined : await ioRedis.get(`integration:${org.id}:${integration}:${days}`);
     if (getIntegrationData) {
       return JSON.parse(getIntegrationData);
     }
@@ -519,7 +505,10 @@ export class IntegrationService {
           getIntegration.token,
           days
         );
-        await ioRedis.set(
+        if (bypassCache) {
+          const current = await this.getActiveIntegrationById(org.id, integration);
+          if (!current || current.token !== getIntegration.token) return [];
+        } else await ioRedis.set(
           `integration:${org.id}:${integration}:${days}`,
           JSON.stringify(loadAnalytics),
           'EX',

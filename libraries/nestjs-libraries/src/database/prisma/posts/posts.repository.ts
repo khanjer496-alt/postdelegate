@@ -1,10 +1,11 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Post as PostBody } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import {
   APPROVED_SUBMIT_FOR_ORDER,
   CreationMethod,
   Post,
+  Prisma,
   State,
 } from '@prisma/client';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
@@ -30,8 +31,66 @@ export class PostsRepository {
     private _comments: PrismaRepository<'comments'>,
     private _tags: PrismaRepository<'tags'>,
     private _tagsPosts: PrismaRepository<'tagsPosts'>,
-    private _errors: PrismaRepository<'errors'>
+    private _errors: PrismaRepository<'errors'>,
+    private _transaction: PrismaTransaction
   ) {}
+
+  private async updateActivePost(
+    id: string,
+    data: Prisma.PostUpdateManyMutationInput,
+    conditions: Prisma.PostWhereInput = {},
+    includeProvider = false,
+    audit?: { message: string; body: string }
+  ) {
+    return this._transaction.model.$transaction(async (tx) => {
+      const post = await tx.post.findUnique({
+        where: { id },
+        select: { integrationId: true },
+      });
+      if (!post) throw new BadRequestException('Post is no longer available.');
+
+      // Lock the active connection for this short transaction. Deletion uses
+      // the same integration row, so it either precedes this write (no match)
+      // or follows the committed result and removes it during cleanup.
+      const connection = await tx.integration.updateMany({
+        where: { id: post.integrationId, deletedAt: null },
+        data: { deletedAt: null },
+      });
+      if (!connection.count) {
+        throw new BadRequestException('Post is no longer available.');
+      }
+      const changed = await tx.post.updateMany({
+        where: {
+          id,
+          AND: [conditions, { integrationId: post.integrationId }],
+          deletedAt: null,
+          integration: { deletedAt: null },
+        },
+        data,
+      });
+      if (!changed.count) {
+        throw new BadRequestException('Post is no longer available.');
+      }
+
+      const updated = await tx.post.findUnique({ where: { id } });
+      if (!includeProvider) return updated;
+      const integration = await tx.integration.findUnique({
+        where: { id: post.integrationId },
+        select: { providerIdentifier: true },
+      });
+      if (audit) {
+        await tx.errors.create({
+          data: {
+            ...audit,
+            organizationId: updated!.organizationId,
+            platform: integration!.providerIdentifier,
+            postId: id,
+          },
+        });
+      }
+      return { ...updated!, integration };
+    });
+  }
 
   searchForMissingThreeHoursPosts() {
     return this._post.model.post.findMany({
@@ -101,14 +160,7 @@ export class PostsRepository {
   }
 
   updateImages(id: string, images: string) {
-    return this._post.model.post.update({
-      where: {
-        id,
-      },
-      data: {
-        image: images,
-      },
-    });
+    return this.updateActivePost(id, { image: images });
   }
 
   getPostUrls(orgId: string, ids: string[]) {
@@ -458,91 +510,83 @@ export class PostsRepository {
     });
   }
 
-  updatePost(id: string, postId: string, releaseURL: string) {
-    return this._post.model.post.update({
-      where: {
-        id,
-      },
-      data: {
-        state: 'PUBLISHED',
-        releaseURL,
-        releaseId: postId,
-      },
-    });
+  updatePost(id: string, postId: string, releaseURL: string, expectedIntegrationId?: string) {
+    return this.updateActivePost(
+      id,
+      { state: 'PUBLISHED', releaseURL, releaseId: postId },
+      expectedIntegrationId ? { integrationId: expectedIntegrationId } : {}
+    );
   }
 
   updateReleaseId(
     id: string,
     orgId: string,
     releaseId: string,
-    releaseURL?: string
+    releaseURL?: string,
+    expectedIntegrationId?: string
   ) {
-    return this._post.model.post.update({
-      where: {
-        id,
-        organizationId: orgId,
-        releaseId: 'missing',
-      },
-      data: {
+    return this.updateActivePost(
+      id,
+      {
         releaseId: String(releaseId),
         ...(releaseURL ? { releaseURL } : {}),
       },
-    });
+      {
+        organizationId: orgId,
+        releaseId: 'missing',
+        ...(expectedIntegrationId ? { integrationId: expectedIntegrationId } : {}),
+      }
+    );
   }
 
   updateResolvedRelease(
     id: string,
     orgId: string,
     releaseId: string,
-    releaseURL: string
+    releaseURL: string,
+    expectedIntegrationId?: string
   ) {
-    return this._post.model.post.update({
-      where: {
-        id,
+    return this.updateActivePost(
+      id,
+      { releaseId, releaseURL },
+      {
         organizationId: orgId,
-      },
-      data: {
-        releaseId,
-        releaseURL,
-      },
-    });
+        ...(expectedIntegrationId ? { integrationId: expectedIntegrationId } : {}),
+      }
+    );
   }
 
   async changeState(id: string, state: State, err?: any, body?: any) {
-    const update = await this._post.model.post.update({
-      where: {
-        id,
-      },
-      data: {
+    const updated = await this.updateActivePost(
+      id,
+      {
         state,
         ...(err
           ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
           : {}),
       },
-      include: {
-        integration: {
-          select: {
-            providerIdentifier: true,
-          },
-        },
-      },
-    });
-
+      {},
+      true
+    );
     if (state === 'ERROR' && err && body) {
       try {
-        await this._errors.model.errors.create({
-          data: {
+        // Audit logging remains best-effort, but this second transaction must
+        // lock and recheck the original channel/post before retaining payloads.
+        await this.updateActivePost(
+          id,
+          { deletedAt: null },
+          { integrationId: updated!.integrationId },
+          true,
+          {
             message: typeof err === 'string' ? err : JSON.stringify(err),
-            organizationId: update.organizationId,
-            platform: update.integration.providerIdentifier,
-            postId: update.id,
             body: typeof body === 'string' ? body : JSON.stringify(body),
-          },
-        });
-      } catch (err) {}
+          }
+        );
+      } catch {
+        // The state transition committed independently of audit availability.
+      }
     }
-
-    return update;
+    return updated;
   }
 
   getErrorsByPostIds(postIds: string[]) {
@@ -698,6 +742,8 @@ export class PostsRepository {
         await this._post.model.post.upsert({
           where: {
             id: value.id || uuidv4(),
+            organizationId: orgId,
+            integrationId: body.integration.id,
           },
           create: { ...updateData('create') },
           update: {

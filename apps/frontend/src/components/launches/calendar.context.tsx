@@ -99,6 +99,7 @@ export const CalendarContext = createContext({
 
 export interface Integrations {
   name: string;
+  dataDeletionNotice?: string;
   originalName?: string;
   id: string;
   disabled?: boolean;

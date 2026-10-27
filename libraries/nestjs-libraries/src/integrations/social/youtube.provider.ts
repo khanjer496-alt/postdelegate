@@ -4,6 +4,11 @@ import {
   PendingCheckResponse,
   PostDetails,
   PostResponse,
+  ProviderAuthorizationCheck,
+  ProviderAuthorizationCredentials,
+  ProviderAuthorizationGrant,
+  ProviderAuthorizationPolicy,
+  ProviderAuthorizationRevocation,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Integration } from '@prisma/client';
@@ -73,6 +78,219 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
   ];
 
   editor = 'normal' as const;
+
+  get authorizationPolicy(): ProviderAuthorizationPolicy {
+    return {
+      authorizationRealm: this.configuredGoogleRealm() || 'google-project:unknown',
+      useRemoteAvatar: true,
+      bypassAnalyticsCache: true,
+      deletionNotice:
+        'Disconnecting revokes this Google account’s permissions for the shared Google project, including other connected YouTube channels and Google sign-in permissions for its clients. PostDelegate removes the affected saved channel data and analytics. Your videos remain on YouTube. You can reconnect afterward.',
+    };
+  }
+
+  private configuredGoogleRealm() {
+    const project = process.env.YOUTUBE_CLIENT_ID?.match(
+      /^(\d+)-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/
+    )?.[1];
+    return project ? `google-project:${project}` : undefined;
+  }
+
+  private verifiedGoogleGrant(
+    info: { aud?: string; user_id?: string; sub?: string },
+    credentials: ProviderAuthorizationCredentials
+  ): ProviderAuthorizationGrant | undefined {
+    const project = info.aud?.match(
+      /^(\d+)-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/
+    )?.[1];
+    const realm = project ? `google-project:${project}` : undefined;
+    const subject = info.sub || info.user_id;
+    if (
+      !realm ||
+      realm !== this.configuredGoogleRealm() ||
+      !subject ||
+      (info.sub && info.user_id && info.sub !== info.user_id) ||
+      (credentials.rootInternalId && credentials.rootInternalId !== subject)
+    ) {
+      return undefined;
+    }
+    return { realm, subject };
+  }
+
+  private hasAuthorizationScopes(scopes: string[] | undefined) {
+    const granted = new Set(scopes || []);
+    // Google may return these OpenID aliases instead of the URL scopes.
+    if (granted.has('email')) {
+      granted.add('https://www.googleapis.com/auth/userinfo.email');
+    }
+    if (granted.has('profile')) {
+      granted.add('https://www.googleapis.com/auth/userinfo.profile');
+    }
+    return this.scopes.every((scope) => granted.has(scope));
+  }
+
+  private authorizationErrorCode(error: any): string | undefined {
+    const code = error?.response?.data?.error;
+    return typeof code === 'string' ? code : undefined;
+  }
+
+  private isInvalidAccessToken(error: any) {
+    const status = error?.response?.status;
+    const code = this.authorizationErrorCode(error);
+    return (
+      (status === 400 || status === 401) &&
+      (code === 'invalid_token' || code === 'invalid_grant')
+    );
+  }
+
+  async getAuthorizationGrant(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationGrant | undefined> {
+    if (!credentials.accessToken || !this.configuredGoogleRealm()) {
+      return undefined;
+    }
+    try {
+      const { client } = clientAndYoutube();
+      const info = await client.getTokenInfo(credentials.accessToken);
+      return this.verifiedGoogleGrant(info, credentials);
+    } catch {
+      // An expired/revoked token cannot prove a project or Google subject.
+      // In particular, stored rootInternalId alone never permits grouping.
+      return undefined;
+    }
+  }
+
+  async checkAuthorization(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationCheck> {
+    if (
+      !credentials.accessToken ||
+      !process.env.YOUTUBE_CLIENT_SECRET ||
+      !this.configuredGoogleRealm()
+    ) {
+      return { status: 'unknown' };
+    }
+
+    try {
+      const { client, youtube } = clientAndYoutube();
+      let info: Awaited<ReturnType<OAuth2Client['getTokenInfo']>> | undefined;
+      try {
+        info = await client.getTokenInfo(credentials.accessToken);
+      } catch (error: any) {
+        if (!this.isInvalidAccessToken(error)) {
+          return { status: 'unknown' };
+        }
+        if (!credentials.refreshToken) {
+          return { status: 'revoked' };
+        }
+      }
+
+      if (
+        info &&
+        (info.aud !== process.env.YOUTUBE_CLIENT_ID ||
+          !this.verifiedGoogleGrant(info, credentials))
+      ) {
+        // Existing credentials from another configured client/project must
+        // not be mistaken for revoked user consent after a deployment change.
+        return { status: 'unknown' };
+      }
+      if (info && !this.hasAuthorizationScopes(info.scopes)) {
+        return { status: 'revoked' };
+      }
+
+      let accessToken = credentials.accessToken;
+      let refreshToken = credentials.refreshToken || undefined;
+      let expiryDate = info?.expiry_date;
+      if (refreshToken) {
+        client.setCredentials({ refresh_token: refreshToken });
+        const refreshed = (await client.refreshAccessToken()).credentials;
+        if (!refreshed.access_token) {
+          return { status: 'unknown' };
+        }
+        accessToken = refreshed.access_token;
+        refreshToken = refreshed.refresh_token || refreshToken;
+        info = await client.getTokenInfo(accessToken);
+        expiryDate = refreshed.expiry_date || info.expiry_date;
+      }
+
+      const grant = info && this.verifiedGoogleGrant(info, credentials);
+      if (!grant || info?.aud !== process.env.YOUTUBE_CLIENT_ID) {
+        return { status: 'unknown' };
+      }
+      if (!this.hasAuthorizationScopes(info.scopes)) {
+        return { status: 'revoked' };
+      }
+
+      // Refresh the selected channel's metadata, rather than replacing it
+      // with the OAuth account's name/avatar. No avatar bytes are copied.
+      client.setCredentials({ access_token: accessToken });
+      const response = await youtube(client).channels.list({
+        part: ['snippet'],
+        id: [credentials.internalId],
+      });
+      const channel = response.data.items?.find(
+        (item) => item.id === credentials.internalId
+      );
+      if (!channel?.snippet?.title) {
+        return { status: 'unknown' };
+      }
+
+      return {
+        status: 'valid',
+        credentials: {
+          accessToken,
+          ...(refreshToken ? { refreshToken } : {}),
+          ...(Number.isFinite(expiryDate)
+            ? { expiresIn: Math.max(0, Math.floor((expiryDate! - Date.now()) / 1000)) }
+            : {}),
+        },
+        identity: {
+          name: channel.snippet.title,
+          profile: channel.snippet.customUrl || '',
+          picture: channel.snippet.thumbnails?.default?.url || '',
+        },
+        grant,
+      };
+    } catch (error: any) {
+      // A user-revoked/expired refresh grant is definitive. Configuration,
+      // throttling and transport failures are not permission to erase data.
+      return this.authorizationErrorCode(error) === 'invalid_grant' &&
+        error?.response?.status === 400
+        ? { status: 'revoked' }
+        : { status: 'unknown' };
+    }
+  }
+
+  async revokeAuthorization(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationRevocation> {
+    const token = credentials.refreshToken || credentials.accessToken;
+    if (!token) {
+      return { status: 'unknown' };
+    }
+    try {
+      const { client } = clientAndYoutube();
+      // The SDK's revokeToken helper puts the token in the query string.
+      // Its existing transporter supports a form body without URL leakage.
+      const response = await client.transporter.request({
+        url: 'https://oauth2.googleapis.com/revoke',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        data: new URLSearchParams({ token }).toString(),
+        timeout: 10_000,
+        retry: false,
+      });
+      return response.status === 200
+        ? { status: 'revoked' }
+        : { status: 'unknown' };
+    } catch (error: any) {
+      return error?.response?.status === 400 &&
+        this.authorizationErrorCode(error) === 'invalid_token'
+        ? { status: 'revoked' }
+        : { status: 'unknown' };
+    }
+  }
+
   maxLength() {
     return 5000;
   }
