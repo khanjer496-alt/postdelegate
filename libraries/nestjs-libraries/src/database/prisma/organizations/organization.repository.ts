@@ -2,6 +2,10 @@ import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/d
 import { Role, ShortLinkPreference, SubscriptionTier } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import {
+  evergreenShareDate,
+  evergreenSharesDone,
+} from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
@@ -580,29 +584,80 @@ export class OrganizationRepository {
   }
 
   async getLastPublishDate(organizationId: string) {
-    const org = await this._organization.model.organization.findUnique({
-      where: {
-        id: organizationId,
-      },
-      select: {
-        post: {
-          where: {
-            state: 'PUBLISHED',
-          },
-          orderBy: {
-            publishDate: 'desc',
-          },
-          take: 1,
-          select: {
-            publishDate: true,
+    // Still publishing, or about to: a post scheduled exactly a day after the
+    // previous one must not end the streak
+    const lookahead = Date.now() + 5 * 60 * 1000;
+    const [org, recurring] = await Promise.all([
+      this._organization.model.organization.findUnique({
+        where: {
+          id: organizationId,
+        },
+        select: {
+          post: {
+            where: {
+              deletedAt: null,
+              parentPostId: null,
+              intervalInDays: null,
+              OR: [
+                { state: 'PUBLISHED' },
+                { state: 'QUEUE', publishDate: { lte: new Date(lookahead) } },
+              ],
+            },
+            orderBy: {
+              publishDate: 'desc',
+            },
+            take: 1,
+            select: {
+              publishDate: true,
+            },
           },
         },
-      },
-    });
+      }),
+      // Recurring posts keep their first publishDate and are republished on
+      // the interval grid, count their latest occurrence instead
+      this._organization.model.organization.findUnique({
+        where: {
+          id: organizationId,
+        },
+        select: {
+          post: {
+            where: {
+              deletedAt: null,
+              parentPostId: null,
+              intervalInDays: { not: null },
+              state: { in: ['PUBLISHED', 'QUEUE'] },
+              publishDate: { lte: new Date(lookahead) },
+            },
+            select: {
+              publishDate: true,
+              state: true,
+              intervalInDays: true,
+              evergreenMaxShares: true,
+              evergreenUntil: true,
+            },
+          },
+        },
+      }),
+    ]);
 
-    const publishDate = org?.post?.[0]?.publishDate;
+    const dates = [
+      ...(org?.post || []).map((p) => p.publishDate.getTime()),
+      // a QUEUE row has not published its first share yet; a published one
+      // re-shares on the grid only until its evergreen limits stop it (an
+      // ended or stopped evergreen post keeps intervalInDays)
+      ...(recurring?.post || []).map((p) =>
+        p.state === 'QUEUE'
+          ? p.publishDate.getTime()
+          : evergreenShareDate(
+              p.publishDate,
+              evergreenSharesDone(p.publishDate, p, lookahead),
+              p.intervalInDays
+            ).getTime()
+      ),
+    ];
+
     // Never in the future, the streak workflow sleeps until a day after it
-    return publishDate ? Math.min(publishDate.getTime(), Date.now()) : null;
+    return dates.length ? Math.min(Math.max(...dates), Date.now()) : null;
   }
 
   async getTeam(orgId: string) {
