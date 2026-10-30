@@ -14,6 +14,7 @@ export default {
     '^@gitroom/orchestrator/(.*)$': '<rootDir>/apps/orchestrator/src/$1',
     '^@gitroom/react/(.*)$': '<rootDir>/libraries/react-shared-libraries/src/$1',
     '^@gitroom/plugins/(.*)$': '<rootDir>/libraries/plugins/src/$1',
+    '^@postdelegate/node$': '<rootDir>/apps/sdk/src/index.ts',
   },
   testMatch: [
     '<rootDir>/apps/*/src/**/*.spec.ts',
