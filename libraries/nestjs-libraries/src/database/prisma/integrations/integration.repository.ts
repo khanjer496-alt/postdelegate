@@ -1,5 +1,9 @@
 import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
 import dayjs from 'dayjs';
 import { Integration, Prisma } from '@prisma/client';
@@ -652,7 +656,24 @@ export class IntegrationRepository {
     });
   }
 
-  updateIntegrationGroup(org: string, id: string, group: string) {
+  async updateIntegrationGroup(org: string, id: string, group: string) {
+    if (group) {
+      const customer = await this._customers.model.customer.findFirst({
+        where: {
+          id: group,
+          orgId: org,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+    }
+
     return this._integration.model.integration.update({
       select: {
         id: true,
@@ -1134,7 +1155,22 @@ export class IntegrationRepository {
     });
   }
 
-  createOrUpdatePlug(org: string, integrationId: string, body: PlugDto) {
+  async createOrUpdatePlug(org: string, integrationId: string, body: PlugDto) {
+    const integration = await this._integration.model.integration.findFirst({
+      where: {
+        id: integrationId,
+        organizationId: org,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!integration) {
+      throw new NotFoundException('Integration not found');
+    }
+
     return this._plugs.model.plugs.upsert({
       where: {
         organizationId: org,

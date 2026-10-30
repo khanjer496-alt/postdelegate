@@ -19,7 +19,14 @@ import { TypedSearchAttributes } from '@temporalio/common';
 import {
   organizationId,
 } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+import {
+  readResponseText,
+  ssrfSafeFetch,
+} from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 const parser = new Parser();
+
+// feeds and article pages are text, anything bigger is not worth reading
+const MAX_REMOTE_TEXT_BYTES = 5_000_000;
 
 interface WorkflowChannelsState {
   messages: BaseMessage[];
@@ -139,7 +146,15 @@ export class AutopostService {
 
   async loadXML(url: string) {
     try {
-      const { items } = await parser.parseURL(url);
+      // the feed is read through the SSRF-safe client (redirects re-validated
+      // on every hop) instead of rss-parser's own http client
+      const response = await ssrfSafeFetch(url);
+      if (!response.ok) {
+        return { success: false };
+      }
+      const { items } = await parser.parseString(
+        await readResponseText(response, MAX_REMOTE_TEXT_BYTES)
+      );
       const findLast = items.reduce(
         (all: any, current: any) => {
           if (dayjs(current.pubDate).isAfter(all.pubDate)) {
@@ -189,7 +204,11 @@ export class AutopostService {
 
   async loadUrl(url: string) {
     try {
-      const loadDom = new JSDOM(await (await fetch(url)).text());
+      // the url comes from the feed item, so it is attacker-controlled
+      const response = await ssrfSafeFetch(url, {}, { allowHttp: true });
+      const loadDom = new JSDOM(
+        await readResponseText(response, MAX_REMOTE_TEXT_BYTES)
+      );
       loadDom.window.document
         .querySelectorAll('script')
         .forEach((s) => s.remove());

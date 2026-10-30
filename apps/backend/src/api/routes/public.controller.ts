@@ -53,11 +53,16 @@ export class PublicController {
 
   @Get(`/posts/:id`)
   async getPreview(@Param('id') id: string) {
-    // the batch only links the posts in the dashboard, it stays out of the
-    // public preview
+    // unauthenticated: expose only what the preview page renders, never the
+    // internal group/batch/settings/error fields of the stored row
     return (await this._postsService.getPostsRecursively(id, true)).map(
-      ({ childrenPost, batchId, ...p }) => ({
-        ...p,
+      (p) => ({
+        id: p.id,
+        organizationId: p.organizationId,
+        publishDate: p.publishDate,
+        creationMethod: p.creationMethod,
+        content: p.content,
+        image: p.image,
         ...(p.integration
           ? {
               integration: {
