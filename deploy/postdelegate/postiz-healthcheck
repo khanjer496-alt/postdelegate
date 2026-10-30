@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+# Server health check for the PostDelegate Postiz stack. Install as
+# /usr/local/bin/postiz-healthcheck, root:root 0700. Run by
+# postiz-healthcheck.timer every 10 minutes.
+#
+# Checks: disk usage, newest local backup age, newest off-site backup age
+# (marker written by offsite-backup-postiz), compose services, Temporal and the
+# public application URL. Failures are logged to the journal and sent to
+# ALERT_WEBHOOK_URL (from /etc/postiz/alerts.env) when it is set.
+#
+# Alerting is rate limited through /var/lib/postiz-ops/health-state: one alert
+# once a failure has lasted HEALTH_FAIL_THRESHOLD runs, another when the set of
+# failing checks changes, a reminder every HEALTH_REMINDER_HOURS, and a
+# recovery notice.
+#
+# Usage: postiz-healthcheck [--test-alert]
+# Exit status: 0 healthy, 1 unhealthy, 2 the alert could not be delivered.
+set -Eeuo pipefail
+umask 077
+
+POSTIZ_OPS_LIB=${POSTIZ_OPS_LIB:-/usr/local/lib/postiz-ops/ops-lib.sh}
+# shellcheck source=ops-lib.sh
+. "$POSTIZ_OPS_LIB"
+
+FAIL_NAMES=''
+FAIL_DETAILS=''
+
+record_failure() { # NAME DETAIL
+    FAIL_NAMES="$FAIL_NAMES $1"
+    FAIL_DETAILS="$FAIL_DETAILS- $1: $2"$'\n'
+    log_err "check failed: $1: $2"
+}
+
+# ------------------------------------------------------ replaceable probes
+disk_usage_pct() { # PATH -> integer percent used
+    df -P "$1" | awk 'NR==2 {gsub("%", "", $5); print $5}'
+}
+
+docker_cmd() {
+    docker "$@"
+}
+
+http_status() { # URL -> status code, 000 when unreachable
+    curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 \
+        --retry "${HEALTH_HTTP_RETRIES:-2}" --retry-delay 3 --user-agent 'PostDelegate-ops-healthcheck/1.0' "$1" || true
+}
+
+# --------------------------------------------------------------- checks
+check_disk() {
+    local max=${HEALTH_DISK_MAX_PCT:-85} p pct
+    for p in ${HEALTH_DISK_PATHS:-/ /var/backups/postiz /var/lib/docker}; do
+        [ -e "$p" ] || continue
+        pct=$(disk_usage_pct "$p")
+        if ! [[ $pct =~ ^[0-9]+$ ]]; then
+            record_failure disk "could not read usage of $p"
+        elif [ "$pct" -ge "$max" ]; then
+            record_failure disk "$p is ${pct}% full (limit below ${max}%)"
+        else
+            log_info "disk ok: $p ${pct}%"
+        fi
+    done
+}
+
+# check_stamp_age NAME LABEL STAMP LIMIT_HOURS
+check_stamp_age() {
+    local name=$1 label=$2 stamp=$3 limit=$4 epoch age_h
+    if ! epoch=$(stamp_to_epoch "$stamp"); then
+        record_failure "$name" "$label has an unreadable timestamp"
+        return 0
+    fi
+    age_h=$((($(now_epoch) - epoch) / 3600))
+    if [ "$age_h" -ge "$limit" ]; then
+        record_failure "$name" "$label is ${age_h}h old (limit ${limit}h, stamp $stamp)"
+    else
+        log_info "$name ok: newest $label is ${age_h}h old"
+    fi
+}
+
+check_local_backup() {
+    local stamp
+    if ! stamp=$(newest_complete_snapshot); then
+        record_failure backup-local "no complete backup found in $BACKUP_ROOT"
+        return 0
+    fi
+    check_stamp_age backup-local "local backup" "$stamp" "${HEALTH_BACKUP_MAX_AGE_HOURS:-26}"
+}
+
+check_offsite_backup() {
+    local stamp
+    if [ ! -f "$OPS_MARKER_FILE" ]; then
+        record_failure backup-offsite "no off-site success marker at $OPS_MARKER_FILE (no verified off-site upload yet)"
+        return 0
+    fi
+    stamp=$(sed -n 's/^stamp=//p' "$OPS_MARKER_FILE" | head -n 1)
+    check_stamp_age backup-offsite "off-site backup" "$stamp" "${HEALTH_OFFSITE_MAX_AGE_HOURS:-26}"
+}
+
+compose_container() { # SERVICE -> container id or empty
+    docker_cmd ps -a -q \
+        --filter "label=com.docker.compose.project=${COMPOSE_PROJECT:-postdelegate-postiz}" \
+        --filter "label=com.docker.compose.service=$1" | head -n 1
+}
+
+check_services() {
+    local svc id state status health
+    if ! docker_cmd info > /dev/null 2>&1; then
+        record_failure docker "Docker daemon is not reachable"
+        return 0
+    fi
+    for svc in ${EXPECTED_SERVICES:-postiz postgres redis temporal-postgresql temporal caddy}; do
+        id=$(compose_container "$svc")
+        if [ -z "$id" ]; then
+            record_failure "service-$svc" "container does not exist"
+            continue
+        fi
+        state=$(docker_cmd inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id")
+        status=${state%%|*}
+        health=${state##*|}
+        if [ "$status" != running ]; then
+            record_failure "service-$svc" "state is $status"
+        elif [ "$health" != healthy ] && [ "$health" != none ]; then
+            record_failure "service-$svc" "health is $health"
+        else
+            log_info "service ok: $svc ($status, $health)"
+        fi
+    done
+}
+
+check_temporal() {
+    local id out
+    id=$(compose_container temporal)
+    if [ -z "$id" ]; then
+        record_failure temporal "temporal container does not exist"
+        return 0
+    fi
+    if out=$(with_timeout 30 docker_cmd exec "$id" temporal operator cluster health --address temporal:7233 2>&1) \
+        && [[ $out == *SERVING* ]]; then
+        log_info "temporal ok: SERVING"
+    else
+        record_failure temporal "cluster health did not report SERVING"
+    fi
+}
+
+check_http() {
+    local url=${APP_HEALTH_URL:-https://app.postdelegate.com/api/auth/can-register} code
+    code=$(http_status "$url")
+    if [[ $code =~ ^2[0-9][0-9]$ ]]; then
+        log_info "http ok: $url returned $code"
+    else
+        record_failure http "$url returned ${code:-no response}"
+    fi
+}
+
+# -------------------------------------------------------- alert decisions
+# decide_alert CUR_STATUS CUR_SET NOW PREV_ALERTED PREV_SET CONSEC LAST_ALERT
+#              THRESHOLD REMINDER_SECS
+# prints one of: none alert update reminder recovery
+decide_alert() {
+    local cur=$1 cur_set=$2 now=$3 prev_alerted=$4 prev_set=$5 consec=$6
+    local last_alert=$7 threshold=$8 reminder=$9
+    if [ "$cur" = ok ]; then
+        if [ "$prev_alerted" = 1 ]; then echo recovery; else echo none; fi
+        return 0
+    fi
+    if [ "$consec" -lt "$threshold" ]; then
+        echo none
+    elif [ "$prev_alerted" != 1 ]; then
+        echo alert
+    elif [ "$cur_set" != "$prev_set" ]; then
+        echo update
+    elif [ $((now - last_alert)) -ge "$reminder" ]; then
+        echo reminder
+    else
+        echo none
+    fi
+}
+
+state_value() { # KEY DEFAULT
+    local v=''
+    if [ -f "$STATE_FILE" ]; then v=$(sed -n "s/^$1=//p" "$STATE_FILE" | head -n 1); fi
+    printf '%s' "${v:-$2}"
+}
+
+write_state() { # STATUS CONSEC ALERTED SET LAST_ALERT
+    local tmp="$STATE_FILE.tmp"
+    {
+        printf 'status=%s\n' "$1"
+        printf 'consecutive_failures=%s\n' "$2"
+        printf 'alerted=%s\n' "$3"
+        printf 'failing_set=%s\n' "$4"
+        printf 'last_alert_epoch=%s\n' "$5"
+    } > "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+load_alert_config() {
+    local alerts=$POSTIZ_ETC_DIR/alerts.env
+    if [ -f "$alerts" ]; then
+        if require_private_file "$alerts"; then
+            load_env_file "$alerts"
+        else
+            log_warn "ignoring $alerts until its permissions are fixed"
+        fi
+    fi
+}
+
+main() {
+    local cur_status cur_set now prev_alerted prev_set prev_consec last_alert consec action
+    local host threshold reminder alerted new_last title msg
+
+    mkdir -p "$OPS_STATE_DIR"
+    chmod 700 "$OPS_STATE_DIR"
+    STATE_FILE=$OPS_STATE_DIR/health-state
+    load_alert_config
+    host=$(hostname -s)
+
+    if [ "${1:-}" = --test-alert ]; then
+        log_info "sending a test alert"
+        send_alert "PostDelegate test alert" "Test message from $host. If you can read this, alerts reach you." default white_check_mark || return 2
+        return 0
+    fi
+
+    acquire_lock healthcheck
+
+    check_disk
+    check_local_backup
+    check_offsite_backup
+    check_services
+    check_temporal
+    check_http
+
+    now=$(now_epoch)
+    threshold=${HEALTH_FAIL_THRESHOLD:-2}
+    reminder=$((${HEALTH_REMINDER_HOURS:-6} * 3600))
+    prev_alerted=$(state_value alerted 0)
+    prev_set=$(state_value failing_set '')
+    prev_consec=$(state_value consecutive_failures 0)
+    last_alert=$(state_value last_alert_epoch 0)
+
+    if [ -z "$FAIL_NAMES" ]; then
+        cur_status=ok
+        cur_set=''
+        consec=0
+    else
+        cur_status=fail
+        # shellcheck disable=SC2086
+        cur_set=$(printf '%s\n' $FAIL_NAMES | sort -u | tr '\n' ',' | sed 's/,$//')
+        consec=$((prev_consec + 1))
+    fi
+
+    action=$(decide_alert "$cur_status" "$cur_set" "$now" "$prev_alerted" "$prev_set" "$consec" "$last_alert" "$threshold" "$reminder")
+    alerted=$prev_alerted
+    new_last=$last_alert
+
+    case $action in
+        none) ;;
+        alert | update | reminder)
+            title="PostDelegate ALERT: $cur_set"
+            [ "$action" = alert ] || title="PostDelegate $(printf '%s' "$action" | tr '[:lower:]' '[:upper:]'): $cur_set"
+            msg="Host $host, $(printf '%s' "$FAIL_NAMES" | wc -w | tr -d ' ') failing check(s):"$'\n'"$FAIL_DETAILS"
+            ;;
+        recovery)
+            title="PostDelegate recovered"
+            msg="Host $host: all checks pass again (were failing: $prev_set)."
+            ;;
+    esac
+
+    if [ "$action" != none ]; then
+        log_warn "alert action: $action ($cur_set)"
+        if [ "$action" = recovery ]; then
+            if send_alert "$title" "$msg" default white_check_mark; then alerted=0; else action=failed; fi
+        else
+            if send_alert "$title" "$msg" high warning; then
+                alerted=1
+                new_last=$now
+            else
+                action=failed
+            fi
+        fi
+    fi
+
+    if [ "$action" = failed ]; then
+        # Keep the old alert state so the next run retries delivery.
+        write_state "$cur_status" "$consec" "$prev_alerted" "$prev_set" "$last_alert"
+        log_err "alert delivery failed; will retry on the next run"
+        return 2
+    fi
+
+    write_state "$cur_status" "$consec" "$alerted" "$cur_set" "$new_last"
+
+    if [ "$cur_status" = ok ]; then
+        log_info "healthy: all checks passed"
+        return 0
+    fi
+    log_err "unhealthy: $cur_set"
+    return 1
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    main "$@"
+fi

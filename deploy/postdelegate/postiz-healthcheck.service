@@ -1,0 +1,12 @@
+[Unit]
+Description=PostDelegate Postiz health check
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/postiz-healthcheck
+UMask=0077
+StateDirectory=postiz-ops
+StateDirectoryMode=0700
+TimeoutStartSec=5min

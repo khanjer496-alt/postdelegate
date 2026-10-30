@@ -1,0 +1,39 @@
+# Disposable databases for proving an off-site backup restores. Not production:
+# no published ports, no network, data in RAM, project name differs from the
+# live stack. Usage is in README.md, "Restore an off-site backup".
+#   export RESTORE_DIR=/srv/restore-test/<stamp>   # the extracted backup
+name: postdelegate-restore-test
+
+services:
+  postiz-db:
+    image: postgres:17-alpine
+    network_mode: none
+    environment:
+      POSTGRES_USER: postiz
+      POSTGRES_DB: postiz
+      POSTGRES_PASSWORD: scratch-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ${RESTORE_DIR:?set RESTORE_DIR to the extracted backup directory}:/backup:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postiz -d postiz"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  temporal-db:
+    image: postgres:16-alpine
+    network_mode: none
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: scratch-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ${RESTORE_DIR:?set RESTORE_DIR to the extracted backup directory}:/backup:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U temporal -d temporal"]
+      interval: 3s
+      timeout: 3s
+      retries: 40

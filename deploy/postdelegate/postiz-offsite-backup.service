@@ -1,0 +1,15 @@
+[Unit]
+Description=Encrypt and upload the newest Postiz backup to off-site R2
+# Ordering only: never pull in or start the local backup from here.
+After=postiz-backup.service network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/offsite-backup-postiz
+UMask=0077
+StateDirectory=postiz-ops
+StateDirectoryMode=0700
+TimeoutStartSec=3h
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily off-site PostDelegate Postiz backup
+
+[Timer]
+# The local backup runs at 02:20 UTC (plus up to 15 minutes of random delay).
+OnCalendar=*-*-* 03:00:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target
