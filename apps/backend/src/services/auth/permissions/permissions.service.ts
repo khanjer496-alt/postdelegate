@@ -1,6 +1,9 @@
 import { Ability, AbilityBuilder, AbilityClass } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  isAiAvailable,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -52,6 +55,10 @@ export class PermissionsService {
       !process.env.STRIPE_PUBLISHABLE_KEY
     ) {
       for (const [action, section] of requestedPermission) {
+        // without billing everyone gets the top tier, but AI still needs a provider key
+        if (section === Sections.AI && !isAiAvailable(pricing.ULTIMATE)) {
+          continue;
+        }
         can(action, section);
       }
       return build({
@@ -150,7 +157,7 @@ export class PermissionsService {
         continue;
       }
 
-      if (section === Sections.AI && options.ai) {
+      if (section === Sections.AI && isAiAvailable(options)) {
         can(action, section);
         continue;
       }

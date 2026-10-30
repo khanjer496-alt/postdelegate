@@ -25,6 +25,11 @@ import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 @ApiTags('Media')
 @Controller('/media')
@@ -41,6 +46,7 @@ export class MediaController {
   }
 
   @Post('/generate-video')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   generateVideo(
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoDto
@@ -50,6 +56,7 @@ export class MediaController {
   }
 
   @Post('/generate-image')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateImage(
     @GetOrgFromRequest() org: Organization,
     @Req() req: Request,
@@ -69,6 +76,7 @@ export class MediaController {
   }
 
   @Post('/generate-image-with-prompt')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateImageFromText(
     @GetOrgFromRequest() org: Organization,
     @Req() req: Request,
@@ -214,6 +222,7 @@ export class MediaController {
   }
 
   @Post('/video/function')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   videoFunction(
     @Body() body: VideoFunctionDto
   ) {

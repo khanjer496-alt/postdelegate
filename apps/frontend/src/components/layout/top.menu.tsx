@@ -13,6 +13,7 @@ interface MenuItemInterface {
   role?: string[];
   hide?: boolean;
   requireBilling?: boolean;
+  requireAi?: boolean;
   onClick?: () => void;
 }
 
@@ -59,6 +60,7 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/agents',
+      requireAi: true,
     },
     {
       name: t('analytics', 'Analytics'),
@@ -244,6 +246,9 @@ export const TopMenu: FC = () => {
                 if (f.requireBilling && !billingEnabled) {
                   return false;
                 }
+                if (f.requireAi && !user?.aiAvailable) {
+                  return false;
+                }
                 if (f.name === 'Billing' && user?.isLifetime) {
                   return false;
                 }
@@ -270,6 +275,9 @@ export const TopMenu: FC = () => {
               return false;
             }
             if (f.requireBilling && !billingEnabled) {
+              return false;
+            }
+            if (f.requireAi && !user?.aiAvailable) {
               return false;
             }
             if (f.name === 'Billing' && user?.isLifetime) {

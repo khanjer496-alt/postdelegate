@@ -19,6 +19,7 @@ import {
 } from 'react-hook-form';
 import { Input } from '@gitroom/react/form/input';
 import { CopilotTextarea } from '@copilotkit/react-textarea';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import clsx from 'clsx';
 import { string, object } from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -37,6 +38,7 @@ export const TextArea: FC<{
   placeHolder: string;
 }> = (props) => {
   const form = useFormContext();
+  const user = useUser();
   const { onChange, onBlur, ...all } = form.register(props.name);
   const value = form.watch(props.name);
   return (
@@ -58,6 +60,7 @@ export const TextArea: FC<{
           });
         }}
         autosuggestionsConfig={{
+          disabled: !user?.aiAvailable,
           textareaPurpose: `Assist me in writing social media posts.`,
           chatApiConfigs: {},
         }}

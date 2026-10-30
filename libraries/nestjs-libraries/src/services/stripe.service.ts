@@ -22,6 +22,81 @@ import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/paym
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
+// Resolve the Stripe price of a tier by its lookup_key (postdelegate_<slug>_<month|year>),
+// falling back to finding/creating the product and price by name for accounts without them
+export async function resolveTierPrice(
+  client: Stripe,
+  billing: string,
+  period: 'MONTHLY' | 'YEARLY'
+): Promise<Stripe.Price> {
+  const priceData = pricing[billing];
+  const interval = period === 'MONTHLY' ? 'month' : 'year';
+  const unitAmount =
+    (period === 'MONTHLY' ? priceData.month_price : priceData.year_price) * 100;
+
+  if (priceData.slug) {
+    const lookupKey = `postdelegate_${priceData.slug}_${interval}`;
+    const byLookupKey = await client.prices.list({
+      lookup_keys: [lookupKey],
+      active: true,
+    });
+    const found = byLookupKey.data[0];
+    if (found && found.unit_amount === unitAmount) {
+      return found;
+    }
+    console.warn('stripe_lookup_key_price_unusable', {
+      lookup_key: lookupKey,
+      found: !!found,
+      expected_amount: unitAmount,
+      found_amount: found?.unit_amount,
+    });
+  }
+
+  const allProducts = await client.products.list({
+    active: true,
+    expand: ['data.prices'],
+  });
+
+  const findProduct =
+    allProducts.data.find(
+      (product) => product.name.toUpperCase() === billing.toUpperCase()
+    ) ||
+    (await client.products.create({
+      active: true,
+      name: billing,
+    }));
+
+  const pricesList = await client.prices.list({
+    active: true,
+    product: findProduct!.id,
+  });
+
+  return (
+    pricesList.data.find(
+      (p) =>
+        p?.recurring?.interval?.toLowerCase() === interval &&
+        p?.unit_amount === unitAmount
+    ) ||
+    (await client.prices.create({
+      active: true,
+      product: findProduct!.id,
+      currency: 'usd',
+      nickname: billing + ' ' + period,
+      unit_amount: unitAmount,
+      recurring: {
+        interval,
+      },
+    }))
+  );
+}
+
+// Subscription statuses that must not keep granting a paid tier
+const NOT_ENTITLED_STATUSES: Stripe.Subscription.Status[] = [
+  'unpaid',
+  'canceled',
+  'incomplete_expired',
+];
+
 @PaymentProvider({ provider: STRIPE_PROVIDER })
 export class StripeService extends PaymentProviderAbstract {
   platform: PaymentPlatform = 'web';
@@ -210,6 +285,12 @@ export class StripeService extends PaymentProviderAbstract {
     return result;
   }
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
+    // Stripe keeps past_due while it retries a failed renewal (the grace period),
+    // but unpaid / canceled / incomplete_expired mean the dunning is over
+    if (NOT_ENTITLED_STATUSES.includes(event.data.object.status)) {
+      return this.deleteSubscription(event);
+    }
+
     const { uniqueId, billing, period } = event.data.object.metadata as {
       billing: 'STANDARD' | 'PRO';
       period: 'MONTHLY' | 'YEARLY';
@@ -233,9 +314,17 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
-  async deleteSubscription(event: Stripe.CustomerSubscriptionDeletedEvent) {
+  async deleteSubscription(
+    event:
+      | Stripe.CustomerSubscriptionDeletedEvent
+      | Stripe.CustomerSubscriptionUpdatedEvent
+  ) {
     const customer = event.data.object.customer as string;
-    const [survivor] = await this.getLiveSubscriptions(customer);
+    const [survivor] = (await this.getLiveSubscriptions(customer)).filter(
+      (f) =>
+        f.id !== event.data.object.id &&
+        !NOT_ENTITLED_STATUSES.includes(f.status)
+    );
     if (!survivor) {
       await this._subscriptionService.deleteSubscription(
         customer,
@@ -355,51 +444,7 @@ export class StripeService extends PaymentProviderAbstract {
   async prorate(organizationId: string, body: BillingSubscribeDto) {
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
-    const priceData = pricing[body.billing];
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
-
-    const pricesList = await stripe.prices.list({
-      active: true,
-      product: findProduct!.id,
-    });
-
-    const findPrice =
-      pricesList.data.find(
-        (p) =>
-          p?.recurring?.interval?.toLowerCase() ===
-            (body.period === 'MONTHLY' ? 'month' : 'year') &&
-          p?.nickname === body.billing + ' ' + body.period &&
-          p?.unit_amount ===
-            (body.period === 'MONTHLY'
-              ? priceData.month_price
-              : priceData.year_price) *
-              100
-      ) ||
-      (await stripe.prices.create({
-        active: true,
-        product: findProduct!.id,
-        currency: 'usd',
-        nickname: body.billing + ' ' + body.period,
-        unit_amount:
-          (body.period === 'MONTHLY'
-            ? priceData.month_price
-            : priceData.year_price) * 100,
-        recurring: {
-          interval: body.period === 'MONTHLY' ? 'month' : 'year',
-        },
-      }));
+    const findPrice = await resolveTierPrice(stripe, body.billing, body.period);
 
     const currentUserSubscription = {
       data: (
@@ -573,6 +618,9 @@ export class StripeService extends PaymentProviderAbstract {
     return stripe.billingPortal.sessions.create({
       customer,
       return_url: process.env['FRONTEND_URL'] + '/billing',
+      ...(process.env.STRIPE_PORTAL_CONFIGURATION
+        ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION }
+        : {}),
     });
   }
 
@@ -985,55 +1033,12 @@ export class StripeService extends PaymentProviderAbstract {
     allowTrial: boolean
   ) {
     const id = makeId(10);
-    const priceData = pricing[body.billing];
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
     if ((await this.getLiveSubscriptions(customer)).length) {
       return { blocked: true };
     }
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
-
-    const pricesList = await stripe.prices.list({
-      active: true,
-      product: findProduct!.id,
-    });
-
-    const findPrice =
-      pricesList.data.find(
-        (p) =>
-          p?.recurring?.interval?.toLowerCase() ===
-            (body.period === 'MONTHLY' ? 'month' : 'year') &&
-          p?.unit_amount ===
-            (body.period === 'MONTHLY'
-              ? priceData.month_price
-              : priceData.year_price) *
-              100
-      ) ||
-      (await stripe.prices.create({
-        active: true,
-        product: findProduct!.id,
-        currency: 'usd',
-        nickname: body.billing + ' ' + body.period,
-        unit_amount:
-          (body.period === 'MONTHLY'
-            ? priceData.month_price
-            : priceData.year_price) * 100,
-        recurring: {
-          interval: body.period === 'MONTHLY' ? 'month' : 'year',
-        },
-      }));
+    const findPrice = await resolveTierPrice(stripe, body.billing, body.period);
 
     return this.createEmbeddedCheckout(
       uniqueId,
@@ -1054,52 +1059,9 @@ export class StripeService extends PaymentProviderAbstract {
     allowTrial: boolean
   ) {
     const id = makeId(10);
-    const priceData = pricing[body.billing];
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
-
-    const pricesList = await stripe.prices.list({
-      active: true,
-      product: findProduct!.id,
-    });
-
-    const findPrice =
-      pricesList.data.find(
-        (p) =>
-          p?.recurring?.interval?.toLowerCase() ===
-            (body.period === 'MONTHLY' ? 'month' : 'year') &&
-          p?.unit_amount ===
-            (body.period === 'MONTHLY'
-              ? priceData.month_price
-              : priceData.year_price) *
-              100
-      ) ||
-      (await stripe.prices.create({
-        active: true,
-        product: findProduct!.id,
-        currency: 'usd',
-        nickname: body.billing + ' ' + body.period,
-        unit_amount:
-          (body.period === 'MONTHLY'
-            ? priceData.month_price
-            : priceData.year_price) * 100,
-        recurring: {
-          interval: body.period === 'MONTHLY' ? 'month' : 'year',
-        },
-      }));
+    const findPrice = await resolveTierPrice(stripe, body.billing, body.period);
 
     const getCurrentSubscriptions =
       await this._subscriptionService.getSubscription(organizationId);

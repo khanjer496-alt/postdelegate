@@ -704,7 +704,7 @@ export const LaunchesComponent = () => {
               <div className="flex gap-[8px] group-[.sidebar]:flex-col mobile:hidden">
                 {sortedIntegrations?.length > 0 && <NewPost />}
                 {sortedIntegrations?.length > 0 &&
-                  user?.tier?.ai &&
+                  user?.aiAvailable &&
                   billingEnabled && <GeneratorComponent />}
               </div>
             </div>
@@ -747,7 +747,7 @@ export const LaunchesComponent = () => {
             </div>
             <div className="mt-[5px] text-center flex flex-col mobile:hidden">
               {billingEnabled && user?.isLifetime && (
-                <div>{capitalize(user?.tier?.current || '')} tier</div>
+                <div>{user?.tier?.label || capitalize(user?.tier?.current || '')} tier</div>
               )}
               <div>
                 {process.env.NEXT_PUBLIC_VERSION
@@ -783,7 +783,7 @@ export const LaunchesComponent = () => {
             {sortedIntegrations?.length > 0 ? (
               <>
                 <NewPost />
-                {user?.tier?.ai && billingEnabled && <GeneratorComponent />}
+                {user?.aiAvailable && billingEnabled && <GeneratorComponent />}
               </>
             ) : (
               <div className="flex-1">

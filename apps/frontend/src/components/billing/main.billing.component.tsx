@@ -189,10 +189,11 @@ const BillingCycle: FC<{
               {'. '}
             </>
           )}
-          {t(
-            'billing_ai_credits_reset_monthly',
-            'AI credits reset every month.'
-          )}
+          {usage.length > 0 &&
+            t(
+              'billing_ai_credits_reset_monthly',
+              'AI credits reset every month.'
+            )}
         </div>
       </div>
       <div className="flex gap-[8px] mobile:flex-col">
@@ -272,7 +273,7 @@ const PlanCard: FC<{
         />
       ))}
       <div className="flex items-center justify-between gap-[8px] min-h-[26px]">
-        <div className="text-[18px] font-[600]">{capitalize(name)}</div>
+        <div className="text-[18px] font-[600]">{pricing[name]?.label || capitalize(name)}</div>
         {current && (
           <div className="flex items-center gap-[6px] h-[26px] px-[10px] rounded-full bg-white/15 text-[12px] font-[600] uppercase whitespace-nowrap">
             <span className="w-[6px] h-[6px] rounded-full bg-[#32D583]" />
