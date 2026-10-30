@@ -61,6 +61,15 @@ export class OAuthController {
       query.resource
     );
 
+    // Where the person lands after they decide, shown on the consent screen:
+    // the name of a dynamically registered app is whatever it called itself
+    let redirectHost: string | undefined;
+    try {
+      redirectHost = new URL(
+        app.dynamic ? query.redirect_uri! : app.redirectUrl
+      ).host;
+    } catch (err) {}
+
     return {
       app: {
         name: app.name,
@@ -68,6 +77,8 @@ export class OAuthController {
         picture: app.picture,
         clientId: app.clientId,
         redirectUrl: app.redirectUrl,
+        dynamic: app.dynamic,
+        redirectHost,
       },
       state: query.state,
       selfHosted,
