@@ -15,7 +15,7 @@ app.postdelegate.com {
     }
     handle /source {
         header Cache-Control "no-store"
-        redir * /source/postdelegate-9890e961.tar.gz 302
+        redir * /source/postdelegate-2246c509.tar.gz 302
     }
     handle_path /source/* {
         root * /source
