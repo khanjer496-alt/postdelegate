@@ -19,7 +19,7 @@ pnpm add @postdelegate/node
 
 ## Get an API key
 
-Open [app.postdelegate.com](https://app.postdelegate.com), go to **Settings > Public API** and copy your API key
+Open [app.postdelegate.com](https://app.postdelegate.com), go to **Settings > Agents / Dev** and copy your API key
 (Public API access depends on your plan). Keep it secret, it can publish to all your channels.
 
 ## Quick start

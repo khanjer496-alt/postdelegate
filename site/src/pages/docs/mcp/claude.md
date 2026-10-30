@@ -19,7 +19,7 @@ https://app.postdelegate.com/mcp-oauth-dynamic
 ```
 
 4. Choose **Add**, then **Connect**. A PostDelegate page opens in your browser.
-5. Sign in to PostDelegate if asked. The page shows the name of the app asking for access and where it will return you. Approve it.
+5. Sign in to PostDelegate if asked. The page shows the name of the app asking for access and where it will return you. Click **Authorize**.
 6. Back in Claude the connector shows as connected.
 
 The address is the same one the app shows for Claude under **Settings > Agents / Dev**. The steps above for adding a custom connector are Claude's own and Anthropic may rename its menus.

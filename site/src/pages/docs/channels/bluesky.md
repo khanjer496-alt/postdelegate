@@ -20,7 +20,7 @@ description: Connect a Bluesky account with an app password, then publish posts 
 | Identifier | Your handle, for example `name.bsky.social` (or the email on the account). |
 | Password | The app password. |
 
-3. Save. PostDelegate signs in to check the details and shows the channel on your calendar.
+3. Click **Connect**. PostDelegate signs in to check the details and shows the channel on your calendar.
 
 The in-app tip says two-factor authentication is not supported: if it is turned on for your Bluesky account you will need to turn it off. If you change the password later, use **Update Credentials** in the channel's menu.
 
