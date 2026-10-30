@@ -35,7 +35,9 @@ export class AuthService {
     body: CreateOrgUserDto | LoginUserDto,
     ip: string,
     userAgent: string,
-    addToOrg?: boolean | { orgId: string; role: 'USER' | 'ADMIN'; id: string }
+    addToOrg?:
+      | boolean
+      | { orgId: string; role: 'USER' | 'ADMIN'; id: string; email?: string }
   ) {
     if (provider === Provider.LOCAL) {
       if (process.env.DISALLOW_PLUS && body.email.includes('+')) {
@@ -66,7 +68,9 @@ export class AuthService {
                 create.users[0].user.id,
                 addToOrg.id,
                 addToOrg.orgId,
-                addToOrg.role
+                addToOrg.role,
+                // email invites can only be accepted by the invited address
+                addToOrg.email || undefined
               )
             : false;
 
@@ -103,7 +107,8 @@ export class AuthService {
             user.id,
             addToOrg.id,
             addToOrg.orgId,
-            addToOrg.role
+            addToOrg.role,
+            addToOrg.email || undefined
           )
         : false;
     return { addedOrg, jwt: await this.jwt(user) };
