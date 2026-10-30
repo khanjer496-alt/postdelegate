@@ -161,6 +161,15 @@ export const SettingsPopup: FC<{
           >
             {t('source_code', 'Source code')}
           </a>
+          <a
+            href="/source"
+            className="mt-[4px] block text-[12px] text-textItemBlur hover:text-newTextColor"
+          >
+            {t(
+              'built_on_open_source_postiz',
+              'Built on the open-source Postiz project'
+            )}
+          </a>
         </div>
       </div>
       <div className="bg-newBgColorInner flex-1 min-w-0 flex-col flex p-[20px] mobile:p-[12px] gap-[12px]">
