@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
+import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +18,8 @@ export class AuthService {
     private _userService: UsersService,
     private _organizationService: OrganizationService,
     private _emailService: EmailService,
-    private _providerManager: AuthProviderManager
+    private _providerManager: AuthProviderManager,
+    private _affiliateService: AffiliateService
   ) {}
   async canRegister(provider: string) {
     if (
@@ -37,7 +39,8 @@ export class AuthService {
     userAgent: string,
     addToOrg?:
       | boolean
-      | { orgId: string; role: 'USER' | 'ADMIN'; id: string; email?: string }
+      | { orgId: string; role: 'USER' | 'ADMIN'; id: string; email?: string },
+    affiliateCookie?: string
   ) {
     if (provider === Provider.LOCAL) {
       if (process.env.DISALLOW_PLUS && body.email.includes('+')) {
@@ -61,6 +64,13 @@ export class AuthService {
           ip,
           userAgent
         );
+
+        await this._affiliateService.attributeOrganization({
+          organizationId: create.id,
+          userId: create.users[0].user.id,
+          email: body.email,
+          cookie: affiliateCookie,
+        });
 
         const addedOrg =
           addToOrg && typeof addToOrg !== 'boolean'
@@ -98,7 +108,8 @@ export class AuthService {
       provider,
       body as CreateOrgUserDto,
       ip,
-      userAgent
+      userAgent,
+      affiliateCookie
     );
 
     const addedOrg =
@@ -146,7 +157,8 @@ export class AuthService {
     provider: Provider,
     body: CreateOrgUserDto,
     ip: string,
-    userAgent: string
+    userAgent: string,
+    affiliateCookie?: string
   ) {
     const providerInstance = this._providerManager.getProvider(provider);
     const providerUser = await providerInstance.getUser(body.providerToken);
@@ -179,6 +191,13 @@ export class AuthService {
       ip,
       userAgent
     );
+
+    await this._affiliateService.attributeOrganization({
+      organizationId: create.id,
+      userId: create.users[0].user.id,
+      email: providerUser.email,
+      cookie: affiliateCookie,
+    });
 
     this._track('register', providerUser.email, body.datafast_visitor_id).catch(
       (err) => {}

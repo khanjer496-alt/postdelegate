@@ -1,7 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   HttpException,
+  Param,
+  Post,
   Query,
 } from '@nestjs/common';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -9,6 +12,8 @@ import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
+import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
+import { MarkAffiliatePaidDto } from '@gitroom/nestjs-libraries/dtos/affiliates/mark.affiliate.paid.dto';
 import dayjs from 'dayjs';
 
 @ApiTags('Admin')
@@ -16,7 +21,8 @@ import dayjs from 'dayjs';
 export class AdminController {
   constructor(
     private _errorsService: ErrorsService,
-    private _adminStatsService: AdminStatsService
+    private _adminStatsService: AdminStatsService,
+    private _affiliateService: AffiliateService
   ) {}
 
   private assertSuperAdmin(user: User) {
@@ -67,5 +73,25 @@ export class AdminController {
       to: toDate.endOf('day').toDate(),
       unknownOnly: unknownOnly === 'true' || unknownOnly === '1',
     });
+  }
+
+  @Get('/affiliates/payouts')
+  async listAffiliatePayouts(@GetUserFromRequest() user: User) {
+    this.assertSuperAdmin(user);
+    return this._affiliateService.listPayouts();
+  }
+
+  @Post('/affiliates/payouts/:affiliateId/paid')
+  async markAffiliatePaid(
+    @GetUserFromRequest() user: User,
+    @Param('affiliateId') affiliateId: string,
+    @Body() body: MarkAffiliatePaidDto
+  ) {
+    this.assertSuperAdmin(user);
+    return this._affiliateService.markPaid(
+      affiliateId,
+      body.expectedAmountCents,
+      body.reference
+    );
   }
 }

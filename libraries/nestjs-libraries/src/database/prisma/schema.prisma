@@ -45,11 +45,19 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  // Affiliate attribution, set once at registration and never changed
+  referredByAffiliateId String?
+  referredByAffiliate   AffiliateProfile? @relation("AffiliateReferrals", fields: [referredByAffiliateId], references: [id])
+  referralCode          String?
+  referredAt            DateTime?
+  // Date of the first paid invoice, the commission window starts here
+  referralFirstPaidAt   DateTime?
 
   @@index([apiKey])
   @@index([streakSince])
   @@index([paymentId])
   @@index([deletedAt])
+  @@index([referredByAffiliateId])
 }
 
 model Tags {
@@ -118,6 +126,7 @@ model User {
   sendFailureEmails     Boolean              @default(true)
   sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
+  affiliateProfile      AffiliateProfile?
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -1838,4 +1847,55 @@ model Announcement {
   description String
   color       AnnouncementColor @default(INFO)
   createdAt   DateTime          @default(now())
+}
+
+enum AffiliateCommissionStatus {
+  PENDING
+  PAID
+  REVERSED
+}
+
+model AffiliateProfile {
+  id             String                @id @default(uuid())
+  userId         String                @unique
+  user           User                  @relation(fields: [userId], references: [id])
+  // lowercase, unique, shared by the generated and the vanity code
+  code           String                @unique
+  // the vanity code can be chosen once
+  customCodeSet  Boolean               @default(false)
+  // PayPal email of the affiliate, personal data stored as plain text
+  payoutEmail    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  organizations  Organization[]        @relation("AffiliateReferrals")
+  commissions    AffiliateCommission[]
+}
+
+// One row per paid Stripe invoice of a referred organization. The pending to
+// approved step is derived from invoicePaidAt and the hold period, only
+// PENDING, PAID and REVERSED are stored.
+model AffiliateCommission {
+  id               String                    @id @default(uuid())
+  affiliateId      String
+  affiliate        AffiliateProfile          @relation(fields: [affiliateId], references: [id])
+  // kept without a relation, the ledger must outlive the organization
+  organizationId   String
+  stripeInvoiceId  String                    @unique
+  currency         String
+  // paid amount of the invoice without tax, the base of the commission
+  invoiceNetCents  Int
+  percent          Int
+  amountCents      Int
+  // part of the commission taken back by refunds and chargebacks
+  reversedCents    Int                       @default(0)
+  status           AffiliateCommissionStatus @default(PENDING)
+  invoicePaidAt    DateTime
+  paidAt           DateTime?
+  paymentReference String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@index([affiliateId, status])
+  @@index([organizationId])
+  @@index([status, invoicePaidAt])
 }

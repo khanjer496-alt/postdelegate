@@ -15,7 +15,7 @@ app.postdelegate.com {
     }
     handle /source {
         header Cache-Control "no-store"
-        redir * /source/postdelegate-2246c509.tar.gz 302
+        redir * /source/postdelegate-5ba2d1fb.tar.gz 302
     }
     handle_path /source/* {
         root * /source
@@ -40,6 +40,12 @@ app.postdelegate.com {
     handle @mcpOauth {
         rewrite * /api{uri}
         reverse_proxy postiz:5000
+    }
+    @affiliateTerms path /legal/affiliate-terms /legal/affiliate-terms/
+    handle @affiliateTerms {
+        root * /legal-public
+        rewrite * /affiliate-terms.html
+        file_server
     }
     @deletion path /legal/data-deletion /legal/data-deletion/ /data-deletion /data-deletion/
     handle @deletion {
