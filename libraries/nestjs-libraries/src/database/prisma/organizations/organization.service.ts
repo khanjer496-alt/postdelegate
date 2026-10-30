@@ -106,7 +106,7 @@ export class OrganizationService {
     // only the invite fields, the body can carry undeclared properties
     const url =
       process.env.FRONTEND_URL +
-      `/?org=${AuthService.signJWT({
+      `/?org=${AuthService.signTypedJWT('invite', {
         email: body.email,
         role: body.role,
         orgId: org.id,

@@ -1,105 +1,97 @@
-jest.mock(
-  '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service',
-  () => ({ SubscriptionService: class {} })
-);
-jest.mock(
-  '@gitroom/nestjs-libraries/database/prisma/posts/posts.service',
-  () => ({
-    PostsService: class {},
-  })
-);
-jest.mock(
-  '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service',
-  () => ({ IntegrationService: class {} })
-);
-jest.mock(
-  '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service',
-  () => ({ WebhooksService: class {} })
-);
+// the real services pull in every social provider, the specs only need the types
+jest.mock('@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service', () => ({ SubscriptionService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => ({ PostsService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/database/prisma/integrations/integration.service', () => ({ IntegrationService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service', () => ({ WebhooksService: class {} }));
 
-import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { PermissionsService } from './permissions.service';
+import { AuthorizationActions, Sections } from './permission.exception.class';
 
-describe('PermissionsService AI section', () => {
-  const env = { ...process.env };
-  const subscriptionService = {
-    getSubscriptionByOrganizationId: jest.fn(),
-  };
-  const service = new PermissionsService(
-    subscriptionService as any,
-    {} as any,
-    {} as any,
-    {} as any
+const create = AuthorizationActions.Create;
+
+const makeService = (tier?: string) => {
+  const subscription = tier ? { subscriptionTier: tier } : null;
+  return new PermissionsService(
+    {
+      getSubscriptionByOrganizationId: jest.fn().mockResolvedValue(subscription),
+      getSubscription: jest.fn().mockResolvedValue(subscription),
+    } as any,
+    { countPostsFromDay: jest.fn().mockResolvedValue(0) } as any,
+    {
+      getIntegrationsList: jest.fn().mockResolvedValue([]),
+      getIntegrationByInternalId: jest.fn(),
+    } as any,
+    { getTotal: jest.fn().mockResolvedValue(0) } as any
   );
-  const ask = () =>
-    service.check('org', new Date(), 'SUPERADMIN', [
-      [AuthorizationActions.Create, Sections.AI],
-    ]);
+};
 
+const canDo = async (
+  role: 'USER' | 'ADMIN' | 'SUPERADMIN',
+  section: Sections,
+  tier?: string
+) => {
+  const ability = await makeService(tier).check(
+    'org',
+    new Date(),
+    role,
+    [[create, section]]
+  );
+  return ability.can(create, section);
+};
+
+describe('PermissionsService role sections', () => {
+  const env = { ...process.env };
   afterEach(() => {
     process.env = { ...env };
-    pricing.ULTIMATE.ai = false;
-    pricing.STANDARD.ai = false;
   });
 
-  describe('without billing (everyone gets the top tier)', () => {
+  describe('billing off (no STRIPE_PUBLISHABLE_KEY)', () => {
     beforeEach(() => {
       delete process.env.STRIPE_PUBLISHABLE_KEY;
     });
 
-    it('refuses AI while the top tier has AI off, even with a provider key', async () => {
-      process.env.OPENAI_API_KEY = 'sk-test';
-      const ability = await ask();
-      expect(ability.can(AuthorizationActions.Create, Sections.AI)).toBe(false);
+    it('denies the admin section to a plain member', async () => {
+      expect(await canDo('USER', Sections.ADMIN)).toBe(false);
     });
 
-    it('refuses AI when the tier allows it but no provider key is set', async () => {
-      delete process.env.OPENAI_API_KEY;
-      pricing.ULTIMATE.ai = true;
-      const ability = await ask();
-      expect(ability.can(AuthorizationActions.Create, Sections.AI)).toBe(false);
+    it.each(['ADMIN', 'SUPERADMIN'] as const)(
+      'grants the admin section to %s',
+      async (role) => {
+        expect(await canDo(role, Sections.ADMIN)).toBe(true);
+      }
+    );
+
+    it('still skips plan and quota sections for everyone', async () => {
+      for (const section of [
+        Sections.CHANNEL,
+        Sections.POSTS_PER_MONTH,
+        Sections.TEAM_MEMBERS,
+        Sections.WEBHOOKS,
+        Sections.AI,
+      ]) {
+        expect(await canDo('USER', section)).toBe(true);
+      }
     });
 
-    it('allows AI with the tier flag and a provider key', async () => {
-      process.env.OPENAI_API_KEY = 'sk-test';
-      pricing.ULTIMATE.ai = true;
-      const ability = await ask();
-      expect(ability.can(AuthorizationActions.Create, Sections.AI)).toBe(true);
-    });
-
-    it('still grants other sections', async () => {
-      const ability = await service.check('org', new Date(), 'SUPERADMIN', [
-        [AuthorizationActions.Create, Sections.WEBHOOKS],
+    it('needs every requested policy, like the team routes do', async () => {
+      const ability = await makeService().check('org', new Date(), 'USER', [
+        [create, Sections.TEAM_MEMBERS],
+        [create, Sections.ADMIN],
       ]);
-      expect(ability.can(AuthorizationActions.Create, Sections.WEBHOOKS)).toBe(
-        true
-      );
+      expect(ability.can(create, Sections.TEAM_MEMBERS)).toBe(true);
+      expect(ability.can(create, Sections.ADMIN)).toBe(false);
     });
   });
 
-  describe('with billing', () => {
+  describe('billing on', () => {
     beforeEach(() => {
       process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
-      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue({
-        subscriptionTier: 'STANDARD',
-      });
     });
 
-    it('refuses AI when the paid tier has AI off', async () => {
-      process.env.OPENAI_API_KEY = 'sk-test';
-      const ability = await ask();
-      expect(ability.can(AuthorizationActions.Create, Sections.AI)).toBe(false);
-    });
-
-    it('allows AI when the paid tier and a provider key allow it', async () => {
-      process.env.OPENAI_API_KEY = 'sk-test';
-      pricing.STANDARD.ai = true;
-      const ability = await ask();
-      expect(ability.can(AuthorizationActions.Create, Sections.AI)).toBe(true);
+    it('decides the admin section by role only', async () => {
+      expect(await canDo('USER', Sections.ADMIN, 'PRO')).toBe(false);
+      expect(await canDo('ADMIN', Sections.ADMIN, 'PRO')).toBe(true);
+      expect(await canDo('SUPERADMIN', Sections.ADMIN, 'PRO')).toBe(true);
     });
   });
 });

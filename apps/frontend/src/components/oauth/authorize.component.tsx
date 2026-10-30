@@ -221,6 +221,17 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
             />
           ) : (
             <>
+              {!!appInfo.app.redirectHost && (
+                <div className="border-t border-[#2A2929] pt-[16px] text-[14px] text-gray-400">
+                  After you decide, you will be sent to{' '}
+                  <span className="text-white font-semibold break-all">
+                    {appInfo.app.redirectHost}
+                  </span>
+                  .{' '}
+                  {!!appInfo.app.dynamic &&
+                    'This application registered itself and its name is not verified, only continue if you started this connection and recognize that address.'}
+                </div>
+              )}
               <div className="border-t border-[#2A2929] pt-[16px]">
                 <div className="text-[14px] text-gray-400 mb-[12px]">
                   This application is requesting access to your PostDelegate

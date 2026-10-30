@@ -4,21 +4,15 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { User } from '@prisma/client';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
-import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
+import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.management';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
+import { isCrossSiteCookieRequest } from '@gitroom/backend/services/auth/csrf';
 import { setSentryUserContext } from '@gitroom/nestjs-libraries/sentry/initialize.sentry';
 
 export const removeAuth = (res: Response) => {
   res.cookie('auth', '', {
-    domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-    ...(!process.env.NOT_SECURED
-      ? {
-          secure: true,
-          httpOnly: true,
-          sameSite: 'none',
-        }
-      : {}),
+    ...getAuthCookieOptions(),
     expires: new Date(0),
     maxAge: -1,
   });
@@ -36,11 +30,21 @@ export class AuthMiddleware implements NestMiddleware {
     if (!auth) {
       throw new HttpForbiddenException();
     }
+
+    // the cookie authenticates whatever site the browser sends it from
+    if (isCrossSiteCookieRequest(req)) {
+      throw new HttpForbiddenException();
+    }
+
     try {
-      // Verify the JWT signature only. Never trust authorization-relevant
-      // claims (id, isSuperAdmin, activated) from the token body — always
-      // re-resolve the user from the database using the id.
-      const payload = AuthService.verifyJWT(auth) as User | null;
+      // Only a session token is a login: reset, activation and invite links
+      // are signed with the same secret and rejected here. The claims are
+      // never trusted for authorization (isSuperAdmin, activated, ...), the
+      // user is always re-resolved from the database using the id.
+      const payload = AuthService.verifyTypedJWT<{ id: string; pv: string }>(
+        auth as string,
+        'session'
+      );
       const orgHeader = req.cookies.showorg || req.headers.showorg;
 
       if (!payload?.id || typeof payload.id !== 'string') {
@@ -50,6 +54,11 @@ export class AuthMiddleware implements NestMiddleware {
       let user = (await this._userService.getUserById(payload.id)) as User | null;
 
       if (!user) {
+        throw new HttpForbiddenException();
+      }
+
+      // a password change signs out every session issued before it
+      if (payload.pv !== AuthService.passwordFingerprint(user.password)) {
         throw new HttpForbiddenException();
       }
 

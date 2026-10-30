@@ -118,20 +118,17 @@ export class PublicController {
   @Post('/modify-subscription')
   async modifySubscription(@Body('params') params: string) {
     try {
-      const load = AuthService.verifyJWT(params) as {
+      const load = AuthService.verifyTypedJWT<{
         orgId: string;
         billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
-      };
+      }>(params, 'enterprise-subscription');
 
       if (
         !load ||
         !load.orgId ||
         typeof load.orgId !== 'string' ||
         !load.billing ||
-        !pricing[load.billing] ||
-        'timeLimit' in load || // team invite token
-        'providerName' in load || // login token (full User row)
-        'expires' in load // password reset token
+        !pricing[load.billing]
       ) {
         return { success: false };
       }
