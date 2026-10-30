@@ -45,6 +45,7 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  reviews             Review[]
   // Affiliate attribution, set once at registration and never changed
   referredByAffiliateId String?
   referredByAffiliate   AffiliateProfile? @relation("AffiliateReferrals", fields: [referredByAffiliateId], references: [id])
@@ -127,6 +128,8 @@ model User {
   sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
   affiliateProfile      AffiliateProfile?
+  review                Review?
+  reviewPrompt          ReviewPrompt?
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -1898,4 +1901,45 @@ model AffiliateCommission {
   @@index([affiliateId, status])
   @@index([organizationId])
   @@index([status, invoicePaidAt])
+}
+
+enum ReviewStatus {
+  NEW
+  APPROVED
+  HIDDEN
+}
+
+// One review per user. The status is moved only by a super admin, and a review
+// is shown publicly only when it is APPROVED and the author consented.
+model Review {
+  id               String       @id @default(uuid())
+  userId           String       @unique
+  user             User         @relation(fields: [userId], references: [id])
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  // 1 to 5
+  rating           Int
+  text             String
+  // entered by the user, optional, shown only when consentToPublish
+  displayName      String?
+  roleCompany      String?
+  consentToPublish Boolean      @default(false)
+  status           ReviewStatus @default(NEW)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([organizationId])
+}
+
+// When the review card was shown, dismissed or answered, per user
+model ReviewPrompt {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id])
+  lastPromptAt DateTime?
+  dismissedAt  DateTime?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

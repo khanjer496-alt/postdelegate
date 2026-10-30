@@ -7,6 +7,7 @@ import Icon from '../components/Icon.astro';
 import Doodles from '../components/Doodles.astro';
 import ProductPreview from '../components/ProductPreview.astro';
 import FeatureVisual from '../components/FeatureVisual.astro';
+import Testimonials from '../components/Testimonials.astro';
 import { NETWORKS } from '../data/networks';
 import { FAQ } from '../data/faq';
 import { SITE } from '../data/site';
@@ -69,6 +70,7 @@ const features=[
   <section class="channels-section section" id="channels" aria-labelledby="channels-title"><div class="container"><h2 class="section-heading" id="channels-title">Your channels.<br/>One place to plan.</h2><p class="section-intro">From the familiar favourites to the next thing you try.  Explore the directory as our publishing connections open.</p><div class="channel-mosaic">{NETWORKS.map((n,i)=><a href={n.scheduler?'/'+n.scheduler:'/platforms'} aria-label={'Explore '+n.name+' connection availability'} style={'--tile-rotate:'+[-5,4,-2,6,0,-4,3,5][i%8]+'deg'}><NetworkBadge n={n} size="lg"/></a>)}</div><a class="button button-outline" href="/platforms">Explore all channels <span aria-hidden="true">↗</span></a><p class="rollout-caption">Directory coverage reflects the Postiz platform. Availability on PostDelegate varies during early access.</p></div></section>
   <CtaBand />
   <section class="proof-section section" aria-labelledby="proof-title"><div class="container"><span class="eyebrow">A FOUNDATION YOU CAN EXPLORE</span><h2 class="section-heading" id="proof-title">Make it part of<br/>your own working day.</h2><div class="proof-grid"><a href={SITE.signup}><span class="proof-icon">▦</span><h3>Start with the workspace</h3><p>Open the calendar, explore the media library and find your way around.</p><span class="proof-link">Create a workspace ↗</span></a><a href={SITE.source}><span class="proof-icon">&lt;/&gt;</span><h3>Built on open source</h3><p>Postiz is our foundation. You can inspect the source behind the application.</p><span class="proof-link">View the source ↗</span></a><a href="/support"><span class="proof-icon">↗</span><h3>Know what’s opening next</h3><p>Check connection availability and ask us about the workflows that matter to you.</p><span class="proof-link">Talk to us ↗</span></a></div></div></section>
+  <Testimonials />
   <section class="section home-faq" id="faq"><div class="container"><h2 class="section-heading">Frequently asked <span class="ink-underline">questions.<Doodles kind="underline"/></span></h2><Faq items={FAQ}/></div></section><CtaBand />
   <a class="support-bubble" href="/support"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v6a3 3 0 0 1-3 3h-4M4 12v5H2v-5h2Zm16 0v5h2v-5h-2Z"/></svg>Support</a>
 </Base>

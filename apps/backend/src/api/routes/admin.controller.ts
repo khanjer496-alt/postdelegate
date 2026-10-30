@@ -14,6 +14,8 @@ import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { MarkAffiliatePaidDto } from '@gitroom/nestjs-libraries/dtos/affiliates/mark.affiliate.paid.dto';
+import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
+import { UpdateReviewStatusDto } from '@gitroom/nestjs-libraries/dtos/reviews/update.review.status.dto';
 import dayjs from 'dayjs';
 
 @ApiTags('Admin')
@@ -22,7 +24,8 @@ export class AdminController {
   constructor(
     private _errorsService: ErrorsService,
     private _adminStatsService: AdminStatsService,
-    private _affiliateService: AffiliateService
+    private _affiliateService: AffiliateService,
+    private _reviewService: ReviewService
   ) {}
 
   private assertSuperAdmin(user: User) {
@@ -93,5 +96,31 @@ export class AdminController {
       body.expectedAmountCents,
       body.reference
     );
+  }
+
+  @Get('/reviews')
+  async listReviews(
+    @GetUserFromRequest() user: User,
+    @Query('status') status?: string
+  ) {
+    this.assertSuperAdmin(user);
+    return this._reviewService.listForAdmin(status || undefined);
+  }
+
+  // Approved and consented reviews only, the shape of the site feed
+  @Get('/reviews/export')
+  async exportReviews(@GetUserFromRequest() user: User) {
+    this.assertSuperAdmin(user);
+    return this._reviewService.exportApproved();
+  }
+
+  @Post('/reviews/:id/status')
+  async setReviewStatus(
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Body() body: UpdateReviewStatusDto
+  ) {
+    this.assertSuperAdmin(user);
+    return this._reviewService.setStatus(id, body.status);
   }
 }

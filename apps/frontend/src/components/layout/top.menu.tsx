@@ -5,11 +5,14 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MenuItem } from '@gitroom/frontend/components/new-layout/menu-item';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { openReviewModal } from '@gitroom/frontend/components/reviews/review.form';
 
 interface MenuItemInterface {
   name: string;
   icon: ReactNode;
   path: string;
+  title?: string;
   role?: string[];
   hide?: boolean;
   requireBilling?: boolean;
@@ -20,6 +23,7 @@ interface MenuItemInterface {
 export const useMenuItem = () => {
   const { isGeneral } = useVariables();
   const t = useT();
+  const { openModal } = useModals();
 
   const firstMenu = [
     {
@@ -165,6 +169,32 @@ export const useMenuItem = () => {
       role: ['ADMIN', 'SUPERADMIN', 'USER'],
     },
     {
+      name: t('review_menu', 'Review'),
+      title: t('review_leave', 'Leave a review'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="21"
+          viewBox="0 0 20 21"
+          fill="none"
+        >
+          <path
+            d="M10 2.75l2.2 4.46 4.92.72-3.56 3.47.84 4.9L10 13.77l-4.4 2.31.84-4.9L2.88 7.93l4.92-.72L10 2.75z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      // opens the review form, there is no page behind it
+      path: '#review',
+      onClick: () =>
+        openReviewModal(openModal, t('review_leave', 'Leave a review')),
+      role: ['ADMIN', 'SUPERADMIN', 'USER'],
+    },
+    {
       name: t('billing', 'Billing'),
       icon: (
         <svg
@@ -260,6 +290,7 @@ export const TopMenu: FC = () => {
                 <MenuItem
                   path={item.path}
                   label={item.name}
+                  title={item.title}
                   icon={item.icon}
                   key={item.name}
                   onClick={item.onClick}
@@ -291,6 +322,7 @@ export const TopMenu: FC = () => {
             <MenuItem
               path={item.path}
               label={item.name}
+              title={item.title}
               icon={item.icon}
               key={item.name}
               onClick={item.onClick}
