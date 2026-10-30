@@ -11,6 +11,7 @@ import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/for
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
+import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +20,8 @@ export class AuthService {
     private _organizationService: OrganizationService,
     private _emailService: EmailService,
     private _providerManager: AuthProviderManager,
-    private _affiliateService: AffiliateService
+    private _affiliateService: AffiliateService,
+    private _loginLockoutService: LoginLockoutService
   ) {}
   async canRegister(provider: string) {
     if (
@@ -93,9 +95,18 @@ export class AuthService {
         return obj;
       }
 
-      if (!user || !AuthChecker.comparePassword(body.password, user.password)) {
+      // a locked email gets the same error as a wrong password, whether or not
+      // the account exists
+      if (await this._loginLockoutService.isLocked(body.email)) {
         throw new Error('Invalid user name or password');
       }
+
+      if (!user || !AuthChecker.comparePassword(body.password, user.password)) {
+        await this._loginLockoutService.recordFailure(body.email);
+        throw new Error('Invalid user name or password');
+      }
+
+      await this._loginLockoutService.clear(body.email);
 
       if (!user.activated) {
         throw new Error('User is not activated');

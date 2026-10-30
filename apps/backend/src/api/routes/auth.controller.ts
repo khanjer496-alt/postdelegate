@@ -10,7 +10,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
+import {
+  ClientIp,
+  ThrottlerRealIpGuard,
+} from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { Response, Request } from 'express';
 
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -22,7 +25,6 @@ import { ResendActivationDto } from '@gitroom/nestjs-libraries/dtos/auth/resend-
 import { ApiTags } from '@nestjs/swagger';
 import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.management';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
-import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { Provider } from '@prisma/client';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
@@ -58,7 +60,7 @@ export class AuthController {
     @Req() req: Request,
     @Body() body: CreateOrgUserDto,
     @Res({ passthrough: false }) response: Response,
-    @RealIP() ip: string,
+    @ClientIp() ip: string,
     @UserAgent() userAgent: string
   ) {
     try {
@@ -121,7 +123,7 @@ export class AuthController {
     @Req() req: Request,
     @Body() body: LoginUserDto,
     @Res({ passthrough: false }) response: Response,
-    @RealIP() ip: string,
+    @ClientIp() ip: string,
     @UserAgent() userAgent: string
   ) {
     try {

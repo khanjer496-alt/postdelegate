@@ -30,7 +30,7 @@ import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
 import { TimezoneDto } from '@gitroom/nestjs-libraries/dtos/users/timezone.dto';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
-import { RealIP } from 'nestjs-real-ip';
+import { ClientIp } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
@@ -392,7 +392,7 @@ export class UsersController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
     @GetUserFromRequest() user: User,
-    @RealIP() ip: string,
+    @ClientIp() ip: string,
     @UserAgent() userAgent: string,
     @Body()
     body: { tt: TrackEnum; fbclid: string; additional: Record<string, any> }

@@ -13,6 +13,22 @@ import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { ProviderAuthorizationCheck } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
+import {
+  decryptCredentials,
+  encryptCredentials,
+  TokenEncryption,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
+
+type Credentials = { token?: string | null; refreshToken?: string | null };
+const blankCredentials = <T extends Credentials>(row: T): T => ({
+  ...row,
+  ...('token' in row ? { token: '' } : {}),
+  ...('refreshToken' in row ? { refreshToken: null } : {}),
+});
+type IntegrationModel = Pick<
+  Prisma.TransactionClient['integration'],
+  'findFirst' | 'updateMany'
+>;
 
 const authorizationSelect = {
   id: true, organizationId: true, providerIdentifier: true, token: true,
@@ -47,7 +63,81 @@ export class IntegrationRepository {
     private _mentions: PrismaRepository<'mentions'>,
     private _transaction: PrismaTransaction,
     private _notificationsRepository: NotificationsRepository
-  ) {}
+  ) {
+    // throws on a malformed key, warns once when tokens stay plaintext
+    TokenEncryption.warnIfDisabled();
+  }
+
+  // Credentials are encrypted at rest (see token.encryption.ts). Every row
+  // leaves this repository with plaintext tokens, and every write goes in
+  // encrypted. A value that cannot be decrypted throws a TokenEncryptionError.
+  private decryptRow<T extends Credentials>(row: T): T;
+  private decryptRow<T extends Credentials>(row: T | null): T | null;
+  private decryptRow<T extends Credentials>(row: T | null): T | null {
+    return row ? decryptCredentials(row) : row;
+  }
+
+  // For lists: one unreadable row must not hide the others. The unreadable
+  // credentials are blanked ('skip' leaves the row out) and the id is logged,
+  // never the value.
+  private decryptRows<T extends Credentials & { id: string }>(
+    rows: T[],
+    unreadable: 'blank' | 'skip'
+  ): T[] {
+    const result: T[] = [];
+    for (const row of rows) {
+      try {
+        result.push(decryptCredentials(row));
+      } catch (err) {
+        console.error(`Integration ${row.id}: ${(err as Error).message}`);
+        if (unreadable === 'blank') {
+          result.push(blankCredentials(row));
+        }
+      }
+    }
+    return result;
+  }
+
+  private tokenEquals(stored: string, expected: string) {
+    try {
+      return TokenEncryption.decrypt(stored) === expected;
+    } catch {
+      return false;
+    }
+  }
+
+  // Tokens are stored with a random IV, so SQL cannot compare them with the
+  // plaintext a caller remembers. The stored value is read, decrypted and
+  // compared here, and the write is pinned to that exact stored value, so it
+  // still matches nothing when the token changed in between. Returns null when
+  // the row does not exist or holds another token.
+  private async pinStoredToken(
+    model: IntegrationModel,
+    where: Prisma.IntegrationWhereInput,
+    expectedToken?: string
+  ): Promise<Prisma.IntegrationWhereInput | null> {
+    if (!expectedToken) return where;
+    const row = await model.findFirst({ where, select: { token: true } });
+    if (!row || !this.tokenEquals(row.token, expectedToken)) return null;
+    return { ...where, token: row.token };
+  }
+
+  private async updateManyIfTokenMatches(
+    model: IntegrationModel,
+    where: Prisma.IntegrationWhereInput,
+    expectedToken: string | undefined,
+    data: Prisma.IntegrationUpdateManyMutationInput
+  ): Promise<{ count: number }> {
+    // a retry covers the stored value being re-encrypted (backfill) between
+    // the read and the write
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const pinned = await this.pinStoredToken(model, where, expectedToken);
+      if (!pinned) return { count: 0 };
+      const result = await model.updateMany({ where: pinned, data });
+      if (result.count || !expectedToken) return result;
+    }
+    return { count: 0 };
+  }
 
   private async lockAuthorizationGrant(tx: Prisma.TransactionClient, provider: string, subject?: string | null) {
     if (!subject) return;
@@ -206,6 +296,12 @@ export class IntegrationRepository {
   }
 
   async updateIntegration(id: string, params: Partial<Integration>, newDeletedGeneration = false, useRemoteAvatar = false) {
+    return this.decryptRow(
+      await this.writeIntegration(id, encryptCredentials(params), newDeletedGeneration, useRemoteAvatar)
+    );
+  }
+
+  private async writeIntegration(id: string, params: Partial<Integration>, newDeletedGeneration: boolean, useRemoteAvatar: boolean) {
     if (newDeletedGeneration) return this._transaction.model.$transaction(async (tx) => {
       let source = await tx.integration.findUnique({ where: { id } });
       if (!source || source.deletedAt) throw new ConflictException('This connection was removed. Please reconnect.');
@@ -308,28 +404,24 @@ export class IntegrationRepository {
   }
 
   disconnectChannel(org: string, id: string, expectedToken?: string) {
-    return this._integration.model.integration.updateMany({
-      where: {
-        id,
-        organizationId: org,
-        deletedAt: null,
-        refreshNeeded: false,
-        ...(expectedToken ? { token: expectedToken } : {}),
-      },
-      data: {
-        refreshNeeded: true,
-      },
-    });
+    return this.updateManyIfTokenMatches(
+      this._integration.model.integration,
+      { id, organizationId: org, deletedAt: null, refreshNeeded: false },
+      expectedToken,
+      { refreshNeeded: true }
+    );
   }
 
-  getIntegrationByInternalId(org: string, internalId: string) {
-    return this._integration.model.integration.findFirst({
-      where: {
-        organizationId: org,
-        internalId,
-        deletedAt: null,
-      },
-    });
+  async getIntegrationByInternalId(org: string, internalId: string) {
+    return this.decryptRow(
+      await this._integration.model.integration.findFirst({
+        where: {
+          organizationId: org,
+          internalId,
+          deletedAt: null,
+        },
+      })
+    );
   }
 
   // Moves a channel to another provider in place (MIGRATE_PROVIDERS): only the
@@ -368,17 +460,19 @@ export class IntegrationRepository {
       });
     }
 
-    return this._integration.model.integration.update({
-      where: {
-        id,
-        organizationId: org,
-      },
-      data: {
-        internalId,
-        providerIdentifier,
-        rootInternalId,
-      },
-    });
+    return this.decryptRow(
+      await this._integration.model.integration.update({
+        where: {
+          id,
+          organizationId: org,
+        },
+        data: {
+          internalId,
+          providerIdentifier,
+          rootInternalId,
+        },
+      })
+    );
   }
 
   async createOrUpdateIntegration(
@@ -417,6 +511,8 @@ export class IntegrationRepository {
           ]),
         }
       : {};
+    const storedToken = TokenEncryption.encrypt(token);
+    const storedRefreshToken = TokenEncryption.encrypt(refreshToken);
     const write = {
       where: {
         organizationId_internalId: {
@@ -428,11 +524,11 @@ export class IntegrationRepository {
         type: type as any,
         name,
         providerIdentifier: provider,
-        token,
+        token: storedToken,
         profile: username,
         ...(picture ? { picture } : {}),
         inBetweenSteps: isBetweenSteps,
-        refreshToken,
+        refreshToken: storedRefreshToken,
         ...(expiresIn
           ? { tokenExpiration: new Date(Date.now() + expiresIn * 1000) }
           : {}),
@@ -460,9 +556,9 @@ export class IntegrationRepository {
         ...(picture ? { picture } : {}),
         profile: username,
         providerIdentifier: provider,
-        token,
+        token: storedToken,
         // never wipe a stored refresh token with an empty one
-        ...(refreshToken ? { refreshToken } : {}),
+        ...(refreshToken ? { refreshToken: storedRefreshToken } : {}),
         ...(expiresIn
           ? { tokenExpiration: new Date(Date.now() + expiresIn * 1000) }
           : {}),
@@ -505,8 +601,8 @@ export class IntegrationRepository {
           rootInternalId: rootId,
         },
         data: {
-          token,
-          refreshToken,
+          token: storedToken,
+          refreshToken: storedRefreshToken,
           refreshNeeded: false,
           ...(expiresIn
             ? { tokenExpiration: new Date(Date.now() + expiresIn * 1000) }
@@ -515,48 +611,42 @@ export class IntegrationRepository {
       });
     }
 
-    return upsert;
+    return this.decryptRow(upsert);
   }
 
-  needsToBeRefreshed() {
-    return this._integration.model.integration.findMany({
-      where: {
-        tokenExpiration: {
-          lte: dayjs().add(1, 'day').toDate(),
+  async needsToBeRefreshed() {
+    return this.decryptRows(
+      await this._integration.model.integration.findMany({
+        where: {
+          tokenExpiration: {
+            lte: dayjs().add(1, 'day').toDate(),
+          },
+          inBetweenSteps: false,
+          deletedAt: null,
+          refreshNeeded: false,
         },
-        inBetweenSteps: false,
-        deletedAt: null,
-        refreshNeeded: false,
-      },
-    });
+      }),
+      // refreshing with blanked credentials would disconnect the channel
+      'skip'
+    );
   }
 
   async setBetweenRefreshSteps(id: string, expectedToken?: string) {
-    return this._integration.model.integration.updateMany({
-      where: {
-        id,
-        deletedAt: null,
-        inBetweenSteps: false,
-        ...(expectedToken ? { token: expectedToken } : {}),
-      },
-      data: {
-        inBetweenSteps: true,
-      },
-    });
+    return this.updateManyIfTokenMatches(
+      this._integration.model.integration,
+      { id, deletedAt: null, inBetweenSteps: false },
+      expectedToken,
+      { inBetweenSteps: true }
+    );
   }
+
   refreshNeeded(org: string, id: string, expectedToken?: string) {
-    return this._integration.model.integration.updateMany({
-      where: {
-        id,
-        organizationId: org,
-        deletedAt: null,
-        refreshNeeded: false,
-        ...(expectedToken ? { token: expectedToken } : {}),
-      },
-      data: {
-        refreshNeeded: true,
-      },
-    });
+    return this.updateManyIfTokenMatches(
+      this._integration.model.integration,
+      { id, organizationId: org, deletedAt: null, refreshNeeded: false },
+      expectedToken,
+      { refreshNeeded: true }
+    );
   }
 
   updateNameAndUrl(id: string, name: string, url: string) {
@@ -574,14 +664,16 @@ export class IntegrationRepository {
     });
   }
 
-  getIntegrationById(org: string, id: string) {
-    return this._integration.model.integration.findFirst({
-      where: {
-        organizationId: org,
-        id,
-        deletedAt: null,
-      },
-    });
+  async getIntegrationById(org: string, id: string) {
+    return this.decryptRow(
+      await this._integration.model.integration.findFirst({
+        where: {
+          organizationId: org,
+          id,
+          deletedAt: null,
+        },
+      })
+    );
   }
 
   async getIntegrationForOrder(
@@ -729,16 +821,19 @@ export class IntegrationRepository {
     });
   }
 
-  getIntegrationsList(org: string) {
-    return this._integration.model.integration.findMany({
-      where: {
-        organizationId: org,
-        deletedAt: null,
-      },
-      include: {
-        customer: true,
-      },
-    });
+  async getIntegrationsList(org: string) {
+    return this.decryptRows(
+      await this._integration.model.integration.findMany({
+        where: {
+          organizationId: org,
+          deletedAt: null,
+        },
+        include: {
+          customer: true,
+        },
+      }),
+      'blank'
+    );
   }
 
   private async latestPostsFor(
@@ -989,33 +1084,50 @@ export class IntegrationRepository {
 
   // Private lifecycle reads deliberately include deleted connections. Never
   // return these rows from a controller: they contain retry credentials.
-  getIntegrationForCleanup(org: string, id: string) {
-    return this._integration.model.integration.findFirst({ where: { organizationId: org, id }, select: authorizationSelect });
+  async getIntegrationForCleanup(org: string, id: string) {
+    return this.decryptRow(await this._integration.model.integration.findFirst({ where: { organizationId: org, id }, select: authorizationSelect }));
   }
 
   getAuthorizationIntegrationsForOrganization(org: string) {
     return this._integration.model.integration.findMany({ where: { organizationId: org }, select: { id: true, providerIdentifier: true } });
   }
 
-  getAuthorizationIntegrationsPage(cursor?: string) {
-    return this._integration.model.integration.findMany({
+  // A row whose credentials cannot be decrypted is flagged instead of dropped
+  // or blanked, so the page keeps its length (the cursor) and the lifecycle
+  // never acts on it as if the provider had revoked the grant.
+  async getAuthorizationIntegrationsPage(cursor?: string) {
+    const rows = await this._integration.model.integration.findMany({
       where: { OR: [{ deletedAt: null }, { deletedAt: { not: null }, disabled: true, refreshNeeded: true }] },
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { id: 'asc' }, take: 100, select: authorizationSelect,
     });
+    return rows.map((row) => {
+      try {
+        return { ...decryptCredentials(row), credentialsUnreadable: false };
+      } catch (err) {
+        console.error(`Integration ${row.id}: ${(err as Error).message}`);
+        return { ...blankCredentials(row), credentialsUnreadable: true };
+      }
+    });
   }
 
-  findAuthorizationGrantCandidates(subject: string) {
-    return this._integration.model.integration.findMany({ where: { rootInternalId: subject }, select: authorizationSelect });
+  async findAuthorizationGrantCandidates(subject: string) {
+    return this.decryptRows(
+      await this._integration.model.integration.findMany({ where: { rootInternalId: subject }, select: authorizationSelect }),
+      'skip'
+    );
   }
 
   async markAuthorizationDeletionRequested(org: string, id: string, expectedToken?: string) {
     return this._transaction.model.$transaction(async (tx) => {
-      const where = { organizationId: org, id, ...(expectedToken ? { token: expectedToken } : {}) };
+      let where = await this.pinStoredToken(tx.integration, { organizationId: org, id }, expectedToken);
+      if (!where) return { matched: false };
       let row = await tx.integration.findFirst({ where, select: authorizationSelect });
       if (!row) return { matched: false };
       if (row.deletedAt && row.disabled && row.refreshNeeded) return { matched: true };
       await this.lockAuthorizationGrant(tx, row.providerIdentifier, row.rootInternalId);
+      where = await this.pinStoredToken(tx.integration, { organizationId: org, id }, expectedToken);
+      if (!where) return { matched: false };
       row = await tx.integration.findFirst({ where, select: authorizationSelect });
       if (!row) return { matched: false };
       if (row.deletedAt && row.disabled && row.refreshNeeded) return { matched: true };
@@ -1043,25 +1155,36 @@ export class IntegrationRepository {
     expectedToken?: string,
     oneTimeToken = false
   ) {
-    const where = { organizationId: org, id, deletedAt: null, inBetweenSteps: false, ...(expectedToken ? { token: expectedToken } : {}) };
+    const base = { organizationId: org, id, deletedAt: null, inBetweenSteps: false };
     const data = {
-        ...(credentials?.accessToken ? { token: credentials.accessToken } : {}),
-        ...(credentials?.refreshToken ? { refreshToken: credentials.refreshToken } : {}),
+        ...encryptCredentials({
+          ...(credentials?.accessToken ? { token: credentials.accessToken } : {}),
+          ...(credentials?.refreshToken ? { refreshToken: credentials.refreshToken } : {}),
+        }),
         ...(credentials?.expiresIn ? { tokenExpiration: new Date(Date.now() + credentials.expiresIn * 1000) } : {}),
         ...(identity ? { name: identity.name, ...(identity.profile !== undefined ? { profile: identity.profile } : {}), ...(identity.picture !== undefined ? { picture: identity.picture } : {}) } : {}),
       };
-    if (!oneTimeToken) return this._integration.model.integration.updateMany({ where, data });
+    if (!oneTimeToken) return this.updateManyIfTokenMatches(this._integration.model.integration, base, expectedToken, data);
     // Preserve single-use grant rotation across the connections sharing that
     // exact credential, while refusing to overwrite a newly reconnected grant.
     return this._transaction.model.$transaction(async (tx) => {
+      const where = await this.pinStoredToken(tx.integration, base, expectedToken);
+      if (!where) return { count: 0 };
       const current = await tx.integration.findFirst({ where, select: { rootInternalId: true } });
       if (!current) return { count: 0 };
       const updated = await tx.integration.updateMany({ where, data });
       if (updated.count && current.rootInternalId && expectedToken) {
-        await tx.integration.updateMany({
-          where: { id: { not: id }, rootInternalId: current.rootInternalId, token: expectedToken, deletedAt: null, inBetweenSteps: false },
-          data,
+        const siblings = await tx.integration.findMany({
+          where: { id: { not: id }, rootInternalId: current.rootInternalId, deletedAt: null, inBetweenSteps: false },
+          select: { id: true, token: true },
         });
+        for (const sibling of siblings) {
+          if (!this.tokenEquals(sibling.token, expectedToken)) continue;
+          await tx.integration.updateMany({
+            where: { id: sibling.id, token: sibling.token, deletedAt: null, inBetweenSteps: false },
+            data,
+          });
+        }
       }
       return updated;
     });
@@ -1234,6 +1357,31 @@ export class IntegrationRepository {
         methodName,
         value: p,
       })),
+    });
+  }
+
+  // The stored (still encrypted) credential columns, a page at a time, for the
+  // encryption backfill. Rows without any credential (erased) are left out.
+  getStoredCredentialsPage(take: number, cursor?: string) {
+    return this._integration.model.integration.findMany({
+      where: { OR: [{ token: { not: '' } }, { refreshToken: { notIn: [''] } }] },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { id: 'asc' },
+      take,
+      select: { id: true, token: true, refreshToken: true },
+    });
+  }
+
+  // Pinned to the stored values: a row that changed since it was read (a
+  // reconnect or a token refresh) is left alone and counts as 0.
+  replaceStoredCredentials(
+    id: string,
+    from: { token: string; refreshToken: string | null },
+    to: { token: string; refreshToken: string | null }
+  ) {
+    return this._integration.model.integration.updateMany({
+      where: { id, token: from.token, refreshToken: from.refreshToken },
+      data: { token: to.token, refreshToken: to.refreshToken },
     });
   }
 

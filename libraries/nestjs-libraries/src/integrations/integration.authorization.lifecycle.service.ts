@@ -220,6 +220,9 @@ export class IntegrationAuthorizationLifecycleService {
     for (const row of rows) {
       const provider = this._manager.getSocialIntegration(row.providerIdentifier);
       if (!provider?.authorizationPolicy || !provider.checkAuthorization) continue;
+      // Stored credentials that cannot be decrypted say nothing about the
+      // provider grant: never check, update or delete from them.
+      if (row.credentialsUnreadable) { pending++; continue; }
       if (row.deletedAt) {
         if (row.disabled && row.refreshNeeded && (row.token || row.refreshToken)) {
           await this.requestDeletion(row.organizationId, row.id).catch(() => { pending++; });

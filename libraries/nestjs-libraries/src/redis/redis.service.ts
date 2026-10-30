@@ -13,9 +13,15 @@ class MockRedis {
     return 'OK';
   }
 
-  async del(key: string) {
-    this.data.delete(key);
-    return 1;
+  async del(...keys: string[]) {
+    keys.forEach((key) => this.data.delete(key));
+    return keys.length;
+  }
+
+  async incr(key: string) {
+    const next = (Number(this.data.get(key)) || 0) + 1;
+    this.data.set(key, next);
+    return next;
   }
 
   async rpush(key: string, value: any) {
