@@ -91,23 +91,42 @@ export class IntegrationAuthorizationLifecycleService {
     }
   }
 
-  private async closeRelatedWorkflows(organizationId: string, integrationId: string, posts: string[]) {
-    const related = new Map<string, string | undefined>([[`refresh_${integrationId}`, undefined], ...posts.map((id) => [`post_${id}`, undefined] as [string, undefined])]);
+  private closeRelatedWorkflows(organizationId: string, integrationId: string, posts: string[]) {
+    return this.closeWorkflows(organizationId, [integrationId], posts);
+  }
+
+  // Also used by the operator erasure command, which closes the workflows of a
+  // whole organization at once. extraWorkflowIds are exact ids to stop as well.
+  async closeWorkflows(organizationId: string, integrationIds: string[], posts: string[], extraWorkflowIds: string[] = []) {
+    const postIds = new Set(posts);
+    const related = new Map<string, string | undefined>([
+      ...integrationIds.map((id) => [`refresh_${id}`, undefined] as [string, undefined]),
+      ...posts.map((id) => [`post_${id}`, undefined] as [string, undefined]),
+      ...extraWorkflowIds.map((id) => [id, undefined] as [string, undefined]),
+    ]);
     // Use only built-in Visibility filtering: self-hosted deployments may not
     // have custom postId attributes registered. Prefixes also identify ABANDON
-    // recurring children created by every existing post workflow version.
+    // recurring children created by every existing post workflow version, their
+    // ids are post_<cuid>_<random>, and a cuid never contains an underscore.
     for await (const execution of this._temporalService.client.getRawClient().workflow.list({ query: 'ExecutionStatus = "Running"' })) {
       const attributes = execution.searchAttributes;
-      const byPost = attributes?.organizationId?.some((id) => String(id) === organizationId) && attributes?.postId?.some((id) => posts.includes(String(id)));
-      if (byPost || posts.some((id) => execution.workflowId === `post_${id}` || execution.workflowId.startsWith(`post_${id}_`))) {
+      const byPost = attributes?.organizationId?.some((id) => String(id) === organizationId) && attributes?.postId?.some((id) => postIds.has(String(id)));
+      const rest = execution.workflowId.startsWith('post_') ? execution.workflowId.slice('post_'.length) : undefined;
+      const byId = rest !== undefined && (postIds.has(rest) || postIds.has(rest.split('_')[0]));
+      if (byPost || byId) {
         related.set(execution.workflowId, execution.runId);
       }
     }
-    const outcomes = await Promise.all([...related].map(([id, runId]) => this.stopWorkflow(id, runId)));
-    return { stopped: !outcomes.includes('pending'), newlyStopped: outcomes.includes('terminated') };
+    // Chunked: an organization can have thousands of posts
+    const entries = [...related];
+    const outcomes: ('closed' | 'terminated' | 'pending')[] = [];
+    for (let i = 0; i < entries.length; i += 50) {
+      outcomes.push(...(await Promise.all(entries.slice(i, i + 50).map(([id, runId]) => this.stopWorkflow(id, runId)))));
+    }
+    return { stopped: !outcomes.includes('pending'), newlyStopped: outcomes.includes('terminated'), terminated: outcomes.filter((outcome) => outcome === 'terminated').length, pending: outcomes.filter((outcome) => outcome === 'pending').length };
   }
 
-  private async purgeAnalytics(organizationId: string, ids: string[]) {
+  async purgeAnalytics(organizationId: string, ids: string[]) {
     for (const id of ids) {
       let cursor = '0';
       do {

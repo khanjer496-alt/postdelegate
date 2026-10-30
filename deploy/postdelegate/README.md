@@ -295,6 +295,87 @@ Run this on any machine with Docker, `age` and `rclone`; the production stack is
 
 A real disaster restore is the same procedure, but into the production stack's database containers using the existing rollback notes above; it also needs the media bucket (not in these backups) and the secrets from the decrypted `configuration/` directory.
 
+## Erasing a person's data on request
+
+The [privacy policy](legal-public/privacy.html) and [data deletion page](legal-public/data-deletion.html) promise two things. In-app account deletion removes data from active use at once (a soft delete). On a verified email request we then **permanently erase** the person's records, channel credentials and uploaded media within 30 days. The operator command `erase-account` does the second part. It ships in the release image (`Dockerfile.release` builds it with the backend and installs `/usr/local/bin/erase-account`); its source is `apps/backend/src/commands/erase-account.ts`, and the logic is in `libraries/nestjs-libraries/src/database/prisma/erasure/`.
+
+### 1. Verify the request first
+
+Never run the command on an unverified email.
+
+1. The request must come from the address on the account. Check the message authentication results (SPF/DKIM pass, From matches); a forged sender is the main risk.
+2. If it comes from another address, or names a workspace or social profile instead, send a confirmation to the **account's** address with a random code and wait for a reply containing it. Do not accept the new address as proof.
+3. Run the dry run below and check that the listed accounts, providers and organizations are what the person described. A person who signed up with Google and with a password has two accounts under one email; both are erased.
+4. Note the receipt date. The 30 days run from the verified request.
+
+### 2. Dry run (the default, writes nothing)
+
+```sh
+sudo postiz-compose exec postiz erase-account --email user@example.com
+```
+
+It prints every matching account (including accounts already removed from the app, found by their hashed email), every organization, and a per-table row count of what would be erased, the Temporal workflows it would stop, the uploaded objects it found, and any blocker.
+
+- An organization where all members are this person (any of their accounts) is **erased entirely**.
+- An organization shared with other people is **kept**; the person only leaves it (membership, comment attribution, OAuth grants, personal avatar).
+- To restrict the run to one organization, add `--org <organization id>`. The user rows are then kept.
+
+### 3. Erase for real
+
+```sh
+sudo postiz-compose exec postiz erase-account --email user@example.com --confirm user@example.com
+```
+
+`--confirm` must repeat the `--email` exactly (or the `--org` id when `--org` is used), otherwise the command refuses before reading anything. `--dry-run` together with `--confirm` still writes nothing. Real runs, in order, per organization: cancel the Stripe subscription, fence the organization, stop its Temporal workflows (and refuse to continue if one cannot be stopped), write the receipt with the object keys, delete the rows in one transaction, then delete the R2 objects and purge the Redis analytics cache. Then each account is erased. A failure stops the run and is safe to repeat: an organization or account that is already gone is simply not found again.
+
+It prints one `ERASURE_AUDIT {...}` line per event (email SHA-256 hash and organization ids only, no email) and the receipt path. Copy the audit line into the operator log. The receipt is a 0600 JSON file in `/config/erasure-receipts` (the `postiz-config` volume), with per-table counts, object counts, and any object key that failed. It also lists manual follow-ups such as the Stripe customer id, so protect it like a credential.
+
+```sh
+sudo postiz-compose exec postiz ls -l /config/erasure-receipts
+sudo postiz-compose exec postiz cat /config/erasure-receipts/<file>.json
+```
+
+Exit codes: 0 done, 1 failed part-way (see the receipt), 2 refused (bad arguments, confirmation mismatch, no such account, super admin), 3 blocked.
+
+Refusals and overrides:
+
+| Situation | Behaviour | Override |
+| --- | --- | --- |
+| Target is a platform super admin (`isSuperAdmin`) | refused | `--allow-superadmin` |
+| Person is the only owner of a workspace shared with others | blocked, they would leave it ownerless | make someone else an owner first, or `--allow-ownerless-orgs` |
+| A channel still holds a provider authorization (providers with an authorization policy, for example YouTube) | blocked; a real run starts the existing revocation lifecycle (`INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED` must be on), re-run when it finished | `--skip-provider-revocation` erases the credentials without revoking them |
+| Object storage URL not configured | real run refused | set `CLOUDFLARE_BUCKET_URL` |
+
+### 4. What is erased and what is kept
+
+Every model in `schema.prisma` has an explicit decision in `erasure.decisions.ts`, and a unit test fails when a model is added without one.
+
+- **Erased with an organization the person alone belongs to:** posts (also soft-deleted and published rows), comments, tags, sets, signatures, media records, integrations including `token`, `refreshToken`, `customInstanceDetails` and profile, webhooks, auto-post, plugs, notifications, customers, third-party API keys, GitHub tokens, credits, used codes, clippings, OAuth apps and authorizations (client secrets, access tokens), reviews, the subscription row, the legacy marketplace rows, the AI chat memory (Mastra tables keyed by the organization id), the organization row with its referral fields, and every membership.
+- **Erased for the person:** the user row, memberships, item flags, agency profile and logo, reviews and review prompts, OAuth grants, comment attribution in shared workspaces, an avatar uploaded into a shared workspace.
+- **Kept, without personal data:** the affiliate commission ledger (`AffiliateCommission`: random organization id, Stripe invoice id, amounts, payment reference) is a financial record and is never deleted. If the person is an affiliate with commissions, the affiliate profile stays with the payout email removed and the vanity code replaced, and the user row stays only as an anonymised tombstone (`erased_<id>`, no name, no password, no provider id) because the ledger's foreign key needs it. An affiliate without commissions is deleted.
+- **Not touched:** global tables (trending, popular posts, mentions, announcements, star statistics) and Mastra framework tables that have no tenant key. Mastra trace spans have no Prisma model and expire with the Mastra storage retention.
+- **R2:** every object named by a media path or thumbnail, clip file, channel avatar, or post image JSON of the erased organizations is deleted after the database commit (not-found objects are counted, not errors; an object that a surviving record still references is kept and counted). Objects that fail are listed in the receipt and the output. The receipt is written before the commit, so the keys survive a crash.
+- **Billing:** the Stripe subscription is cancelled. Stripe keeps its own customer and invoice records for tax law; delete the customer in the Stripe dashboard (the id is in the receipt follow-ups) once invoices are no longer needed.
+- **Temporal:** post, refresh, auto-post, streak, digest, clipping and processing-media workflows of the erased organization are terminated through the existing `closeWorkflows` of the authorization lifecycle service. Closed workflow history stays until the namespace retention expires (24 hours here); email-send workflows cannot be matched to a person and expire the same way.
+- **Outside our control:** posts already published to a social network, and media shared by URL in them, stay there. The person must remove them on that platform. Encrypted backups keep a copy until they rotate out (about 8 weeks) and are not restored into active use; if one is ever restored, run the logged erasures again from the audit lines.
+
+### 5. Template reply
+
+> Subject: Re: Data deletion request
+>
+> Hello,
+>
+> We confirm that your PostDelegate data was permanently erased on [date]. This covered [N] account(s) under this email address, the workspace(s) that only you belonged to (posts, comments, media files, connected channel credentials and billing links), and your personal details. [If a subscription existed: Your subscription was cancelled and will not renew.]
+>
+> [If a shared workspace: You were also removed from the workspace(s) shared with other people. Their content stays with the other members, with your name removed from comments.]
+>
+> What we keep: billing and tax records held by our payment processor, and, only if you took part in our affiliate programme, an anonymised commission ledger without your name or payout details, as required for financial records. Encrypted backups may hold a copy until they expire within about 8 weeks; they are never restored into active use.
+>
+> Posts that were already published to Facebook, Instagram, Threads, TikTok, LinkedIn or another network are not stored by us and stay there; you can delete them on that platform, and you can also remove PostDelegate from the connected apps in that account's settings.
+>
+> Regards,
+> PostDelegate support
+
 ## BrightBean data and rollback
 
 Before cutover the old database contained one user, one organization, two workspaces, one disconnected Bluesky account record, five draft platform posts and zero subscriptions. There was no scheduled publishing queue to transfer.
