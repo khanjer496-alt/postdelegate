@@ -183,6 +183,22 @@ export class MediaService {
     );
   }
 
+  // Registers an object another service wrote to the bucket (the transloadit
+  // flow). A name another organization already owns is refused, otherwise the
+  // media processing of this record could rewrite that organization's file
+  async saveBucketObject(
+    org: string,
+    fileName: string,
+    filePath: string,
+    originalName?: string
+  ) {
+    if (await this._mediaRepository.getMediaOfOtherOrg(org, fileName)) {
+      throw new BadRequestException('File not found');
+    }
+
+    return this.saveFile(org, fileName, filePath, originalName);
+  }
+
   // Saves an upload and, when a normalizer is configured, hands it to the
   // processing workflow; the caller polls getMediaStatus until it is ready
   async saveUploadedFile(

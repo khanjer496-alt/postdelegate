@@ -23,6 +23,8 @@ export interface IUploadProvider {
   // credentials; only cloud storage can mint them
   signDownloadUrl?(fileName: string): Promise<string>;
   signUploadUrl?(fileName: string, contentType: string): Promise<string>;
+  // Size in bytes of a stored object, null when it does not exist
+  objectSize?(fileName: string): Promise<number | null>;
   // Public URL of a key the media processor wrote through a presigned upload
   publicUrl?(fileName: string): string;
   // Small text files (a transcript) exchanged with the media processor under a

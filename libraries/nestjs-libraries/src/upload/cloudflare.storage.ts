@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
@@ -218,6 +219,20 @@ class CloudflareStorage implements IUploadProvider {
       }),
       { expiresIn: 3 * 3600 }
     );
+  }
+
+  async objectSize(fileName: string) {
+    try {
+      const head = await this._client.send(
+        new HeadObjectCommand({ Bucket: this._bucketName, Key: fileName })
+      );
+      return head.ContentLength ?? 0;
+    } catch (err: any) {
+      if (err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404) {
+        return null;
+      }
+      throw err;
+    }
   }
 
   publicUrl(fileName: string) {
