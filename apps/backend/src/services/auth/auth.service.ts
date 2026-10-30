@@ -74,7 +74,7 @@ export class AuthService {
         await this._emailService.sendEmailSync(
           body.email,
           'Activate your account',
-          `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${obj.jwt}">here</a> to activate your account`
+          this.activationEmail(create.users[0].user)
         );
         return obj;
       }
@@ -115,7 +115,7 @@ export class AuthService {
     }
 
     try {
-      const getOrg: any = AuthChecker.verifyJWT(cookie);
+      const getOrg: any = AuthChecker.verifyTypedJWT(cookie, 'invite');
       if (
         typeof getOrg.orgId !== 'string' ||
         typeof getOrg.id !== 'string' ||
@@ -217,30 +217,61 @@ export class AuthService {
     }
   }
 
+  // The response of /auth/forgot and /auth/resend-activation must not tell
+  // whether an account exists, so the email goes out in the background and
+  // a missing account costs the same as a found one
+  private sendInBackground(to: string, subject: string, html: string) {
+    this._emailService.sendEmailSync(to, subject, html).catch((err) => {
+      console.log('Failed to send auth email', err?.message);
+    });
+  }
+
+  private activationEmail(user: Pick<User, 'id' | 'email'>) {
+    const token = AuthChecker.signTypedJWT('activation', {
+      id: user.id,
+      email: user.email,
+    });
+    return `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${token}">here</a> to activate your account<br />The link will expire in 2 days`;
+  }
+
   async forgot(email: string) {
     const user = await this._userService.getUserByEmail(email);
     if (!user || user.providerName !== Provider.LOCAL) {
       return false;
     }
 
-    const resetValues = AuthChecker.signJWT({
+    // the fingerprint ties the link to the current password, so it works once
+    const resetValues = AuthChecker.signTypedJWT('reset', {
       id: user.id,
-      expires: dayjs().add(20, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
+      pv: AuthChecker.passwordFingerprint(user.password),
     });
 
-    await this._emailService.sendEmailSync(
+    this.sendInBackground(
       user.email,
       'Reset your password',
       `You have requested to reset your password. <br />Click <a href="${process.env.FRONTEND_URL}/auth/forgot/${resetValues}">here</a> to reset your password<br />The link will expire in 20 minutes`
     );
+    return true;
   }
 
-  forgotReturn(body: ForgotReturnPasswordDto) {
-    const user = AuthChecker.verifyJWT(body.token) as {
-      id: string;
-      expires: string;
-    };
-    if (typeof user.id !== 'string' || dayjs(user.expires).isBefore(dayjs())) {
+  async forgotReturn(body: ForgotReturnPasswordDto) {
+    let token: { id: string; pv: string };
+    try {
+      token = AuthChecker.verifyTypedJWT(body.token, 'reset');
+    } catch (err) {
+      return false;
+    }
+
+    if (typeof token.id !== 'string') {
+      return false;
+    }
+
+    const user = await this._userService.getUserById(token.id);
+    if (
+      !user ||
+      user.providerName !== Provider.LOCAL ||
+      token.pv !== AuthChecker.passwordFingerprint(user.password)
+    ) {
       return false;
     }
 
@@ -248,43 +279,39 @@ export class AuthService {
   }
 
   async activate(code: string, tracking: string) {
-    const user = AuthChecker.verifyJWT(code) as {
-      id: string;
-      activated: boolean;
-      email: string;
-    };
-    if (user.id && !user.activated) {
-      const getUserAgain = await this._userService.getUserByEmail(user.email);
-      if (getUserAgain.activated) {
-        return false;
-      }
-      await this._userService.activateUser(user.id);
-      user.activated = true;
-      this._track('register', user.email, tracking).catch((err) => {});
-      await NewsletterService.register(user.email);
-      return this.jwt(user as any);
+    let token: { id: string; email: string };
+    try {
+      token = AuthChecker.verifyTypedJWT(code, 'activation');
+    } catch (err) {
+      return false;
     }
 
-    return false;
+    if (typeof token.id !== 'string') {
+      return false;
+    }
+
+    const user = await this._userService.getUserById(token.id);
+    if (!user || user.activated) {
+      return false;
+    }
+
+    await this._userService.activateUser(user.id);
+    this._track('register', user.email, tracking).catch((err) => {});
+    await NewsletterService.register(user.email);
+    return this.jwt(user);
   }
 
   async resendActivationEmail(email: string) {
     const user = await this._userService.getUserByEmail(email);
 
-    if (!user) {
-      throw new Error('User not found');
+    if (!user || user.activated) {
+      return false;
     }
 
-    if (user.activated) {
-      throw new Error('Account is already activated');
-    }
-
-    const jwt = await this.jwt(user);
-
-    await this._emailService.sendEmailSync(
+    this.sendInBackground(
       user.email,
       'Activate your account',
-      `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${jwt}">here</a> to activate your account`
+      this.activationEmail(user)
     );
 
     return true;
@@ -329,10 +356,14 @@ export class AuthService {
     return { token };
   }
 
-  private async jwt(user: User) {
-    if (user.password) {
-      delete user.password;
-    }
-    return AuthChecker.signJWT(user);
+  // The session token: who it is and which password it was issued for
+  // (so changing the password signs every other session out). Nothing else
+  // from the user row, the claims are never trusted for authorization
+  private async jwt(user: Pick<User, 'id'>) {
+    const current = await this._userService.getUserById(user.id);
+    return AuthChecker.signTypedJWT('session', {
+      id: user.id,
+      pv: AuthChecker.passwordFingerprint(current?.password),
+    });
   }
 }

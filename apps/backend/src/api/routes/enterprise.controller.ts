@@ -18,17 +18,9 @@ export class EnterpriseController {
   ) {}
 
   private verifyEnterpriseToken<T extends object>(params: string): T {
-    const payload = AuthService.verifyJWT(params) as any;
-    if (
-      !payload || typeof payload !== 'object' ||
-      'providerName' in payload || // login token (full User row)
-      'orgId' in payload || // team invite token
-      'expires' in payload // password reset token
-    ) {
-      throw new Error('Invalid enterprise token');
-    }
-
-    return payload as T;
+    // signed by the partner platform with typ "enterprise-user", a session,
+    // reset, activation or invite token is rejected by its type
+    return AuthService.verifyTypedJWT<T>(params, 'enterprise-user');
   }
 
   @Post('/create-user')
