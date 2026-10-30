@@ -42,9 +42,16 @@ export class OrganizationService {
     userId: string,
     id: string,
     orgId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    invitedEmail?: string
   ) {
-    return this._organizationRepository.addUserToOrg(userId, id, orgId, role);
+    return this._organizationRepository.addUserToOrg(
+      userId,
+      id,
+      orgId,
+      role,
+      invitedEmail
+    );
   }
 
   getOrgById(id: string) {

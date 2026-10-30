@@ -280,7 +280,9 @@ export class UsersController {
       user.id,
       getOrgFromCookie.id,
       getOrgFromCookie.orgId,
-      getOrgFromCookie.role
+      getOrgFromCookie.role,
+      // only the invited email can accept the invite
+      getOrgFromCookie.email ?? ''
     );
 
     response.status(200).json({
