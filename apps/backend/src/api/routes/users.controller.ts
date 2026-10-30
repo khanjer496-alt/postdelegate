@@ -281,8 +281,9 @@ export class UsersController {
       getOrgFromCookie.id,
       getOrgFromCookie.orgId,
       getOrgFromCookie.role,
-      // only the invited email can accept the invite
-      getOrgFromCookie.email ?? ''
+      // an invite issued for an email can only be accepted by that email; a
+      // copy-link invite carries no email and stays a bearer link
+      getOrgFromCookie.email || undefined
     );
 
     response.status(200).json({

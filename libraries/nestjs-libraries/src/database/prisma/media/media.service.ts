@@ -184,8 +184,8 @@ export class MediaService {
   }
 
   // Registers an object another service wrote to the bucket (the transloadit
-  // flow). A name another organization already owns is refused, otherwise the
-  // media processing of this record could rewrite that organization's file
+  // flow). A name another organization already owns is refused, so one
+  // organization can't claim another one's file as its own media
   async saveBucketObject(
     org: string,
     fileName: string,

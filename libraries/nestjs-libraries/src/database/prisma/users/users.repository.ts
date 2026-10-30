@@ -256,8 +256,20 @@ export class UsersRepository {
   }
 
   async changePersonal(userId: string, body: UserDetailDto) {
-    if (body.picture) {
-      // the picture must be a media of an organization the user belongs to
+    // the picture must be a media of an organization the user belongs to; the
+    // current one is sent back on every save and is left alone
+    const current = body.picture
+      ? await this._user.model.user.findUnique({
+          where: {
+            id: userId,
+          },
+          select: {
+            pictureId: true,
+          },
+        })
+      : null;
+
+    if (body.picture && current?.pictureId !== body.picture.id) {
       const picture = await this._media.model.media.findFirst({
         where: {
           id: body.picture.id,

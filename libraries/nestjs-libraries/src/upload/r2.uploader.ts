@@ -291,7 +291,9 @@ export async function completeMultipartUpload(req: Request, res: Response) {
     const prefix = Buffer.concat(chunks);
     const detected = await fileTypeFromBuffer(prefix);
     // "bytes 0-4100/<total>": the whole object size, for the per-type cap
-    const total = Number(head.ContentRange?.split('/').pop());
+    const total = Number(
+      head.ContentRange?.split('/').pop() ?? head.ContentLength
+    );
 
     // .mov and .mp4 are the same ISO BMFF family: a .mov with an ISO brand
     // sniffs as video/mp4 and a QuickTime-brand file is often named .mp4.

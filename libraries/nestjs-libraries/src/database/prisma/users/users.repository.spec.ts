@@ -3,7 +3,10 @@ import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users
 
 describe('UsersRepository.changePersonal', () => {
   const makeRepo = () => {
-    const user = { update: jest.fn().mockResolvedValue({}) };
+    const user = {
+      update: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue({ pictureId: 'current-media' }),
+    };
     const media = { findFirst: jest.fn() };
     const repo = new UsersRepository(
       { model: { user } } as any,
@@ -39,6 +42,17 @@ describe('UsersRepository.changePersonal', () => {
 
     expect(user.update.mock.calls[0][0].data.picture).toEqual({
       connect: { id: 'media-1' },
+    });
+  });
+
+  it('keeps the current picture without re-validating it', async () => {
+    const { repo, user, media } = makeRepo();
+
+    await repo.changePersonal('user-1', dto({ id: 'current-media' }));
+
+    expect(media.findFirst).not.toHaveBeenCalled();
+    expect(user.update.mock.calls[0][0].data.picture).toEqual({
+      connect: { id: 'current-media' },
     });
   });
 
