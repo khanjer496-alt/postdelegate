@@ -153,7 +153,7 @@ const login: Command = async (ctx, values) => {
   const apiKey = (
     values['api-key'] ||
     ctx.env.POSTDELEGATE_API_KEY ||
-    (await ctx.readSecret('PostDelegate API key (Settings > Public API): '))
+    (await ctx.readSecret('PostDelegate API key (Settings > Agents / Dev): '))
   )?.trim();
   if (!apiKey) {
     throw new CliError(

@@ -15,7 +15,7 @@ PostDelegate is a hosted social media scheduler. You write a post once, pick the
 ## 1. Create your workspace
 
 1. Open [app.postdelegate.com](https://app.postdelegate.com/auth).
-2. Create an account with your email and a password, or use Google sign-in if the button is shown. If your account needs email activation, open the link in the message we send you.
+2. Create an account with your email, a password and your company name (it becomes your workspace name, at least 3 characters), or use Google sign-in. If your account needs email activation, open the link in the message we send you.
 3. Sign in at [app.postdelegate.com/auth/login](https://app.postdelegate.com/auth/login) from then on.
 
 Signing in with Google gives you access to PostDelegate. It does not connect a YouTube channel. Each publishing destination has its own connection step.
