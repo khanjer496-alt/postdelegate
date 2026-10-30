@@ -67,8 +67,9 @@ describe('PermissionsService role sections', () => {
         Sections.POSTS_PER_MONTH,
         Sections.TEAM_MEMBERS,
         Sections.WEBHOOKS,
-        Sections.AI,
       ]) {
+        // AI is not a quota here: it also needs a provider key and an AI tier,
+        // covered in permissions.service.ai.spec.ts
         expect(await canDo('USER', section)).toBe(true);
       }
     });
