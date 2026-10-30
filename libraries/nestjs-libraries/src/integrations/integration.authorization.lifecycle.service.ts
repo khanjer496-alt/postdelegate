@@ -131,14 +131,25 @@ export class IntegrationAuthorizationLifecycleService {
   }
 
   private async digestHistorySettled(organizationId: string) {
-    try {
-      const description = await this._temporalService.client.getRawClient().workflow.getHandle(`digest_email_workflow_${organizationId}`).describe();
-      // A shared digest can contain other owners' queued messages. Do not
-      // terminate it or assume its payload was migrated to sanitized content.
-      return description.status.name !== 'RUNNING' && this.historyExpired(description.closeTime);
-    } catch (error: any) {
-      return error?.name === 'WorkflowNotFoundError';
+    // v1 runs may still exist next to the v2 digest, both must be settled
+    for (const workflowId of [
+      `digest_email_workflow_${organizationId}`,
+      `digest_email_workflow_v2_${organizationId}`,
+    ]) {
+      try {
+        const description = await this._temporalService.client.getRawClient().workflow.getHandle(workflowId).describe();
+        // A shared digest can contain other owners' queued messages. Do not
+        // terminate it or assume its payload was migrated to sanitized content.
+        if (description.status.name === 'RUNNING' || !this.historyExpired(description.closeTime)) {
+          return false;
+        }
+      } catch (error: any) {
+        if (error?.name !== 'WorkflowNotFoundError') {
+          return false;
+        }
+      }
     }
+    return true;
   }
 
   private async queueVerifiedGrantSiblings(row: Awaited<ReturnType<IntegrationRepository['getIntegrationForCleanup']>>) {
