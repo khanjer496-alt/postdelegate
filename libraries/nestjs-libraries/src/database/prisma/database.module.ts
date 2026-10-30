@@ -52,6 +52,8 @@ import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
 import { AffiliateRepository } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.repository';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
+import { ReviewRepository } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.repository';
+import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
 @Global()
@@ -115,6 +117,8 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     AdminStatsService,
     AffiliateRepository,
     AffiliateService,
+    ReviewRepository,
+    ReviewService,
   ],
   get exports() {
     return this.providers;

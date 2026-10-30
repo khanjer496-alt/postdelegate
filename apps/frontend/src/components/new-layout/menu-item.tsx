@@ -4,8 +4,9 @@ import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import Link from 'next/link';
 
-export const MenuItem: FC<{ label: string; icon: ReactNode; path: string; onClick?: () => void }> = ({
+export const MenuItem: FC<{ label: string; title?: string; icon: ReactNode; path: string; onClick?: () => void }> = ({
   label,
+  title,
   icon,
   path,
   onClick,
@@ -29,7 +30,7 @@ export const MenuItem: FC<{ label: string; icon: ReactNode; path: string; onClic
 
   if (onClick) {
     return (
-      <button onClick={onClick} title={label} className={className}>
+      <button onClick={onClick} title={title || label} className={className}>
         {inner}
       </button>
     );
@@ -39,7 +40,7 @@ export const MenuItem: FC<{ label: string; icon: ReactNode; path: string; onClic
     <Link
       prefetch={true}
       href={path}
-      title={label}
+      title={title || label}
       {...path.indexOf('http') === 0 && { target: '_blank' }}
       className={className}
     >
