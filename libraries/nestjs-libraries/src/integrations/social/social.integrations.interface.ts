@@ -331,7 +331,7 @@ export interface SocialProvider
   dto?: any;
   maxLength: (additionalSettings?: any, settings?: any) => number;
   checkValidity(
-    posts: Array<{ path: string; thumbnail?: string }[]>,
+    posts: Array<{ path: string; thumbnail?: string; alt?: string }[]>,
     settings: any,
     additionalSettings: any[],
     // each entry's text as the provider receives it when it publishes, in
