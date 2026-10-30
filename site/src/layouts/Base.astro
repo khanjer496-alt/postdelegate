@@ -5,7 +5,7 @@ import Footer from '../components/Footer.astro';
 import { SITE } from '../data/site';
 interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string }
 const { title, description, ogImage = '/og.png', jsonLd = [], noindex = false, type = 'website' } = Astro.props;
-const canonicalPath = Astro.url.pathname.replace(/\/+$/, '') || '/';
+const canonicalPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const canonical = new URL(canonicalPath, SITE.url).href;
 const og = new URL(ogImage, SITE.url).href;
 const org = { '@context': 'https://schema.org', '@type': 'Organization', name: 'PostDelegate', legalName: SITE.operator, url: SITE.url, logo: new URL('/postdelegate-icon-512.png', SITE.url).href, email: SITE.email };

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { SITE } from '../data/site';
 import { NETWORKS } from '../data/networks';
 import { PLANS } from '../data/plans';
+import { DOC_SECTIONS } from '../data/docs';
 export const GET: APIRoute = () => {
   const audiences = PLANS.map((plan) => `- ${plan.name}: ${plan.description}`).join('\n');
   const networks = NETWORKS.map((network) => `- ${network.name}: source-provider coverage; hosted rollout pending.`).join('\n');
@@ -20,12 +21,18 @@ Users can create a workspace. The Postiz foundation provides calendar, composer,
 Channel connections are in rollout. Check the workspace or contact support for the account types and actions currently available. Google account sign-in does not by itself connect YouTube or Google Business Profile.
 
 ## Plans
-Paid checkout is not active. No prices, paid packages, permanent free tier, trial period, channel limits, AI allowance or API quota is promised by these pages. Subscription details will be announced before checkout opens.
+Paid checkout is not guaranteed to be open for every account. The documentation at ${SITE.url}/docs/billing describes the configured plans (Starter, Team, Pro, Ultimate) and the 7-day card trial as plan information only; it is not a promise that checkout is available today. No permanent free tier is promised.
 The pricing cards describe audiences, not approved paid packages:
 ${audiences}
 
 ## Automation and AI
-The upstream Postiz project has API, CLI and MCP interfaces and AI features. PostDelegate's pages are integration previews while hosted behavior is qualified. We do not publish setup commands, a hosted MCP URL or scoped-token guarantees here. An official upstream Postiz connector or cloud endpoint is not automatically a PostDelegate connection.
+PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/api/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs. Access depends on the plan. AI features inside the app are off: PostDelegate does not provide an AI, and customers bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of the upstream Postiz project are not PostDelegate connections.
+
+## Channels available to connect today
+YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr and WordPress. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals, and cannot be connected today.
+
+## Documentation
+${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `${SITE.url}${item.href} : ${item.title}. ${item.description}`).join('\n')}
 
 ## Source-provider coverage
 This list describes the Postiz foundation. It is not a list of live production connections:
@@ -45,6 +52,7 @@ This website does not publish an automated uptime history or an availability gua
 The application is a modified version of https://github.com/gitroomhq/postiz-app. PostDelegate has its own deployment, operator, policies and support. It is not affiliated with or endorsed by Postiz. Do not attribute upstream customer testimonials, approval status or service commitments to PostDelegate.
 
 ## Pages
+${SITE.url}/docs
 ${SITE.url}/pricing
 ${SITE.url}/platforms
 ${SITE.url}/agents

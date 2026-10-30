@@ -1,0 +1,33 @@
+---
+import { DOC_SECTIONS } from '../../data/docs';
+interface Props { current: string }
+const { current } = Astro.props;
+const open = DOC_SECTIONS.map((section) => section.items.some((item) => item.href === current));
+---
+<nav class="docs-nav" aria-label="Documentation">
+  <a class="docs-nav-home" href="/docs" aria-current={current === '/docs' ? 'page' : undefined}>Documentation home</a>
+  {DOC_SECTIONS.map((section, index) => (
+    <details class="docs-nav-group" open={open[index] || undefined}>
+      <summary>{section.title}<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary>
+      <ul>
+        {section.items.map((item) => (
+          <li><a href={item.href} aria-current={current === item.href ? 'page' : undefined}>{item.title}</a></li>
+        ))}
+      </ul>
+    </details>
+  ))}
+</nav>
+<style>
+  .docs-nav { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+  .docs-nav-home { display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 10px; color: #d6d6d6; font-weight: 650; }
+  .docs-nav-group { border-top: 1px solid #262626; padding: 6px 0; }
+  .docs-nav-group > summary { display: flex; align-items: center; justify-content: space-between; min-height: 40px; padding: 0 12px; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; border-radius: 10px; }
+  .docs-nav-group > summary svg { transition: transform .2s; color: #8f8f8f; }
+  .docs-nav-group[open] > summary svg { transform: rotate(180deg); }
+  .docs-nav ul { list-style: none; margin: 2px 0 0; padding: 0; }
+  .docs-nav li a { display: flex; align-items: center; min-height: 36px; padding: 6px 12px; border-radius: 10px; color: #a9a9a9; line-height: 1.4; }
+  .docs-nav a:hover, .docs-nav summary:hover { color: #fff; background: #1c1c1c; }
+  .docs-nav a[aria-current='page'] { color: #fff; background: #25203b; box-shadow: inset 2px 0 0 #7357ff; font-weight: 650; }
+  .docs-nav :is(a, summary):focus-visible { outline: 2px solid var(--accent, #7357ff); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .docs-nav-group > summary svg { transition: none; } }
+</style>

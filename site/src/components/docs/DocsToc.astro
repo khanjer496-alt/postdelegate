@@ -1,0 +1,22 @@
+---
+interface Heading { depth: number; slug: string; text: string }
+interface Props { headings: Heading[] }
+const items = Astro.props.headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+---
+{items.length > 1 && (
+  <nav class="docs-toc" aria-labelledby="docs-toc-title">
+    <h2 id="docs-toc-title">On this page</h2>
+    <ul>
+      {items.map((heading) => <li class:list={{ sub: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}
+    </ul>
+  </nav>
+)}
+<style>
+  .docs-toc h2 { margin: 0 0 12px; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .docs-toc ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid #2a2a2a; }
+  .docs-toc li a { display: block; padding: 5px 0 5px 14px; margin-left: -1px; border-left: 2px solid transparent; color: #9c9c9c; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+  .docs-toc li.sub a { padding-left: 28px; font-size: 12.5px; }
+  .docs-toc a:hover { color: #fff; }
+  .docs-toc a[aria-current='true'] { color: #fff; border-left-color: #7357ff; }
+  .docs-toc a:focus-visible { outline: 2px solid var(--accent, #7357ff); outline-offset: 2px; }
+</style>
