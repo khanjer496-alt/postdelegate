@@ -1,5 +1,9 @@
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  Injectable,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { isIP } from 'net';
 
@@ -95,6 +99,13 @@ export const getClientIp = (req: Record<string, any>): string => {
 
   return throttleKey(cleanIp(req.ip) || req.socket?.remoteAddress || 'unknown');
 };
+
+// Controller parameter with the hardened client address (getClientIp), in
+// place of the unverified X-Forwarded-For based @RealIP()
+export const ClientIp = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string =>
+    getClientIp(ctx.switchToHttp().getRequest())
+);
 
 @Injectable()
 export class ThrottlerBehindProxyGuard extends ThrottlerGuard {

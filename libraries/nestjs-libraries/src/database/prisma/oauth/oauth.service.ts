@@ -72,6 +72,25 @@ const browserSchemes = [
   'about:',
 ];
 
+// Private-use schemes (RFC 8252 §7.1) a dynamically registered client may
+// redirect to: the native apps that are known to use one, or a reverse-DNS
+// scheme of an app the client owns (com.example.app:/callback). Any other
+// scheme could hand the authorization code to an arbitrary application.
+const knownPrivateSchemes = [
+  'cursor',
+  'vscode',
+  'vscode-insiders',
+  'windsurf',
+  'claude',
+];
+const isAllowedPrivateScheme = (protocol: string) => {
+  const scheme = protocol.replace(/:$/, '').toLowerCase();
+  return (
+    knownPrivateSchemes.includes(scheme) ||
+    /^[a-z][a-z0-9+-]*(\.[a-z0-9+-]+)+$/.test(scheme)
+  );
+};
+
 @Injectable()
 export class OAuthService {
   constructor(private _oauthRepository: OAuthRepository) {}
@@ -181,6 +200,13 @@ export class OAuthService {
       if (parsed.protocol === 'http:' && !isLoopback) {
         throw new HttpException(
           { error: 'invalid_redirect_uri', error_description: 'redirect_uris must use https or a private-use scheme (http is allowed for loopback only)' },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (isPrivateScheme && !isAllowedPrivateScheme(parsed.protocol)) {
+        throw new HttpException(
+          { error: 'invalid_redirect_uri', error_description: `redirect_uri scheme "${parsed.protocol}" is not allowed: use https, a loopback http address, a known app scheme or a reverse-DNS scheme such as com.example.app:/callback` },
           HttpStatus.BAD_REQUEST
         );
       }

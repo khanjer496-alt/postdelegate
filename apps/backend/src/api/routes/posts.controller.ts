@@ -33,7 +33,7 @@ import {
   CreatePublicCommentDto,
   ResolveCommentDto,
 } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
-import { RealIP } from 'nestjs-real-ip';
+import { ClientIp } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -88,7 +88,7 @@ export class PostsController {
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body() body: CreatePublicCommentDto,
-    @RealIP() ip: string
+    @ClientIp() ip: string
   ) {
     return this._postsService.createPublicComment(
       id,

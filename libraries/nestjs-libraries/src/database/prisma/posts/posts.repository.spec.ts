@@ -120,3 +120,61 @@ describe('PostsRepository.editTag', () => {
     });
   });
 });
+
+describe('PostsRepository integration credentials', () => {
+  const { randomBytes } = require('crypto');
+  const {
+    TokenEncryption,
+  } = require('@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption');
+  const env = { ...process.env };
+
+  beforeEach(() => {
+    process.env.TOKEN_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+    TokenEncryption.reset();
+  });
+  afterAll(() => {
+    process.env = env;
+    TokenEncryption.reset();
+  });
+
+  const withIntegration = () => ({
+    id: 'p-1',
+    integration: {
+      id: 'int-1',
+      token: TokenEncryption.encrypt('access'),
+      refreshToken: TokenEncryption.encrypt('refresh'),
+    },
+  });
+  const makePostRepo = (post: any) => {
+    const model = {
+      findUnique: jest.fn().mockResolvedValue(post),
+      findMany: jest.fn().mockResolvedValue([post]),
+    };
+    return new PostsRepository(
+      { model: { post: model } } as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any
+    );
+  };
+
+  it('getPostById returns the integration with plaintext tokens', async () => {
+    const post: any = await makePostRepo(withIntegration()).getPostById('p-1', 'org');
+    expect(post.integration).toMatchObject({ token: 'access', refreshToken: 'refresh' });
+  });
+
+  it('getPost with the integration returns plaintext tokens', async () => {
+    const post: any = await makePostRepo(withIntegration()).getPost('p-1', true, 'org');
+    expect(post.integration).toMatchObject({ token: 'access', refreshToken: 'refresh' });
+  });
+
+  it('getPostsByGroup returns plaintext tokens', async () => {
+    const posts: any[] = await makePostRepo(withIntegration()).getPostsByGroup('org', 'g');
+    expect(posts[0].integration).toMatchObject({ token: 'access', refreshToken: 'refresh' });
+  });
+
+  it('a missing post stays missing and legacy plaintext is untouched', async () => {
+    expect(await makePostRepo(null).getPostById('x')).toBeNull();
+    const legacy = { id: 'p', integration: { token: 'plain', refreshToken: null } };
+    const post: any = await makePostRepo(legacy).getPostById('p');
+    expect(post.integration.token).toBe('plain');
+  });
+});
