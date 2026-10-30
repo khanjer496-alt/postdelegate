@@ -63,6 +63,13 @@ export function isBlockedIp(ip: string): boolean {
 }
 
 export async function isSafePublicHttpsUrl(value: unknown): Promise<boolean> {
+  return isSafePublicUrl(value, ['https:']);
+}
+
+export async function isSafePublicUrl(
+  value: unknown,
+  protocols: string[]
+): Promise<boolean> {
   if (typeof value !== 'string' || !value.trim()) {
     return false;
   }
@@ -74,7 +81,7 @@ export async function isSafePublicHttpsUrl(value: unknown): Promise<boolean> {
     return false;
   }
 
-  if (parsed.protocol !== 'https:') {
+  if (!protocols.includes(parsed.protocol)) {
     return false;
   }
 

@@ -4,7 +4,7 @@ import dns from 'node:dns';
 import net from 'node:net';
 import http from 'node:http';
 import https from 'node:https';
-import { isBlockedIp } from './webhook.url.validator';
+import { isBlockedIp, isSafePublicUrl } from './webhook.url.validator';
 
 // Pins DNS resolution: every resolved IP is checked with `isBlockedIp` and
 // the caller connects to that same set. Closes the TOCTOU window
@@ -73,4 +73,103 @@ export function getSsrfSafeDispatcher(): Agent | undefined {
 
 export function getSsrfSafeAxios(): AxiosInstance {
   return process.env.DISABLE_SSRF_PROTECTION === 'true' ? axios : ssrfSafeAxios;
+}
+
+export type SsrfSafeFetchOptions = {
+  // http: is only accepted when the caller really has to read plain-http pages
+  allowHttp?: boolean;
+  maxRedirects?: number;
+  timeoutMs?: number;
+};
+
+// Fetches a user-influenced URL. `fetch` follows redirects by default, which
+// bypasses any URL check done before the request (see GHSA-34w8-5j2v-h6ww),
+// so redirects are followed manually and every hop is re-validated, on top of
+// the pinned-DNS dispatcher that guards the connection itself.
+export async function ssrfSafeFetch(
+  url: string,
+  init: RequestInit = {},
+  {
+    allowHttp = false,
+    maxRedirects = 5,
+    timeoutMs = 15_000,
+  }: SsrfSafeFetchOptions = {}
+): Promise<Response> {
+  const protocols = allowHttp ? ['https:', 'http:'] : ['https:'];
+  const signal = AbortSignal.timeout(timeoutMs);
+  let currentUrl = url;
+  let method = init.method || 'GET';
+  let body = init.body;
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const safe =
+      process.env.DISABLE_SSRF_PROTECTION === 'true'
+        ? protocols.includes(new URL(currentUrl).protocol)
+        : await isSafePublicUrl(currentUrl, protocols);
+    if (!safe) {
+      throw new Error('Blocked URL');
+    }
+
+    const response = await fetch(currentUrl, {
+      ...init,
+      method,
+      body,
+      signal,
+      redirect: 'manual',
+      // @ts-ignore — undici option, not in lib.dom fetch types
+      dispatcher: getSsrfSafeDispatcher(),
+    });
+
+    if (response.status < 300 || response.status >= 400) {
+      return response;
+    }
+
+    const location = response.headers.get('location');
+    await response.body?.cancel().catch(() => undefined);
+    if (!location) {
+      throw new Error('Redirect without Location');
+    }
+
+    currentUrl = new URL(location, currentUrl).toString();
+    // like a browser: 303, and 301/302 on a POST, continue as a body-less GET
+    if (
+      response.status === 303 ||
+      ((response.status === 301 || response.status === 302) &&
+        method === 'POST')
+    ) {
+      method = 'GET';
+      body = undefined;
+    }
+  }
+
+  throw new Error('Too many redirects');
+}
+
+// Reads a response body as text and gives up once it grows past `maxBytes`.
+export async function readResponseText(
+  response: Response,
+  maxBytes: number
+): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return '';
+  }
+
+  const decoder = new TextDecoder();
+  let received = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    received += value.byteLength;
+    if (received > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error('Response too large');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+
+  return text + decoder.decode();
 }
