@@ -27,7 +27,7 @@ The MCP server lives under the API origin, `https://app.postdelegate.com/api`. I
 
 | Address | Sign-in | Use it for |
 | --- | --- | --- |
-| `https://app.postdelegate.com/api/mcp-oauth-dynamic` | Sign in with PostDelegate (OAuth) | **Recommended.** Claude, ChatGPT, Claude Code, Cursor and any client that can register itself. |
+| `https://app.postdelegate.com/mcp-oauth-dynamic` | Sign in with PostDelegate (OAuth) | **Recommended.** Claude, ChatGPT, Claude Code, Cursor and any client that can register itself. |
 | `https://app.postdelegate.com/api/mcp` | API key as `Authorization: Bearer YOUR_API_KEY` | Clients and scripts that can set a header. |
 | `https://app.postdelegate.com/api/mcp/YOUR_API_KEY` | API key inside the address | Clients that can only take a URL. |
 

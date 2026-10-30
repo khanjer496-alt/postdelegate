@@ -15,7 +15,7 @@ PostDelegate is not an official ChatGPT app listing. Custom connectors in ChatGP
 3. Enter a name such as `PostDelegate` and paste this address as the server URL:
 
 ```text
-https://app.postdelegate.com/api/mcp-oauth-dynamic
+https://app.postdelegate.com/mcp-oauth-dynamic
 ```
 
 4. Choose OAuth for authentication. ChatGPT registers itself with PostDelegate automatically.

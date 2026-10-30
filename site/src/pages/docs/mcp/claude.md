@@ -15,7 +15,7 @@ PostDelegate is not in Claude's connector directory, so you add it by address. W
 3. Paste this address as the server URL:
 
 ```text
-https://app.postdelegate.com/api/mcp-oauth-dynamic
+https://app.postdelegate.com/mcp-oauth-dynamic
 ```
 
 4. Choose **Add**, then **Connect**. A PostDelegate page opens in your browser.

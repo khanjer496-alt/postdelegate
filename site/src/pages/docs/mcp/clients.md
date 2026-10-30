@@ -13,7 +13,7 @@ Prefer **sign in with PostDelegate** where the client supports OAuth. The client
 Sign in with PostDelegate:
 
 ```bash
-claude mcp add postdelegate --transport http "https://app.postdelegate.com/api/mcp-oauth-dynamic"
+claude mcp add postdelegate --transport http "https://app.postdelegate.com/mcp-oauth-dynamic"
 ```
 
 Then run `/mcp` inside Claude Code and authenticate the `postdelegate` server. With an API key instead:
@@ -30,7 +30,7 @@ Add to `.cursor/mcp.json` in your project.
 {
   "mcpServers": {
     "postdelegate": {
-      "url": "https://app.postdelegate.com/api/mcp-oauth-dynamic"
+      "url": "https://app.postdelegate.com/mcp-oauth-dynamic"
     }
   }
 }
@@ -58,7 +58,7 @@ Add to `.vscode/mcp.json`.
   "servers": {
     "postdelegate": {
       "type": "http",
-      "url": "https://app.postdelegate.com/api/mcp-oauth-dynamic"
+      "url": "https://app.postdelegate.com/mcp-oauth-dynamic"
     }
   }
 }
@@ -72,7 +72,7 @@ Add to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.postdelegate]
-url = "https://app.postdelegate.com/api/mcp-oauth-dynamic"
+url = "https://app.postdelegate.com/mcp-oauth-dynamic"
 ```
 
 Then run `codex mcp login postdelegate`. With an API key:
@@ -91,7 +91,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "postdelegate": {
-      "serverUrl": "https://app.postdelegate.com/api/mcp-oauth-dynamic"
+      "serverUrl": "https://app.postdelegate.com/mcp-oauth-dynamic"
     }
   }
 }
@@ -105,7 +105,7 @@ Add to `~/.gemini/settings.json`:
 {
   "mcpServers": {
     "postdelegate": {
-      "url": "https://app.postdelegate.com/api/mcp-oauth-dynamic"
+      "url": "https://app.postdelegate.com/mcp-oauth-dynamic"
     }
   }
 }
@@ -114,7 +114,7 @@ Add to `~/.gemini/settings.json`:
 ## Amp
 
 ```bash
-amp mcp add postdelegate https://app.postdelegate.com/api/mcp-oauth-dynamic
+amp mcp add postdelegate https://app.postdelegate.com/mcp-oauth-dynamic
 ```
 
 ## Warp, Hermes, OpenClaw and NanoClaw
@@ -127,7 +127,7 @@ If your client supports remote MCP servers over streamable HTTP, give it one of 
 
 | Sign-in | Address | Header |
 | --- | --- | --- |
-| OAuth | `https://app.postdelegate.com/api/mcp-oauth-dynamic` | None. The client handles sign-in. |
+| OAuth | `https://app.postdelegate.com/mcp-oauth-dynamic` | None. The client handles sign-in. |
 | API key | `https://app.postdelegate.com/api/mcp` | `Authorization: Bearer YOUR_API_KEY` |
 | API key in the address | `https://app.postdelegate.com/api/mcp/YOUR_API_KEY` | None |
 

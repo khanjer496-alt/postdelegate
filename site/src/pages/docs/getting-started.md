@@ -20,7 +20,7 @@ PostDelegate is a hosted social media scheduler. You write a post once, pick the
 
 Signing in with Google gives you access to PostDelegate. It does not connect a YouTube channel. Each publishing destination has its own connection step.
 
-If you cannot create an account yet, sign-up may still be limited during early access. Email [support@postdelegate.com](mailto:support@postdelegate.com) and we will tell you where things stand.
+If anything goes wrong while signing up, email [support@postdelegate.com](mailto:support@postdelegate.com).
 
 ## 2. Connect a channel
 
