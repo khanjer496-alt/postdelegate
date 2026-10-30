@@ -29,7 +29,7 @@ const groups = [
     { label: 'Support', href: '/support', description: 'Get help with your workspace.' },
   ] },
 ];
-const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
 ---
 <header class="site-header">
   <div class="header-inner">
@@ -47,6 +47,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         </>
       ))}
       <a href="/pricing" class="nav-link" aria-current={path === '/pricing' ? 'page' : undefined}>Pricing</a>
+      <a href="/docs" class="nav-link" aria-current={path === '/docs' || path.startsWith('/docs/') ? 'page' : undefined}>Docs</a>
     </nav>
     <div class="desktop-actions"><a href={SITE.login} class="sign-in">Sign in</a><a href={SITE.signup} class="create-account">Create account <span aria-hidden="true">↗</span></a></div>
     <details class="mobile-menu" data-mobile-menu>
@@ -55,6 +56,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         <nav aria-label="Mobile navigation">
           {groups.map((group, index) => <><details class="mobile-group"><summary>{group.label}<span aria-hidden="true">+</span></summary><div>{group.links.map((link) => <a href={link.href} aria-current={path === link.href ? 'page' : undefined}>{link.label}</a>)}</div></details>{index === 0 && <a class="mobile-direct" href="/api">Developers</a>}</>)}
           <a class="mobile-direct" href="/pricing">Pricing</a>
+          <a class="mobile-direct" href="/docs" aria-current={path === '/docs' || path.startsWith('/docs/') ? 'page' : undefined}>Docs</a>
         </nav>
         <div class="mobile-actions"><a href={SITE.login} class="sign-in">Sign in</a><a href={SITE.signup} class="create-account">Create account <span aria-hidden="true">↗</span></a></div>
       </div>

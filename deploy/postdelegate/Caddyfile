@@ -15,7 +15,7 @@ app.postdelegate.com {
     }
     handle /source {
         header Cache-Control "no-store"
-        redir * /source/postdelegate-9890e961.tar.gz 302
+        redir * /source/postdelegate-2246c509.tar.gz 302
     }
     handle_path /source/* {
         root * /source
@@ -32,6 +32,14 @@ app.postdelegate.com {
         root * /legal-public
         rewrite * /terms.html
         file_server
+    }
+    # MCP OAuth (custom connectors in Claude/ChatGPT): clients probe the
+    # resource and its discovery documents at the origin root; the backend
+    # serves them under /api, so re-enter the /api mapping.
+    @mcpOauth path /mcp-oauth-dynamic /mcp-oauth-dynamic/* /.well-known/oauth-protected-resource/mcp-oauth-dynamic /.well-known/oauth-authorization-server/mcp-oauth-dynamic
+    handle @mcpOauth {
+        rewrite * /api{uri}
+        reverse_proxy postiz:5000
     }
     @affiliateTerms path /legal/affiliate-terms /legal/affiliate-terms/
     handle @affiliateTerms {

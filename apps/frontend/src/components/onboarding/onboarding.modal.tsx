@@ -12,14 +12,9 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import {
-  AnyMcpClient,
+  ConnectAiSection,
   CopyButton,
-  getMcpConfig,
-  McpAuth,
-  McpClient,
-  mcpClients,
 } from '@gitroom/frontend/components/public-api/public.component';
-import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
 
 interface OnboardingModalProps {
   onClose: () => void;
@@ -243,25 +238,10 @@ const OnboardingStep1: FC<{ onNext: () => void; onSkip: () => void }> = ({
   );
 };
 
-const onboardingAgents = [
-  'Claude',
-  'ChatGPT',
-  'Claude Code',
-  'Cursor',
-  'Codex',
-] as const;
-
-type OnboardingAgent = (typeof onboardingAgents)[number];
-
-// Every other MCP client, grouped under one tab with its own picker
-const otherTab = 'Other agents' as const;
-const otherAgents = mcpClients.filter(
-  (client) => !(onboardingAgents as readonly string[]).includes(client)
-);
-
 // Not an agent, a tab showing the raw API key for people integrating by hand
 const apiTab = 'API' as const;
-type OnboardingTab = OnboardingAgent | typeof otherTab | typeof apiTab;
+const connectTab = 'AI' as const;
+type OnboardingTab = typeof connectTab | typeof apiTab;
 
 const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
   onBack,
@@ -269,31 +249,12 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
 }) => {
   const t = useT();
   const user = useUser();
-  const { backendUrl, mcpUrl } = useVariables();
-  const [tab, setTab] = useState<OnboardingTab>('Claude');
-  const [otherAgent, setOtherAgent] = useState<McpClient>(otherAgents[0]);
-  // The client the cards describe: the tab itself, or the pick inside "Other agents"
-  const agent: AnyMcpClient | typeof apiTab =
-    tab === otherTab ? otherAgent : tab;
-  const [auth, setAuth] = useState<McpAuth>('oauth');
+  const { backendUrl } = useVariables();
+  const [tab, setTab] = useState<OnboardingTab>(connectTab);
   const [revealed, setRevealed] = useState(false);
-  const mcpBase = mcpUrl || backendUrl;
   const apiKey = user?.publicApi || '';
   const available = !!apiKey && !!user?.tier?.public_api;
   const apiBase = `${backendUrl}/public/v1`;
-
-  const { config, hint } =
-    agent === apiTab
-      ? { config: '', hint: '' }
-      : getMcpConfig(agent, auth, mcpBase, apiKey);
-
-  const maskedConfig =
-    revealed || auth === 'oauth' || !apiKey
-      ? config
-      : config.replace(
-          new RegExp(apiKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-          '*'.repeat(apiKey.length)
-        );
 
   const maskedApiKey = revealed ? apiKey : '*'.repeat(apiKey.length);
 
@@ -347,74 +308,6 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
     </>
   );
 
-  const mcpSection = (
-    <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden flex flex-col">
-      <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder">
-        <div className="text-[15px] font-[600]">{t('mcp', 'MCP')}</div>
-        <div className="text-[13px] text-customColor18 mt-[2px]">
-          {t(
-            'mcp_onboarding_description',
-            'Give your agent PostDelegate tools to create, schedule and manage posts'
-          )}
-        </div>
-      </div>
-      <div className="p-[20px] flex flex-col gap-[16px] flex-1">
-        <div className="flex flex-col gap-[6px]">
-          <div className="text-[13px] font-[600] text-customColor18">
-            {t('auth_method', 'Authentication')}
-          </div>
-          <div className="flex gap-[6px]">
-            {(['oauth', 'apikey'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={clsx(
-                  'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
-                  auth === m
-                    ? 'bg-[#612BD3] text-white'
-                    : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
-                )}
-                onClick={() => setAuth(m)}
-              >
-                {m === 'oauth'
-                  ? t(
-                      'sign_in_no_api_key',
-                      'Sign in with PostDelegate (no API key)'
-                    )
-                  : t('api_key', 'API Key')}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-[8px]">
-          <div className="text-[12px] text-customColor18 font-[500]">
-            {hint}
-            {auth === 'oauth' &&
-              ` ${t(
-                'oauth_sign_in_hint',
-                'Your agent will open a browser window to sign in to PostDelegate.'
-              )}`}
-          </div>
-          <pre className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[12px] text-[12px] whitespace-pre-wrap break-all overflow-x-auto leading-[1.5]">
-            {maskedConfig}
-          </pre>
-          <div className="flex gap-[8px]">
-            {auth === 'apikey' && (
-              <button
-                type="button"
-                onClick={() => setRevealed(!revealed)}
-                className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              >
-                {revealed ? t('hide', 'Hide') : t('reveal', 'Reveal')}
-              </button>
-            )}
-            <CopyButton text={config} label={t('copy', 'Copy')} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex flex-col gap-[24px] flex-1">
       <div className="flex gap-[4px] flex-col text-center">
@@ -432,51 +325,25 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
       {available ? (
         <div className="flex flex-col gap-[16px] w-full max-w-[1100px] mx-auto">
           <div className="flex flex-wrap justify-center gap-[6px]">
-            {[...onboardingAgents, otherTab, apiTab].map((item) => (
+            {[connectTab, apiTab].map((item) => (
               <button
                 key={item}
                 type="button"
                 className={clsx(
-                  'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors flex items-center gap-[8px]',
+                  'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                   tab === item
-                    ? 'bg-[#612BD3] text-white'
-                    : item === apiTab
-                    ? 'bg-btnSimple text-[#a78bfa] hover:bg-boxHover hover:text-[#c4b5fd]'
-                    : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
+                    ? 'bg-btnPrimary text-white'
+                    : 'bg-btnSimple text-textItemBlur hover:bg-boxHover hover:text-textColor'
                 )}
                 onClick={() => setTab(item)}
               >
-                <McpClientIcon client={item} />
-                {item}
+                {item === connectTab
+                  ? t('connect_your_ai', 'Connect your AI')
+                  : t('api', 'API')}
               </button>
             ))}
           </div>
-          {tab === otherTab && (
-            <div className="flex flex-wrap justify-center gap-[6px]">
-              {otherAgents.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={clsx(
-                    'cursor-pointer px-[12px] h-[32px] text-[12px] font-[500] rounded-[8px] transition-colors flex items-center gap-[6px]',
-                    otherAgent === item
-                      ? 'bg-[#612BD3] text-white'
-                      : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
-                  )}
-                  onClick={() => setOtherAgent(item)}
-                >
-                  <McpClientIcon client={item} size={14} />
-                  {item}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {agent === apiTab ? (
-            apiSection
-          ) : (
-            mcpSection
-          )}
+          {tab === apiTab ? apiSection : <ConnectAiSection />}
         </div>
       ) : (
         <div className="bg-newTableHeader rounded-[8px] p-[16px] text-[14px] text-customColor18 text-center w-full max-w-[860px] mx-auto">

@@ -1,0 +1,37 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import { DOC_SECTIONS } from '../../data/docs';
+import { SITE } from '../../data/site';
+const frontmatter = { title: 'PostDelegate documentation', description: 'Guides for planning and scheduling posts, connecting channels, using the REST API and connecting your own AI assistant.' };
+---
+<DocsLayout frontmatter={frontmatter}>
+  <div class="docs-home">
+    <div class="callout">
+      <p><strong>PostDelegate is in early access.</strong> The channels listed as available in these docs are the ones you can connect today. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals. Nothing here promises a connection that is not yet open.</p>
+    </div>
+    <h2>Start here</h2>
+    <div class="card-grid">
+      <a href="/docs/getting-started"><strong>Getting started</strong><span>Create a workspace, connect a channel and schedule your first post.</span></a>
+      <a href="/docs/channels"><strong>Connect a channel</strong><span>Step-by-step guides for the nine networks you can connect today.</span></a>
+      <a href="/docs/api"><strong>REST API</strong><span>Authentication, rate limits and every endpoint with examples.</span></a>
+      <a href="/docs/mcp"><strong>Connect your AI assistant</strong><span>Use Claude, ChatGPT, Cursor or another MCP client to draft and schedule posts.</span></a>
+    </div>
+    {DOC_SECTIONS.map((section) => (
+      <section>
+        <h2>{section.title}</h2>
+        <ul class="doc-list">
+          {section.items.map((item) => <li><a href={item.href}>{item.title}</a><span>{item.description}</span></li>)}
+        </ul>
+      </section>
+    ))}
+    <h2>Need a hand?</h2>
+    <p>Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a>. Include your workspace name, the channel involved and what you expected to happen. Never send passwords, API keys or tokens.</p>
+  </div>
+</DocsLayout>
+<style>
+  .doc-list { list-style: none; padding: 0 !important; margin: 14px 0 0 !important; border-top: 1px solid #262626; }
+  .doc-list li { display: grid; grid-template-columns: minmax(180px, 250px) 1fr; gap: 6px 24px; margin: 0 !important; padding: 13px 0 !important; border-bottom: 1px solid #262626; }
+  .doc-list a { font-weight: 650; }
+  .doc-list span { color: #a3a3a3; font-size: 14.5px; line-height: 1.6; }
+  @media (max-width: 640px) { .doc-list li { grid-template-columns: 1fr; } }
+</style>

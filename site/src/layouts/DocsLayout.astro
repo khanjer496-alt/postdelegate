@@ -1,0 +1,204 @@
+---
+import Base from './Base.astro';
+import DocsSidebar from '../components/docs/DocsSidebar.astro';
+import DocsToc from '../components/docs/DocsToc.astro';
+import { DOC_PAGES, findDocSection } from '../data/docs';
+import { SITE } from '../data/site';
+// Markdown pages pass { frontmatter, headings }; .astro pages pass the same props by hand.
+interface Props { frontmatter: { title: string; description: string; eyebrow?: string }; headings?: { depth: number; slug: string; text: string }[] }
+const { frontmatter, headings = [] } = Astro.props;
+const { title, description } = frontmatter;
+const current = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
+const isHome = current === '/docs';
+const section = findDocSection(current);
+const eyebrow = frontmatter.eyebrow ?? section?.title ?? 'Documentation';
+const index = DOC_PAGES.findIndex((page) => page.href === current);
+const prev = index > 0 ? DOC_PAGES[index - 1] : undefined;
+const next = index > -1 && index < DOC_PAGES.length - 1 ? DOC_PAGES[index + 1] : undefined;
+const url = new URL(current, SITE.url).href;
+const crumbs = [
+  { name: 'PostDelegate', item: SITE.url },
+  { name: 'Docs', item: new URL('/docs', SITE.url).href },
+  ...(isHome ? [] : [{ name: title, item: url }]),
+];
+const jsonLd = [
+  { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs.map((crumb, position) => ({ '@type': 'ListItem', position: position + 1, name: crumb.name, item: crumb.item })) },
+  ...(isHome ? [] : [{ '@context': 'https://schema.org', '@type': 'TechArticle', headline: title, description, url, inLanguage: 'en', publisher: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url } }]),
+];
+---
+<Base title={`${title} — PostDelegate Docs`} description={description} jsonLd={jsonLd}>
+  <div class="docs-shell">
+    <div class="docs-grid">
+      <aside class="docs-sidebar" aria-label="Documentation sidebar"><DocsSidebar current={current} /></aside>
+      <div class="docs-main">
+        <details class="docs-mobile-nav">
+          <summary>Browse the docs<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary>
+          <DocsSidebar current={current} />
+        </details>
+        <header class="docs-head">
+          <p class="docs-crumbs"><a href="/docs">Docs</a>{!isHome && <><span aria-hidden="true">/</span><span>{eyebrow}</span></>}</p>
+          <h1>{title}</h1>
+          <p class="docs-lead">{description}</p>
+        </header>
+        {headings.length > 1 && (
+          <details class="docs-toc-inline"><summary>On this page<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><DocsToc headings={headings} /></details>
+        )}
+        <article class="docs-prose" data-docs-article><slot /></article>
+        {!isHome && (
+          <>
+            <nav class="docs-pager" aria-label="Previous and next page">
+              {prev ? <a class="prev" href={prev.href}><small>Previous</small><span>{prev.title}</span></a> : <span></span>}
+              {next ? <a class="next" href={next.href}><small>Next</small><span>{next.title}</span></a> : <span></span>}
+            </nav>
+            <p class="docs-help">Something unclear, wrong or missing? Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a> and tell us which page you were on.</p>
+          </>
+        )}
+      </div>
+      <aside class="docs-toc-wrap" aria-label="Page contents"><DocsToc headings={headings} /></aside>
+    </div>
+  </div>
+</Base>
+<style>
+  .docs-shell { background: var(--bg, #0d0d0d); color: var(--text, #fff); padding: 38px 0 96px; }
+  .docs-grid { width: min(1320px, calc(100% - 48px)); margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 0 56px; align-items: start; }
+  .docs-sidebar { position: sticky; top: 104px; max-height: calc(100dvh - 124px); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #333 transparent; }
+  .docs-toc-wrap { position: sticky; top: 104px; min-width: 0; max-height: calc(100dvh - 124px); overflow-y: auto; padding-top: 6px; scrollbar-width: thin; scrollbar-color: #333 transparent; }
+  .docs-main { min-width: 0; max-width: 780px; width: 100%; }
+  .docs-mobile-nav, .docs-toc-inline { display: none; }
+
+  .docs-head { padding-bottom: 28px; margin-bottom: 8px; border-bottom: 1px solid #262626; }
+  .docs-crumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; color: #bca9ff; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+  .docs-crumbs a { color: inherit; }
+  .docs-crumbs a:hover { color: #fff; }
+  .docs-crumbs span { color: #8f8f8f; }
+  .docs-head h1 { margin: 0; font-size: clamp(32px, 4.4vw, 48px); line-height: 1.1; letter-spacing: -.045em; font-weight: 800; text-wrap: balance; }
+  .docs-lead { margin: 18px 0 0; color: var(--muted, #b9b9b9); font-size: 18px; line-height: 1.7; text-wrap: pretty; }
+
+  .docs-mobile-nav, .docs-toc-inline { border: 1px solid #303030; border-radius: 14px; background: #151515; margin-bottom: 22px; }
+  .docs-mobile-nav > summary, .docs-toc-inline > summary { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 16px; font-size: 14px; font-weight: 650; cursor: pointer; }
+  .docs-mobile-nav[open] > summary, .docs-toc-inline[open] > summary { border-bottom: 1px solid #262626; }
+  .docs-mobile-nav[open] > summary svg, .docs-toc-inline[open] > summary svg { transform: rotate(180deg); }
+  .docs-mobile-nav > :global(nav) { padding: 10px 10px 14px; max-height: 60dvh; overflow-y: auto; }
+  .docs-toc-inline > :global(nav) { padding: 14px 16px 10px; }
+  .docs-toc-inline :global(h2) { display: none; }
+  .docs-mobile-nav > summary:focus-visible, .docs-toc-inline > summary:focus-visible { outline: 2px solid var(--accent, #7357ff); outline-offset: 3px; }
+
+  .docs-prose { margin-top: 30px; color: var(--muted, #b9b9b9); font-size: 16px; line-height: 1.8; overflow-wrap: break-word; }
+  .docs-prose > :global(:first-child) { margin-top: 0; }
+  .docs-prose :global(h2) { position: relative; margin: 52px 0 14px; padding-top: 4px; color: #fff; font-size: clamp(24px, 2.6vw, 29px); line-height: 1.25; letter-spacing: -.035em; font-weight: 800; }
+  .docs-prose :global(h3) { position: relative; margin: 34px 0 10px; color: #fff; font-size: 19px; line-height: 1.4; letter-spacing: -.02em; font-weight: 750; }
+  .docs-prose :global(h4) { margin: 24px 0 8px; color: #fff; font-size: 16px; font-weight: 700; }
+  .docs-prose :global(h2 code), .docs-prose :global(h3 code) { font-size: .82em; }
+  .docs-prose :global(p) { margin: 14px 0; }
+  .docs-prose :global(ul), .docs-prose :global(ol) { margin: 16px 0; padding-left: 24px; }
+  .docs-prose :global(ul) { list-style: disc; }
+  .docs-prose :global(ol) { list-style: decimal; }
+  .docs-prose :global(li) { margin: 7px 0; padding-left: 3px; }
+  .docs-prose :global(li > ul), .docs-prose :global(li > ol) { margin: 6px 0; }
+  .docs-prose :global(a) { color: #d1bfff; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #5f4a8c; }
+  .docs-prose :global(a:hover) { color: #fff; text-decoration-color: #fff; }
+  .docs-prose :global(strong) { color: #fff; font-weight: 700; }
+  .docs-prose :global(hr) { border: 0; border-top: 1px solid #262626; margin: 40px 0; }
+  .docs-prose :global(code) { padding: 2px 6px; border-radius: 6px; background: #242424; color: #e5dcff; font-family: var(--font-mono); font-size: .86em; overflow-wrap: anywhere; }
+  .docs-prose :global(pre) { position: relative; margin: 20px 0; padding: 18px 20px; border: 1px solid #333; border-radius: 14px; background: #151515 !important; font-size: 13.5px; line-height: 1.7; overflow-x: auto; }
+  .docs-prose :global(pre code) { padding: 0; background: transparent; color: inherit; font-size: inherit; overflow-wrap: normal; }
+  .docs-prose :global(table) { display: block; width: 100%; max-width: 100%; overflow-x: auto; margin: 22px 0; border-collapse: collapse; font-size: 14.5px; line-height: 1.6; }
+  .docs-prose :global(th), .docs-prose :global(td) { padding: 11px 14px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+  .docs-prose :global(th) { color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; border-bottom-color: #3a3a3a; }
+  .docs-prose :global(td code) { white-space: nowrap; }
+  .docs-prose :global(.callout) { margin: 26px 0; padding: 18px 22px; border: 1px solid #363636; border-left: 3px solid #7357ff; border-radius: 14px; background: #171717; font-size: 15px; line-height: 1.75; }
+  .docs-prose :global(.callout.warn) { border-left-color: #f5b44a; }
+  .docs-prose :global(.callout > :first-child) { margin-top: 0; }
+  .docs-prose :global(.callout > :last-child) { margin-bottom: 0; }
+  .docs-prose :global(.card-grid) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 24px 0; }
+  .docs-prose :global(.card-grid > a) { display: flex; flex-direction: column; gap: 6px; padding: 20px; border: 1px solid #363636; border-radius: 16px; background: #171717; color: #fff; text-decoration: none; transition: border-color .2s; }
+  .docs-prose :global(.card-grid > a:hover) { border-color: #888; }
+  .docs-prose :global(.card-grid strong) { font-size: 16px; }
+  .docs-prose :global(.card-grid span) { color: #adadad; font-size: 14px; line-height: 1.6; }
+  .docs-prose :global(.anchor) { position: absolute; left: -22px; top: 50%; transform: translateY(-50%); padding: 4px; color: #6f6f6f; font-size: .8em; font-weight: 500; text-decoration: none; opacity: 0; }
+  .docs-prose :global(h2:hover .anchor), .docs-prose :global(h3:hover .anchor), .docs-prose :global(.anchor:focus-visible) { opacity: 1; }
+  .docs-prose :global(.copy-code) { position: absolute; top: 8px; right: 8px; min-height: 30px; padding: 0 11px; border: 1px solid #3b3b3b; border-radius: 8px; background: #1d1d1d; color: #cfcfcf; font-size: 12px; font-weight: 600; opacity: 0; transition: opacity .15s; }
+  .docs-prose :global(pre:hover .copy-code), .docs-prose :global(.copy-code:focus-visible) { opacity: 1; }
+  .docs-prose :global(.copy-code:hover) { color: #fff; border-color: #777; }
+  .docs-prose :global(:is(pre, table):focus-visible) { outline: 2px solid var(--accent, #7357ff); outline-offset: 3px; }
+
+  .docs-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 56px 0 0; }
+  .docs-pager a { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid #333; border-radius: 14px; color: #fff; transition: border-color .2s; }
+  .docs-pager a:hover { border-color: #888; }
+  .docs-pager small { color: #8f8f8f; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .docs-pager span { font-size: 15px; font-weight: 650; }
+  .docs-pager .next { text-align: right; grid-column: 2; }
+  .docs-help { margin: 26px 0 0; color: #8f8f8f; font-size: 13px; line-height: 1.7; }
+  .docs-help a { color: #bfbfbf; text-decoration: underline; text-underline-offset: 3px; }
+  .docs-pager a:focus-visible, .docs-help a:focus-visible, .docs-crumbs a:focus-visible { outline: 2px solid var(--accent, #7357ff); outline-offset: 3px; }
+
+  @media (max-width: 1180px) {
+    .docs-grid { grid-template-columns: 240px minmax(0, 1fr); gap: 0 44px; }
+    .docs-toc-wrap { display: none; }
+    .docs-toc-inline { display: block; }
+  }
+  @media (max-width: 860px) {
+    .docs-shell { padding: 24px 0 64px; }
+    .docs-grid { display: block; width: calc(100% - 36px); }
+    .docs-sidebar { display: none; }
+    .docs-mobile-nav { display: block; }
+    .docs-main { max-width: none; }
+    .docs-lead { font-size: 16px; }
+    .docs-prose :global(.card-grid) { grid-template-columns: 1fr; }
+    .docs-prose :global(.anchor) { display: none; }
+    .docs-prose :global(.copy-code) { opacity: 1; }
+    .docs-pager { grid-template-columns: 1fr; }
+    .docs-pager .next { grid-column: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) { .docs-prose :global(.copy-code), .docs-prose :global(.card-grid > a), .docs-pager a { transition: none; } }
+</style>
+<script>
+  // Progressive enhancement: heading anchors, copy buttons, keyboard-reachable scroll areas, TOC highlight.
+  const article = document.querySelector<HTMLElement>('[data-docs-article]');
+  if (article) {
+    article.querySelectorAll<HTMLElement>('h2[id], h3[id]').forEach((heading) => {
+      const link = document.createElement('a');
+      link.className = 'anchor';
+      link.href = `#${heading.id}`;
+      link.setAttribute('aria-label', `Link to “${heading.textContent}”`);
+      link.textContent = '#';
+      heading.prepend(link);
+    });
+    article.querySelectorAll<HTMLElement>('pre').forEach((pre) => {
+      const code = pre.querySelector('code');
+      if (!code || !navigator.clipboard) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'copy-code';
+      button.textContent = 'Copy';
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(code.innerText.replace(/\n$/, ''));
+          button.textContent = 'Copied';
+        } catch {
+          button.textContent = 'Press ⌘/Ctrl+C';
+        }
+        setTimeout(() => { button.textContent = 'Copy'; }, 1800);
+      });
+      pre.append(button);
+    });
+    article.querySelectorAll<HTMLElement>('table').forEach((table) => {
+      if (table.scrollWidth > table.clientWidth) table.tabIndex = 0;
+    });
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('.docs-toc a')];
+    const headings = links.map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1)))).filter((el): el is HTMLElement => !!el);
+    if (headings.length && 'IntersectionObserver' in window) {
+      const mark = (id: string) => links.forEach((link) => {
+        if (decodeURIComponent(link.hash.slice(1)) === id) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      });
+      const visible = new Set<string>();
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => { if (entry.isIntersecting) visible.add(entry.target.id); else visible.delete(entry.target.id); });
+        const first = headings.find((heading) => visible.has(heading.id));
+        if (first) mark(first.id);
+      }, { rootMargin: '-100px 0px -65% 0px' });
+      headings.forEach((heading) => observer.observe(heading));
+    }
+  }
+</script>
