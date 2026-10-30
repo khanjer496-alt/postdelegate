@@ -33,6 +33,12 @@ app.postdelegate.com {
         rewrite * /terms.html
         file_server
     }
+    @affiliateTerms path /legal/affiliate-terms /legal/affiliate-terms/
+    handle @affiliateTerms {
+        root * /legal-public
+        rewrite * /affiliate-terms.html
+        file_server
+    }
     @deletion path /legal/data-deletion /legal/data-deletion/ /data-deletion /data-deletion/
     handle @deletion {
         root * /legal-public

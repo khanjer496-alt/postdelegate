@@ -65,3 +65,49 @@ describe('AuthController account enumeration', () => {
     }
   });
 });
+
+describe('AuthController referral cookie', () => {
+  const response = () => {
+    const res: any = {
+      header: jest.fn(),
+      cookie: jest.fn(),
+      status: jest.fn(() => res),
+      json: jest.fn(),
+      send: jest.fn(),
+    };
+    return res;
+  };
+
+  it.each(['register', 'login'] as const)(
+    '%s hands the referral cookie to the auth service',
+    async (name) => {
+      const routeAuth = jest
+        .fn()
+        .mockResolvedValue({ jwt: 'jwt', addedOrg: false });
+      const controller = new AuthController(
+        {
+          routeAuth,
+          getOrgFromCookie: jest.fn().mockReturnValue(false),
+        } as any,
+        { hasProvider: () => false } as any
+      );
+
+      await (controller as any)[name](
+        { cookies: { pd_ref: 'friend.1790000000000' } },
+        { provider: 'LOCAL', email: 'a@b.c', password: 'secret' },
+        response(),
+        '1.1.1.1',
+        'agent'
+      );
+
+      expect(routeAuth).toHaveBeenCalledWith(
+        'LOCAL',
+        expect.anything(),
+        '1.1.1.1',
+        'agent',
+        false,
+        'friend.1790000000000'
+      );
+    }
+  );
+});

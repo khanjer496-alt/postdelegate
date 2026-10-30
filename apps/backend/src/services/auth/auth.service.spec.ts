@@ -8,6 +8,7 @@ jest.mock('@gitroom/nestjs-libraries/newsletter/newsletter.service', () => ({
 }));
 
 import { AuthService } from './auth.service';
+import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { AuthService as Tokens } from '@gitroom/helpers/auth/auth.service';
 
 const localUser = (over: Record<string, unknown> = {}) => ({
@@ -31,6 +32,7 @@ const setup = (user: any) => {
     users as any,
     {} as any,
     emails as any,
+    {} as any,
     {} as any
   );
   return { service, users, emails };
@@ -175,5 +177,107 @@ describe('AuthService tokens', () => {
         )
       ).toBe(false);
     });
+  });
+});
+
+describe('AuthService affiliate attribution at registration', () => {
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+    process.env.FRONTEND_URL = 'https://app.example.com';
+    delete process.env.DISABLE_REGISTRATION;
+  });
+
+  const created = (email: string) => ({
+    id: 'org-new',
+    users: [{ user: { id: 'user-new', email } }],
+  });
+
+  const setupRegistration = () => {
+    const users = {
+      getUserByEmail: jest.fn(async () => null),
+      getUserByProvider: jest.fn(async () => null),
+      getUserById: jest.fn(async () => ({ id: 'user-new', password: '' })),
+    };
+    const organizations = {
+      createOrgAndUser: jest.fn(async (body: any) => created(body.email)),
+    };
+    const emails = { sendEmailSync: jest.fn(async () => undefined) };
+    const providers = {
+      getProvider: jest.fn(() => ({
+        getUser: jest.fn(async () => ({ id: 'g-1', email: 'g@example.com' })),
+      })),
+    };
+    const affiliates = { attributeOrganization: jest.fn(async () => true) };
+    const service = new AuthService(
+      users as any,
+      organizations as any,
+      emails as any,
+      providers as any,
+      affiliates as any
+    );
+    return { service, affiliates };
+  };
+
+  it('attributes an email registration with the referral cookie', async () => {
+    const { service, affiliates } = setupRegistration();
+
+    await service.routeAuth(
+      'LOCAL' as any,
+      Object.assign(new CreateOrgUserDto(), {
+        email: 'New@Example.com',
+        password: 'secret',
+        provider: 'LOCAL',
+        company: 'Acme',
+      }),
+      '1.1.1.1',
+      'agent',
+      false,
+      'friend.1790000000000'
+    );
+
+    expect(affiliates.attributeOrganization).toHaveBeenCalledWith({
+      organizationId: 'org-new',
+      userId: 'user-new',
+      email: 'new@example.com',
+      cookie: 'friend.1790000000000',
+    });
+  });
+
+  it('attributes an OAuth registration with the referral cookie', async () => {
+    const { service, affiliates } = setupRegistration();
+
+    await service.routeAuth(
+      'GOOGLE' as any,
+      { provider: 'GOOGLE', providerToken: 'token', company: 'Acme' } as any,
+      '1.1.1.1',
+      'agent',
+      false,
+      'friend.1790000000000'
+    );
+
+    expect(affiliates.attributeOrganization).toHaveBeenCalledWith({
+      organizationId: 'org-new',
+      userId: 'user-new',
+      email: 'g@example.com',
+      cookie: 'friend.1790000000000',
+    });
+  });
+
+  it('does not attribute when an existing OAuth user signs in', async () => {
+    const { service, affiliates } = setupRegistration();
+    (service as any)._userService.getUserByProvider = jest.fn(async () => ({
+      id: 'existing',
+    }));
+
+    await service.routeAuth(
+      'GOOGLE' as any,
+      { provider: 'GOOGLE', providerToken: 'token', company: 'Acme' } as any,
+      '1.1.1.1',
+      'agent',
+      false,
+      'friend.1790000000000'
+    );
+
+    expect(affiliates.attributeOrganization).not.toHaveBeenCalled();
   });
 });

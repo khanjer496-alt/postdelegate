@@ -829,6 +829,21 @@ const ViewStats = () => {
   );
 };
 
+const ViewAffiliates = () => {
+  const t = useT();
+  const handleClick = useCallback(() => {
+    window.location.href = '/admin/affiliates';
+  }, []);
+  return (
+    <div
+      className="px-[10px] rounded-[4px] bg-orange-700 text-white cursor-pointer whitespace-nowrap"
+      onClick={handleClick}
+    >
+      {t('view_affiliates', 'View Affiliates')}
+    </div>
+  );
+};
+
 const ImportDebugPost = () => {
   const { openModal } = useModals();
   const t = useT();
@@ -1116,6 +1131,7 @@ export const Impersonate = () => {
                 <AddAnnouncement />
                 <ViewErrors />
                 <ViewStats />
+                <ViewAffiliates />
               </div>
             )}
           </div>

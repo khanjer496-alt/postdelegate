@@ -28,6 +28,7 @@ import { Provider } from '@prisma/client';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import * as Sentry from '@sentry/nestjs';
 import { FarcasterProvider } from '@gitroom/nestjs-libraries/integrations/social/farcaster.provider';
+import { AFFILIATE_COOKIE_NAME } from '@gitroom/helpers/affiliate/affiliate.cookie';
 
 // Per client address (see getClientIp), on top of the global limits. Every one
 // of these is public and either sends an email, checks a password or burns
@@ -70,7 +71,8 @@ export class AuthController {
         body,
         ip,
         userAgent,
-        getOrgFromCookie
+        getOrgFromCookie,
+        req?.cookies?.[AFFILIATE_COOKIE_NAME]
       );
 
       const activationRequired =
@@ -132,7 +134,8 @@ export class AuthController {
         body,
         ip,
         userAgent,
-        getOrgFromCookie
+        getOrgFromCookie,
+        req?.cookies?.[AFFILIATE_COOKIE_NAME]
       );
 
       response.cookie('auth', jwt, {

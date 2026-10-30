@@ -11,6 +11,7 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
+import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import {
   PaymentInvoice,
   PaymentPlatform,
@@ -90,6 +91,16 @@ export async function resolveTierPrice(
   );
 }
 
+// Events that are not created by our own Stripe objects, so they carry no
+// metadata.service. Invoices feed the pixel and the affiliate commissions, the
+// charge events reverse commissions. Anything unrelated to a commission is
+// ignored further down.
+const EVENTS_WITHOUT_SERVICE_METADATA: string[] = [
+  'invoice.payment_succeeded',
+  'charge.refunded',
+  'charge.dispute.created',
+];
+
 // Subscription statuses that must not keep granting a paid tier
 const NOT_ENTITLED_STATUSES: Stripe.Subscription.Status[] = [
   'unpaid',
@@ -105,7 +116,8 @@ export class StripeService extends PaymentProviderAbstract {
     private _subscriptionService: SubscriptionService,
     private _organizationService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService
+    private _trackService: TrackService,
+    private _affiliateService: AffiliateService
   ) {
     super();
   }
@@ -130,7 +142,7 @@ export class StripeService extends PaymentProviderAbstract {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       event?.data?.object?.metadata?.service !== 'gitroom' &&
-      event.type !== 'invoice.payment_succeeded'
+      !EVENTS_WITHOUT_SERVICE_METADATA.includes(event.type)
     ) {
       return { ok: true };
     }
@@ -144,6 +156,10 @@ export class StripeService extends PaymentProviderAbstract {
         return this.updateSubscription(event);
       case 'customer.subscription.deleted':
         return this.deleteSubscription(event);
+      case 'charge.refunded':
+        return this.chargeRefunded(event);
+      case 'charge.dispute.created':
+        return this.chargeDisputed(event);
       default:
         return { ok: true };
     }
@@ -1127,6 +1143,117 @@ export class StripeService extends PaymentProviderAbstract {
     // only feeds the Facebook pixel, it runs in the background so it can
     // never fail or slow down the webhook
     this.trackConversion(event.data.object).catch((err) => {});
+    await this.recordAffiliateCommission(event.data.object);
+    return { ok: true };
+  }
+
+  // A failure here is logged with the invoice id and never fails the webhook:
+  // the subscription events are handled by the same endpoint and a failing
+  // endpoint would stop all of them. The row is unique per invoice, so a
+  // missed one can be replayed from the Stripe dashboard.
+  private async recordAffiliateCommission(invoice: Stripe.Invoice) {
+    try {
+      const customerId =
+        typeof invoice.customer === 'string'
+          ? invoice.customer
+          : invoice.customer?.id;
+      if (!customerId) {
+        return;
+      }
+
+      // the tax is part of the invoice total, only the rest is commissionable
+      const taxCents = (invoice.total_taxes || []).reduce(
+        (sum, tax) => sum + tax.amount,
+        0
+      );
+
+      await this._affiliateService.recordInvoicePayment({
+        invoiceId: invoice.id!,
+        customerId,
+        amountPaidCents: invoice.amount_paid,
+        totalCents: invoice.total,
+        taxCents,
+        currency: invoice.currency,
+        paidAt: new Date(
+          (invoice.status_transitions?.paid_at || invoice.created) * 1000
+        ),
+      });
+    } catch (err) {
+      console.error(
+        'affiliate_commission_failed',
+        { stripe_invoice_id: invoice.id },
+        err
+      );
+    }
+  }
+
+  // The invoice of a charge: older API versions put it on the charge, the
+  // current ones on the invoice payment of the payment intent
+  private async getInvoiceIdOfCharge(charge: Stripe.Charge) {
+    const direct = (charge as any).invoice;
+    if (direct) {
+      return typeof direct === 'string' ? direct : direct.id;
+    }
+
+    const paymentIntent =
+      typeof charge.payment_intent === 'string'
+        ? charge.payment_intent
+        : charge.payment_intent?.id;
+    if (!paymentIntent) {
+      return null;
+    }
+
+    const payments = await stripe.invoicePayments.list({
+      payment: { type: 'payment_intent', payment_intent: paymentIntent },
+      limit: 1,
+    });
+    const invoice = payments.data[0]?.invoice;
+    return (typeof invoice === 'string' ? invoice : invoice?.id) || null;
+  }
+
+  async chargeRefunded(event: Stripe.ChargeRefundedEvent) {
+    try {
+      const charge = event.data.object;
+      const invoiceId = await this.getInvoiceIdOfCharge(charge);
+      if (invoiceId) {
+        // amount_refunded adds up all the refunds of the charge
+        await this._affiliateService.reverseCommission({
+          invoiceId,
+          reversedCents: charge.amount_refunded,
+          chargedCents: charge.amount,
+        });
+      }
+    } catch (err) {
+      console.error(
+        'affiliate_refund_failed',
+        { stripe_charge_id: event.data.object.id },
+        err
+      );
+    }
+    return { ok: true };
+  }
+
+  async chargeDisputed(event: Stripe.ChargeDisputeCreatedEvent) {
+    try {
+      const dispute = event.data.object;
+      const charge = await stripe.charges.retrieve(
+        typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id
+      );
+      const invoiceId = await this.getInvoiceIdOfCharge(charge);
+      if (invoiceId) {
+        await this._affiliateService.reverseCommission({
+          invoiceId,
+          reversedCents: dispute.amount,
+          chargedCents: charge.amount,
+        });
+      }
+    } catch (err) {
+      console.error(
+        'affiliate_dispute_failed',
+        { stripe_dispute_id: event.data.object.id },
+        err
+      );
+    }
     return { ok: true };
   }
 

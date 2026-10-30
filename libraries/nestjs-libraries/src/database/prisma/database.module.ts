@@ -50,6 +50,8 @@ import { ErrorsRepository } from '@gitroom/nestjs-libraries/database/prisma/erro
 import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
 import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.repository';
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
+import { AffiliateRepository } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.repository';
+import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
 @Global()
@@ -111,6 +113,8 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     ErrorsService,
     AdminStatsRepository,
     AdminStatsService,
+    AffiliateRepository,
+    AffiliateService,
   ],
   get exports() {
     return this.providers;

@@ -22,6 +22,10 @@ COPY apps/orchestrator /app/apps/orchestrator
 COPY libraries /app/libraries
 COPY tsconfig.base.json /app/tsconfig.base.json
 COPY i18n.json /app/i18n.json
+# The schema gained the affiliate models, so the Prisma client generated in
+# the pinned upstream image must be regenerated before the apps are built.
+# The schema is the file copied in with /app/libraries above.
+RUN pnpm run prisma-generate
 RUN rm -rf /app/apps/backend/dist /app/apps/orchestrator/dist \
     && NODE_OPTIONS=--max-old-space-size=3072 pnpm --filter ./apps/backend run build \
     && NODE_OPTIONS=--max-old-space-size=3072 pnpm --filter ./apps/orchestrator run build

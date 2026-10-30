@@ -16,6 +16,8 @@ import clsx from 'clsx';
 import { VariableContextComponent } from '@gitroom/react/helpers/variable.context';
 import { Fragment } from 'react';
 import UtmSaver from '@gitroom/helpers/utils/utm.saver';
+import { AffiliateSaver } from '@gitroom/frontend/components/layout/affiliate.saver';
+import { DEFAULT_AFFILIATE_COOKIE_DAYS } from '@gitroom/helpers/affiliate/affiliate.cookie';
 import { DubAnalytics } from '@gitroom/frontend/components/layout/dubAnalytics';
 import { FacebookComponent } from '@gitroom/frontend/components/layout/facebook.component';
 import { GoogleTagManagerComponent } from '@gitroom/frontend/components/layout/gtm.component';
@@ -90,6 +92,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           googleAdsTrialTracking={process.env.NEXT_PUBLIC_TRACKING_TRIAL}
           language={language}
           recaptchaSiteKey={process.env.RECAPTCHA_SITE_KEY || ''}
+          affiliateCookieDays={
+            parseInt(process.env.AFFILIATE_COOKIE_DAYS || '', 10) ||
+            DEFAULT_AFFILIATE_COOKIE_DAYS
+          }
           mediaProcessing={
             process.env.STORAGE_PROVIDER === 'cloudflare' &&
             !!process.env.RUNPOD_API_KEY &&
@@ -112,6 +118,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <Plausible domain={analyticsDomain}>
               <LayoutContext>
                 <UtmSaver />
+                <AffiliateSaver />
                 {children}
               </LayoutContext>
             </Plausible>
