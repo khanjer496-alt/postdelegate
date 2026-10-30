@@ -75,6 +75,43 @@ The live Google **Prepare for verification** summary confirms published branding
 
 Upstream channel deletion retained tokens and API-derived data. The deployed authorization lifecycle adds provider revocation, periodic authorization checks and bounded cleanup, with late-write safeguards. It remains disabled until the [operating gates](authorization-lifecycle-operations.md) are satisfied. The [four-day backup proposal](backup-retention-proposal.md) is dry-run only: production backups have not been pruned. Do not claim YouTube verification readiness from the private publication test.
 
+## Token encryption
+
+Social access and refresh tokens (`Integration.token`, `Integration.refreshToken`) are encrypted at rest with AES-256-GCM, a random 12-byte IV per value and a dedicated key. Stored form: `enc:v1:<iv>:<tag>:<ciphertext>` (base64url). Values without the prefix are legacy plaintext and keep working, so deploying the code changes nothing until the key is set; new writes are encrypted from the moment the key is set, and the backfill below converts the existing rows. Without `TOKEN_ENCRYPTION_KEY` the app stores plaintext (the self-hosted default) and logs one warning per process at startup. A malformed key stops the app at startup instead of silently storing plaintext. Tokens are never sent to the browser.
+
+`customInstanceDetails` (Bluesky, Mastodon custom, Lemmy, Listmonk and Skool credentials, and Chrome-extension cookies) was already encrypted with `AuthService.fixedEncryption` (AES-256-CBC with a static IV derived from `JWT_SECRET`) and is unchanged. Skool rows connected before that format change still hold a signed JWT, which is readable but not encrypted; reconnecting the channel rewrites it in the current format.
+
+### Enable it (order matters)
+
+1. Generate the key on the server and put it in the runtime configuration:
+
+   ```sh
+   openssl rand -base64 32
+   ./set-secret.sh TOKEN_ENCRYPTION_KEY      # from this checkout; asks for the value (hidden), restarts nothing
+   ```
+
+   `/etc/postiz/runtime.env` is included in the config backups; also store the key in the password manager. **If the key is lost the stored tokens cannot be decrypted** and every channel has to be reconnected. Never derive it from, or reuse, `JWT_SECRET`.
+2. Deploy the release (recreate `postiz`). Existing plaintext rows are read as they are.
+3. Dry run, then the real backfill, inside the running container:
+
+   ```sh
+   sudo postiz-compose exec postiz node /app/apps/backend/dist/apps/backend/src/commands/backfill.integration.tokens.js --dry-run
+   sudo postiz-compose exec postiz node /app/apps/backend/dist/apps/backend/src/commands/backfill.integration.tokens.js
+   ```
+
+   Options: `--batch-size=200`, `--reencrypt` (see rotation). It prints `progress {...}` after every batch and a final `done {...}` with `scanned`, `updated`, `unchanged`, `skippedChanged`, `unreadable`; it never prints token values. It is idempotent: re-run it any time, encrypted values are not touched again, and a row that was reconnected or refreshed while it ran is skipped (`skippedChanged`, exit code 2: just run it again). `unreadable` rows (exit code 2) are never modified; investigate those channel ids.
+4. Verify with `sudo postiz-compose exec postgres psql -U postiz postiz -c "select count(*) from \"Integration\" where (token <> '' and token not like 'enc:v1:%') or (\"refreshToken\" <> '' and \"refreshToken\" not like 'enc:v1:%')"` returning 0, then open a connected channel in the app and check that its preview or analytics load, and that a scheduled post still publishes. Take a backup (`sudo backup-postiz`) before step 3.
+
+Do not remove the key afterwards: values are only readable with it.
+
+### Rotation
+
+Generate a new key, set `TOKEN_ENCRYPTION_KEY=<new>` and `TOKEN_ENCRYPTION_KEY_PREVIOUS=<old>` (comma separated for several), recreate `postiz`, run the backfill with `--reencrypt`, verify, then remove `TOKEN_ENCRYPTION_KEY_PREVIOUS`. Until the previous key is removed it is only used for reading.
+
+### Failure behaviour
+
+A stored value that was tampered with, or that the configured key cannot decrypt, is never returned as garbage: reading that single channel raises a clear error (publishing for it fails, it is not treated as a revoked token and the channel is not disconnected). Lists keep working without that channel's credentials, the refresh scan skips it, and the data-removal lifecycle ignores it.
+
 ## Public source offer and stock Postiz rollback
 
 The settings Source code link is live: [the source offer](https://app.postdelegate.com/source) returns HTTP 302 to [the matching versioned application archive](https://app.postdelegate.com/source/postdelegate-38dd7f0e.tar.gz), which returned HTTP 200. Independent public download verification on 2026-10-27 confirmed 13,491,032 bytes and SHA-256 `dc4f5d22c6f4b2cacff5deb119807e020f58fea3e9625244ff9ceb0769865fb8`. The redirect now uses `Cache-Control: no-store`. Use this versioned URL for release checks: Cloudflare previously served an older cached archive at a stable alias. This is the exact tracked release tree, including application source, assets, lockfiles, license, release recipe and regression tests. Ignored credentials, runtime configuration, `.local` evidence and backups are absent; the archive passed structural and credential-pattern checks.

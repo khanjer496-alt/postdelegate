@@ -33,7 +33,8 @@ import { ChangeDirClient } from '@gitroom/frontend/components/new-layout/change.
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
   const language = normalizeLanguage(cookieStore.get(cookieName)?.value);
-  const Plausible = !!process.env.STRIPE_PUBLISHABLE_KEY
+  // analytics are opt-in with their own switch, never implied by billing
+  const Plausible = process.env.PLAUSIBLE_ENABLED === 'true'
     ? PlausibleProvider
     : Fragment;
   const analyticsDomain = process.env.FRONTEND_URL
@@ -78,7 +79,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           cloudflareUrl={process.env.CLOUDFLARE_BUCKET_URL || ''}
           mainUrl={process.env.MAIN_URL || ''}
           mcpUrl={process.env.MCP_URL}
-          dub={!!process.env.STRIPE_PUBLISHABLE_KEY}
+          dub={process.env.DUB_ANALYTICS_ENABLED === 'true'}
           facebookPixel={process.env.NEXT_PUBLIC_FACEBOOK_PIXEL!}
           telegramBotName={process.env.TELEGRAM_BOT_NAME!}
           neynarClientId={process.env.NEYNAR_CLIENT_ID!}

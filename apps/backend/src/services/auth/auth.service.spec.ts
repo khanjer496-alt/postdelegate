@@ -9,6 +9,7 @@ jest.mock('@gitroom/nestjs-libraries/newsletter/newsletter.service', () => ({
 
 import { AuthService } from './auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
+import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto';
 import { AuthService as Tokens } from '@gitroom/helpers/auth/auth.service';
 
 const localUser = (over: Record<string, unknown> = {}) => ({
@@ -33,7 +34,8 @@ const setup = (user: any) => {
     {} as any,
     emails as any,
     {} as any,
-    {} as any
+    {} as any,
+    { isLocked: jest.fn(async () => false), recordFailure: jest.fn(), clear: jest.fn() } as any
   );
   return { service, users, emails };
 };
@@ -213,7 +215,8 @@ describe('AuthService affiliate attribution at registration', () => {
       organizations as any,
       emails as any,
       providers as any,
-      affiliates as any
+      affiliates as any,
+      { isLocked: jest.fn(async () => false), recordFailure: jest.fn(), clear: jest.fn() } as any
     );
     return { service, affiliates };
   };
@@ -279,5 +282,88 @@ describe('AuthService affiliate attribution at registration', () => {
     );
 
     expect(affiliates.attributeOrganization).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService login lockout', () => {
+  const { LoginLockoutService } = require('@gitroom/nestjs-libraries/services/login.lockout.service');
+  // no expiry needed here, the window is covered by login.lockout.service.spec.ts
+  const fakeRedis = () => {
+    const data = new Map<string, string>();
+    return {
+      get: async (key: string) => data.get(key) ?? null,
+      set: async (key: string, value: string) => void data.set(key, value),
+      incr: async (key: string) => {
+        const next = Number(data.get(key) || 0) + 1;
+        data.set(key, String(next));
+        return next;
+      },
+      expire: async () => 1,
+      del: async (...keys: string[]) => keys.forEach((key) => data.delete(key)),
+    };
+  };
+
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+  });
+
+  const setupLogin = (user: any) => {
+    const lockout = new LoginLockoutService();
+    lockout.redis = fakeRedis();
+    const users = {
+      getUserByEmail: jest.fn(async () => user),
+      getUserById: jest.fn(async () => user),
+    };
+    const service = new AuthService(
+      users as any, {} as any, {} as any, {} as any, {} as any, lockout
+    );
+    const login = (email: string, password: string) =>
+      service.routeAuth(
+        'LOCAL' as any,
+        Object.assign(new LoginUserDto(), { email, password, provider: 'LOCAL' }),
+        '203.0.113.1',
+        'agent'
+      );
+    return { service, lockout, users, login };
+  };
+  const goodUser = () => localUser({ password: Tokens.hashPassword('right-password') });
+  const GENERIC = 'Invalid user name or password';
+
+  it('rejects the 11th attempt with the generic error even with the right password', async () => {
+    const { login, users } = setupLogin(goodUser());
+    for (let i = 0; i < 10; i++) {
+      await expect(login('a@example.com', 'wrong')).rejects.toThrow(GENERIC);
+    }
+    users.getUserByEmail.mockClear();
+    await expect(login('a@example.com', 'right-password')).rejects.toThrow(GENERIC);
+  });
+
+  it('answers the same for an account that does not exist', async () => {
+    const { login } = setupLogin(null);
+    for (let i = 0; i < 10; i++) {
+      await expect(login('ghost@example.com', 'whatever')).rejects.toThrow(GENERIC);
+    }
+    await expect(login('ghost@example.com', 'whatever')).rejects.toThrow(GENERIC);
+  });
+
+  it('a successful login clears the failures', async () => {
+    const { login } = setupLogin(goodUser());
+    for (let i = 0; i < 9; i++) {
+      await expect(login('a@example.com', 'wrong')).rejects.toThrow(GENERIC);
+    }
+    await expect(login('a@example.com', 'right-password')).resolves.toMatchObject({ addedOrg: false });
+    for (let i = 0; i < 9; i++) {
+      await expect(login('a@example.com', 'wrong')).rejects.toThrow(GENERIC);
+    }
+    await expect(login('a@example.com', 'right-password')).resolves.toBeTruthy();
+  });
+
+  it('does not lock other accounts', async () => {
+    const { login, lockout } = setupLogin(goodUser());
+    for (let i = 0; i < 10; i++) {
+      await expect(login('victim@example.com', 'wrong')).rejects.toThrow(GENERIC);
+    }
+    expect(await lockout.isLocked('other@example.com')).toBe(false);
+    await expect(login('other@example.com', 'right-password')).resolves.toBeTruthy();
   });
 });
