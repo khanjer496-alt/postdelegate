@@ -121,7 +121,7 @@ export function helpText(version: string, topic?: string): string {
     '',
     'Exit codes: 0 ok, 1 error, 2 usage error, 3 authentication failed',
     '',
-    'Get an API key in the app: Settings > Public API (https://app.postdelegate.com).',
+    'Get an API key in the app: Settings > Agents / Dev (https://app.postdelegate.com).',
     '',
   ].join('\n');
 }

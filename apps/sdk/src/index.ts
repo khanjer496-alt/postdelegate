@@ -92,7 +92,7 @@ export class PostDelegate {
   private readonly _userAgent: string;
 
   /**
-   * @param _apiKey API key from Settings > Public API in the PostDelegate app.
+   * @param _apiKey API key from Settings > Agents / Dev in the PostDelegate app.
    * @param baseUrlOrOptions API base URL (without `/public/v1`) or an options object.
    */
   constructor(

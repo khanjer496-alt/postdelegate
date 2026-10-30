@@ -12,7 +12,7 @@ npx postdelegate help
 
 ## Log in
 
-Create an API key in the app under **Settings > Public API** (availability depends on your plan).
+Create an API key in the app under **Settings > Agents / Dev** (availability depends on your plan).
 
 ```bash
 postdelegate login          # prompts for the key (hidden), verifies it, saves it

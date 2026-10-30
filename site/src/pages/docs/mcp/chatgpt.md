@@ -19,7 +19,7 @@ https://app.postdelegate.com/mcp-oauth-dynamic
 ```
 
 4. Choose OAuth for authentication. ChatGPT registers itself with PostDelegate automatically.
-5. Choose **Create**, then **Connect**. A PostDelegate page opens. Sign in if asked and approve.
+5. Choose **Create**, then **Connect**. A PostDelegate page opens. Sign in if asked and click **Authorize**.
 
 This is the address and menu path the app shows for ChatGPT under **Settings > Agents / Dev**: Settings > Connectors > Create, then paste the URL.
 

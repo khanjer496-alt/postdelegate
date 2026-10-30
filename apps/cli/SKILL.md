@@ -12,7 +12,7 @@ so confirm anything irreversible with the user first.
 
 - Check it is installed: `postdelegate --version`. If not: `npm install -g postdelegate` (or prefix commands with `npx`).
 - Check you are logged in: `postdelegate whoami`. Exit code 3 means no valid key.
-- The user creates an API key in the app (Settings > Public API) and runs `postdelegate login` themselves,
+- The user creates an API key in the app (Settings > Agents / Dev) and runs `postdelegate login` themselves,
   or exports `POSTDELEGATE_API_KEY`. Never ask the user to paste the key into the chat, and never print,
   log or commit it.
 
