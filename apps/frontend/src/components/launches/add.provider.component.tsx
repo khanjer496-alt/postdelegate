@@ -282,23 +282,10 @@ const ExtensionNotFound: FC = () => {
       <p className="text-[14px] text-textColor/80">
         {t(
           'extension_not_available',
-          'The Postiz browser extension is not installed. You need to install it before connecting this channel.'
+          'The PostDelegate browser extension is not available yet, so this channel cannot be connected right now.'
         )}
       </p>
       <div className="flex gap-[10px]">
-        <Button
-          type="button"
-          className="flex-1"
-          onClick={() => {
-            window.open(
-              'https://chromewebstore.google.com/detail/postiz/cidhffagahknaeodkplfbcpfeielnkjl?hl=en',
-              '_blank'
-            );
-            modals.closeCurrent();
-          }}
-        >
-          {t('install_extension', 'Install Extension')}
-        </Button>
         <Button
           type="button"
           className="flex-1 !bg-transparent border border-tableBorder text-textColor"
@@ -348,7 +335,7 @@ const ChromeExtensionWarning: FC<{
           We will store your cookies securely to facilitate the connection.
         </li>
         <li>
-          Postiz does not take responsibility for any issues arising or account
+          PostDelegate does not take responsibility for any issues arising or account
           termination due to the use of this method.
         </li>
       </ul>
@@ -584,7 +571,7 @@ export const AddProviderComponent: FC<{
             toaster.show(
               t(
                 'extension_not_installed',
-                'Postiz browser extension is not installed or not reachable.'
+                'PostDelegate browser extension is not installed or not reachable.'
               ),
               'warning'
             );

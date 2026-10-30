@@ -3,7 +3,6 @@ import { getT } from '@gitroom/react/translation/get.translation.service.backend
 export const dynamic = 'force-dynamic';
 import { ReactNode } from 'react';
 import loadDynamic from 'next/dynamic';
-import { TestimonialComponent } from '@gitroom/frontend/components/auth/testimonial.component';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Toaster } from '@gitroom/react/toaster/toaster';
@@ -34,14 +33,13 @@ export default async function AuthLayout({
             with <span className="text-[#C8FF4D]">PostDelegate</span>
           </div>
           <a
-            href="https://github.com/gitroomhq/postiz-app"
+            href="/source"
             target="_blank"
             rel="noreferrer"
             className="mt-[20px] text-[14px] text-gray-400 hover:text-white"
           >
-            Built on open-source Postiz · From the Postiz community
+            {t('source_code', 'Source code')}
           </a>
-          <TestimonialComponent />
         </div>
       </div>
     </MantineWrapper>

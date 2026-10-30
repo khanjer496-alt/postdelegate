@@ -2,12 +2,10 @@
 
 import { FC, ReactNode, useCallback, useState } from 'react';
 import clsx from 'clsx';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import DeleteAccountComponent from '@gitroom/frontend/components/settings/delete-account.component';
 const useFaqList = () => {
-  const { isGeneral } = useVariables();
   const user = useUser();
   const t = useT();
   return [
@@ -16,11 +14,11 @@ const useFaqList = () => {
           {
             title: t(
               'faq_am_i_going_to_be_charged_by_postiz',
-              'Am I going to be charged by Postiz?'
+              'Am I going to be charged by PostDelegate?'
             ),
             description: t(
               'faq_to_confirm_credit_card_information_postiz_will_hold',
-              'To confirm credit card information Postiz will hold $2 and release it immediately, you can cancel your subscription anytime from settings without talking to a person'
+              'To confirm your card, PostDelegate places a $1 authorization and voids it right away, so you are not charged. You can cancel your subscription anytime from settings without talking to a person'
             ),
           },
         ]
@@ -28,24 +26,18 @@ const useFaqList = () => {
     {
       title: t(
         'faq_can_i_trust_postiz_gitroom',
-        `Can I trust ${isGeneral ? 'Postiz' : 'Gitroom'}?`
+        'Can I trust PostDelegate?'
       ),
       description: t(
         'faq_postiz_gitroom_is_proudly_open_source',
-        `${
-          isGeneral ? 'Postiz' : 'Gitroom'
-        } is proudly open-source! We believe in an ethical and transparent culture, meaning that ${
-          isGeneral ? 'Postiz' : 'Gitroom'
-        } will live forever. You can check out the entire code or use it for personal projects. To view the open-source repository, <a href="https://github.com/gitroomhq/postiz-app" target="_blank" style="text-decoration: underline;">click here</a>.`
+        'PostDelegate is operated by Nasida Apps LLC. We believe in an ethical and transparent culture, so the source code of the application is available to everyone under the AGPL-3.0 license. To get it, <a href="/source" target="_blank" style="text-decoration: underline;">click here</a>.'
       ),
     },
     {
       title: t('faq_what_are_channels', 'What are channels?'),
       description: t(
         'faq_postiz_gitroom_allows_you_to_schedule_posts',
-        `${
-          isGeneral ? 'Postiz' : 'Gitroom'
-        } allows you to schedule your posts between different channels.
+        `PostDelegate allows you to schedule your posts between different channels.
 A channel is a publishing platform where you can schedule your posts.
 For example, you can schedule your posts on X, Facebook, Instagram, TikTok, YouTube, Reddit, Linkedin, Dribbble, Threads and Pinterest.`
       ),
@@ -66,9 +58,7 @@ For example, you can schedule your posts on X, Facebook, Instagram, TikTok, YouT
             ),
             description: t(
               'faq_delete_account_description',
-              `If you don't want to continue using ${
-                isGeneral ? 'Postiz' : 'Gitroom'
-              }, you can delete your account, including all your organizations, channels and posts. This action cannot be undone.`
+              `If you don't want to continue using PostDelegate, you can delete your account, including all your organizations, channels and posts. This action cannot be undone.`
             ),
             content: <DeleteAccountComponent isLink={true} />,
           },

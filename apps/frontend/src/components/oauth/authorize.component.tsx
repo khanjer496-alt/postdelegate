@@ -4,7 +4,6 @@ import { FC, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
-import { OAuthSelfHosted } from '@gitroom/frontend/components/oauth/self.hosted.component';
 
 export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
   const searchParams = useSearchParams();
@@ -13,7 +12,6 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [selfHosted, setSelfHosted] = useState(false);
 
   const clientId = searchParams.get('client_id');
   const responseType = searchParams.get('response_type');
@@ -205,22 +203,7 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
             )}
           </div>
 
-          {selfHosted ? (
-            <OAuthSelfHosted
-              appName={appInfo.app.name}
-              askEmail={!!appInfo.selfHostedEmail}
-              params={{
-                client_id: clientId,
-                state,
-                redirect_uri: redirectUri,
-                code_challenge: codeChallenge,
-                code_challenge_method: codeChallengeMethod,
-                resource,
-              }}
-              onBack={() => setSelfHosted(false)}
-            />
-          ) : (
-            <>
+          <>
               {!!appInfo.app.redirectHost && (
                 <div className="border-t border-[#2A2929] pt-[16px] text-[14px] text-gray-400">
                   After you decide, you will be sent to{' '}
@@ -269,18 +252,7 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
                   Sign in to PostDelegate
                 </button>
               )}
-
-              {!!appInfo.selfHosted && (
-                <button
-                  onClick={() => setSelfHosted(true)}
-                  disabled={submitting}
-                  className="text-[14px] text-gray-400 hover:text-white disabled:opacity-50 transition-colors"
-                >
-                  Use self-hosted
-                </button>
-              )}
-            </>
-          )}
+          </>
         </div>
       </div>
     </div>

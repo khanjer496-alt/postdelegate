@@ -34,6 +34,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const Plausible = !!process.env.STRIPE_PUBLISHABLE_KEY
     ? PlausibleProvider
     : Fragment;
+  const analyticsDomain = process.env.FRONTEND_URL
+    ? new URL(process.env.FRONTEND_URL).hostname
+    : 'app.postdelegate.com';
   return (
     <html>
       <head>
@@ -43,7 +46,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         {!!process.env.DATAFAST_WEBSITE_ID && (
           <Script
             data-website-id={process.env.DATAFAST_WEBSITE_ID}
-            data-domain="postiz.com"
+            data-domain={analyticsDomain}
             src="https://datafa.st/js/script.js"
             strategy="afterInteractive"
           />
@@ -106,9 +109,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <DubAnalytics />
             <FacebookComponent />
             <GoogleTagManagerComponent gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
-            <Plausible
-              domain={!!process.env.IS_GENERAL ? 'postiz.com' : 'gitroom.com'}
-            >
+            <Plausible domain={analyticsDomain}>
               <LayoutContext>
                 <UtmSaver />
                 {children}

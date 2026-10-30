@@ -104,8 +104,9 @@ export class NotificationService {
       try {
         await this._temporalService.client
           .getRawClient()
-          ?.workflow.signalWithStart('digestEmailWorkflow', {
-            workflowId: 'digest_email_workflow_' + orgId,
+          ?.workflow.signalWithStart('digestEmailWorkflowV2', {
+            // v2 only changes the digest subject; v1 runs stay registered and idle
+            workflowId: 'digest_email_workflow_v2_' + orgId,
             signal: 'email',
             signalArgs: [
               [
