@@ -3,11 +3,11 @@ name: Uptime
 
 # External uptime monitor. A failed run makes GitHub email the repository
 # owner, and it does not depend on the VPS being alive. No checkout, one tiny
-# job: every 30 minutes is about 1,440 billed minutes a month, so reduce the
+# job: hourly is about 720 billed minutes a month (GitHub Free: 2,000); reduce the
 # schedule if the private-repo minute allowance gets tight.
 on:
   schedule:
-    - cron: '7,37 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 permissions: {}

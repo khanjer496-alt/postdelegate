@@ -125,7 +125,7 @@ What it adds:
 | --- | --- | --- |
 | `offsite-backup-postiz` + `postiz-offsite-backup.timer` | `/usr/local/bin`, 03:00 UTC daily (after the 02:20 local backup) | Takes the newest complete `/var/backups/postiz/<stamp>`, re-verifies its checksums, tars it, encrypts it with `age` to the owner's **public** key, uploads `postiz/<stamp>.tar.age` and `.sha256` to the separate R2 bucket, reads it back to confirm the checksum, then prunes to 14 daily + 8 weekly. Any failure exits non-zero and sends an alert. |
 | `postiz-healthcheck` + `postiz-healthcheck.timer` | `/usr/local/bin`, every 10 minutes | Disk below 85%, newest local backup under 26 h, newest off-site backup under 26 h, all six compose services running and healthy, Temporal `SERVING`, and `https://app.postdelegate.com/api/auth/can-register` returning 2xx. Logs to journald and posts to your phone. |
-| `.github/workflows/uptime.yml` | GitHub Actions | Every 30 minutes, from outside the VPS: curls the app API, app home page and marketing site, and checks both TLS certificates have more than 14 days left. A failed run makes GitHub email the repository owner. |
+| `.github/workflows/uptime.yml` | GitHub Actions | Every hour, from outside the VPS: curls the app API, app home page and marketing site, and checks both TLS certificates have more than 14 days left. A failed run makes GitHub email the repository owner. |
 
 Design notes:
 
