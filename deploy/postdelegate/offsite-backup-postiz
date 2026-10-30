@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# Encrypt the newest verified Postiz backup with age and copy it to a separate,
+# private R2 bucket. Install as /usr/local/bin/offsite-backup-postiz, root:root 0700.
+#
+# Runs from postiz-offsite-backup.timer after backup-postiz. Reads
+# /etc/postiz/backup-r2.env (see backup-r2.env.example). The private age key
+# is never on this server; only the public recipient is.
+#
+# Exit status is non-zero on any failure, and a failure also sends an alert.
+set -Eeuo pipefail
+umask 077
+
+POSTIZ_OPS_LIB=${POSTIZ_OPS_LIB:-/usr/local/lib/postiz-ops/ops-lib.sh}
+# shellcheck source=ops-lib.sh
+. "$POSTIZ_OPS_LIB"
+
+RCLONE_BIN=${RCLONE_BIN:-rclone}
+AGE_BIN=${AGE_BIN:-age}
+REMOTE_NAME=PDBACKUP
+OBJECT_PREFIX=postiz
+LAST_ERROR=''
+TMP_DIR=''
+
+die() {
+    LAST_ERROR=$*
+    log_err "$*"
+    exit 1
+}
+
+on_err() {
+    if [ -z "$LAST_ERROR" ]; then
+        LAST_ERROR="unexpected failure at line $1: $2"
+        log_err "$LAST_ERROR"
+    fi
+}
+
+on_exit() {
+    local rc=$?
+    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
+    fi
+    if [ "$rc" -ne 0 ]; then
+        send_alert "PostDelegate off-site backup FAILED" \
+            "Host $(hostname -s): ${LAST_ERROR:-exit status $rc}. Check: journalctl -u postiz-offsite-backup -n 100" \
+            urgent rotating_light || log_err "could not deliver the failure alert"
+    fi
+    exit "$rc"
+}
+trap 'on_err "$LINENO" "$BASH_COMMAND"' ERR
+trap on_exit EXIT
+
+rc() {
+    "$RCLONE_BIN" "$@"
+}
+
+load_config() {
+    local env_file=$POSTIZ_ETC_DIR/backup-r2.env alerts=$POSTIZ_ETC_DIR/alerts.env
+    local media_bucket media_key r
+    require_private_file "$env_file" || die "$env_file is missing or has unsafe permissions"
+    load_env_file "$env_file"
+    if [ -f "$alerts" ]; then
+        if require_private_file "$alerts"; then load_env_file "$alerts"; fi
+    fi
+
+    for r in BACKUP_R2_ACCOUNT_ID BACKUP_R2_ACCESS_KEY_ID BACKUP_R2_SECRET_ACCESS_KEY BACKUP_R2_BUCKET AGE_RECIPIENT; do
+        [ -n "${!r:-}" ] || die "$r is not set in $env_file"
+    done
+
+    [[ $BACKUP_R2_ACCOUNT_ID =~ ^[0-9a-f]{32}$ ]] || die "BACKUP_R2_ACCOUNT_ID must be the 32-character Cloudflare account id"
+    [[ $BACKUP_R2_BUCKET =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || die "BACKUP_R2_BUCKET is not a valid bucket name"
+    for r in $AGE_RECIPIENT; do
+        [[ $r =~ ^age1[0-9a-z]{50,}$ ]] || die "AGE_RECIPIENT must list public age keys starting with age1 (never the AGE-SECRET-KEY private key)"
+    done
+
+    # The backup bucket and credentials must be separate from the media ones.
+    media_bucket=$(env_file_value "$POSTIZ_ETC_DIR/runtime.env" CLOUDFLARE_BUCKETNAME || true)
+    media_key=$(env_file_value "$POSTIZ_ETC_DIR/r2.env" CLOUDFLARE_ACCESS_KEY || env_file_value "$POSTIZ_ETC_DIR/runtime.env" CLOUDFLARE_ACCESS_KEY || true)
+    if [ -n "$media_bucket" ] && [ "$media_bucket" = "$BACKUP_R2_BUCKET" ]; then
+        die "BACKUP_R2_BUCKET must not be the media bucket ($media_bucket)"
+    fi
+    if [ -n "$media_key" ] && [ "$media_key" = "$BACKUP_R2_ACCESS_KEY_ID" ]; then
+        die "BACKUP_R2_ACCESS_KEY_ID must be a separate token from the media bucket token"
+    fi
+
+    KEEP_DAILY=${BACKUP_KEEP_DAILY:-14}
+    KEEP_WEEKLY=${BACKUP_KEEP_WEEKLY:-8}
+    MAX_DELETE=${BACKUP_MAX_DELETE_PER_RUN:-10}
+    MAX_AGE_HOURS=${BACKUP_MAX_AGE_HOURS:-26}
+    VERIFY_READBACK=${BACKUP_VERIFY_READBACK:-1}
+    [[ $KEEP_DAILY =~ ^[0-9]+$ && $KEEP_WEEKLY =~ ^[0-9]+$ && $MAX_DELETE =~ ^[0-9]+$ && $MAX_AGE_HOURS =~ ^[0-9]+$ ]] \
+        || die "retention and age settings must be whole numbers"
+    [ "$KEEP_DAILY" -ge 1 ] || die "BACKUP_KEEP_DAILY must be at least 1"
+
+    # rclone is configured only through the environment, so no secrets are
+    # written to disk or put on a command line.
+    export RCLONE_CONFIG=/dev/null
+    export "RCLONE_CONFIG_${REMOTE_NAME}_TYPE=s3"
+    export "RCLONE_CONFIG_${REMOTE_NAME}_PROVIDER=Cloudflare"
+    export "RCLONE_CONFIG_${REMOTE_NAME}_ACCESS_KEY_ID=$BACKUP_R2_ACCESS_KEY_ID"
+    export "RCLONE_CONFIG_${REMOTE_NAME}_SECRET_ACCESS_KEY=$BACKUP_R2_SECRET_ACCESS_KEY"
+    export "RCLONE_CONFIG_${REMOTE_NAME}_ENDPOINT=https://${BACKUP_R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    export "RCLONE_CONFIG_${REMOTE_NAME}_REGION=auto"
+    export "RCLONE_CONFIG_${REMOTE_NAME}_NO_CHECK_BUCKET=true"
+    REMOTE_DIR="${REMOTE_NAME}:${BACKUP_R2_BUCKET}/${OBJECT_PREFIX}"
+}
+
+# Sets REMOTE_LISTING to "SIZE NAME" lines for objects under the prefix. A
+# prefix with no objects yet is not an error (rclone exits 3 for "directory not
+# found"). Not run in a subshell, so that die() keeps its message.
+REMOTE_LISTING=''
+remote_list() {
+    local out status=0
+    out=$(rc lsf --files-only --format sp --separator ' ' "$REMOTE_DIR") || status=$?
+    case $status in
+        0) REMOTE_LISTING=$out ;;
+        3) REMOTE_LISTING='' ;;
+        *) die "could not list $REMOTE_DIR (rclone exit $status)" ;;
+    esac
+}
+
+remote_size() { # NAME LISTING
+    local name=$1 line
+    while read -r line; do
+        case $line in *" $name") printf '%s\n' "${line%% *}"; return 0 ;; esac
+    done <<< "$2"
+    return 1
+}
+
+UPLOAD_SIZE=''
+UPLOAD_HASH=''
+upload_snapshot() { # STAMP SNAPSHOT_DIR
+    local stamp=$1 snap=$2 name="$1.tar.age" out hash size avail_kb need_kb r
+    local -a recipients=()
+    TMP_DIR=$(mktemp -d "$OPS_STATE_DIR/offsite.XXXXXX")
+    out=$TMP_DIR/$name
+
+    avail_kb=$(df -Pk "$TMP_DIR" | awk 'NR==2 {print $4}')
+    need_kb=$(du -sk "$snap" | cut -f1)
+    need_kb=$((need_kb * 11 / 10 + 10240))
+    [ "$avail_kb" -ge "$need_kb" ] || die "not enough free space in $OPS_STATE_DIR for the encrypted copy (${avail_kb} KB free, ${need_kb} KB needed)"
+
+    for r in $AGE_RECIPIENT; do recipients+=(-r "$r"); done
+
+    # The off-site bucket credentials live in this file; the bucket must not
+    # hold the key to itself, so it is left out of the archive.
+    tar --numeric-owner --exclude=configuration/backup-r2.env -C "$snap" -cf - . \
+        | "$AGE_BIN" "${recipients[@]}" -o "$out"
+    [ -s "$out" ] || die "encrypted archive is empty"
+    size=$(wc -c < "$out" | tr -d ' ')
+    hash=$(sha256_file "$out")
+    printf '%s  %s\n' "$hash" "$name" > "$TMP_DIR/$name.sha256"
+
+    rc copyto "$out" "$REMOTE_DIR/$name"
+    rc copyto "$TMP_DIR/$name.sha256" "$REMOTE_DIR/$name.sha256"
+
+    verify_remote "$name" "$size" "$hash"
+    UPLOAD_SIZE=$size
+    UPLOAD_HASH=$hash
+}
+
+verify_remote() { # NAME SIZE HASH
+    local name=$1 size=$2 hash=$3 got
+    remote_list
+    got=$(remote_size "$name" "$REMOTE_LISTING") || die "uploaded object $name is not listed in the bucket"
+    [ "$got" = "$size" ] || die "uploaded object size mismatch for $name (local $size, remote $got)"
+    remote_size "$name.sha256" "$REMOTE_LISTING" > /dev/null || die "checksum file for $name is missing in the bucket"
+    if [ "$VERIFY_READBACK" = 1 ]; then
+        got=$(rc cat "$REMOTE_DIR/$name" | sha256_stdin)
+        [ "$got" = "$hash" ] || die "read-back checksum mismatch for $name"
+    fi
+}
+
+write_marker() { # STAMP NAME SIZE HASH
+    local tmp="$OPS_MARKER_FILE.tmp"
+    mkdir -p "$(dirname "$OPS_MARKER_FILE")"
+    {
+        printf 'stamp=%s\n' "$1"
+        printf 'object=%s/%s\n' "$OBJECT_PREFIX" "$2"
+        printf 'bytes=%s\n' "$3"
+        printf 'sha256=%s\n' "$4"
+        printf 'verified_epoch=%s\n' "$(now_epoch)"
+    } > "$tmp"
+    mv "$tmp" "$OPS_MARKER_FILE"
+}
+
+apply_retention() { # NEWEST_STAMP
+    local newest=$1 stamps deletes count s
+    remote_list
+    stamps=$(printf '%s\n' "$REMOTE_LISTING" | sed -n 's/^[0-9][0-9]* \(.*\)\.tar\.age$/\1/p' | grep -E '^[0-9]{8}T[0-9]{6}Z$' || true)
+    deletes=$(printf '%s\n' "$stamps" | retention_delete_list "$KEEP_DAILY" "$KEEP_WEEKLY")
+    [ -n "$deletes" ] || {
+        log_info "retention: nothing to delete"
+        return 0
+    }
+    count=$(printf '%s\n' "$deletes" | wc -l | tr -d ' ')
+    if [ "$count" -gt "$MAX_DELETE" ]; then
+        die "retention would delete $count objects (limit $MAX_DELETE per run); inspect the bucket before raising BACKUP_MAX_DELETE_PER_RUN"
+    fi
+    while IFS= read -r s; do
+        [ "$s" != "$newest" ] || die "retention selected the newest backup; refusing to delete"
+        is_stamp "$s" || die "retention produced an invalid name"
+        log_info "retention: deleting $OBJECT_PREFIX/$s.tar.age"
+        # Checksum file first, so an interrupted run leaves a retriable archive.
+        rc deletefile "$REMOTE_DIR/$s.tar.age.sha256" || true
+        rc deletefile "$REMOTE_DIR/$s.tar.age"
+    done <<< "$deletes"
+}
+
+main() {
+    local stamp snap name size hash age_hours snap_epoch now
+
+    mkdir -p "$OPS_STATE_DIR"
+    chmod 700 "$OPS_STATE_DIR"
+    acquire_lock offsite-backup
+    load_config
+
+    stamp=$(newest_complete_snapshot) || die "no complete snapshot found in $BACKUP_ROOT (is postiz-backup.service working?)"
+    snap=$BACKUP_ROOT/$stamp
+    name=$stamp.tar.age
+    log_info "newest local snapshot: $stamp"
+    verify_snapshot_checksums "$snap" || die "local snapshot $stamp failed checksum verification; not uploading"
+
+    remote_list
+    if remote_size "$name" "$REMOTE_LISTING" > /dev/null && remote_size "$name.sha256" "$REMOTE_LISTING" > /dev/null; then
+        log_info "snapshot $stamp is already off-site; skipping upload"
+        size=$(remote_size "$name" "$REMOTE_LISTING")
+        hash=$(rc cat "$REMOTE_DIR/$name.sha256" | cut -d' ' -f1)
+        [[ $hash =~ ^[0-9a-f]{64}$ ]] || die "existing checksum file for $name is unreadable"
+        write_marker "$stamp" "$name" "$size" "$hash"
+    else
+        upload_snapshot "$stamp" "$snap"
+        size=$UPLOAD_SIZE
+        hash=$UPLOAD_HASH
+        write_marker "$stamp" "$name" "$size" "$hash"
+        log_info "uploaded and verified $OBJECT_PREFIX/$name ($size bytes, sha256 $hash)"
+    fi
+
+    apply_retention "$stamp"
+
+    # Fresh data must be off-site; a stale newest snapshot means the local
+    # backup job is failing even though the copy above succeeded.
+    now=$(now_epoch)
+    snap_epoch=$(stamp_to_epoch "$stamp")
+    age_hours=$(((now - snap_epoch) / 3600))
+    if [ "$age_hours" -ge "$MAX_AGE_HOURS" ]; then
+        die "the newest local backup is ${age_hours}h old (limit ${MAX_AGE_HOURS}h): the daily backup is not running; off-site copy only holds old data"
+    fi
+    log_info "off-site backup complete"
+}
+
+main "$@"

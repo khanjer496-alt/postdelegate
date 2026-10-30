@@ -38,6 +38,7 @@ R2 usage is billed under the account's existing allowances/pricing; this is not 
 - Compose wrapper: `sudo postiz-compose ps`, `sudo postiz-compose logs --tail 100 postiz`.
 - Daily local backups: `postiz-backup.timer`, with output under `/var/backups/postiz`.
 - Manual backup: `sudo backup-postiz`.
+- Off-site encrypted backups and health alerts: `offsite-backup-postiz`, `postiz-healthcheck`, installed with `install-ops.sh`; see [Operations: off-site backups and alerts](#operations-off-site-backups-and-alerts).
 
 Treat application logs as potentially sensitive; do not paste raw logs/configuration into public issues. The base image remains pinned, and the custom image tag records its source revision. Upgrades require an intentional release change followed by acceptance checks.
 
@@ -114,6 +115,149 @@ curl --fail --user-agent 'PostDelegate-operations-verification/1.0' https://app.
 
 The Caddyfile is written through its existing inode and Caddy is recreated so the bind mount and running configuration agree. Confirm owner login, the intended registration setting and worker health after rollback. This pre-branding restore predates the Google credentials, published policies and open signup; the first command preserves later runtime settings for deliberate reapplication. Keep the current policy/source routes and Google callback configuration in view when choosing a rollback target.
 
+## Operations: off-site backups and alerts
+
+Added 30 October 2026 (branch `pd/ops-monitoring`). Nothing here changes the existing `backup-postiz` job, its timer, the four-day local retention proposal or any application file. Backups were on the VPS only until this is installed.
+
+What it adds:
+
+| Piece | Where it lives on the server | What it does |
+| --- | --- | --- |
+| `offsite-backup-postiz` + `postiz-offsite-backup.timer` | `/usr/local/bin`, 03:00 UTC daily (after the 02:20 local backup) | Takes the newest complete `/var/backups/postiz/<stamp>`, re-verifies its checksums, tars it, encrypts it with `age` to the owner's **public** key, uploads `postiz/<stamp>.tar.age` and `.sha256` to the separate R2 bucket, reads it back to confirm the checksum, then prunes to 14 daily + 8 weekly. Any failure exits non-zero and sends an alert. |
+| `postiz-healthcheck` + `postiz-healthcheck.timer` | `/usr/local/bin`, every 10 minutes | Disk below 85%, newest local backup under 26 h, newest off-site backup under 26 h, all six compose services running and healthy, Temporal `SERVING`, and `https://app.postdelegate.com/api/auth/can-register` returning 2xx. Logs to journald and posts to your phone. |
+| `.github/workflows/uptime.yml` | GitHub Actions | Every hour, from outside the VPS: curls the app API, app home page and marketing site, and checks both TLS certificates have more than 14 days left. A failed run makes GitHub email the repository owner. |
+
+Design notes:
+
+- The age **private** key is never on the VPS, so a server compromise cannot read old backups. Only the owner can decrypt them.
+- The archive omits `configuration/backup-r2.env`, so the backup bucket does not hold the credentials for itself. The rest of `/etc/postiz` (including `runtime.env` and `r2.env`) is inside the encrypted archive.
+- Media lives in R2 `nashr-production-media`, not on disk, so it is not in these backups. Off-site backups cover both databases and configuration only.
+- The scripts refuse to run if the backup bucket equals the media bucket, if the backup token equals the media token, or if the env file is not `root:root` 0600.
+- Retention keeps the newest backup of each of the last 14 UTC days plus the newest of each of the last 8 Monday-based weeks. It only touches `postiz/<stamp>.tar.age[.sha256]` names, refuses to delete more than 10 objects in one run, and never deletes the backup it just uploaded. Local retention is unchanged.
+- Health alerts: the first alert goes out after 2 consecutive failing runs (about 10-20 minutes), a changed set of failing checks alerts immediately, a reminder repeats every 6 hours, and a recovery message is sent when all checks pass again. State is in `/var/lib/postiz-ops/health-state`; the off-site success marker is `/var/lib/postiz-ops/offsite-last-success`.
+- Alerts go to `ALERT_WEBHOOK_URL`: an ntfy topic URL (plain text with title/priority headers), or a Slack or Discord webhook (JSON, detected from the URL). The URL is a secret and is never logged. Email is not used.
+
+### Owner steps (one time)
+
+1. **Cloudflare R2 bucket and token.** Dashboard, R2, Create bucket `postdelegate-backups` (private: do not add a public URL or custom domain). Then R2, Manage API tokens, Create API token: permission **Object Read & Write**, scoped to **only** `postdelegate-backups`. Keep the Account ID, Access Key ID and Secret Access Key for step 4. Do not reuse the media bucket token.
+2. **age key (on your Mac, never on the server).**
+
+   ```sh
+   brew install age
+   age-keygen -o postdelegate-backup.agekey
+   ```
+
+   The command prints `Public key: age1...`. Save the **whole** `postdelegate-backup.agekey` file in your password manager (and ideally one offline copy), then delete it from the Mac. Without it the off-site backups cannot be decrypted. Only the `age1...` public key goes on the server.
+3. **Phone alerts.** Install the ntfy app, subscribe to a long random topic, for example the output of `echo postdelegate-ops-$(openssl rand -hex 12)`. The full URL is `https://ntfy.sh/<that topic>`. Treat it like a password.
+4. **Install on the server.** From your Mac (the file list below is everything the installer needs):
+
+   ```sh
+   cd <repo>/deploy/postdelegate
+   tar czf - ops-lib.sh offsite-backup-postiz postiz-healthcheck \
+     postiz-offsite-backup.service postiz-offsite-backup.timer \
+     postiz-healthcheck.service postiz-healthcheck.timer \
+     backup-r2.env.example alerts.env.example install-ops.sh \
+     | ssh <vps> 'mkdir -p /root/postdelegate-ops && tar xzf - -C /root/postdelegate-ops'
+   ```
+
+   On the server, as root:
+
+   ```sh
+   cd /root/postdelegate-ops
+   ./install-ops.sh --install-packages --init-env   # installs age + rclone, creates both env files (0600)
+   nano /etc/postiz/backup-r2.env                   # account id, token, bucket, age1... public key
+   nano /etc/postiz/alerts.env                      # ALERT_WEBHOOK_URL=https://ntfy.sh/<your topic>
+   ./install-ops.sh --check                         # lists anything still missing
+   ./install-ops.sh                                 # installs, enables timers, runs one upload + a test alert
+   ```
+
+   The phone should buzz with "PostDelegate test alert", and the script prints the timer table. If anything is missing, it refuses and lists exactly what.
+5. **Do the restore drill once** (below) within the first week; an untested backup is only a hope.
+6. **GitHub emails.** In GitHub, Settings, Notifications, keep "Actions" notifications enabled for failed workflows (the default). After the branch is merged, run the **Uptime** workflow once from the Actions tab to confirm it is green.
+
+File ownership and modes (the installer sets these): scripts `root:root 0700`, `/usr/local/lib/postiz-ops/ops-lib.sh` `0600`, units `0644`, `/etc/postiz/backup-r2.env` and `alerts.env` `root:root 0600`, `/var/lib/postiz-ops` `0700`. Never commit real values; `backup-r2.env.example` and `alerts.env.example` contain placeholders only.
+
+Useful commands:
+
+```sh
+systemctl list-timers 'postiz-*'
+journalctl -u postiz-offsite-backup -n 100 --no-pager
+journalctl -u postiz-healthcheck -n 50 --no-pager
+sudo offsite-backup-postiz            # run an off-site backup now
+sudo postiz-healthcheck               # run the checks now (exit 0 healthy, 1 unhealthy, 2 alert not delivered)
+sudo postiz-healthcheck --test-alert  # send a test message to your phone
+```
+
+Tuning (optional, in the env files): `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_MAX_AGE_HOURS`, `HEALTH_FAIL_THRESHOLD`, `HEALTH_REMINDER_HOURS`, `HEALTH_DISK_MAX_PCT`; see the `.example` files.
+
+### Restore an off-site backup
+
+Run this on any machine with Docker, `age` and `rclone`; the production stack is never touched. The private key comes from the password manager.
+
+1. **Download and check the archive.**
+
+   ```sh
+   export RCLONE_CONFIG=/dev/null RCLONE_CONFIG_PDBACKUP_TYPE=s3 RCLONE_CONFIG_PDBACKUP_PROVIDER=Cloudflare \
+     RCLONE_CONFIG_PDBACKUP_REGION=auto RCLONE_CONFIG_PDBACKUP_NO_CHECK_BUCKET=true \
+     RCLONE_CONFIG_PDBACKUP_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com \
+     RCLONE_CONFIG_PDBACKUP_ACCESS_KEY_ID=<backup token id> RCLONE_CONFIG_PDBACKUP_SECRET_ACCESS_KEY=<backup token secret>
+   rclone lsf PDBACKUP:postdelegate-backups/postiz | sort | tail      # pick the newest <stamp>
+   STAMP=20261030T022100Z
+   mkdir -p /srv/restore-test/$STAMP && cd /srv/restore-test
+   rclone copy PDBACKUP:postdelegate-backups/postiz/$STAMP.tar.age . && rclone copy PDBACKUP:postdelegate-backups/postiz/$STAMP.tar.age.sha256 .
+   sha256sum -c $STAMP.tar.age.sha256          # macOS: shasum -a 256 -c
+   ```
+
+2. **Decrypt and unpack.** Put the private key file somewhere temporary, then remove it afterwards.
+
+   ```sh
+   age -d -i ~/postdelegate-backup.agekey -o $STAMP.tar $STAMP.tar.age
+   tar -xf $STAMP.tar -C $STAMP
+   ```
+
+3. **Verify the dumps' own checksums.** `SHA256SUMS` stores the original server paths, so compare by file name:
+
+   ```sh
+   cd $STAMP && sed 's#  .*/#  #' SHA256SUMS | sha256sum -c -     # macOS: shasum -a 256 -c -
+   ```
+
+4. **Start the scratch databases** (no network, no published ports, data in RAM; project name `postdelegate-restore-test`):
+
+   ```sh
+   export RESTORE_DIR=/srv/restore-test/$STAMP
+   docker compose -f <repo>/deploy/postdelegate/restore-scratch.compose.yaml up -d --wait
+   ```
+
+5. **Restore the three dumps.** Any error stops the restore:
+
+   ```sh
+   C="docker compose -f <repo>/deploy/postdelegate/restore-scratch.compose.yaml"
+   $C exec -T postiz-db pg_restore -U postiz -d postiz --exit-on-error --no-owner < $RESTORE_DIR/postiz.dump
+   $C exec -T temporal-db pg_restore -U temporal -d temporal --exit-on-error --no-owner < $RESTORE_DIR/temporal.dump
+   $C exec -T temporal-db createdb -U temporal temporal_visibility
+   $C exec -T temporal-db pg_restore -U temporal -d temporal_visibility --exit-on-error --no-owner < $RESTORE_DIR/temporal-visibility.dump
+   ```
+
+6. **Verify.** Compare with production (`sudo postiz-compose exec -T postgres psql -U postiz -d postiz -tAc '<same query>'`), allowing for rows added since the snapshot:
+
+   ```sh
+   $C exec -T postiz-db psql -U postiz -d postiz -tAc 'select count(*) from "User"'
+   $C exec -T postiz-db psql -U postiz -d postiz -tAc 'select count(*) from "Organization"'
+   $C exec -T postiz-db psql -U postiz -d postiz -tAc 'select count(*) from "Post"'
+   $C exec -T temporal-db psql -U temporal -d temporal -tAc "select count(*) from information_schema.tables where table_schema='public'"
+   $C exec -T temporal-db psql -U temporal -d temporal_visibility -tAc "select count(*) from information_schema.tables where table_schema='public'"
+   ```
+
+   The unpacked `configuration/` directory holds the `/etc/postiz` files as of the snapshot, minus `backup-r2.env`. Treat it as secret.
+7. **Tear down.** The scratch project has no volumes, so this removes everything. Never use the production project name with these commands.
+
+   ```sh
+   $C down
+   rm -rf /srv/restore-test/$STAMP*
+   ```
+
+A real disaster restore is the same procedure, but into the production stack's database containers using the existing rollback notes above; it also needs the media bucket (not in these backups) and the secrets from the decrypted `configuration/` directory.
+
 ## BrightBean data and rollback
 
 Before cutover the old database contained one user, one organization, two workspaces, one disconnected Bluesky account record, five draft platform posts and zero subscriptions. There was no scheduled publishing queue to transfer.
@@ -131,7 +275,7 @@ curl --fail https://app.postdelegate.com/health/
 
 `pd` and `pd-deploy` remain legacy BrightBean helpers. Use `postiz-compose` for the new deployment. Never run `down -v`, volume prune, or discard the old image as part of routine deployment. If new Postiz publishing work has been accepted, reconcile schedules before changing scheduler ownership.
 
-Daily backups currently stay on the VPS; retention and automated off-site replication remain follow-up operations. Private recovery copies of the BrightBean snapshot and initial Postiz backups were additionally downloaded to the ignored `.local/backups` directory on this Mac. A readable archive/listing is not a restore test; the three Postiz database dumps were separately restored as described above. The old BrightBean dump passed archive validation and remains alongside its intact original database volume.
+Daily backups stay on the VPS until the off-site tooling in [Operations: off-site backups and alerts](#operations-off-site-backups-and-alerts) is installed; local pruning remains a separate, unapproved proposal. Private recovery copies of the BrightBean snapshot and initial Postiz backups were additionally downloaded to the ignored `.local/backups` directory on this Mac. A readable archive/listing is not a restore test; the three Postiz database dumps were separately restored as described above. The old BrightBean dump passed archive validation and remains alongside its intact original database volume.
 
 ## Deliberate next migration work
 
