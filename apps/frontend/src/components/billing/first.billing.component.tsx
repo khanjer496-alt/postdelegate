@@ -297,7 +297,7 @@ export const FirstBillingComponent = () => {
                     )}
                   >
                     <div className="text-[20px] mobile:text-[18px] font-[500]">
-                      {capitalize(key)}
+                      {pricing[key]?.label || capitalize(key)}
                     </div>
                     <div className="text-[24px] mobile:text-[18px] font-[400]">
                       <span className="text-[44px] mobile:text-[30px] font-[600]">
