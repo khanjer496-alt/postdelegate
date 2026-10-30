@@ -8,6 +8,7 @@
     "target": "es2017",
     "sourceMap": true,
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "rootDir": "../../",
     "incremental": false
   },

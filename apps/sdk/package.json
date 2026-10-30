@@ -1,23 +1,37 @@
 {
-  "name": "@postiz/node",
-  "version": "1.0.8",
-  "description": "The ultimate social media scheduling tool",
+  "name": "@postdelegate/node",
+  "version": "1.0.0",
+  "description": "Official Node.js SDK for the PostDelegate social media scheduling API",
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "publish": "tsup && pnpm publish --access public"
+    "build": "tsup",
+    "prepublishOnly": "tsup"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "keywords": [
+    "postdelegate",
     "social media",
-    "scheduling tool",
-    "social media scheduling tool"
+    "scheduling",
+    "sdk",
+    "api"
   ],
-  "author": "Nevo David",
-  "license": "AGPL-3.0",
-  "dependencies": {
-    "node-fetch": "^3.3.2"
-  }
+  "homepage": "https://postdelegate.com",
+  "author": "PostDelegate",
+  "license": "AGPL-3.0"
 }

@@ -847,6 +847,8 @@ importers:
 
   apps/backend: {}
 
+  apps/cli: {}
+
   apps/commands: {}
 
   apps/extension: {}
@@ -855,11 +857,7 @@ importers:
 
   apps/orchestrator: {}
 
-  apps/sdk:
-    dependencies:
-      node-fetch:
-        specifier: ^3.3.2
-        version: 3.3.2
+  apps/sdk: {}
 
 packages:
 
