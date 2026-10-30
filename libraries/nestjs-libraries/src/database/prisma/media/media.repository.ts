@@ -84,6 +84,15 @@ export class MediaRepository {
     });
   }
 
+  getOrgMediaById(org: string, id: string) {
+    return this._media.model.media.findFirst({
+      where: {
+        id,
+        organizationId: org,
+      },
+    });
+  }
+
   deleteMedia(org: string, id: string) {
     return this._media.model.media.update({
       where: {

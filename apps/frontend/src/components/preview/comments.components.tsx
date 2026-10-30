@@ -130,7 +130,11 @@ const CommentComposer: FC<{
   const toast = useToaster();
   const modals = useModals();
   const { recaptchaSiteKey } = useVariables();
-  const { previewId, pending, setPending, mutate } = usePreviewComments();
+  const { previewId, organizationId, pending, setPending, mutate } =
+    usePreviewComments();
+  // only members of the post's organization use the authenticated endpoint,
+  // everyone else comments through the public one
+  const isMember = !!user?.id && user?.orgId === organizationId;
   const [loading, setLoading] = useState(false);
   const form = useForm({ values: { content: '' } });
   const anchor = parentId ? null : pending;
@@ -167,7 +171,7 @@ const CommentComposer: FC<{
 
       let displayName: string | undefined;
       let recaptchaToken: string | undefined;
-      if (!user?.id) {
+      if (!isMember) {
         const name = await askForName();
         if (!name) {
           return;
@@ -192,7 +196,7 @@ const CommentComposer: FC<{
       setLoading(true);
       try {
         const response = await fetch(
-          user?.id
+          isMember
             ? `/posts/${previewId}/comments`
             : `/public/posts/${previewId}/comments`,
           {
@@ -234,7 +238,7 @@ const CommentComposer: FC<{
         setLoading(false);
       }
     },
-    [user?.id, recaptchaSiteKey, previewId, parentId, anchor, askForName]
+    [isMember, recaptchaSiteKey, previewId, parentId, anchor, askForName]
   );
 
   return (

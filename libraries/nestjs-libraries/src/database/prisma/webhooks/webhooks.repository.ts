@@ -5,7 +5,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class WebhooksRepository {
-  constructor(private _webhooks: PrismaRepository<'webhooks'>) {}
+  constructor(
+    private _webhooks: PrismaRepository<'webhooks'>,
+    private _integration: PrismaRepository<'integration'>
+  ) {}
 
   getTotal(orgId: string) {
     return this._webhooks.model.webhooks.count({
@@ -51,6 +54,22 @@ export class WebhooksRepository {
   }
 
   async createWebhook(orgId: string, body: WebhooksDto) {
+    // only integrations of this organization can be linked to the webhook
+    const ownedIntegrations = body.integrations?.length
+      ? await this._integration.model.integration.findMany({
+          where: {
+            id: {
+              in: body.integrations.map((integration) => integration.id),
+            },
+            organizationId: orgId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+          },
+        })
+      : [];
+
     const { id } = await this._webhooks.model.webhooks.upsert({
       where: {
         id: body.id || uuidv4(),
@@ -75,7 +94,7 @@ export class WebhooksRepository {
       data: {
         integrations: {
           deleteMany: {},
-          create: body.integrations.map((integration) => ({
+          create: ownedIntegrations.map((integration) => ({
             integrationId: integration.id,
           })),
         },

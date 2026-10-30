@@ -84,12 +84,19 @@ export class PostsController {
 
   @Post('/:id/comments')
   async createComment(
+    @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body() body: CreatePublicCommentDto,
     @RealIP() ip: string
   ) {
-    return this._postsService.createPublicComment(id, body, user.id, ip);
+    return this._postsService.createPublicComment(
+      id,
+      body,
+      user.id,
+      ip,
+      org.id
+    );
   }
 
   @Put('/comments/:commentId/resolve')

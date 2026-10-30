@@ -554,7 +554,12 @@ export class PostsService {
     );
   }
 
-  async updateMedia(id: string, imagesList: any[], convertToJPEG = false) {
+  async updateMedia(
+    id: string,
+    orgId: string,
+    imagesList: any[],
+    convertToJPEG = false
+  ) {
     try {
       let imageUpdateNeeded = false;
       const getImageList = await Promise.all(
@@ -567,12 +572,15 @@ export class PostsService {
 
               if (!p.path) {
                 imageUpdateNeeded = true;
-                return this._mediaService.getMediaById(p.id);
+                return this._mediaService.getOrgMediaById(orgId, p.id);
               }
 
               // the normalizer may have replaced the file after the post was
               // composed; a record still processing publishes the original
-              const fresh = await this._mediaService.getMediaById(p.id);
+              const fresh = await this._mediaService.getOrgMediaById(
+                orgId,
+                p.id
+              );
               if (fresh?.status === 'ready' && fresh.path !== p.path) {
                 imageUpdateNeeded = true;
                 return { ...p, name: fresh.name, path: fresh.path };
@@ -582,7 +590,7 @@ export class PostsService {
             })
           )
         )
-          .filter((m) => this.isAllowedMediaPath(m?.path))
+          .filter((m) => m && this.isAllowedMediaPath(m.path))
           .map((m) => {
             return {
               ...m,
@@ -795,6 +803,7 @@ export class PostsService {
             : {}),
           image: await this.updateMedia(
             post.id,
+            post.organizationId,
             JSON.parse(post.image || '[]'),
             convertToJPEG
           ),
@@ -1702,10 +1711,12 @@ export class PostsService {
     previewId: string,
     body: CreatePublicCommentDto,
     userId: string | null,
-    ip: string
+    ip: string,
+    // authenticated flow: the post must belong to the caller's organization
+    orgId?: string
   ) {
     const posts = await this.getPostsRecursively(previewId, false);
-    if (!posts.length) {
+    if (!posts.length || (orgId && posts[0].organizationId !== orgId)) {
       throw new NotFoundException('Post not found');
     }
 
