@@ -17,6 +17,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import utc from 'dayjs/plugin/utc';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
+import { decryptIntegrationOf } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
@@ -434,8 +435,8 @@ export class PostsRepository {
     });
   }
 
-  getPostsByGroup(orgId: string, group: string) {
-    return this._post.model.post.findMany({
+  async getPostsByGroup(orgId: string, group: string) {
+    const posts = await this._post.model.post.findMany({
       where: {
         group,
         ...(orgId ? { organizationId: orgId } : {}),
@@ -455,6 +456,7 @@ export class PostsRepository {
         },
       },
     });
+    return posts.map((post) => decryptIntegrationOf(post));
   }
 
   // the posts of the other channels in the batch, without the given group
@@ -477,13 +479,13 @@ export class PostsRepository {
     });
   }
 
-  getPost(
+  async getPost(
     id: string,
     includeIntegration = false,
     orgId?: string,
     isFirst?: boolean
   ) {
-    return this._post.model.post.findUnique({
+    const post = await this._post.model.post.findUnique({
       where: {
         id,
         ...(orgId ? { organizationId: orgId } : {}),
@@ -508,6 +510,7 @@ export class PostsRepository {
         childrenPost: true,
       },
     });
+    return post ? decryptIntegrationOf(post) : post;
   }
 
   updatePost(id: string, postId: string, releaseURL: string, expectedIntegrationId?: string) {
@@ -897,8 +900,8 @@ export class PostsRepository {
     });
   }
 
-  getPostById(id: string, org?: string) {
-    return this._post.model.post.findUnique({
+  async getPostById(id: string, org?: string) {
+    const post = await this._post.model.post.findUnique({
       where: {
         id,
         ...(org ? { organizationId: org } : {}),
@@ -923,6 +926,7 @@ export class PostsRepository {
         },
       },
     });
+    return post ? decryptIntegrationOf(post) : post;
   }
 
   private get postTimelineSelect() {

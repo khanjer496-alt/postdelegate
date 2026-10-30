@@ -123,3 +123,55 @@ describe('ThrottlerRealIpGuard', () => {
     }
   });
 });
+
+describe('ClientIp', () => {
+  afterEach(() => {
+    delete process.env.TRUST_CF_CONNECTING_IP;
+  });
+
+  // the controller parameter must not trust the leftmost X-Forwarded-For entry
+  // the way @RealIP() did
+  it('gives controllers the hardened client address', async () => {
+    const { Controller, Get } = await import('@nestjs/common');
+    const { Test } = await import('@nestjs/testing');
+    const { ClientIp } = await import('./throttler.provider');
+
+    @Controller('/ip')
+    class IpController {
+      @Get('/')
+      ip(@ClientIp() ip: string) {
+        return { ip };
+      }
+    }
+
+    const module = await Test.createTestingModule({
+      controllers: [IpController],
+    }).compile();
+    const app = module.createNestApplication();
+    await app.listen(0, '127.0.0.1');
+    const url = (await app.getUrl()).replace('[::1]', '127.0.0.1') + '/ip';
+    const ask = async (headers: Record<string, string>) =>
+      ((await (await fetch(url, { headers })).json()) as { ip: string }).ip;
+
+    try {
+      expect(await ask({ 'x-forwarded-for': '1.1.1.1, 203.0.113.7' })).toBe(
+        '203.0.113.7'
+      );
+      expect(
+        await ask({
+          'cf-connecting-ip': '8.8.8.8',
+          'x-forwarded-for': '198.51.100.4, 172.18.0.5',
+        })
+      ).toBe('198.51.100.4');
+      process.env.TRUST_CF_CONNECTING_IP = 'true';
+      expect(
+        await ask({
+          'cf-connecting-ip': '8.8.8.8',
+          'x-forwarded-for': '198.51.100.4, 172.18.0.5',
+        })
+      ).toBe('8.8.8.8');
+    } finally {
+      await app.close();
+    }
+  });
+});
