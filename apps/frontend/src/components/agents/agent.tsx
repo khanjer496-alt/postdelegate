@@ -4,6 +4,7 @@ import React, {
   createContext,
   FC,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   ReactNode,
@@ -22,6 +23,7 @@ import { Integration } from '@prisma/client';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 
 export const MediaPortal: FC<{
   media: { path: string; id: string }[];
@@ -203,6 +205,18 @@ export const AgentList: FC<{ onChange: (arr: any[]) => void }> = ({
 export const PropertiesContext = createContext({ properties: [] });
 export const Agent: FC<{ children: ReactNode }> = ({ children }) => {
   const [properties, setProperties] = useState([]);
+  const user = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user && !user.aiAvailable) {
+      router.replace('/launches');
+    }
+  }, [user?.aiAvailable]);
+
+  if (!user?.aiAvailable) {
+    return null;
+  }
 
   return (
     <PropertiesContext.Provider value={{ properties }}>

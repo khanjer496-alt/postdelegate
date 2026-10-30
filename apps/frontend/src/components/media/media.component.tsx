@@ -992,7 +992,7 @@ export const MultiMediaComponent: FC<{
                   <ThirdPartyMedia allData={allData} onChange={changeMedia} />
                 )}
 
-                {!!user?.tier?.ai && (
+                {!!user?.aiAvailable && (
                   <>
                     <AiImage value={text} onChange={changeMedia} />
                     {!insertInContent && (
