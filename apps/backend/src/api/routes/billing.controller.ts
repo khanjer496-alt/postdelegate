@@ -65,16 +65,18 @@ export class BillingController {
     return {
       offerCoupon: !(await (await this.provider(org)).checkDiscount(org))
         ? false
-        : AuthService.signJWT({ discount: true }),
+        : AuthService.signTypedJWT('billing-discount', { discount: true }),
     };
   }
 
   @Post('/apply-discount')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async applyDiscount(@GetOrgFromRequest() org: Organization) {
     await (await this.provider(org)).applyDiscount(org);
   }
 
   @Post('/finish-trial')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async finishTrial(@GetOrgFromRequest() org: Organization) {
     const provider = await this.provider(org);
     try {
@@ -97,6 +99,7 @@ export class BillingController {
   }
 
   @Post('/embedded')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async embedded(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -118,6 +121,7 @@ export class BillingController {
   }
 
   @Post('/subscribe')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async subscribe(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -139,6 +143,7 @@ export class BillingController {
   }
 
   @Post('/sync')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async sync(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -160,6 +165,7 @@ export class BillingController {
   }
 
   @Get('/portal')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async modifyPayment(@GetOrgFromRequest() org: Organization) {
     const { url } = await (await this.provider(org)).portalLink(org.id);
     return {
@@ -184,6 +190,7 @@ export class BillingController {
   }
 
   @Post('/cancel')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async cancel(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -204,6 +211,7 @@ export class BillingController {
   }
 
   @Post('/prorate')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async prorate(
     @GetOrgFromRequest() org: Organization,
     @Body() body: BillingSubscribeDto
@@ -291,6 +299,7 @@ export class BillingController {
   }
 
   @Post('/chatbase-refund')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async chatbaseRefund(
     @GetUserFromRequest() user: User,
     @GetOrgFromRequest() org: Organization

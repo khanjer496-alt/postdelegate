@@ -47,11 +47,19 @@ export class PermissionsService {
       Ability<[AuthorizationActions, Sections]>
     >(Ability as AbilityClass<AppAbility>);
 
+    // Role sections are about who the member is, never about the plan, so they
+    // are decided the same way with or without billing
+    const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(permission);
+
     if (
       requestedPermission.length === 0 ||
       !process.env.STRIPE_PUBLISHABLE_KEY
     ) {
+      // Without billing there are no plan limits or quotas to enforce
       for (const [action, section] of requestedPermission) {
+        if (section === Sections.ADMIN && !isAdmin) {
+          continue;
+        }
         can(action, section);
       }
       return build({
@@ -126,10 +134,7 @@ export class PermissionsService {
         continue;
       }
 
-      if (
-        section === Sections.ADMIN &&
-        ['ADMIN', 'SUPERADMIN'].includes(permission)
-      ) {
+      if (section === Sections.ADMIN && isAdmin) {
         can(action, section);
         continue;
       }
