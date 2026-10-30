@@ -228,40 +228,71 @@ export class OAuthRepository {
     });
   }
 
-  findByAccessToken(encryptedToken: string) {
-    return this._oauthAuth.model.oAuthAuthorization.findFirst({
-      where: {
-        accessToken: encryptedToken,
-        revokedAt: null,
-      },
-      include: {
-        oauthApp: {
-          select: {
-            clientId: true,
-            dynamic: true,
-            redirectUris: true,
+  // A token only works while the person who approved it is still an active,
+  // activated member of the organization it was approved for (not removed,
+  // disabled or deleted), otherwise it is as good as revoked
+  async findByAccessToken(encryptedToken: string) {
+    const authorization = await this._oauthAuth.model.oAuthAuthorization.findFirst(
+      {
+        where: {
+          accessToken: encryptedToken,
+          revokedAt: null,
+          user: {
+            deletedAt: null,
+            activated: true,
+          },
+          organization: {
+            deletedAt: null,
           },
         },
-        organization: {
-          include: {
-            subscription: {
-              select: {
-                subscriptionTier: true,
-                totalChannels: true,
-                isLifetime: true,
+        include: {
+          oauthApp: {
+            select: {
+              clientId: true,
+              dynamic: true,
+              redirectUris: true,
+            },
+          },
+          organization: {
+            include: {
+              subscription: {
+                select: {
+                  subscriptionTier: true,
+                  totalChannels: true,
+                  isLifetime: true,
+                },
+              },
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              email: true,
+              activated: true,
+              organizations: {
+                select: {
+                  organizationId: true,
+                  disabled: true,
+                },
               },
             },
           },
         },
-        user: {
-          select: {
-            id: true,
-            email: true,
-            activated: true,
-          },
-        },
-      },
-    });
+      }
+    );
+
+    if (!authorization) {
+      return null;
+    }
+
+    const { organizations, ...user } = authorization.user;
+    const isMember = organizations.some(
+      (membership) =>
+        membership.organizationId === authorization.organizationId &&
+        !membership.disabled
+    );
+
+    return isMember ? { ...authorization, user } : null;
   }
 
   getApprovedApps(userId: string) {

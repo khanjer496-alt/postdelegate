@@ -15,6 +15,8 @@ import crypto from 'crypto';
 import path from 'path';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { getMaxSize } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { fileTypeFromBuffer } = require('file-type');
 
@@ -67,14 +69,54 @@ function generateRandomString() {
   return makeId(20);
 }
 
+// S3 allows 10,000 parts per multipart upload, numbered from 1
+const MAX_PART_NUMBER = 10000;
+// an unfinished multipart upload is dropped by the bucket after a few days
+const UPLOAD_OWNERSHIP_TTL = 3 * 24 * 3600;
+
+const uploadOwnerKey = (key: string) => `r2-multipart:${key}`;
+
+// The key and upload id are server generated, so remembering which
+// organization created them is enough to refuse any other organization that
+// replays or guesses them on the follow-up endpoints
+async function ownsUpload(orgId: string, key: unknown, uploadId: unknown) {
+  if (typeof key !== 'string' || typeof uploadId !== 'string') {
+    return false;
+  }
+
+  const owner = await ioRedis.get(uploadOwnerKey(key));
+  if (!owner) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(owner as string);
+    return parsed.orgId === orgId && parsed.uploadId === uploadId;
+  } catch {
+    return false;
+  }
+}
+
+const isValidPartNumber = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) >= 1 && (value as number) <= MAX_PART_NUMBER;
+
 export default async function handleR2Upload(
   endpoint: string,
   req: Request,
-  res: Response
+  res: Response,
+  orgId: string
 ) {
+  if (endpoint !== 'create-multipart-upload') {
+    const ref =
+      endpoint === 'prepare-upload-parts' ? req.body?.partData : req.body;
+    if (!(await ownsUpload(orgId, ref?.key, ref?.uploadId))) {
+      return res.status(404).json({ message: 'Upload not found.' });
+    }
+  }
+
   switch (endpoint) {
     case 'create-multipart-upload':
-      return createMultipartUpload(req, res);
+      return createMultipartUpload(req, res, orgId);
     case 'prepare-upload-parts':
       return prepareUploadParts(req, res);
     case 'complete-multipart-upload':
@@ -115,7 +157,11 @@ export async function simpleUpload(
   return CLOUDFLARE_BUCKET_URL + '/' + randomFilename;
 }
 
-export async function createMultipartUpload(req: Request, res: Response) {
+export async function createMultipartUpload(
+  req: Request,
+  res: Response,
+  orgId: string
+) {
   const { file, fileHash } = req.body;
   const safeExt = normalizeExtension(file?.name || '');
   if (!safeExt) {
@@ -136,6 +182,12 @@ export async function createMultipartUpload(req: Request, res: Response) {
 
     const command = new CreateMultipartUploadCommand({ ...params });
     const response = await R2.send(command);
+    await ioRedis.set(
+      uploadOwnerKey(response.Key || randomFilename),
+      JSON.stringify({ orgId, uploadId: response.UploadId }),
+      'EX',
+      UPLOAD_OWNERSHIP_TTL
+    );
     return res.status(200).json({
       uploadId: response.UploadId,
       key: response.Key,
@@ -150,6 +202,13 @@ export async function prepareUploadParts(req: Request, res: Response) {
   const { partData } = req.body;
 
   const parts = partData.parts;
+  if (
+    !Array.isArray(parts) ||
+    parts.length > 1000 ||
+    !parts.every((part) => isValidPartNumber(part?.number))
+  ) {
+    return res.status(400).json({ message: 'Invalid part number.' });
+  }
 
   const response = {
     presignedUrls: {},
@@ -231,6 +290,10 @@ export async function completeMultipartUpload(req: Request, res: Response) {
     }
     const prefix = Buffer.concat(chunks);
     const detected = await fileTypeFromBuffer(prefix);
+    // "bytes 0-4100/<total>": the whole object size, for the per-type cap
+    const total = Number(
+      head.ContentRange?.split('/').pop() ?? head.ContentLength
+    );
 
     // .mov and .mp4 are the same ISO BMFF family: a .mov with an ISO brand
     // sniffs as video/mp4 and a QuickTime-brand file is often named .mp4.
@@ -249,6 +312,17 @@ export async function completeMultipartUpload(req: Request, res: Response) {
         .status(400)
         .json({ message: 'File contents do not match declared type.' });
     }
+
+    // parts are presigned without a size, so the cap is enforced on the
+    // assembled object with the same per-type limits as the other uploads
+    if (!Number.isFinite(total) || total > getMaxSize(detected.mime)) {
+      await R2.send(
+        new DeleteObjectCommand({ Bucket: CLOUDFLARE_BUCKETNAME, Key: key })
+      );
+      return res.status(400).json({ message: 'File is too large.' });
+    }
+
+    await ioRedis.del(uploadOwnerKey(key));
 
     response.Location =
       process.env.CLOUDFLARE_BUCKET_URL +
@@ -272,6 +346,7 @@ export async function abortMultipartUpload(req: Request, res: Response) {
     };
     const command = new AbortMultipartUploadCommand({ ...params });
     const response = await R2.send(command);
+    await ioRedis.del(uploadOwnerKey(key));
 
     return res.status(200).json(response);
   } catch (err) {
@@ -283,6 +358,9 @@ export async function abortMultipartUpload(req: Request, res: Response) {
 export async function signPart(req: Request, res: Response) {
   const { key, uploadId } = req.body;
   const partNumber = parseInt(req.body.partNumber);
+  if (!isValidPartNumber(partNumber)) {
+    return res.status(400).json({ message: 'Invalid part number.' });
+  }
 
   const params = {
     Bucket: CLOUDFLARE_BUCKETNAME,

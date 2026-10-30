@@ -2,7 +2,7 @@ import {
   PrismaRepository,
   PrismaTransaction,
 } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Provider, Role } from '@prisma/client';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
@@ -15,6 +15,7 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 export class UsersRepository {
   constructor(
     private _user: PrismaRepository<'user'>,
+    private _media: PrismaRepository<'media'>,
     private _transaction: PrismaTransaction
   ) {}
 
@@ -255,6 +256,43 @@ export class UsersRepository {
   }
 
   async changePersonal(userId: string, body: UserDetailDto) {
+    // the picture must be a media of an organization the user belongs to; the
+    // current one is sent back on every save and is left alone
+    const current = body.picture
+      ? await this._user.model.user.findUnique({
+          where: {
+            id: userId,
+          },
+          select: {
+            pictureId: true,
+          },
+        })
+      : null;
+
+    if (body.picture && current?.pictureId !== body.picture.id) {
+      const picture = await this._media.model.media.findFirst({
+        where: {
+          id: body.picture.id,
+          deletedAt: null,
+          organization: {
+            users: {
+              some: {
+                userId,
+                disabled: false,
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!picture) {
+        throw new BadRequestException('Picture not found');
+      }
+    }
+
     await this._user.model.user.update({
       where: {
         id: userId,

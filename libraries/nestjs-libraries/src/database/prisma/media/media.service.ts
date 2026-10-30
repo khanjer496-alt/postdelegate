@@ -102,6 +102,10 @@ export class MediaService {
     return this._mediaRepository.getMediaById(id);
   }
 
+  getOrgMediaById(org: string, id: string) {
+    return this._mediaRepository.getOrgMediaById(org, id);
+  }
+
   async generateImage(
     prompt: string,
     org: Organization,
@@ -177,6 +181,22 @@ export class MediaService {
       filePath,
       originalName
     );
+  }
+
+  // Registers an object another service wrote to the bucket (the transloadit
+  // flow). A name another organization already owns is refused, so one
+  // organization can't claim another one's file as its own media
+  async saveBucketObject(
+    org: string,
+    fileName: string,
+    filePath: string,
+    originalName?: string
+  ) {
+    if (await this._mediaRepository.getMediaOfOtherOrg(org, fileName)) {
+      throw new BadRequestException('File not found');
+    }
+
+    return this.saveFile(org, fileName, filePath, originalName);
   }
 
   // Saves an upload and, when a normalizer is configured, hands it to the

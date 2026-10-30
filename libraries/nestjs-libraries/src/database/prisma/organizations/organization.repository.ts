@@ -1,4 +1,4 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Role, ShortLinkPreference, SubscriptionTier } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
@@ -11,7 +11,8 @@ export class OrganizationRepository {
   constructor(
     private _organization: PrismaRepository<'organization'>,
     private _userOrg: PrismaRepository<'userOrganization'>,
-    private _user: PrismaRepository<'user'>
+    private _user: PrismaRepository<'user'>,
+    private _transaction: PrismaTransaction
   ) {}
 
   createMaxUser(id: string, name: string, saasName: string, email: string) {
@@ -408,8 +409,31 @@ export class OrganizationRepository {
     userId: string,
     id: string,
     orgId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    // the email the invite was issued for; invite links pass it so only the
+    // invited person can accept (admin-initiated adds have no invite email)
+    invitedEmail?: string
   ) {
+    if (invitedEmail !== undefined) {
+      const accepting = await this._user.model.user.findUnique({
+        where: {
+          id: userId,
+        },
+        select: {
+          email: true,
+        },
+      });
+
+      if (
+        !accepting ||
+        typeof invitedEmail !== 'string' ||
+        accepting.email.trim().toLowerCase() !==
+          invitedEmail.trim().toLowerCase()
+      ) {
+        return false;
+      }
+    }
+
     const checkIfInviteExists = await this._user.model.user.findFirst({
       where: {
         inviteId: id,
@@ -417,6 +441,20 @@ export class OrganizationRepository {
     });
 
     if (checkIfInviteExists) {
+      return false;
+    }
+
+    const alreadyMember = await this._userOrg.model.userOrganization.findFirst({
+      where: {
+        userId,
+        organizationId: orgId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (alreadyMember) {
       return false;
     }
 
@@ -438,22 +476,25 @@ export class OrganizationRepository {
       return false;
     }
 
-    const create = await this._userOrg.model.userOrganization.create({
-      data: {
-        role,
-        userId,
-        organizationId: orgId,
-      },
-    });
-
-    await this._user.model.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        inviteId: id,
-      },
-    });
+    // joining and burning the invite id happen together, so a half applied
+    // accept can't leave the invite usable again
+    const [create] = await this._transaction.model.$transaction([
+      this._userOrg.model.userOrganization.create({
+        data: {
+          role,
+          userId,
+          organizationId: orgId,
+        },
+      }),
+      this._user.model.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          inviteId: id,
+        },
+      }),
+    ]);
 
     return create;
   }

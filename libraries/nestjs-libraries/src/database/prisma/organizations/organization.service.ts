@@ -42,9 +42,16 @@ export class OrganizationService {
     userId: string,
     id: string,
     orgId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    invitedEmail?: string
   ) {
-    return this._organizationRepository.addUserToOrg(userId, id, orgId, role);
+    return this._organizationRepository.addUserToOrg(
+      userId,
+      id,
+      orgId,
+      role,
+      invitedEmail
+    );
   }
 
   getOrgById(id: string) {
@@ -106,7 +113,7 @@ export class OrganizationService {
     // only the invite fields, the body can carry undeclared properties
     const url =
       process.env.FRONTEND_URL +
-      `/?org=${AuthService.signJWT({
+      `/?org=${AuthService.signTypedJWT('invite', {
         email: body.email,
         role: body.role,
         orgId: org.id,

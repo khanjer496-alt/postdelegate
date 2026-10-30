@@ -12,6 +12,18 @@ import { Organization } from '@prisma/client';
 import { Request } from 'express';
 import { SubscriptionException } from './permission.exception.class';
 
+// Routes that run before there is an organization on the request. Matched on
+// whole path segments from the start, a path that merely contains one of
+// these (/oauth/authorize, /whatever/auth/x) is still checked
+const skippedPrefixes = [
+  '/auth',
+  '/integrations/social-connect',
+  '/integrations/provider',
+];
+
+export const isUnderPrefix = (path: string, prefix: string) =>
+  path === prefix || path.startsWith(prefix + '/');
+
 @Injectable()
 export class PoliciesGuard implements CanActivate {
   constructor(
@@ -21,12 +33,7 @@ export class PoliciesGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request: Request = context.switchToHttp().getRequest();
-    if (
-      request.path.indexOf('/auth') > -1 ||
-      request.path.indexOf('/auth') > -1 ||
-      request.path.indexOf('/integrations/social-connect') > -1 ||
-      request.path.indexOf('/integrations/provider') > -1
-    ) {
+    if (skippedPrefixes.some((prefix) => isUnderPrefix(request.path, prefix))) {
       return true;
     }
 

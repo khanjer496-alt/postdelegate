@@ -503,6 +503,7 @@ export class PublicIntegrationsController {
   }
 
   @Post('/generate-video')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   generateVideo(
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoDto
@@ -512,6 +513,7 @@ export class PublicIntegrationsController {
   }
 
   @Post('/video/function')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   videoFunction(@Body() body: VideoFunctionDto) {
     Sentry.metrics.count('public_api-request', 1);
     return this._mediaService.videoFunction(
@@ -522,6 +524,7 @@ export class PublicIntegrationsController {
   }
 
   @Post('/clipping')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   startClipping(
     @GetOrgFromRequest() org: Organization,
     @Body() body: ClippingDto

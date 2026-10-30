@@ -20,7 +20,7 @@ import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/for
 import { ForgotPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot.password.dto';
 import { ResendActivationDto } from '@gitroom/nestjs-libraries/dtos/auth/resend-activation.dto';
 import { ApiTags } from '@nestjs/swagger';
-import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
+import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.management';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
@@ -28,6 +28,12 @@ import { Provider } from '@prisma/client';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import * as Sentry from '@sentry/nestjs';
 import { FarcasterProvider } from '@gitroom/nestjs-libraries/integrations/social/farcaster.provider';
+
+// Per client address (see getClientIp), on top of the global limits. Every one
+// of these is public and either sends an email, checks a password or burns
+// CPU on a hash, so each gets its own counter
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
 
 @ApiTags('Auth')
 @Controller('/auth')
@@ -44,6 +50,8 @@ export class AuthController {
     };
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 10, ttl: HOUR } })
   @Post('/register')
   async register(
     @Req() req: Request,
@@ -75,14 +83,7 @@ export class AuthController {
       }
 
       response.cookie('auth', jwt, {
-        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
-          ? {
-              secure: true,
-              httpOnly: true,
-              sameSite: 'none',
-            }
-          : {}),
+        ...getAuthCookieOptions(),
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
       });
 
@@ -92,14 +93,7 @@ export class AuthController {
 
       if (typeof addedOrg !== 'boolean' && addedOrg?.organizationId) {
         response.cookie('showorg', addedOrg.organizationId, {
-          domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-          ...(!process.env.NOT_SECURED
-            ? {
-                secure: true,
-                httpOnly: true,
-                sameSite: 'none',
-              }
-            : {}),
+          ...getAuthCookieOptions(),
           expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
         });
 
@@ -118,6 +112,8 @@ export class AuthController {
     }
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 10, ttl: MINUTE } })
   @Post('/login')
   async login(
     @Req() req: Request,
@@ -140,14 +136,7 @@ export class AuthController {
       );
 
       response.cookie('auth', jwt, {
-        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
-          ? {
-              secure: true,
-              httpOnly: true,
-              sameSite: 'none',
-            }
-          : {}),
+        ...getAuthCookieOptions(),
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
       });
 
@@ -157,14 +146,7 @@ export class AuthController {
 
       if (typeof addedOrg !== 'boolean' && addedOrg?.organizationId) {
         response.cookie('showorg', addedOrg.organizationId, {
-          domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-          ...(!process.env.NOT_SECURED
-            ? {
-                secure: true,
-                httpOnly: true,
-                sameSite: 'none',
-              }
-            : {}),
+          ...getAuthCookieOptions(),
           expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
         });
 
@@ -182,20 +164,22 @@ export class AuthController {
     }
   }
 
+  // Same answer whether or not the account exists
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 5, ttl: HOUR } })
   @Post('/forgot')
   async forgot(@Body() body: ForgotPasswordDto) {
     try {
       await this._authService.forgot(body.email);
-      return {
-        forgot: true,
-      };
-    } catch (e) {
-      return {
-        forgot: false,
-      };
-    }
+    } catch (e) {}
+
+    return {
+      forgot: true,
+    };
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 10, ttl: HOUR } })
   @Post('/forgot-return')
   async forgotReturn(@Body() body: ForgotReturnPasswordDto) {
     const reset = await this._authService.forgotReturn(body);
@@ -217,6 +201,8 @@ export class AuthController {
     return response.redirect(302, `${scheme}?${params.toString()}`);
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 60, ttl: MINUTE } })
   @Get('/oauth/:provider')
   async oauthLink(
     @Param('provider') provider: string,
@@ -225,20 +211,15 @@ export class AuthController {
   ) {
     const state = `login-${makeSecureId(16)}`;
     response.cookie('oauth_state', state, {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       expires: new Date(Date.now() + 1000 * 60 * 10),
     });
 
     return this._authService.oauthLink(provider, { ...query, state });
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 20, ttl: HOUR } })
   @Post('/activate')
   async activate(
     @Body('code') code: string,
@@ -254,14 +235,7 @@ export class AuthController {
     }
 
     response.cookie('auth', activate, {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
@@ -274,19 +248,18 @@ export class AuthController {
     return response.status(200).json({ can: true });
   }
 
+  // Same answer whether or not the account exists or is already activated
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 5, ttl: HOUR } })
   @Post('/resend-activation')
   async resendActivation(@Body() body: ResendActivationDto) {
     try {
       await this._authService.resendActivationEmail(body.email);
-      return {
-        success: true,
-      };
-    } catch (e: any) {
-      return {
-        success: false,
-        message: e.message,
-      };
-    }
+    } catch (e) {}
+
+    return {
+      success: true,
+    };
   }
 
   // public and creates a signer at Neynar per call, so cap it per client
@@ -334,6 +307,8 @@ export class AuthController {
     );
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 30, ttl: 10 * MINUTE } })
   @Post('/oauth/:provider/exists')
   async oauthExists(
     @Req() req: Request,
@@ -361,14 +336,7 @@ export class AuthController {
     }
 
     response.cookie('auth', jwt, {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 

@@ -19,8 +19,11 @@ import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.management';
+import {
+  isAiAvailable,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
@@ -91,6 +94,10 @@ export class UsersController {
     }
 
     const impersonate = req.cookies.impersonate || req.headers.impersonate;
+    const tier =
+      // @ts-ignore
+      organization?.subscription?.subscriptionTier ||
+      (!process.env.STRIPE_PUBLISHABLE_KEY ? 'ULTIMATE' : 'FREE');
     // @ts-ignore
     return {
       ...user,
@@ -99,10 +106,8 @@ export class UsersController {
         ? 10000
         : // @ts-ignore
           organization?.subscription?.totalChannels || pricing.FREE.channel,
-      tier:
-        // @ts-ignore
-        organization?.subscription?.subscriptionTier ||
-        (!process.env.STRIPE_PUBLISHABLE_KEY ? 'ULTIMATE' : 'FREE'),
+      tier,
+      aiAvailable: isAiAvailable(pricing[tier]),
       // @ts-ignore
       role: organization?.users[0]?.role,
       // @ts-ignore
@@ -152,14 +157,7 @@ export class UsersController {
     }
 
     response.cookie('impersonate', id, {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
@@ -206,7 +204,10 @@ export class UsersController {
   private getRequestUserId(req: Request): string | null {
     try {
       const auth = (req.headers.auth as string) || req.cookies?.auth;
-      const payload = AuthChecker.verifyJWT(auth) as { id?: string } | null;
+      const payload = AuthChecker.verifyTypedJWT<{ id?: string }>(
+        auth,
+        'session'
+      );
       return payload?.id || null;
     } catch {
       return null;
@@ -280,7 +281,10 @@ export class UsersController {
       user.id,
       getOrgFromCookie.id,
       getOrgFromCookie.orgId,
-      getOrgFromCookie.role
+      getOrgFromCookie.role,
+      // an invite issued for an email can only be accepted by that email; a
+      // copy-link invite carries no email and stays a bearer link
+      getOrgFromCookie.email || undefined
     );
 
     response.status(200).json({
@@ -306,14 +310,7 @@ export class UsersController {
     @Res({ passthrough: true }) response: Response
   ) {
     response.cookie('showorg', id, {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
@@ -370,40 +367,19 @@ export class UsersController {
   logout(@Res({ passthrough: true }) response: Response) {
     response.header('logout', 'true');
     response.cookie('auth', '', {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       maxAge: -1,
       expires: new Date(0),
     });
 
     response.cookie('showorg', '', {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       maxAge: -1,
       expires: new Date(0),
     });
 
     response.cookie('impersonate', '', {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
+      ...getAuthCookieOptions(),
       maxAge: -1,
       expires: new Date(0),
     });

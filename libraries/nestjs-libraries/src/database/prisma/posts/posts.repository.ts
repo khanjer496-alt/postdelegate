@@ -665,7 +665,21 @@ export class PostsRepository {
   ) {
     const posts: Post[] = [];
     const uuid = uuidv4();
-    const group = keepGroup && body.group ? body.group : uuid;
+    // keepGroup reuses the client-supplied group only when it already belongs
+    // to this organization, so a foreign group id can never be adopted
+    const ownsGroup =
+      keepGroup && body.group
+        ? !!(await this._post.model.post.findFirst({
+            where: {
+              group: body.group,
+              organizationId: orgId,
+            },
+            select: {
+              id: true,
+            },
+          }))
+        : false;
+    const group = ownsGroup ? body.group : uuid;
 
     // an edited post stays in the batch it was created in, even when it is
     // saved on its own or with a group that was rotated since
@@ -803,6 +817,7 @@ export class PostsRepository {
           await this._post.model.post.findFirst({
             where: {
               group: body.group,
+              organizationId: orgId,
               deletedAt: null,
               parentPostId: null,
             },
@@ -817,6 +832,7 @@ export class PostsRepository {
       await this._post.model.post.updateMany({
         where: {
           group: body.group,
+          organizationId: orgId,
           deletedAt: null,
         },
         data: {
@@ -832,6 +848,7 @@ export class PostsRepository {
       await this._post.model.post.updateMany({
         where: {
           group: body.group,
+          organizationId: orgId,
           deletedAt: null,
           id: {
             notIn: posts.map((p) => p.id),
@@ -1141,6 +1158,7 @@ export class PostsRepository {
     return this._tags.model.tags.update({
       where: {
         id,
+        orgId,
       },
       data: {
         name: body.name,

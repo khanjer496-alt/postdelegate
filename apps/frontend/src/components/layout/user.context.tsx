@@ -11,6 +11,7 @@ export const UserContext = createContext<
   | (User & {
       orgId: string;
       tier: PricingInnerInterface;
+      aiAvailable: boolean;
       publicApi: string;
       role: 'USER' | 'ADMIN' | 'SUPERADMIN';
       totalChannels: number;

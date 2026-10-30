@@ -9,6 +9,7 @@ import { array, boolean, object, string } from 'yup';
 import { FormProvider, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { CopilotTextarea } from '@copilotkit/react-textarea';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Select } from '@gitroom/react/form/select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -168,6 +169,7 @@ const AddOrRemoveSignature: FC<{
   reload: () => void;
 }> = (props) => {
   const { data, reload } = props;
+  const user = useUser();
   const toast = useToaster();
   const fetch = useFetch();
   const form = useForm({
@@ -237,6 +239,7 @@ const AddOrRemoveSignature: FC<{
               }}
               placeholder="Write your signature..."
               autosuggestionsConfig={{
+                disabled: !user?.aiAvailable,
                 textareaPurpose: `Assist me in writing social media signature`,
                 chatApiConfigs: {},
               }}

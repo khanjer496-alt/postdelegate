@@ -84,12 +84,19 @@ export class PostsController {
 
   @Post('/:id/comments')
   async createComment(
+    @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body() body: CreatePublicCommentDto,
     @RealIP() ip: string
   ) {
-    return this._postsService.createPublicComment(id, body, user.id, ip);
+    return this._postsService.createPublicComment(
+      id,
+      body,
+      user.id,
+      ip,
+      org.id
+    );
   }
 
   @Put('/comments/:commentId/resolve')
@@ -264,7 +271,10 @@ export class PostsController {
   }
 
   @Post('/generator')
-  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.POSTS_PER_MONTH],
+    [AuthorizationActions.Create, Sections.AI]
+  )
   async generatePosts(
     @GetOrgFromRequest() org: Organization,
     @Body() body: GeneratorDto,
@@ -313,6 +323,7 @@ export class PostsController {
   }
 
   @Post('/separate-posts')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async separatePosts(
     @GetOrgFromRequest() org: Organization,
     @Body() body: { content: string; len: number }

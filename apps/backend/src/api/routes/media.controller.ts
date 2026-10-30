@@ -22,9 +22,15 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { streamUploadOptions } from '@gitroom/nestjs-libraries/upload/multer.stream.engine';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { getMaxSize } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 @ApiTags('Media')
 @Controller('/media')
@@ -41,6 +47,7 @@ export class MediaController {
   }
 
   @Post('/generate-video')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   generateVideo(
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoDto
@@ -50,6 +57,7 @@ export class MediaController {
   }
 
   @Post('/generate-image')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateImage(
     @GetOrgFromRequest() org: Organization,
     @Req() req: Request,
@@ -69,6 +77,7 @@ export class MediaController {
   }
 
   @Post('/generate-image-with-prompt')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateImageFromText(
     @GetOrgFromRequest() org: Organization,
     @Req() req: Request,
@@ -124,7 +133,14 @@ export class MediaController {
       throw new BadRequestException('Invalid file name');
     }
 
-    return this._mediaService.saveFile(
+    // only an object that really sits in the bucket, within the video size
+    // cap, can be registered as a media
+    const size = await this.storage.objectSize?.(name);
+    if (size === undefined || size === null || size > getMaxSize('video/mp4')) {
+      throw new BadRequestException('File not found');
+    }
+
+    return this._mediaService.saveBucketObject(
       org.id,
       name,
       process.env.CLOUDFLARE_BUCKET_URL + '/' + name,
@@ -170,7 +186,7 @@ export class MediaController {
     @Res() res: Response,
     @Param('endpoint') endpoint: string
   ) {
-    const upload = await handleR2Upload(endpoint, req, res);
+    const upload = await handleR2Upload(endpoint, req, res, org.id);
     // a rejected or failed completion has already answered with its own status
     if (endpoint !== 'complete-multipart-upload' || res.headersSent) {
       return upload;
@@ -214,6 +230,7 @@ export class MediaController {
   }
 
   @Post('/video/function')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   videoFunction(
     @Body() body: VideoFunctionDto
   ) {

@@ -97,7 +97,7 @@ export const SettingsPopup: FC<{
     if (user?.tier?.webhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks') });
     }
-    if (user?.tier?.autoPost) {
+    if (user?.tier?.autoPost && user?.aiAvailable) {
       arr.push({ tab: 'autopost', label: t('auto_post', 'Auto Post') });
     }
     if (user?.tier.current !== 'FREE') {
@@ -195,7 +195,9 @@ export const SettingsPopup: FC<{
                 </div>
               )}
 
-              {tab === 'autopost' && !!user?.tier?.autoPost && (
+              {tab === 'autopost' &&
+                !!user?.tier?.autoPost &&
+                !!user?.aiAvailable && (
                 <div>
                   <Autopost />
                 </div>

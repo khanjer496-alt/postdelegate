@@ -297,6 +297,16 @@ export class NoAuthIntegrationsController {
       }
     }
 
+    // The org behind the state is spent once the channel is saved. A
+    // provider that still has to pick a page keeps it for that one last step
+    // (saveProviderPage deletes it), and a failed attempt above leaves it for
+    // the retry of providers that take credentials from the person
+    if (!(integrationProvider.isBetweenSteps && !refresh)) {
+      await ioRedis.del(`organization:${body.state}`);
+    }
+
+    await ioRedis.del(`login:${body.state}`);
+
     const webhookUrl = await ioRedis.get(`webhookUrl:${body.state}`);
     if (webhookUrl) {
       try {
@@ -304,7 +314,7 @@ export class NoAuthIntegrationsController {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            params: AuthService.signJWT({
+            params: AuthService.signTypedJWT('connect-webhook', {
               apiKey: org.apiKey,
             }),
           }),
@@ -322,7 +332,7 @@ export class NoAuthIntegrationsController {
     }
 
     const extensionToken = integrationProvider.isChromeExtension
-      ? AuthService.signJWT({
+      ? AuthService.signTypedJWT('extension', {
           integrationId: createUpdate.id,
           organizationId: org.id,
           internalId: String(id),
@@ -362,7 +372,13 @@ export class NoAuthIntegrationsController {
 
     const org = await this._organizationService.getOrgById(organization);
 
-    return this._integrationService.saveProviderPage(org.id, id, body);
+    const saved = await this._integrationService.saveProviderPage(
+      org.id,
+      id,
+      body
+    );
+    await ioRedis.del(`organization:${body.state}`);
+    return saved;
   }
 
   @Post('/extension-refresh')
@@ -371,7 +387,7 @@ export class NoAuthIntegrationsController {
   ) {
     let payload: any;
     try {
-      payload = AuthService.verifyJWT(body.jwt);
+      payload = AuthService.verifyTypedJWT(body.jwt, 'extension');
     } catch {
       throw new HttpException('Invalid token', 401);
     }
@@ -385,9 +401,7 @@ export class NoAuthIntegrationsController {
       !internalId ||
       typeof internalId !== 'string' ||
       !provider ||
-      typeof provider !== 'string' ||
-      'timeLimit' in payload || // team invite token
-      'expires' in payload // password reset token
+      typeof provider !== 'string'
     ) {
       throw new HttpException('Invalid token payload', 400);
     }

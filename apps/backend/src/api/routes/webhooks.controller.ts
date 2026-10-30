@@ -16,6 +16,7 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import {
   OnlyURL, UpdateDto, WebhooksDto
 } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
+import { ssrfSafeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 @ApiTags('Webhooks')
@@ -56,11 +57,14 @@ export class WebhookController {
   @Post('/send')
   async sendWebhook(@Body() body: any, @Query() query: OnlyURL) {
     try {
-      await fetch(query.url, {
+      // the url was validated by the DTO, but DNS and redirects can still
+      // point somewhere else: pin resolution and re-validate every hop
+      const response = await ssrfSafeFetch(query.url, {
         method: 'POST',
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
       });
+      await response.body?.cancel().catch(() => undefined);
     } catch (err) {
       /** sent **/
     }

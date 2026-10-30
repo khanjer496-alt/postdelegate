@@ -65,6 +65,7 @@ import { useHasScroll } from '@gitroom/frontend/components/ui/is.scroll.hook';
 import { useShortlinkPreference } from '@gitroom/frontend/components/settings/shortlink-preference.component';
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useClickOutside } from '@mantine/hooks';
 import {
   MediaSettingsSection,
@@ -73,6 +74,7 @@ import {
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
+  const user = useUser();
   const fetch = useFetch();
   const ref = useRef(null);
   const existingData = useExistingData();
@@ -1435,11 +1437,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           />
         </BottomSheet>
       )}
-      <CopilotPopup
-        className="mobile:!z-[460] mobile:!bottom-[112px]"
-        hitEscapeToClose={false}
-        clickOutsideToClose={true}
-        instructions={`
+      {!!user?.aiAvailable && (
+        <CopilotPopup
+          className="mobile:!z-[460] mobile:!bottom-[112px]"
+          hitEscapeToClose={false}
+          clickOutsideToClose={true}
+          instructions={`
 You are an assistant that help the user to schedule their social media posts,
 Here are the things you can do:
 - Add a new comment / post to the list of posts
@@ -1450,14 +1453,15 @@ Here are the things you can do:
 Post content can be added using the addPostContentFor{num} function.
 After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} function.
 `}
-        labels={{
-          title: t('your_assistant', 'Your Assistant'),
-          initial: t(
-            'assistant_initial_message',
-            'Hi! I can help you to refine your social media posts.'
-          ),
-        }}
-      />
+          labels={{
+            title: t('your_assistant', 'Your Assistant'),
+            initial: t(
+              'assistant_initial_message',
+              'Hi! I can help you to refine your social media posts.'
+            ),
+          }}
+        />
+      )}
     </div>
   );
 };
