@@ -157,6 +157,14 @@ export class NotificationService {
     }
   }
 
+  // Account matters (billing, the plan) only the admins can act on
+  async sendEmailsToOrgAdmins(orgId: string, subject: string, message: string) {
+    const admins = await this._organizationRepository.getOrgAdmins(orgId);
+    for (const admin of admins) {
+      await this.sendEmail(admin.user.email, subject, message);
+    }
+  }
+
   async sendEmail(to: string, subject: string, html: string, replyTo?: string) {
     await this._emailService.sendEmail(to, subject, html, 'top', replyTo);
   }

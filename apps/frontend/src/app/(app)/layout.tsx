@@ -4,6 +4,12 @@ export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'PostDelegate',
   description: 'Plan, publish, and manage your social content with PostDelegate.',
+  openGraph: {
+    title: 'PostDelegate',
+    description:
+      'Plan, publish, and manage your social content with PostDelegate.',
+    siteName: 'PostDelegate',
+  },
 };
 import '../global.scss';
 import 'react-tooltip/dist/react-tooltip.css';

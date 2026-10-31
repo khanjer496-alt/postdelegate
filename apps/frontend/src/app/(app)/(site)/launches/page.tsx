@@ -3,7 +3,6 @@ import { LaunchesComponent } from '@gitroom/frontend/components/launches/launche
 import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'PostDelegate Calendar',
-  description: '',
 };
 export default async function Index() {
   return <LaunchesComponent />;

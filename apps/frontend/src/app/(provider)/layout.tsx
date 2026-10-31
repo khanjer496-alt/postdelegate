@@ -1,7 +1,11 @@
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'PostDelegate' };
+export const metadata = {
+  title: 'PostDelegate',
+  description:
+    'Plan, publish, and manage your social content with PostDelegate.',
+};
 import '../global.scss';
 import 'react-tooltip/dist/react-tooltip.css';
 import '@copilotkit/react-ui/styles.css';
