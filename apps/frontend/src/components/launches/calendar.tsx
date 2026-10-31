@@ -102,9 +102,10 @@ export const hours = Array.from(
   (_, i) => i
 );
 
-// The current time badge at the start of the now line
+// The current time badge at the start of the now line. White on the light
+// theme's violet, black on the dark theme's lime, so both pass AA
 const NowTime: FC<{ time: string }> = ({ time }) => (
-  <div className="rounded-[6px] bg-newTableTextFocused px-[6px] text-[12px] leading-[20px] font-[500] text-black whitespace-nowrap">
+  <div className="rounded-[6px] bg-newTableTextFocused px-[6px] text-[12px] leading-[20px] font-[500] text-white dark:text-black whitespace-nowrap">
     {time}
   </div>
 );
@@ -1033,7 +1034,7 @@ export const CalendarColumn: FC<{
             className={clsx(
               'h-[24px] min-w-[24px] px-[5px] mobile:h-[20px] mobile:min-w-[20px] mobile:px-[4px] rounded-[6px] flex items-center justify-center',
               getDate.isSame(currentHour, 'day') &&
-                'bg-newTableTextFocused text-black font-[600]'
+                'bg-newTableTextFocused text-white dark:text-black font-[600]'
             )}
           >
             {getDate.date()}

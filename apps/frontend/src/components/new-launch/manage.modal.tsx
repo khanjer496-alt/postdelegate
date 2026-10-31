@@ -995,25 +995,30 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   // on phones, the settings, tags, repeat and delete live in a settings sheet
   const settingsButton = !dummy && (
-    <div
+    <button
+      type="button"
       onClick={() => setMobileSheet('settings')}
-      className="hidden mobile:flex shrink-0 w-[32px] h-[44px] justify-end items-center cursor-pointer text-[#A3A3A3]"
+      aria-label={t('settings', 'Settings')}
+      className="hidden mobile:flex shrink-0 w-[44px] h-[44px] justify-center items-center cursor-pointer text-[#A3A3A3]"
     >
       <SettingsOutlineIcon />
-    </div>
+    </button>
   );
 
   // phones have no room for the preview column, it replaces the editor instead
   const previewButton = (
-    <div
+    <button
+      type="button"
       onClick={() => setMobileTab(mobileTab === 'preview' ? 'edit' : 'preview')}
+      aria-label={t('post_preview', 'Post Preview')}
+      aria-pressed={mobileTab === 'preview'}
       className={clsx(
-        'hidden mobile:flex shrink-0 w-[32px] h-[44px] justify-end items-center cursor-pointer',
+        'hidden mobile:flex shrink-0 w-[44px] h-[44px] justify-center items-center cursor-pointer',
         mobileTab === 'preview' ? 'text-[#FC69FF]' : 'text-[#A3A3A3]'
       )}
     >
       <EyeIcon />
-    </div>
+    </button>
   );
 
   return (
@@ -1104,12 +1109,14 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       </div>
                       {!existingData.integration && (
                         <>
-                          <div
+                          <button
+                            type="button"
                             onClick={() => setMobileSheet('channels')}
+                            aria-label={t('select_channels', 'Select channels')}
                             className="hidden mobile:flex shrink-0 w-[44px] h-[44px] rounded-[8px] bg-btnSimple justify-center items-center cursor-pointer"
                           >
                             <PlusIcon size={24} />
-                          </div>
+                          </button>
                           <div className="hidden mobile:block flex-1" />
                           {previewButton}
                           {settingsButton}
@@ -1226,9 +1233,14 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           >
             <div className="bg-newBgColor h-[65px] rounded-e-[20px] !rounded-b-[0] mobile:hidden flex items-center px-[20px] text-[20px] font-[600]">
               <div className="flex-1">{t('post_preview', 'Post Preview')}</div>
-              <div className="cursor-pointer mobile:hidden">
-                <CloseIcon onClick={askClose} className="text-[#A3A3A3]" />
-              </div>
+              <button
+                type="button"
+                onClick={askClose}
+                aria-label={t('close', 'Close')}
+                className="cursor-pointer mobile:hidden"
+              >
+                <CloseIcon className="text-[#A3A3A3]" />
+              </button>
             </div>
             <div className="flex-1 relative">
               <Scrollable
