@@ -100,6 +100,7 @@ const TrialCountdownInner: FC<{ orgId: string }> = ({ orgId }) => {
   return (
     <div
       role="group"
+      data-trial-countdown=""
       aria-label={t('trial_countdown_label', 'Free trial')}
       className={clsx(
         'flex items-center h-[32px] rounded-full border text-[13px] font-[500] whitespace-nowrap overflow-hidden',
@@ -118,20 +119,22 @@ const TrialCountdownInner: FC<{ orgId: string }> = ({ orgId }) => {
             'trial_countdown_add_card_hint',
             'Add a card to keep your plan and your scheduled posts when the trial ends.'
           )}
-          className="h-full flex items-center gap-[6px] ps-[12px] pe-[10px] hover:opacity-80 disabled:opacity-60 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-btnPrimary rounded-s-full"
+          className="h-full flex items-center gap-[6px] ps-[12px] pe-[10px] xs:ps-[10px] xs:pe-[6px] hover:opacity-80 disabled:opacity-60 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-btnPrimary rounded-s-full"
         >
           <span
             aria-hidden="true"
             className={clsx(
-              'w-[6px] h-[6px] rounded-full shrink-0',
+              'w-[6px] h-[6px] rounded-full shrink-0 xs:hidden',
               urgent ? 'bg-red-500' : 'bg-btnPrimary dark:bg-btnCta'
             )}
           />
           <span className="mobile:hidden">{text}</span>
-          <span className="hidden mobile:inline">
-            {t('trial_countdown_short', '{{days}}d left', { days })}
+          {/* phones: the bare day count, the full sentence stays for screen readers */}
+          <span className="hidden mobile:inline" aria-hidden="true">
+            {t('trial_countdown_compact', '{{days}}d', { days })}
           </span>
-          <span aria-hidden="true" className="opacity-50">
+          <span className="hidden mobile:inline sr-only">{text}</span>
+          <span aria-hidden="true" className="opacity-50 xs:hidden">
             ·
           </span>
           <span className="font-[600] underline underline-offset-2">

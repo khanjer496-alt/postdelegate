@@ -23,7 +23,9 @@ export const MenuItem: FC<{ label: string; title?: string; icon: ReactNode; path
 
   const inner = (
     <>
-      <div className="custom:scale-90 transition-transform">{icon}</div>
+      <div className="custom:scale-90 transition-transform" aria-hidden="true">
+        {icon}
+      </div>
       <div className="custom:text-[9px] minCustom:text-[10px] leading-[1.1] text-center">
         {label}
       </div>
@@ -32,7 +34,12 @@ export const MenuItem: FC<{ label: string; title?: string; icon: ReactNode; path
 
   if (onClick) {
     return (
-      <button onClick={onClick} title={title || label} className={className}>
+      <button
+        type="button"
+        onClick={onClick}
+        title={title || label}
+        className={className}
+      >
         {inner}
       </button>
     );
@@ -43,6 +50,7 @@ export const MenuItem: FC<{ label: string; title?: string; icon: ReactNode; path
       prefetch={true}
       href={path}
       title={title || label}
+      aria-current={isActive ? 'page' : undefined}
       {...path.indexOf('http') === 0 && { target: '_blank' }}
       className={className}
     >

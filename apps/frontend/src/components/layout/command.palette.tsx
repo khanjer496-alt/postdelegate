@@ -44,7 +44,7 @@ export const CommandPalette: FC = () => {
         aria-haspopup="dialog"
         aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}
         aria-label={t('quick_menu_open', 'Search and quick actions')}
-        className="flex items-center self-center gap-[8px] h-[32px] -my-[4px] ps-[10px] pe-[6px] mobile:pe-[10px] rounded-[8px] bg-btnSimple text-textItemBlur hover:text-newTextColor transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
+        className="flex items-center self-center gap-[8px] h-[32px] -my-[4px] ps-[10px] pe-[6px] rounded-[8px] bg-btnSimple text-textItemBlur hover:text-newTextColor transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary mobile:w-[40px] mobile:h-[40px] mobile:my-0 mobile:p-0 mobile:justify-center mobile:bg-transparent mobile:hover:bg-boxFocused"
       >
         <svg
           aria-hidden="true"
