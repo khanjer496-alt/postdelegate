@@ -18,7 +18,14 @@ import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creat
 dayjs.extend(utc);
 export const metadata: Metadata = {
   title: `PostDelegate Preview`,
-  description: '',
+  description:
+    'A post preview shared from PostDelegate, the social media scheduler.',
+  openGraph: {
+    title: 'Post preview on PostDelegate',
+    description:
+      'A post preview shared from PostDelegate, the social media scheduler.',
+    siteName: 'PostDelegate',
+  },
 };
 export default async function Auth(
   props: {

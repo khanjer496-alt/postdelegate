@@ -6,7 +6,9 @@ const mockStripe = {
     cancel: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    retrieve: jest.fn(),
   },
+  promotionCodes: { list: jest.fn() },
   customers: { retrieve: jest.fn(), update: jest.fn() },
   paymentMethods: { list: jest.fn() },
   billingPortal: { sessions: { create: jest.fn() } },
@@ -456,7 +458,12 @@ describe('StripeService affiliate events', () => {
       service.processWebhook({
         type: 'charge.refunded',
         data: {
-          object: { id: 'ch_1', payment_intent: 'pi_1', amount: 1, amount_refunded: 1 },
+          object: {
+            id: 'ch_1',
+            payment_intent: 'pi_1',
+            amount: 1,
+            amount_refunded: 1,
+          },
         },
       } as any)
     ).resolves.toEqual({ ok: true });
@@ -491,7 +498,10 @@ describe('StripeService cardless trial', () => {
     getUserById: jest.fn().mockResolvedValue({ email: 'a@b.com' }),
   };
   const trackService = { track: jest.fn() };
-  const notificationService = { inAppNotification: jest.fn() };
+  const notificationService = {
+    inAppNotification: jest.fn(),
+    sendEmailsToOrgAdmins: jest.fn(),
+  };
   const service = new StripeService(
     subscriptionService as any,
     organizationService as any,
@@ -504,30 +514,31 @@ describe('StripeService cardless trial', () => {
   const cardless = {
     trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
   };
-  const subscriptionEvent = (type: string, object: any) =>
-    ({
-      type,
-      data: {
-        object: {
-          id: 'sub_1',
-          customer: 'cus_1',
-          cancel_at: null,
-          metadata: {
-            service: 'gitroom',
-            billing: 'STANDARD',
-            period: 'MONTHLY',
-            uniqueId: 'u1',
-          },
-          ...object,
-        },
+  // subscriptions.retrieve returns the subscription of the latest event
+  let latest: any;
+  const subscriptionEvent = (type: string, object: any) => {
+    latest = {
+      id: 'sub_1',
+      customer: 'cus_1',
+      cancel_at: null,
+      metadata: {
+        service: 'gitroom',
+        billing: 'STANDARD',
+        period: 'MONTHLY',
+        uniqueId: 'u1',
       },
-    } as any);
+      ...object,
+    };
+    return { type, data: { object: latest } } as any;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
     mockStripe.paymentMethods.list.mockResolvedValue({ data: [] });
+    mockStripe.promotionCodes.list.mockResolvedValue({ data: [] });
+    mockStripe.subscriptions.retrieve.mockImplementation(async () => latest);
     mockStripe.customers.retrieve.mockResolvedValue({
       invoice_settings: { default_payment_method: null },
     });
@@ -601,10 +612,7 @@ describe('StripeService cardless trial', () => {
     expect(notificationService.inAppNotification).toHaveBeenCalledWith(
       'org_1',
       'Your free trial has started',
-      expect.stringContaining('no credit card needed'),
-      true,
-      false,
-      'info'
+      expect.stringContaining('no credit card needed')
     );
 
     expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalledWith(
@@ -643,11 +651,229 @@ describe('StripeService cardless trial', () => {
     expect(notificationService.inAppNotification).toHaveBeenCalledWith(
       'org_1',
       'Your free trial ends soon',
-      expect.stringContaining('Add a card'),
-      true,
-      false,
-      'info'
+      expect.stringContaining('Add a card')
     );
+  });
+
+  it('emails the reminder only to the workspace admins', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        ...cardless,
+      })
+    );
+
+    expect(notificationService.inAppNotification).toHaveBeenCalledWith(
+      'org_1',
+      'Your free trial ends soon',
+      expect.any(String)
+    );
+    expect(notificationService.sendEmailsToOrgAdmins).toHaveBeenCalledWith(
+      'org_1',
+      'Your free trial ends soon',
+      expect.stringContaining('Add a card')
+    );
+  });
+
+  describe('auto-apply promotion', () => {
+    const autoApply = {
+      id: 'promo_1',
+      code: 'LAUNCH',
+      metadata: {},
+      promotion: {
+        coupon: { id: 'coupon_1', metadata: { autoapply: 'true' } },
+      },
+      expires_at: null,
+      max_redemptions: null,
+      times_redeemed: 0,
+    };
+    const monthly = (interval: string) => ({
+      items: { data: [{ price: { recurring: { interval } } }] },
+    });
+
+    beforeEach(() => {
+      mockStripe.promotionCodes.list.mockResolvedValue({ data: [autoApply] });
+    });
+
+    it('is added to a monthly trial when it is about to convert', async () => {
+      await service.processWebhook(
+        subscriptionEvent('customer.subscription.trial_will_end', {
+          status: 'trialing',
+          trial_end: 1793664000,
+          discounts: [],
+          ...monthly('month'),
+          ...cardless,
+        })
+      );
+
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+        discounts: [{ promotion_code: 'promo_1' }],
+      });
+    });
+
+    it('is not added again by a late retry after the trial converted', async () => {
+      const event = subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        discounts: [],
+        ...monthly('month'),
+        ...cardless,
+      });
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
+        ...latest,
+        status: 'active',
+        discounts: ['di_1'],
+      });
+
+      await service.processWebhook(event);
+
+      expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it('is not added to a yearly trial', async () => {
+      await service.processWebhook(
+        subscriptionEvent('customer.subscription.trial_will_end', {
+          status: 'trialing',
+          trial_end: 1793664000,
+          discounts: [],
+          ...monthly('year'),
+          ...cardless,
+        })
+      );
+
+      expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it('is not stacked on a trial that already has a discount', async () => {
+      await service.processWebhook(
+        subscriptionEvent('customer.subscription.trial_will_end', {
+          status: 'trialing',
+          trial_end: 1793664000,
+          discounts: ['di_1'],
+          ...monthly('month'),
+          ...cardless,
+        })
+      );
+
+      expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
+    });
+
+    it('still sends the reminder when the discount cannot be added', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockStripe.subscriptions.update.mockRejectedValueOnce(
+        new Error('restricted')
+      );
+
+      await service.processWebhook(
+        subscriptionEvent('customer.subscription.trial_will_end', {
+          status: 'trialing',
+          trial_end: 1793664000,
+          discounts: [],
+          ...monthly('month'),
+          ...cardless,
+        })
+      );
+
+      expect(notificationService.sendEmailsToOrgAdmins).toHaveBeenCalled();
+    });
+
+    it('is added before a trial is ended early', async () => {
+      mockStripe.customers.retrieve.mockResolvedValue({
+        invoice_settings: { default_payment_method: 'pm_1' },
+      });
+      mockStripe.subscriptions.list.mockResolvedValue({
+        data: [
+          {
+            id: 'sub_1',
+            status: 'trialing',
+            customer: 'cus_1',
+            discounts: [],
+            ...monthly('month'),
+            ...cardless,
+          },
+        ],
+      });
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
+        latest_invoice: null,
+      });
+
+      await service.finishTrial({ paymentId: 'cus_1' } as any);
+
+      expect(mockStripe.subscriptions.update.mock.calls[0]).toEqual([
+        'sub_1',
+        { discounts: [{ promotion_code: 'promo_1' }] },
+      ]);
+      expect(mockStripe.subscriptions.update.mock.calls[1]).toEqual([
+        'sub_1',
+        { trial_end: 'now' },
+      ]);
+    });
+
+    it('is dropped when switching to yearly, keeping other discounts', async () => {
+      const subscriptionService2 = {
+        getSubscription: jest.fn().mockResolvedValue({ id: 'local' }),
+      };
+      const switching = new StripeService(
+        subscriptionService2 as any,
+        {
+          getOrgById: jest
+            .fn()
+            .mockResolvedValue({ id: 'org_1', paymentId: 'cus_1' }),
+        } as any,
+        userService as any,
+        trackService as any,
+        {} as any,
+        notificationService as any
+      );
+      mockStripe.prices.list.mockResolvedValueOnce({
+        data: [{ id: 'price_team_year', unit_amount: 27600 }],
+      });
+      mockStripe.subscriptions.list.mockResolvedValue({
+        data: [
+          {
+            id: 'sub_1',
+            status: 'active',
+            items: { data: [{ id: 'si_1' }] },
+          },
+        ],
+      });
+      mockStripe.subscriptions.retrieve.mockImplementation(
+        async (id: string, params: any) =>
+          params?.expand?.includes('discounts.promotion_code.promotion.coupon')
+            ? {
+                discounts: [
+                  { id: 'di_auto', promotion_code: autoApply },
+                  {
+                    id: 'di_other',
+                    promotion_code: {
+                      ...autoApply,
+                      id: 'promo_2',
+                      metadata: {},
+                      promotion: { coupon: { id: 'coupon_2', metadata: {} } },
+                    },
+                  },
+                ],
+              }
+            : { latest_invoice: null }
+      );
+
+      await switching.subscribe(
+        'cookie',
+        'org_1',
+        'user_1',
+        {
+          billing: 'TEAM',
+          period: 'YEARLY',
+        } as any,
+        false
+      );
+
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
+        'sub_1',
+        expect.objectContaining({ discounts: [{ discount: 'di_other' }] })
+      );
+    });
   });
 
   it('does not remind when a card was added', async () => {
@@ -664,6 +890,7 @@ describe('StripeService cardless trial', () => {
     );
 
     expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+    expect(notificationService.sendEmailsToOrgAdmins).not.toHaveBeenCalled();
   });
 
   it('does not remind a trial that is set to cancel', async () => {
@@ -677,6 +904,7 @@ describe('StripeService cardless trial', () => {
     );
 
     expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+    expect(notificationService.sendEmailsToOrgAdmins).not.toHaveBeenCalled();
   });
 
   it('never fails the webhook when the reminder cannot be sent', async () => {
@@ -713,10 +941,7 @@ describe('StripeService cardless trial', () => {
     expect(notificationService.inAppNotification).toHaveBeenCalledWith(
       'org_1',
       'Your free trial has ended',
-      expect.any(String),
-      true,
-      false,
-      'info'
+      expect.any(String)
     );
   });
 
@@ -732,6 +957,7 @@ describe('StripeService cardless trial', () => {
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalled();
     expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+    expect(notificationService.sendEmailsToOrgAdmins).not.toHaveBeenCalled();
   });
 
   it('does not send the trial ended notice when a converted subscription is canceled later', async () => {
@@ -746,6 +972,7 @@ describe('StripeService cardless trial', () => {
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalled();
     expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+    expect(notificationService.sendEmailsToOrgAdmins).not.toHaveBeenCalled();
   });
 
   it('does not run the card check on a paid subscription', async () => {

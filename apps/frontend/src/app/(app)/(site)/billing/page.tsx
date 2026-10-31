@@ -3,7 +3,6 @@ import { BillingComponent } from '@gitroom/frontend/components/billing/billing.c
 import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: `PostDelegate Billing`,
-  description: '',
 };
 export default async function Page() {
   return (

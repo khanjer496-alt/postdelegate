@@ -4,7 +4,6 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: `PostDelegate Admin Stats`,
-  description: '',
 };
 
 export default async function Page() {

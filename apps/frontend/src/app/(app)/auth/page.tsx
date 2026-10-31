@@ -7,7 +7,14 @@ import { getT } from '@gitroom/react/translation/get.translation.service.backend
 import { LoginWithOidc } from '@gitroom/frontend/components/auth/login.with.oidc';
 export const metadata: Metadata = {
   title: `PostDelegate Register`,
-  description: '',
+  description:
+    'Create your PostDelegate account and start a 7-day free trial, no credit card required. Plan, schedule and publish your social posts from one calendar.',
+  openGraph: {
+    title: 'Start your 7-day free trial',
+    description:
+      'Create your PostDelegate account and start a 7-day free trial, no credit card required. Plan, schedule and publish your social posts from one calendar.',
+    siteName: 'PostDelegate',
+  },
 };
 export default async function Auth(params: {searchParams: Promise<{provider: string}>}) {
   const t = await getT();

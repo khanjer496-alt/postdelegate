@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: `PostDelegate Lifetime deal`,
-  description: '',
 };
 export default async function Page() {
   return <LifetimeDeal />;

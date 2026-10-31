@@ -619,6 +619,28 @@ export class OrganizationRepository {
     });
   }
 
+  getOrgAdmins(orgId: string) {
+    return this._userOrg.model.userOrganization.findMany({
+      where: {
+        organizationId: orgId,
+        disabled: false,
+        role: {
+          in: [Role.SUPERADMIN, Role.ADMIN],
+        },
+        user: {
+          deletedAt: null,
+        },
+      },
+      select: {
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
   getAllUsersOrgs(orgId: string) {
     return this._organization.model.organization.findUnique({
       where: {
