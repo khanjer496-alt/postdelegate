@@ -1,7 +1,7 @@
 ---
 import Doc from '../layouts/Doc.astro';
 import { SCHEDULERS } from '../data/schedulers';
-import { SITE } from '../data/site';
+import { SITE, CTA_LABEL } from '../data/site';
 import { NETWORKS } from '../data/networks';
 export function getStaticPaths() { return SCHEDULERS.map((s) => ({ params: { scheduler: s.slug }, props: { s } })); }
 const { s } = Astro.props;
@@ -12,7 +12,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   { '@type': 'ListItem', position: 2, name: s.name, item: `${SITE.url}/${s.slug}` }] };
 ---
 <Doc title={available ? `${s.name} scheduling — PostDelegate` : `${s.name} coverage and rollout — PostDelegate`} description={s.intro} h1={s.h1} eyebrow={available ? `${s.name} · available now` : `${s.name} · coming soon`} lead={s.intro} jsonLd={[crumbs]}>
-  <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
+  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/tools/caption-checker" class="button button-outline">Try the caption checker</a>
   {available
     ? <aside class="doc-note"><strong>Available now.</strong> Connect {s.name} from <strong>Add Channel</strong> on the calendar page. The <a href={s.docs}>{s.name} guide</a> has the exact fields and post settings.</aside>

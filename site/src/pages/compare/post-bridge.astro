@@ -1,9 +1,9 @@
 ---
 import Doc from '../../layouts/Doc.astro';
-import { SITE } from '../../data/site';
+import { SITE, CTA_LABEL } from '../../data/site';
 ---
 <Doc title="PostDelegate and Post Bridge — choosing a publishing workflow" description="A high-level look at PostDelegate and Post Bridge, with practical questions about channels, workflow and automation." h1="Two ways to organize your social publishing." eyebrow="PostDelegate and Post Bridge" lead="The right choice depends on your channels and how you prefer to work.">
-  <a slot="actions" href={SITE.signup} class="button">Explore PostDelegate</a>
+  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://www.post-bridge.com/" class="button button-outline" target="_blank" rel="noreferrer">Visit Post Bridge</a>
   <h2>PostDelegate</h2>
   <p>PostDelegate is an open-source, early-access service. It brings a calendar, composer and media library together while more channel connections and hosted integrations are rolled out.</p>

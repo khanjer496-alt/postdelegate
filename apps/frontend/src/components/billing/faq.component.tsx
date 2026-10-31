@@ -17,8 +17,8 @@ const useFaqList = () => {
               'Am I going to be charged by PostDelegate?'
             ),
             description: t(
-              'faq_to_confirm_credit_card_information_postiz_will_hold',
-              'To confirm your card, PostDelegate places a $1 authorization and voids it right away, so you are not charged. You can cancel your subscription anytime from settings without talking to a person'
+              'faq_free_trial_no_credit_card',
+              'Not during your free trial, and you do not need a credit card to start it. If you add a card, your first payment is charged when the trial ends. Without a card, your workspace is paused when the trial ends until you choose a plan, and your posts are kept. You can cancel anytime from settings without talking to a person'
             ),
           },
         ]

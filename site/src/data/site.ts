@@ -7,4 +7,7 @@ export const SITE = {
  dataDeletion:'/support#data-requests',licenses:'/licenses',
  subprocessors:'https://app.postdelegate.com/legal/privacy/',security:'/about#security'},operator:'Nasida Apps LLC',
 } as const;
-export const CTA_LABEL='Create your workspace';
+// Sign-up calls to action. Every plan starts with a 7-day free trial that needs no card.
+export const CTA_LABEL='Start your 7-day free trial';
+export const CTA_SHORT='Start free trial';
+export const CTA_NOTE='No credit card required';

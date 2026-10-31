@@ -1,9 +1,9 @@
 ---
 import Doc from '../layouts/Doc.astro';
-import { SITE } from '../data/site';
+import { SITE, CTA_LABEL } from '../data/site';
 ---
 <Doc title="Codex and coding agents — PostDelegate" description="Connect Codex, Cursor, Claude Code and other coding tools to PostDelegate over MCP or the REST API." h1="Keep content close to your coding workflow." eyebrow="Codex and coding agents" lead="Coding agents can use PostDelegate over MCP or the REST API. Bring your own tool, sign in with PostDelegate and review every draft.">
-  <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
+  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/docs/mcp/clients" class="button button-outline">MCP client setup</a>
   <h2>A launch post is a good first task</h2>
   <p>Have your coding tool prepare a short launch announcement and any supporting media. Review the wording in PostDelegate and choose an available channel and time yourself.</p>

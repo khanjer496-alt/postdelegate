@@ -11,6 +11,8 @@ import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/emai
 import { TimezoneDto } from '@gitroom/nestjs-libraries/dtos/users/timezone.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
+const hash = (value: string) => createHash('md5').update(value).digest('hex');
+
 @Injectable()
 export class UsersRepository {
   constructor(
@@ -153,6 +155,38 @@ export class UsersRepository {
     });
   }
 
+  // A workspace stops allowing a trial once it had a trial or a plan, so an
+  // owner email (also once deleted) that owns such a workspace already had one
+  async getUserWithUsedTrialByOrg(organizationId: string) {
+    const owners = await this._user.model.user.findMany({
+      where: {
+        organizations: {
+          some: { organizationId, role: Role.SUPERADMIN },
+        },
+      },
+      select: { email: true },
+    });
+    if (!owners.length) {
+      return null;
+    }
+
+    return this._user.model.user.findFirst({
+      where: {
+        OR: owners.flatMap(({ email }) => [
+          { email: { equals: email, mode: 'insensitive' as const } },
+          { email: { startsWith: `deleted_${hash(email.toLowerCase())}_` } },
+        ]),
+        organizations: {
+          some: {
+            role: Role.SUPERADMIN,
+            organization: { allowTrial: false },
+          },
+        },
+      },
+      select: { id: true },
+    });
+  }
+
   activateUser(id: string) {
     return this._user.model.user.update({
       where: {
@@ -184,9 +218,6 @@ export class UsersRepository {
     if (!user || user.deletedAt) {
       return;
     }
-
-    const hash = (value: string) =>
-      createHash('md5').update(value).digest('hex');
 
     // Hash the identifying fields instead of removing the row, the random
     // suffix keeps [email, providerName] unique if the same email is deleted
