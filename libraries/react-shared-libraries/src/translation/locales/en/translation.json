@@ -1099,5 +1099,16 @@
   "no_templates_yet": "No templates yet. Save a post you reuse often and insert it in one click.",
   "untitled_template": "Untitled template",
   "insert": "Insert",
-  "delete_template": "Delete template"
+  "delete_template": "Delete template",
+  "skip_to_content": "Skip to content",
+  "main_menu": "Main menu",
+  "open_menu": "Open menu",
+  "more_options": "More options",
+  "switch_to_light_mode": "Switch to light mode",
+  "switch_to_dark_mode": "Switch to dark mode",
+  "organization": "Organization",
+  "trial_countdown_compact": "{{days}}d",
+  "previous_page": "Previous page",
+  "next_page": "Next page",
+  "filters": "Filters"
 }

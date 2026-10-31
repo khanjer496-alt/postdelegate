@@ -65,8 +65,54 @@ body {
   pointer-events: none;
 }
 
+/* Keyboard focus: a brand ring on :focus-visible only, so mouse and touch
+   users see no outline (everything else keeps the old outline: none).
+   Text fields match :focus-visible on click too, so they get the ring only
+   while the keyboard is in use (html[data-keyboard], set by
+   components/layout/html.component.tsx). Elements that draw their own
+   focus ring (tailwind focus-visible:ring) keep it, elements clipped by an
+   overflow-hidden parent draw it inside (focus-visible:-outline-offset-2),
+   and containers focused from code (tabindex -1) stay plain. */
 body * {
   outline: none !important;
+}
+
+/* :where keeps this at (0,1,1) so the exceptions below win */
+body
+  *:focus-visible:where(
+    :not([class*='focus-visible:ring']):not(
+        [class*='focus-visible:outline-none']
+      )
+  ) {
+  outline: 2px solid var(--new-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+body *:focus-visible[class*='focus-visible:-outline-offset'] {
+  outline-offset: -2px !important;
+}
+
+html:not([data-keyboard])
+  body
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not([type='range']):not([type='color']):not([type='file']),
+    textarea,
+    [contenteditable]
+  ):focus-visible,
+body [tabindex='-1']:focus-visible,
+body .mantine-Paper-root:focus-visible {
+  outline: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *:not(.orbit-loader-spin):not(.orbit-loader-counter):not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .box {
