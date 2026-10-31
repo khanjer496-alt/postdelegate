@@ -79,7 +79,7 @@ If you plan posts for audiences in several regions, the `timezone` column lets e
 
 ## Step 5: find the settings a channel needs
 
-Some networks need extra fields. Article networks ask for a title, YouTube for a title and visibility, Hashnode for a publication and a tag. A Slack row needs the Slack channel to post to, given by its ID, like `{"channel": "C0123456789"}`. Each [channel guide](/docs/channels) lists the fields. For the exact JSON names, the API's [`GET /integration-settings/:id`](/docs/api/channels) returns the settings schema for a channel.
+Some networks need extra fields. Article networks ask for a title: at least 2 characters on DEV.to, Medium and WordPress, and at least 6 on Hashnode. Medium also requires a subtitle, WordPress a post type, Hashnode a publication and at least one tag, and YouTube a title and visibility. A Slack row needs the Slack channel to post to, given by its ID, like `{"channel": "C0123456789"}`. Each [channel guide](/docs/channels) lists the fields. For the exact JSON names, the API's [`GET /integration-settings/:id`](/docs/api/channels) returns the settings schema for a channel.
 
 Each row goes through the same checks as a post made in the composer, including length limits and required settings, so a missing field shows up in the preview rather than at publishing time.
 

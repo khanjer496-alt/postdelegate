@@ -92,13 +92,13 @@ Once the note goes out it stays on your calendar with a link to it on primal.net
 
 ## Post the same idea to Nostr and Bluesky
 
-Nostr and Bluesky audiences overlap. In one post you can select both channels and adjust the text per channel. Bluesky has a 300-character limit and takes up to four images or one video, while Nostr takes a much longer note with media as links. Write the short version for Bluesky, and add more detail for Nostr if you like. See [how to schedule Bluesky posts](/guides/schedule-bluesky-posts) and the [character limits guide](/guides/social-media-character-limits).
+If you post on both Nostr and Bluesky, you can write once for both. In one post you can select both channels and adjust the text per channel. Bluesky has a 300-character limit and takes up to four images or one video, while Nostr takes a much longer note with media as links. Write the short version for Bluesky, and add more detail for Nostr if you like. See [how to schedule Bluesky posts](/guides/schedule-bluesky-posts) and the [character limits guide](/guides/social-media-character-limits).
 
 For notes that repeat, such as a weekly link roundup, use **Repeat Post Every**, or make the post [evergreen](/docs/evergreen) with rotating wordings. To fill a month at once, use the [CSV import](/guides/bulk-schedule-social-posts-csv).
 
 ## Draft notes with an AI assistant
 
-If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for **drafts** on your Nostr channel. Review them in the calendar, then schedule. Because a note cannot be taken back once relays accept it, keep **Require approval for AI-created posts** on in **Settings > Approvals**. See [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails). AI is bring-your-own, and PostDelegate never charges for it.
+If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for **drafts** on your Nostr channel. Review them in the calendar, then schedule. Because a note cannot be taken back once relays accept it, keep **Require approval for AI-created posts** on in **Settings > Approvals**, so anything an assistant schedules or posts now waits in Approvals until a person approves it. See [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails). AI is bring-your-own, and PostDelegate never charges for it.
 
 ## Troubleshooting
 

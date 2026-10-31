@@ -66,7 +66,7 @@ Choose **Create Post** and select your Telegram channel.
 | One attachment | That photo, video or file, with your text as its caption. |
 | Two or more | An album of up to 10 items, with your text on the first album. More than 10 are split into several albums. |
 
-**With an attachment, Telegram limits the caption to 1,024 characters.** That is the limit most often missed. Keep longer text for posts without media, or put it in a follow-up entry (see step 5).
+**With an attachment, Telegram limits the caption to 1,024 characters**, far less than the 4,096 allowed for text on its own. Keep longer text for posts without media, or put it in a follow-up entry (see step 5).
 
 Media comes from your device or the [media library](/docs/media). If Telegram cannot download a file, the post fails with "Telegram could not download your media file", so check the file and try again.
 
@@ -102,7 +102,7 @@ A post to a large channel lands in every subscriber's chat list and is hard to t
 
 ## Let an assistant draft for your channel
 
-If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for **drafts** to your Telegram channel. The assistant reads the channel's rules before it creates a post. Keep **Require approval for AI-created posts** on in **Settings > Approvals**, so nothing an assistant schedules reaches your subscribers before a person approves it. See [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails). AI is bring-your-own, and PostDelegate never charges for it.
+If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for **drafts** to your Telegram channel. The assistant reads the channel's rules before it creates a post. Keep **Require approval for AI-created posts** on in **Settings > Approvals**, so anything an assistant schedules or posts now waits in Approvals until a person approves it. See [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails). AI is bring-your-own, and PostDelegate never charges for it.
 
 ## Troubleshooting
 

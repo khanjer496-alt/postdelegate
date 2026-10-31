@@ -91,7 +91,7 @@ For a launch with an article, schedule the article first and the Slack message a
 
 ## Draft announcements with an AI assistant
 
-If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for a **draft** to your Slack workspace. The assistant reads the channel's settings, so it knows a Slack channel must be chosen, and it can look up the list of channels. Keep **Require approval for AI-created posts** on, so a draft or scheduled post waits in Approvals until a person approves it. See [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails). AI is bring-your-own, and PostDelegate never charges for it.
+If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for a **draft** to your Slack workspace. The assistant reads the channel's settings, so it knows a Slack channel must be chosen, and it can look up the list of channels. Keep **Require approval for AI-created posts** on, so anything an assistant schedules or posts now waits in Approvals until a person approves it. A draft stays a draft until someone schedules it. See [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails). AI is bring-your-own, and PostDelegate never charges for it.
 
 ## Know when a message went out
 

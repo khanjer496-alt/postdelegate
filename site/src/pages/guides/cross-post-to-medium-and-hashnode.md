@@ -1,14 +1,14 @@
 ---
 layout: ../../layouts/Guide.astro
-title: "Cross-post to Medium and Hashnode without duplicate content"
-metaTitle: "Cross-Post to Medium and Hashnode Safely | PostDelegate"
-description: "Republish an article on Medium and Hashnode with a canonical URL so search engines credit the original, plus where each copy lands and the mistakes to avoid."
+title: "Avoid duplicate content on Medium and Hashnode with canonical URLs"
+metaTitle: "Avoid Duplicate Content on Medium and Hashnode | PostDelegate"
+description: "Set a canonical URL on your Medium and Hashnode copies so search engines credit the original article: which address to use, when to publish and what to avoid."
 date: "2026-11-01"
 ---
 
 Medium and Hashnode both have readers you will not reach from your own blog. Both also accept a canonical URL, a setting that tells the platform and search engines which address is the original. Set it correctly and a republished article helps the original. Get it wrong, or skip it, and the copy can end up competing with the page you actually care about.
 
-This guide is about that one decision: how to use canonical URLs on Medium and Hashnode with PostDelegate. If you want the wider workflow across DEV.to, Hashnode, Medium and WordPress in one go, read [cross-post articles with canonical URLs](/guides/cross-post-blog-articles) instead.
+This guide is about that one decision: how to use canonical URLs on Medium and Hashnode with PostDelegate. It does not repeat the full publishing workflow. For the step-by-step setup across DEV.to, Hashnode, Medium and WordPress, read [cross-post articles with canonical URLs](/guides/cross-post-blog-articles).
 
 ## What a canonical URL does
 

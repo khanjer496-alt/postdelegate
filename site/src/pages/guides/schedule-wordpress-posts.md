@@ -13,7 +13,7 @@ This guide shows how to connect a WordPress site to PostDelegate and schedule po
 ## What you need
 
 - A WordPress site that is reachable from the internet, with the REST API turned on. Most self-hosted sites have it on by default.
-- A WordPress user that is allowed to create posts. An Author or Editor account is a sensible choice, rather than your main administrator.
+- A WordPress user that is allowed to create posts. An Editor, or an Author if you only publish posts, is a sensible choice rather than your main administrator. Authors cannot create pages.
 - An **application password** for that user. Application passwords are built into WordPress. Some hosts and security plugins turn them off, and WordPress generally only offers them on sites served over HTTPS.
 - A PostDelegate workspace. Every plan starts with a 7-day free trial and needs no credit card.
 
@@ -94,7 +94,7 @@ This is the reason to use one calendar. Plan the promotion around the article:
 3. Schedule a Slack message to your team or community channel. See [how to schedule Slack announcements](/guides/slack-scheduled-announcements).
 4. If you cross-post the article, schedule the copies a day later with a canonical URL pointing at the WordPress original. The [cross-posting guide](/guides/cross-post-blog-articles) explains the order.
 
-Leave a gap between the original and anything that links to it, and open the live page before the promotion goes out. A link to a page that is not there yet is the most common mistake in this kind of plan.
+Leave a gap between the original and anything that links to it, and open the live page before the promotion goes out. A promotional post that goes out before the article is live sends readers to a page that is not there yet.
 
 ## Use approvals for blog posts
 
@@ -115,6 +115,6 @@ If you write with Claude or ChatGPT, connect PostDelegate over MCP and ask for a
 
 ## Next steps
 
-The [WordPress scheduler page](/wordpress-scheduler) is the short version of this guide, and the [WordPress channel guide](/docs/channels/wordpress) is the reference for every field. If you also publish the article elsewhere, read [cross-posting to Medium and Hashnode without duplicate content](/guides/cross-post-to-medium-and-hashnode).
+The [WordPress scheduler page](/wordpress-scheduler) is the short version of this guide, and the [WordPress channel guide](/docs/channels/wordpress) is the reference for every field. If you also publish the article elsewhere, read [avoiding duplicate content on Medium and Hashnode with canonical URLs](/guides/cross-post-to-medium-and-hashnode).
 
 Ready? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.
