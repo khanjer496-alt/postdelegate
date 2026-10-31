@@ -19,6 +19,7 @@ import utc from 'dayjs/plugin/utc';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
 import { decryptIntegrationOf } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
+import { evergreenOccurrences } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
@@ -256,6 +257,8 @@ export class PostsRepository {
         state: true,
         error: true,
         intervalInDays: true,
+        evergreenMaxShares: true,
+        evergreenUntil: true,
         group: true,
         creationMethod: true,
         approvalStatus: true,
@@ -289,19 +292,16 @@ export class PostsRepository {
         return [...all, post];
       }
 
-      const addMorePosts = [];
-      let startingDate = dayjs.utc(post.publishDate);
-      while (dayjs.utc(endDate).isSameOrAfter(startingDate)) {
-        if (dayjs(startingDate).isSameOrAfter(dayjs.utc(post.publishDate))) {
-          addMorePosts.push({
-            ...post,
-            publishDate: startingDate.toDate(),
-            actualDate: post.publishDate,
-          });
-        }
-
-        startingDate = startingDate.add(post.intervalInDays, 'days');
-      }
+      // an evergreen post stops after its last share
+      const addMorePosts = evergreenOccurrences(
+        post.publishDate,
+        post,
+        endDate
+      ).map((date) => ({
+        ...post,
+        publishDate: date,
+        actualDate: post.publishDate,
+      }));
 
       return [...all, ...addMorePosts];
     }, [] as any[]);
@@ -365,6 +365,16 @@ export class PostsRepository {
             }
           : {}),
       },
+      ...(query.tags?.length
+        ? {
+            tags: {
+              some: {
+                tagId: { in: query.tags },
+                tag: { orgId, deletedAt: null as Date | null },
+              },
+            },
+          }
+        : {}),
     };
 
     const [posts, total] = await Promise.all([
@@ -1179,6 +1189,10 @@ export class PostsRepository {
         orgId,
         name: body.name,
         color: body.color,
+        ...(body.kind ? { kind: body.kind } : {}),
+        ...(body.description !== undefined
+          ? { description: body.description }
+          : {}),
       },
     });
   }
@@ -1192,6 +1206,10 @@ export class PostsRepository {
       data: {
         name: body.name,
         color: body.color,
+        ...(body.kind ? { kind: body.kind } : {}),
+        ...(body.description !== undefined
+          ? { description: body.description }
+          : {}),
       },
     });
   }

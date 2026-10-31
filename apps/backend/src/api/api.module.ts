@@ -62,6 +62,10 @@ import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.pr
 import { StripeController } from '@gitroom/backend/api/routes/stripe.controller';
 import { ApprovalsController } from '@gitroom/backend/api/routes/approvals.controller';
 import { PublicApprovalsController } from '@gitroom/backend/api/routes/public.approvals.controller';
+import { IdeasController } from '@gitroom/backend/api/routes/ideas.controller';
+import { EvergreenController } from '@gitroom/backend/api/routes/evergreen.controller';
+import { PostsImportController } from '@gitroom/backend/api/routes/posts.import.controller';
+import { WeeklySummaryController } from '@gitroom/backend/api/routes/weekly.summary.controller';
 
 const authenticatedController = [
   UsersController,
@@ -88,6 +92,10 @@ const authenticatedController = [
   ReviewsController,
   ActivationController,
   ApprovalsController,
+  IdeasController,
+  EvergreenController,
+  PostsImportController,
+  WeeklySummaryController,
 ];
 @Module({
   imports: [UploadModule],

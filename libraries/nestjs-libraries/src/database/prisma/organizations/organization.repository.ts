@@ -522,6 +522,8 @@ export class OrganizationRepository {
         users: {
           create: {
             role: Role.SUPERADMIN,
+            // the admin of a new workspace gets the Monday summary
+            weeklySummaryEmails: true,
             user: {
               create: {
                 activated: body.provider !== 'LOCAL' || !hasEmail,
