@@ -1,9 +1,11 @@
 import {
   AnalyticsData,
+  AccountStats,
   AuthTokenDetails,
   PendingCheckResponse,
   PostDetails,
   PostResponse,
+  RecentPostStat,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import dayjs from 'dayjs';
@@ -44,7 +46,7 @@ type TikTokCreatorInfo = {
 )
 export class TiktokProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tiktok';
-  name = 'Tiktok';
+  name = 'TikTok';
   isBetweenSteps = false;
   convertToJPEG = true;
   scopes = [
@@ -60,6 +62,19 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   editor = 'normal' as const;
   maxLength() {
     return 2000;
+  }
+
+  // UPLOAD only drops the media into the creator's TikTok inbox
+  publishedLabel(settings: Partial<TikTokDto>) {
+    return settings?.content_posting_method === 'UPLOAD'
+      ? 'Sent to TikTok inbox'
+      : undefined;
+  }
+
+  publishedLinkLabel(settings: Partial<TikTokDto>) {
+    return settings?.content_posting_method === 'UPLOAD'
+      ? 'Open TikTok inbox'
+      : undefined;
   }
 
   private isVideo(path: string) {
@@ -447,6 +462,21 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       )
     ).json();
 
+    // A spam_risk_* code means the creator can't make more posts at this
+    // moment: stop and ask to try again later (a ban keeps its own message).
+    // Rejected requests already get these messages from handleErrors.
+    const code = String(response?.error?.code || '');
+    if (code.indexOf('spam_risk') === 0) {
+      throw new BadBody(
+        'tiktok-creator-info',
+        JSON.stringify(response),
+        '{}',
+        code === 'spam_risk_user_banned_from_posting'
+          ? this.handleErrors(code)!.value
+          : "TikTok says this account can't make more posts right now. Try again later."
+      );
+    }
+
     const data = response?.data;
     if (
       response?.error?.code !== 'ok' ||
@@ -521,11 +551,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     const ownBrand = this.assetBoolean(settings.brand_organic_toggle);
     if (settings.disclose && !branded && !ownBrand) {
       invalid(
-        'Select at least one brand option when commercial content disclosure is enabled.'
+        'You need to indicate if your content promotes yourself, a third party, or both.'
       );
     }
     if (branded && settings.privacy_level === 'SELF_ONLY') {
-      invalid('Branded content cannot use private visibility.');
+      invalid('Branded content visibility cannot be set to private.');
     }
   }
 
@@ -1033,6 +1063,37 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     );
   }
 
+  async accountStats(id: string, accessToken: string): Promise<AccountStats> {
+    const { data, error } = await (
+      await fetch(
+        'https://open.tiktokapis.com/v2/user/info/?fields=follower_count,following_count,video_count',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      )
+    ).json();
+
+    if (error?.code && error.code !== 'ok') {
+      throw new Error(error.message || error.code);
+    }
+
+    const user = data?.user || {};
+    return {
+      ...(typeof user.follower_count === 'number'
+        ? { followers: user.follower_count }
+        : {}),
+      ...(typeof user.following_count === 'number'
+        ? { following: user.following_count }
+        : {}),
+      ...(typeof user.video_count === 'number'
+        ? { posts: user.video_count }
+        : {}),
+    };
+  }
+
   async analytics(
     id: string,
     accessToken: string,
@@ -1172,6 +1233,71 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       console.error('Error fetching TikTok analytics:', err);
       return [];
     }
+  }
+
+  // TikTok's video list only returns public videos
+  recentPostsEmptyHint =
+    "TikTok only lists public videos here. Posts set to 'Only me' won't appear.";
+
+  // Unlike analytics(), a failed call throws so the caller can tell an error
+  // from an account without videos
+  async recentPosts(
+    id: string,
+    accessToken: string,
+    limit: number
+  ): Promise<RecentPostStat[]> {
+    const data = await (
+      await this.fetch(
+        'https://open.tiktokapis.com/v2/video/list/?fields=id,title,video_description,cover_image_url,share_url,create_time,view_count,like_count,comment_count,share_count',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          // TikTok returns at most 20 videos per page
+          body: JSON.stringify({ max_count: Math.min(Math.max(limit, 1), 20) }),
+        }
+      )
+    ).json();
+
+    if (data?.error?.code && data.error.code !== 'ok') {
+      throw new BadBody(
+        'tiktok-recent-posts',
+        JSON.stringify(data.error),
+        Buffer.from('{}'),
+        'Could not load the TikTok videos'
+      );
+    }
+
+    const count = (value: unknown) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+    return ((data?.data?.videos || []) as any[])
+      .filter((video) => video?.id)
+      .map((video) => ({
+        id: String(video.id),
+        title: String(video.title || video.video_description || '').trim(),
+        thumbnailUrl:
+          typeof video.cover_image_url === 'string' &&
+          video.cover_image_url.startsWith('https://')
+            ? video.cover_image_url
+            : undefined,
+        // share_url carries tracking params (the app's client key among them)
+        url:
+          typeof video.share_url === 'string' &&
+          video.share_url.startsWith('https://')
+            ? video.share_url.split('?')[0]
+            : undefined,
+        publishedAt:
+          Number(video.create_time) > 0
+            ? dayjs.unix(Number(video.create_time)).toISOString()
+            : '',
+        views: count(video.view_count),
+        likes: count(video.like_count),
+        comments: count(video.comment_count),
+        shares: count(video.share_count),
+      }));
   }
 
   async missing(

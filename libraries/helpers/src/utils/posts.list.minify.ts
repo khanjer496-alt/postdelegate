@@ -16,6 +16,7 @@ const POST_CALENDAR_KEYS: Record<string, string> = {
 const POST_ITEM_KEYS: Record<string, string> = {
   id: 'i',
   content: 'c',
+  image: 'im',
   publishDate: 'd',
   releaseURL: 'u',
   releaseId: 'ri',
@@ -26,6 +27,9 @@ const POST_ITEM_KEYS: Record<string, string> = {
   intervalInDays: 'iv',
   actualDate: 'ad',
   creationMethod: 'cm',
+  publishedLabel: 'pl',
+  approvalStatus: 'as',
+  agentSource: 'ag',
 };
 
 const INTEGRATION_KEYS: Record<string, string> = {

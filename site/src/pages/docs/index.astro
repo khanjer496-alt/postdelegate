@@ -1,6 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
 import { DOC_SECTIONS } from '../../data/docs';
+import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { SITE } from '../../data/site';
 const frontmatter = { title: 'PostDelegate documentation', description: 'Guides for planning and scheduling posts, connecting channels, using the REST API and connecting your own AI assistant.' };
 ---
@@ -12,7 +13,7 @@ const frontmatter = { title: 'PostDelegate documentation', description: 'Guides 
     <h2>Start here</h2>
     <div class="card-grid">
       <a href="/docs/getting-started"><strong>Getting started</strong><span>Start your free trial, connect a channel and schedule your first post.</span></a>
-      <a href="/docs/channels"><strong>Connect a channel</strong><span>Step-by-step guides for the ten networks you can connect today.</span></a>
+      <a href="/docs/channels"><strong>Connect a channel</strong><span>Step-by-step guides for the {AVAILABLE_NETWORKS.length} networks you can connect today.</span></a>
       <a href="/docs/api"><strong>REST API</strong><span>Authentication, rate limits and every endpoint with examples.</span></a>
       <a href="/docs/mcp"><strong>Connect your AI assistant</strong><span>Use Claude, ChatGPT, Cursor or another MCP client to draft and schedule posts.</span></a>
     </div>

@@ -317,7 +317,8 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
 
     return blogs.map((blog) => ({
       id: blog.name,
-      name: blog.title || blog.name,
+      // Tumblr names untitled blogs "Untitled"; the blog handle is clearer.
+      name: blog.title && blog.title !== 'Untitled' ? blog.title : blog.name,
       username: blog.url || `https://${blog.name}.tumblr.com/`,
       followers: blog.followers || 0,
       primary: !!blog.primary,

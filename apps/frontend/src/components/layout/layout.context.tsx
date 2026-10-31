@@ -32,6 +32,8 @@ function LayoutContextInner(params: { children: ReactNode }) {
       if (
         typeof window !== 'undefined' &&
         (window.location.href.includes('/p/') ||
+          // client approval links are opened signed out, never redirect them
+          window.location.pathname.startsWith('/approve/') ||
           window.location.pathname.startsWith('/provider/'))
       ) {
         return true;

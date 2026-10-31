@@ -143,18 +143,24 @@ test('failed creator checks block direct publishing and retry loads fresh capabi
 test('commercial choices enforce disclosure and private branded content restrictions in the form', async () => {
   mount();
   await ready();
+  assert.equal(screen.getByTestId('tiktok-declaration').textContent, "By posting, you agree to TikTok's Music Usage Confirmation");
   fireEvent.change(field('privacy_level'), { target: { value: 'SELF_ONLY' } });
   fireEvent.click(field('disclose'));
   assert.equal(field('brand_content_toggle').disabled, true);
+  await screen.findByText(/Branded content is unavailable because this post is set to/);
   fireEvent.click(field('music_usage_consent'));
   assert.equal(await validate(), false);
+  await waitFor(() => assert.equal(useLaunchStore.getState().publishBlockedReason['review-channel'], 'You need to indicate if your content promotes yourself, a third party, or both.'));
   fireEvent.click(field('brand_organic_toggle'));
-  await screen.findByText(/will be labeled “Promotional content”/);
+  await screen.findByText(/will be labeled as 'Promotional content'/);
+  assert.equal(screen.getByTestId('tiktok-declaration').textContent, "By posting, you agree to TikTok's Music Usage Confirmation");
   assert.equal(await validate(), true);
   assert.equal(useLaunchStore.getState().publishBlocked['review-channel'], false);
   fireEvent.change(field('privacy_level'), { target: { value: 'PUBLIC_TO_EVERYONE' } });
   fireEvent.click(field('brand_content_toggle'));
-  await screen.findByText(/will be labeled “Paid partnership”/);
+  await screen.findByText(/will be labeled as 'Paid partnership'/);
+  assert.equal(screen.getByTestId('tiktok-declaration').textContent, "By posting, you agree to TikTok's Branded Content Policy and Music Usage Confirmation");
+  assert.equal(Array.from(field('privacy_level').options).find((option) => option.value === 'SELF_ONLY').title, 'Branded content visibility cannot be set to private.');
   assert.equal(field('music_usage_consent').checked, false);
   assert.equal(Array.from(field('privacy_level').options).find((option) => option.value === 'SELF_ONLY').disabled, true);
   assert.equal(await validate(), false);

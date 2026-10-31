@@ -25,6 +25,7 @@ import { DNDProvider } from '@gitroom/frontend/components/launches/helpers/dnd.p
 import { GeneratorComponent } from './generator/generator';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { NewPost } from '@gitroom/frontend/components/launches/new.post';
+import { ImportPostsButton } from '@gitroom/frontend/components/launches/import/import.posts.button';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import useCookie from 'react-use-cookie';
@@ -33,6 +34,9 @@ import { ChannelsAfterPayment } from '@gitroom/frontend/components/layout/check.
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
+import { NeedsAttention } from '@gitroom/frontend/components/activation/needs.attention';
+import { FirstRunChecklist } from '@gitroom/frontend/components/activation/first.run.checklist';
+import { ChannelHealthBadge } from '@gitroom/frontend/components/activation/channel.health.badge';
 
 export const SVGLine = () => {
   return (
@@ -395,6 +399,10 @@ export const MenuComponent: FC<
             <div className="bg-primary/60 w-[39px] h-[46px] start-0 top-0 absolute rounded-full z-[199]" />
           </div>
         )}
+        <ChannelHealthBadge
+          integrationId={integration.id}
+          onReconnect={refreshChannel(integration)}
+        />
         <ImageWithFallback
           fallbackSrc={'/no-picture.jpg'}
           src={integration.picture || '/no-picture.jpg'}
@@ -701,6 +709,7 @@ export const LaunchesComponent = () => {
               <AddProviderButton update={() => update(true)} />
               <div className="flex gap-[8px] group-[.sidebar]:flex-col mobile:hidden">
                 {sortedIntegrations?.length > 0 && <NewPost />}
+                {sortedIntegrations?.length > 0 && <ImportPostsButton />}
                 {sortedIntegrations?.length > 0 &&
                   user?.aiAvailable &&
                   billingEnabled && <GeneratorComponent />}
@@ -781,6 +790,7 @@ export const LaunchesComponent = () => {
             {sortedIntegrations?.length > 0 ? (
               <>
                 <NewPost />
+                <ImportPostsButton />
                 {user?.aiAvailable && billingEnabled && <GeneratorComponent />}
               </>
             ) : (
@@ -789,6 +799,11 @@ export const LaunchesComponent = () => {
               </div>
             )}
           </div>
+          <NeedsAttention
+            refreshChannel={refreshChannel}
+            continueIntegration={continueIntegration}
+          />
+          <FirstRunChecklist />
           <Filters />
           <div className="flex-1 flex">
             <Calendar />

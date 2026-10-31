@@ -10,6 +10,7 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import {
   AnalyticsData,
   AuthTokenDetails,
+  RecentPostStat,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Integration, Organization } from '@prisma/client';
@@ -32,6 +33,19 @@ import { TemporalService } from 'nestjs-temporal-core';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
 dayjs.extend(utc);
+
+const RECENT_POSTS_LIMIT = 20;
+
+// `unavailable`: the provider supports the list but it could not be loaded now
+// (expired token on a read-only call, platform error)
+export type RecentPostsResponse =
+  | { supported: false; posts: [] }
+  | {
+      supported: true;
+      unavailable?: true;
+      emptyHint?: string;
+      posts: RecentPostStat[];
+    };
 
 @Injectable()
 export class IntegrationService {
@@ -449,7 +463,9 @@ export class IntegrationService {
     org: Organization,
     integration: string,
     date: string,
-    forceRefresh = false
+    forceRefresh = false,
+    // read-only callers (the analytics overview) never refresh or disconnect
+    allowRefresh = true
   ): Promise<AnalyticsData[]> {
     // Days to load, missing or invalid on some public API calls (same default as the app)
     const days = Number(date) > 0 ? Number(date) : 7;
@@ -471,6 +487,9 @@ export class IntegrationService {
       dayjs(getIntegration?.tokenExpiration).isBefore(dayjs()) ||
       forceRefresh
     ) {
+      if (!allowRefresh) {
+        return [];
+      }
       const data = await this._refreshIntegrationService.refresh(
         getIntegration
       );
@@ -518,13 +537,115 @@ export class IntegrationService {
         );
         return loadAnalytics;
       } catch (e) {
-        if (e instanceof RefreshToken) {
+        if (e instanceof RefreshToken && allowRefresh) {
           return this.checkAnalytics(org, integration, date, true);
         }
       }
     }
 
     return [];
+  }
+
+  // The "Recent posts" list of the channel analytics view: the same lookup,
+  // token handling and hour-long cache as checkAnalytics. The cache key falls
+  // under the `integration:{org}:{id}:*` pattern purgeAnalytics clears.
+  async recentPosts(
+    org: Organization,
+    integration: string,
+    // read-only callers never refresh or disconnect
+    allowRefresh = true,
+    forceRefresh = false
+  ): Promise<RecentPostsResponse> {
+    const getIntegration = await this.getIntegrationById(org.id, integration);
+
+    if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
+      throw new Error('Invalid integration');
+    }
+
+    const integrationProvider =
+      getIntegration.type === 'social'
+        ? this._integrationManager.getSocialIntegration(
+            getIntegration.providerIdentifier
+          )
+        : undefined;
+
+    if (!integrationProvider?.recentPosts) {
+      return { supported: false, posts: [] };
+    }
+
+    const unavailable = {
+      supported: true as const,
+      unavailable: true as const,
+      posts: [] as RecentPostStat[],
+    };
+
+    if (
+      dayjs(getIntegration.tokenExpiration).isBefore(dayjs()) ||
+      forceRefresh
+    ) {
+      if (!allowRefresh) {
+        return unavailable;
+      }
+      const data = await this._refreshIntegrationService.refresh(
+        getIntegration
+      );
+      if (!data) {
+        return unavailable;
+      }
+
+      const { accessToken } = data;
+
+      if (accessToken) {
+        getIntegration.token = accessToken;
+
+        if (integrationProvider.refreshWait) {
+          await timer(10000);
+        }
+      } else {
+        await this.disconnectChannel(org.id, getIntegration);
+        return unavailable;
+      }
+    }
+
+    const cacheKey = `integration:${org.id}:${integration}:recent-posts`;
+    const bypassCache = integrationProvider.authorizationPolicy?.bypassAnalyticsCache;
+    const cached = bypassCache ? undefined : await ioRedis.get(cacheKey);
+    if (cached) {
+      return {
+        supported: true,
+        emptyHint: integrationProvider.recentPostsEmptyHint,
+        posts: JSON.parse(cached),
+      };
+    }
+
+    try {
+      const posts = await integrationProvider.recentPosts(
+        getIntegration.internalId,
+        getIntegration.token,
+        RECENT_POSTS_LIMIT
+      );
+      if (bypassCache) {
+        const current = await this.getActiveIntegrationById(org.id, integration);
+        if (!current || current.token !== getIntegration.token) return unavailable;
+      } else await ioRedis.set(
+        cacheKey,
+        JSON.stringify(posts),
+        'EX',
+        !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+          ? 1
+          : 3600
+      );
+      return {
+        supported: true,
+        emptyHint: integrationProvider.recentPostsEmptyHint,
+        posts,
+      };
+    } catch (e) {
+      if (e instanceof RefreshToken && allowRefresh && !forceRefresh) {
+        return this.recentPosts(org, integration, true, true);
+      }
+      return unavailable;
+    }
   }
 
   customers(orgId: string) {

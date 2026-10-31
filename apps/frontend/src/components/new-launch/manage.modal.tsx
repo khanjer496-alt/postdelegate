@@ -34,11 +34,14 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { capitalize } from 'lodash';
+import { capitalize, uniq } from 'lodash';
 import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
 import { CopilotPopup } from '@copilotkit/react-ui';
 import { DummyCodeComponent } from '@gitroom/frontend/components/new-launch/dummy.code.component';
 import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creation.method.badge';
+import { ApprovalStatusBadge } from '@gitroom/frontend/components/approvals/approval.status.badge';
+import { PostReviewPanel } from '@gitroom/frontend/components/approvals/post.review.panel';
+import { useApprovalSettings } from '@gitroom/frontend/components/approvals/approvals.hooks';
 import {
   SettingsIcon,
   SettingsOutlineIcon,
@@ -71,6 +74,12 @@ import {
   MediaSettingsSection,
   useMediaSettingsValues,
 } from '@gitroom/frontend/components/new-launch/media.settings.section';
+import { ChannelChecks } from '@gitroom/frontend/components/new-launch/channel.checks.component';
+
+// the modifier key of the shortcuts, as the keyboard labels it
+const isMac = () =>
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -91,6 +100,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     setShowPostNow(false);
   });
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
+  const { data: approvalSettings } = useApprovalSettings();
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
@@ -107,6 +117,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     setSelectedIntegrations,
     locked,
     publishBlocked,
+    publishBlockedReason,
     current,
     activateExitButton,
     setHide,
@@ -130,6 +141,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setSelectedIntegrations: state.setSelectedIntegrations,
       locked: state.locked,
       publishBlocked: state.publishBlocked,
+      publishBlockedReason: state.publishBlockedReason,
       activateExitButton: state.activateExitButton,
     }))
   );
@@ -166,6 +178,18 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     : selectedIntegrations.some(
         ({ integration }) => publishBlocked[integration.id]
       );
+  // what the blocking channel asks for, shown on the disabled actions
+  const publishingBlockedReason = !publishingBlocked
+    ? undefined
+    : existingData.integration
+    ? publishBlockedReason[channel.integration]
+    : selectedIntegrations
+        .map(({ integration }) =>
+          publishBlocked[integration.id]
+            ? publishBlockedReason[integration.id]
+            : undefined
+        )
+        .find(Boolean);
 
   useEffect(() => {
     if (hide) {
@@ -825,6 +849,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           // every type of save is its own request, the drafts last, since a
           // draft save skips the checks the others still run
           let saved = false;
+          // the workspace can hold a save for an approver instead of scheduling it
+          let heldForReview = false;
           for (const requestType of ['update', 'schedule', 'now', 'draft']) {
             const request = {
               type: requestType,
@@ -859,15 +885,68 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               return;
             }
             saved = true;
+            const output = await response.json().catch(() => []);
+            if (
+              Array.isArray(output) &&
+              output.some((p: any) => p?.approvalStatus === 'IN_REVIEW')
+            ) {
+              heldForReview = true;
+            }
+          }
+          if (heldForReview) {
+            mutate();
+            toaster.show(
+              t(
+                'approval_sent_for_review_toast',
+                'Sent for review. It will publish once an approver approves it.'
+              )
+            );
+            if (customClose) {
+              setTimeout(() => {
+                customClose();
+              }, 2000);
+            }
+            modal.closeAll();
+            return;
           }
         }
 
         if (!addEditSets) {
           mutate();
+          // a provider can say what happens next once its post is sent out,
+          // now or as a schedule whose date already came
+          const postSubmitMessages = uniq(
+            posts
+              .filter(
+                (post: any) =>
+                  saveTypeOf(post.integration.id) === 'now' ||
+                  (saveTypeOf(post.integration.id) === 'schedule' &&
+                    !dayjs().isBefore(
+                      (channelDates[post.integration.id] || date).utc()
+                    ))
+              )
+              .map((post: any) => {
+                const message = getProviderSettingsMeta(
+                  Providers.find(
+                    (p) =>
+                      p.identifier ===
+                      integrationById(post.integration.id)?.integration
+                        .identifier
+                  )?.component
+                )?.postSubmitMessage;
+                return typeof message === 'function'
+                  ? message(post.settings)
+                  : message;
+              })
+              .filter(Boolean)
+          );
+          const savedMessage = !existingData.integration
+            ? t('added_successfully', 'Added successfully')
+            : t('updated_successfully', 'Updated successfully');
           toaster.show(
-            !existingData.integration
-              ? t('added_successfully', 'Added successfully')
-              : t('updated_successfully', 'Updated successfully')
+            postSubmitMessages.length
+              ? `${savedMessage}. ${postSubmitMessages.join(' ')}`
+              : savedMessage
           );
         }
         if (customClose) {
@@ -896,8 +975,61 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     ]
   );
 
+  // Cmd/Ctrl + Enter runs the primary action, like the main button would
+  const primaryDisabled =
+    selectedIntegrations.length === 0 ||
+    loading ||
+    locked ||
+    (!addEditSets && publishingBlocked);
+  const onShortcut = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        e.key !== 'Enter' ||
+        !(e.metaKey || e.ctrlKey) ||
+        e.shiftKey ||
+        e.altKey ||
+        e.nativeEvent.isComposing
+      ) {
+        return;
+      }
+      e.preventDefault();
+      if (primaryDisabled) {
+        return;
+      }
+      schedule(addEditSets ? 'draft' : 'schedule')();
+    },
+    [primaryDisabled, schedule, addEditSets]
+  );
+  const shortcutHint = isMac() ? '⌘ ↵' : 'Ctrl ↵';
+  const shortcutKeys = isMac() ? 'Meta+Enter' : 'Control+Enter';
+
+  const showChannelSettings = useCallback(
+    (where: 'fix' | 'preview') => setShowSettings(where === 'fix'),
+    []
+  );
+
+  // the review state decides what the main button does for this member
+  const existingApproval = existingData?.posts?.[0]?.approvalStatus;
+  const existingWaiting = ['IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'].includes(
+    existingApproval
+  );
+  const existingPublished = existingData?.posts?.[0]?.state === 'PUBLISHED';
+  const savesForReview =
+    !dummy &&
+    !addEditSets &&
+    !existingPublished &&
+    !!approvalSettings &&
+    !approvalSettings.canApprove &&
+    (approvalSettings.requireApproval || existingWaiting);
+  const savesAsApproval =
+    !dummy && !!approvalSettings?.canApprove && existingWaiting;
+
   const scheduleLabel = dummy
     ? t('create_output', 'Create output')
+    : savesForReview
+    ? t('approval_submit_for_review', 'Submit for review')
+    : savesAsApproval
+    ? t('approval_approve_and_schedule', 'Approve and schedule')
     : !existingData?.integration
     ? t('add_to_calendar', 'Add to calendar')
     : existingData?.posts?.[0]?.state === 'DRAFT'
@@ -956,29 +1088,37 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   // on phones, the settings, tags, repeat and delete live in a settings sheet
   const settingsButton = !dummy && (
-    <div
+    <button
+      type="button"
       onClick={() => setMobileSheet('settings')}
-      className="hidden mobile:flex shrink-0 w-[32px] h-[44px] justify-end items-center cursor-pointer text-[#A3A3A3]"
+      aria-label={t('settings', 'Settings')}
+      className="hidden mobile:flex shrink-0 w-[44px] h-[44px] justify-center items-center cursor-pointer text-[#A3A3A3]"
     >
       <SettingsOutlineIcon />
-    </div>
+    </button>
   );
 
   // phones have no room for the preview column, it replaces the editor instead
   const previewButton = (
-    <div
+    <button
+      type="button"
       onClick={() => setMobileTab(mobileTab === 'preview' ? 'edit' : 'preview')}
+      aria-label={t('post_preview', 'Post Preview')}
+      aria-pressed={mobileTab === 'preview'}
       className={clsx(
-        'hidden mobile:flex shrink-0 w-[32px] h-[44px] justify-end items-center cursor-pointer',
+        'hidden mobile:flex shrink-0 w-[44px] h-[44px] justify-center items-center cursor-pointer',
         mobileTab === 'preview' ? 'text-[#FC69FF]' : 'text-[#A3A3A3]'
       )}
     >
       <EyeIcon />
-    </div>
+    </button>
   );
 
   return (
-    <div className="w-full h-full flex-1 p-[40px] mobile:p-0 mobile:h-auto mobile:min-h-full flex relative">
+    <div
+      className="w-full h-full flex-1 p-[40px] mobile:p-0 mobile:h-auto mobile:min-h-full flex relative"
+      onKeyDown={onShortcut}
+    >
       <div className="flex flex-1 min-w-0 bg-newBgColorInner rounded-[20px] mobile:rounded-none flex-col">
         <MobileTopBar
           onBack={askClose}
@@ -1008,6 +1148,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 creationMethod={existingData?.posts?.[0]?.creationMethod}
                 size="sm"
               />
+              <ApprovalStatusBadge status={existingApproval} />
             </div>
             <div className="flex-1 flex flex-col gap-[16px]">
               <div
@@ -1048,6 +1189,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                             }
                             size="sm"
                           />
+                          <ApprovalStatusBadge
+                            status={existingApproval}
+                            className="ms-[6px]"
+                          />
                         </div>
                         {previewButton}
                         {settingsButton}
@@ -1062,12 +1207,14 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       </div>
                       {!existingData.integration && (
                         <>
-                          <div
+                          <button
+                            type="button"
                             onClick={() => setMobileSheet('channels')}
+                            aria-label={t('select_channels', 'Select channels')}
                             className="hidden mobile:flex shrink-0 w-[44px] h-[44px] rounded-[8px] bg-btnSimple justify-center items-center cursor-pointer"
                           >
                             <PlusIcon size={24} />
-                          </div>
+                          </button>
                           <div className="hidden mobile:block flex-1" />
                           {previewButton}
                           {settingsButton}
@@ -1082,6 +1229,19 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     >
                       {!hide && <EditorWrapper totalPosts={1} value="" />}
                     </div>
+                    {/* a set is saved without these checks */}
+                    {!dummy && !addEditSets && (
+                      <div
+                        className={clsx(
+                          mobileTab === 'preview' && 'mobile:hidden'
+                        )}
+                      >
+                        <ChannelChecks
+                          providers={ref}
+                          onFix={showChannelSettings}
+                        />
+                      </div>
+                    )}
                     <div
                       id="social-empty"
                       className={clsx(
@@ -1121,7 +1281,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     <div
                       onClick={() => setShowSettings(!showSettings)}
                       className={clsx(
-                        'bg-[#612BD3] rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
+                        'bg-btnPrimary rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
                         showSettings ? '!rounded-b-none' : ''
                       )}
                     >
@@ -1171,15 +1331,29 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           >
             <div className="bg-newBgColor h-[65px] rounded-e-[20px] !rounded-b-[0] mobile:hidden flex items-center px-[20px] text-[20px] font-[600]">
               <div className="flex-1">{t('post_preview', 'Post Preview')}</div>
-              <div className="cursor-pointer mobile:hidden">
-                <CloseIcon onClick={askClose} className="text-[#A3A3A3]" />
-              </div>
+              <button
+                type="button"
+                onClick={askClose}
+                aria-label={t('close', 'Close')}
+                className="cursor-pointer mobile:hidden"
+              >
+                <CloseIcon className="text-[#A3A3A3]" />
+              </button>
             </div>
             <div className="flex-1 relative">
               <Scrollable
                 scrollClasses="!pe-[20px]"
                 className="absolute mobile:static top-0 p-[20px] pe-[8px] mobile:p-[16px] left-0 w-full h-full mobile:h-auto overflow-x-hidden overflow-y-scroll mobile:overflow-y-visible scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
               >
+                {!dummy && !!existingData?.posts?.[0]?.id && (
+                  <PostReviewPanel
+                    postId={existingData.posts[0].id}
+                    state={existingData.posts[0].state}
+                    approvalStatus={existingApproval}
+                    publishDate={existingData.posts[0].publishDate}
+                    mutate={mutate}
+                  />
+                )}
                 <ShowAllProviders ref={ref} />
               </Scrollable>
             </div>
@@ -1236,17 +1410,34 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             )}
             {addEditSets && (
               <button
-                className="text-white text-[15px] font-[600] min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
+                className="text-btnCtaText text-[15px] font-[600] min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]"
                 disabled={
                   selectedIntegrations.length === 0 || loading || locked
                 }
                 onClick={schedule('draft')}
+                aria-keyshortcuts={shortcutKeys}
+                title={`${t('save_set', 'Save Set')} (${shortcutHint})`}
               >
-                Save Set
+                {t('save_set', 'Save Set')}
+                <ShortcutHint hint={shortcutHint} />
               </button>
             )}
             {!addEditSets && (
-              <div ref={postNowRef} className="group cursor-pointer relative">
+              <div
+                ref={postNowRef}
+                className={clsx(
+                  'group relative',
+                  publishingBlockedReason
+                    ? 'cursor-not-allowed'
+                    : 'cursor-pointer'
+                )}
+                {...(publishingBlockedReason
+                  ? {
+                      'data-tooltip-id': 'tooltip',
+                      'data-tooltip-content': publishingBlockedReason,
+                    }
+                  : {})}
+              >
                 <button
                   disabled={
                     selectedIntegrations.length === 0 ||
@@ -1255,11 +1446,22 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     publishingBlocked
                   }
                   onClick={schedule('schedule')}
-                  className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
+                  aria-keyshortcuts={shortcutKeys}
+                  aria-description={publishingBlockedReason}
+                  title={
+                    publishingBlockedReason
+                      ? undefined
+                      : `${scheduleLabel} (${shortcutHint})`
+                  }
+                  className={clsx(
+                    'text-btnCtaText relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]',
+                    // a disabled button gets no hover, the wrapper shows why
+                    publishingBlockedReason && 'pointer-events-none'
+                  )}
                 >
                   {loading && (
                     <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-                      <div className="animate-spin h-[20px] w-[20px] border-4 border-white border-t-transparent rounded-full" />
+                      <div className="animate-spin h-[20px] w-[20px] border-4 border-btnCtaText border-t-transparent rounded-full" />
                     </div>
                   )}
                   <div
@@ -1272,6 +1474,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       ? t('check_circles_above', 'Check the circles above')
                       : scheduleLabel}
                   </div>
+                  {selectedIntegrations.length > 0 && (
+                    <ShortcutHint
+                      hint={shortcutHint}
+                      className={clsx(loading && 'invisible')}
+                    />
+                  )}
                   {!dummy && (
                     <div
                       onClick={(e) => {
@@ -1282,7 +1490,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     >
                       <DropdownArrowSmallIcon
                         className={clsx(
-                          'group-hover:rotate-180 text-white',
+                          'group-hover:rotate-180 text-btnCtaText',
                           showPostNow && 'rotate-180'
                         )}
                       />
@@ -1299,9 +1507,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       locked ||
                       publishingBlocked
                     }
+                    aria-description={publishingBlockedReason}
                     className={clsx(
                       'rounded-[8px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner',
-                      showPostNow ? 'flex' : 'hidden group-hover:flex'
+                      showPostNow ? 'flex' : 'hidden group-hover:flex',
+                      publishingBlockedReason && 'pointer-events-none'
                     )}
                   >
                     <div className="text-white rounded-[8px] bg-[#D82D7E] h-[44px] w-full flex justify-center items-center post-now">
@@ -1465,6 +1675,22 @@ After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} f
     </div>
   );
 };
+
+// the keyboard shortcut of a button, next to its label
+const ShortcutHint: FC<{ hint: string; className?: string }> = ({
+  hint,
+  className,
+}) => (
+  <kbd
+    aria-hidden="true"
+    className={clsx(
+      'font-sans text-[11px] font-[600] leading-none px-[5px] py-[3px] rounded-[4px] border border-white/30 text-white/80 whitespace-nowrap',
+      className
+    )}
+  >
+    {hint}
+  </kbd>
+);
 
 const Scrollable: FC<{
   className: string;

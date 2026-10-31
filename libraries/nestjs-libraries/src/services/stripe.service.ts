@@ -22,6 +22,7 @@ import {
 import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/payment.providers';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import dayjs from 'dayjs';
+import { emailButton } from '@gitroom/nestjs-libraries/services/email.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
@@ -419,8 +420,19 @@ export class StripeService extends PaymentProviderAbstract {
   // canceled when it ends, so ask the workspace to add one. It never fails the
   // webhook, a retry would send the reminder twice.
   async trialWillEnd(event: Stripe.CustomerSubscriptionTrialWillEndEvent) {
-    const subscription = event.data.object;
     try {
+      // A retried event can be days old, so act on the subscription as it is now
+      const subscription = await stripe.subscriptions.retrieve(
+        event.data.object.id
+      );
+      await this.applyTrialDiscount(subscription).catch((err) => {
+        console.error('stripe_trial_discount_failed', {
+          stripe_event_id: event.id,
+          stripe_subscription_id: subscription.id,
+          err,
+        });
+      });
+
       if (!(await this.needsPaymentMethod(subscription))) {
         return { ok: true };
       }
@@ -432,7 +444,7 @@ export class StripeService extends PaymentProviderAbstract {
         return { ok: true };
       }
 
-      await this._notificationService.inAppNotification(
+      await this.notifyBilling(
         org.id,
         'Your free trial ends soon',
         `Your PostDelegate free trial ends on ${dayjs
@@ -440,14 +452,12 @@ export class StripeService extends PaymentProviderAbstract {
           .format('MMMM D, YYYY')}. Add a card in Settings > Billing (${
           process.env.FRONTEND_URL
         }/billing) to keep your plan. Without a card, your workspace is paused until you choose a plan.`,
-        true,
-        false,
-        'info'
+        'Add a card'
       );
     } catch (err) {
       console.error('stripe_trial_will_end_failed', {
         stripe_event_id: event.id,
-        stripe_subscription_id: subscription.id,
+        stripe_subscription_id: event.data.object.id,
         err,
       });
     }
@@ -462,7 +472,7 @@ export class StripeService extends PaymentProviderAbstract {
       return;
     }
 
-    await this._notificationService.inAppNotification(
+    await this.notifyBilling(
       org.id,
       'Your free trial has started',
       `Welcome to PostDelegate! Your ${TRIAL_DAYS}-day free trial runs until ${dayjs
@@ -472,9 +482,23 @@ export class StripeService extends PaymentProviderAbstract {
         )}, no credit card needed. To keep your plan after that, add a card any time in Settings > Billing (${
         process.env.FRONTEND_URL
       }/billing).`,
-      true,
-      false,
-      'info'
+      'Open Billing'
+    );
+  }
+
+  // Billing notices: in-app for the whole workspace, by email only to the
+  // admins, who are the ones that can add a card or choose a plan
+  private async notifyBilling(
+    orgId: string,
+    subject: string,
+    message: string,
+    action: string
+  ) {
+    await this._notificationService.inAppNotification(orgId, subject, message);
+    await this._notificationService.sendEmailsToOrgAdmins(
+      orgId,
+      subject,
+      message + emailButton(`${process.env.FRONTEND_URL}/billing`, action)
     );
   }
 
@@ -497,13 +521,11 @@ export class StripeService extends PaymentProviderAbstract {
       return;
     }
 
-    await this._notificationService.inAppNotification(
+    await this.notifyBilling(
       org.id,
       'Your free trial has ended',
       `Your PostDelegate free trial has ended and your workspace is paused. Your posts are kept: choose a plan in Settings > Billing (${process.env.FRONTEND_URL}/billing) to switch your channels back on and pick up where you left off.`,
-      true,
-      false,
-      'info'
+      'Choose a plan'
     );
   }
 
@@ -796,16 +818,29 @@ export class StripeService extends PaymentProviderAbstract {
     });
   }
 
+  // A promotion code marked autoapply: true on itself or its coupon
+  private isAutoApplyPromotion(promoCode: Stripe.PromotionCode) {
+    const coupon =
+      typeof promoCode.promotion.coupon === 'string'
+        ? null
+        : promoCode.promotion.coupon;
+
+    return (
+      Object.assign({}, promoCode.metadata, coupon?.metadata)?.autoapply ===
+      'true'
+    );
+  }
+
   /**
    * Find an active promotion code with autoapply: true metadata
    * Only returns codes that are active and not expired
-   * Returns the promotion code string (not the ID) for frontend auto-apply
    */
-  private async findAutoApplyPromotionCode(): Promise<string | null> {
+  private async findAutoApplyPromotion(): Promise<Stripe.PromotionCode | null> {
     try {
       const promotionCodes = await stripe.promotionCodes.list({
         active: true,
         limit: 100,
+        expand: ['data.promotion.coupon'],
       });
 
       const now = Math.floor(Date.now() / 1000);
@@ -816,13 +851,7 @@ export class StripeService extends PaymentProviderAbstract {
             ? null
             : promoCode.promotion.coupon;
 
-        // Check if it has autoapply metadata set to true (check both promo and coupon metadata)
-        const autoApply = Object.assign(
-          {},
-          promoCode.metadata,
-          coupon?.metadata
-        )?.autoapply;
-        if (autoApply !== 'true') continue;
+        if (!this.isAutoApplyPromotion(promoCode)) continue;
 
         // Check if the promotion code has expired
         if (promoCode.expires_at && promoCode.expires_at < now) continue;
@@ -837,8 +866,7 @@ export class StripeService extends PaymentProviderAbstract {
         )
           continue;
 
-        // Found a valid auto-apply promotion code - return the code string for frontend
-        return promoCode.code;
+        return promoCode;
       }
 
       return null;
@@ -846,6 +874,59 @@ export class StripeService extends PaymentProviderAbstract {
       console.error('Error finding auto-apply promotion code:', err);
       return null;
     }
+  }
+
+  // The promotion code string (not the ID) for frontend auto-apply
+  private async findAutoApplyPromotionCode(): Promise<string | null> {
+    return (await this.findAutoApplyPromotion())?.code || null;
+  }
+
+  // A monthly trial gets the auto-apply promotion the monthly checkout
+  // pre-fills. It is added when the trial is about to convert, so a one-time
+  // coupon is not used up by the $0 trial invoice.
+  private async applyTrialDiscount(subscription: Stripe.Subscription) {
+    if (
+      !isCardlessTrial(subscription) ||
+      subscription.cancel_at_period_end ||
+      subscription.cancel_at ||
+      subscription.discounts?.length ||
+      subscription.items.data[0]?.price?.recurring?.interval !== 'month'
+    ) {
+      return;
+    }
+
+    const promotion = await this.findAutoApplyPromotion();
+    if (!promotion) {
+      return;
+    }
+
+    await stripe.subscriptions.update(subscription.id, {
+      discounts: [{ promotion_code: promotion.id }],
+    });
+  }
+
+  // The auto-apply promotion is for monthly plans only, so a switch to yearly
+  // drops it and keeps any other discount. Undefined when nothing changes.
+  private async discountsWithoutAutoApply(subscriptionId: string) {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['discounts.promotion_code.promotion.coupon'],
+    });
+    const discounts = (subscription.discounts || []).filter(
+      (discount): discount is Stripe.Discount => typeof discount !== 'string'
+    );
+    const kept = discounts.filter(
+      (discount) =>
+        !(
+          typeof discount.promotion_code === 'object' &&
+          discount.promotion_code &&
+          this.isAutoApplyPromotion(discount.promotion_code)
+        )
+    );
+
+    if (kept.length === discounts.length) {
+      return undefined;
+    }
+    return kept.map((discount) => ({ discount: discount.id }));
   }
 
   // The billing email is the user who checks out, and the dub click id is
@@ -1091,6 +1172,13 @@ export class StripeService extends PaymentProviderAbstract {
       throw new Error('The trial has no payment method');
     }
 
+    await this.applyTrialDiscount(trialing).catch((err) => {
+      console.error('stripe_trial_discount_failed', {
+        stripe_subscription_id: trialing.id,
+        err,
+      });
+    });
+
     await stripe.subscriptions.update(trialing.id, {
       trial_end: 'now',
     });
@@ -1334,7 +1422,15 @@ export class StripeService extends PaymentProviderAbstract {
     };
 
     try {
+      const discounts =
+        body.period === 'YEARLY'
+          ? await this.discountsWithoutAutoApply(
+              currentUserSubscription.data[0].id
+            )
+          : undefined;
+
       await stripe.subscriptions.update(currentUserSubscription.data[0].id, {
+        ...(discounts ? { discounts: discounts.length ? discounts : '' } : {}),
         cancel_at_period_end: false,
         metadata: {
           service: 'gitroom',

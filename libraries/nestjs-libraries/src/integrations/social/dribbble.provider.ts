@@ -16,6 +16,13 @@ import { DribbbleDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-sett
 import mime from 'mime-types';
 import { DiscordDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discord.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import sharp from 'sharp';
+
+// Dribbble only accepts shots of exactly these sizes.
+const SHOT_SIZES = [
+  { width: 800, height: 600 },
+  { width: 400, height: 300 },
+];
 
 export class DribbbleProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Dribbble has moderate API limits
@@ -42,13 +49,37 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
       return 'Does not support mp4 files';
     }
     const details = await this.getImageDimensions(firstItem?.[0]?.path);
-    if (
-      (details?.width === 400 && details?.height === 300) ||
-      (details?.width === 800 && details?.height === 600)
-    ) {
+    if (this.isShotSize(details)) {
       return true;
     }
-    return 'Invalid image size. Requires 400x300 or 800x600 px images.';
+    // Other sizes are cropped to 4:3 when posting; animated GIFs can't be.
+    if ((firstItem?.[0]?.path?.indexOf?.('.gif') ?? -1) > -1) {
+      return 'GIFs must be exactly 400x300 or 800x600 px.';
+    }
+    if (details?.width < 400 || details?.height < 300) {
+      return 'Image too small. Dribbble needs at least 400x300 px.';
+    }
+    return true;
+  }
+
+  private isShotSize(details?: { width: number; height: number }) {
+    return SHOT_SIZES.some(
+      (size) => details?.width === size.width && details?.height === size.height
+    );
+  }
+
+  // Center-crop to the largest Dribbble size the image can fill.
+  private async fitShotSize(image: Buffer) {
+    const { width = 0, height = 0, format } = await sharp(image).metadata();
+    if (format === 'gif' || this.isShotSize({ width, height })) {
+      return image;
+    }
+    const target =
+      SHOT_SIZES.find((size) => width >= size.width && height >= size.height) ||
+      SHOT_SIZES[SHOT_SIZES.length - 1];
+    return sharp(image)
+      .resize(target.width, target.height, { fit: 'cover', position: 'centre' })
+      .toBuffer();
   }
 
   async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
@@ -163,23 +194,27 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     postDetails: PostDetails<DribbbleDto>[]
   ): Promise<PostResponse[]> {
-    const { data, status } = await this.getSsrfSafeAxios().get(
+    const { data } = await this.getSsrfSafeAxios().get(
       postDetails?.[0]?.media?.[0]?.path!,
       {
-        responseType: 'stream',
+        responseType: 'arraybuffer',
       }
     );
+    const image = await this.fitShotSize(Buffer.from(data));
 
     const slash = postDetails?.[0]?.media?.[0]?.path.split('/').at(-1);
 
     const formData = new FormData();
-    formData.append('image', data, {
+    formData.append('image', image, {
       filename: slash,
       contentType: mime.lookup(slash!) || '',
     });
 
     formData.append('title', postDetails[0].settings.title);
     formData.append('description', postDetails[0].message);
+    if (postDetails[0].settings.team) {
+      formData.append('team_id', String(postDetails[0].settings.team));
+    }
 
     let data2;
     try {

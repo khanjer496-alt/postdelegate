@@ -6,6 +6,10 @@ import dayjs from 'dayjs';
 import { useCallback, useState } from 'react';
 import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
 import { SelectChannels } from '@gitroom/frontend/components/launches/select.channels';
+import {
+  SelectTags,
+  useWorkspaceTags,
+} from '@gitroom/frontend/components/launches/select.tags';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import i18next from 'i18next';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
@@ -47,6 +51,9 @@ export const Filters = () => {
   const calendar = useCalendar();
   const t = useT();
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const { data: workspaceTags } = useWorkspaceTags();
+  const hasTags = !!workspaceTags?.tags?.length;
+  const filtered = !!calendar.selectedChannels || !!calendar.selectedTags;
 
   // Set dayjs locale based on current language
   const currentLanguage = i18next.resolvedLanguage || 'en';
@@ -296,9 +303,11 @@ export const Filters = () => {
       {!isListView && (
         <div className="flex flex-grow flex-row items-center gap-[10px] mobile:order-3 mobile:basis-full mobile:min-w-0 mobile:gap-[8px]">
           <div className="border h-[42px] border-newTableBorder bg-newTableBorder gap-[1px] flex items-center rounded-[8px] overflow-hidden mobile:flex-1 mobile:min-w-0">
-            <div
+            <button
+              type="button"
               onClick={previous}
-              className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
+              aria-label={t('previous', 'Previous')}
+              className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[44px] focus-visible:-outline-offset-2 bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -315,7 +324,7 @@ export const Filters = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-            </div>
+            </button>
             <div className="min-w-[200px] mobile:min-w-0 mobile:flex-1 text-center bg-newBgColorInner h-full flex items-center justify-center">
               <div className="py-[3px] px-[9px] mobile:px-[4px] rounded-[5px] transition-all text-[14px] mobile:truncate">
                 <span className="mobile:hidden">{getDisplayText()}</span>
@@ -324,9 +333,11 @@ export const Filters = () => {
                 </span>
               </div>
             </div>
-            <div
+            <button
+              type="button"
               onClick={next}
-              className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
+              aria-label={t('next', 'Next')}
+              className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[44px] focus-visible:-outline-offset-2 bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -343,16 +354,17 @@ export const Filters = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-            </div>
+            </button>
           </div>
           <div className="flex-1 mobile:flex-none text-[14px] font-[500]">
             <div className="text-center flex h-[42px]">
-              <div
+              <button
+                type="button"
                 onClick={setToday}
                 className="hover:text-textItemFocused hover:bg-boxFocused py-[3px] px-[9px] flex justify-center items-center rounded-[8px] transition-all cursor-pointer text-[14px] bg-newBgColorInner border border-newTableBorder"
               >
                 {t('today', 'Today')}
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -365,10 +377,13 @@ export const Filters = () => {
               calendar.listTotalPages <= 1 && 'mobile:hidden'
             )}
           >
-            <div
+            <button
+              type="button"
               onClick={previousPage}
+              aria-label={t('previous_page', 'Previous page')}
+              aria-disabled={calendar.listPage <= 0}
               className={clsx(
-                'text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center',
+                'text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[44px] focus-visible:-outline-offset-2 bg-newBgColorInner h-full flex items-center justify-center',
                 calendar.listPage > 0
                   ? 'cursor-pointer hover:text-textItemFocused hover:bg-boxFocused'
                   : 'opacity-50 cursor-not-allowed'
@@ -389,16 +404,19 @@ export const Filters = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-            </div>
+            </button>
             <div className="min-w-[200px] mobile:min-w-0 mobile:flex-1 text-center bg-newBgColorInner h-full flex items-center justify-center">
               <div className="py-[3px] px-[9px] rounded-[5px] transition-all text-[14px]">
                 {t('page', 'Page')} {calendar.listPage + 1} {t('of', 'of')} {Math.max(1, calendar.listTotalPages)}
               </div>
             </div>
-            <div
+            <button
+              type="button"
               onClick={nextPage}
+              aria-label={t('next_page', 'Next page')}
+              aria-disabled={calendar.listPage >= calendar.listTotalPages - 1}
               className={clsx(
-                'text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center',
+                'text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[44px] focus-visible:-outline-offset-2 bg-newBgColorInner h-full flex items-center justify-center',
                 calendar.listPage < calendar.listTotalPages - 1
                   ? 'cursor-pointer hover:text-textItemFocused hover:bg-boxFocused'
                   : 'opacity-50 cursor-not-allowed'
@@ -419,21 +437,23 @@ export const Filters = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-            </div>
+            </button>
           </div>
           <div className="flex flex-row p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500] mobile:order-1 mobile:w-full mobile:overflow-x-auto">
             {listStateOptions.map((option) => (
-              <div
+              <button
+                type="button"
                 key={option.value}
+                aria-pressed={calendar.listState === option.value}
                 onClick={setListStateFilter(option.value)}
                 className={clsx(
-                  'pt-[6px] pb-[5px] cursor-pointer min-w-[80px] px-[12px] text-center rounded-[6px] mobile:flex-1 mobile:min-w-fit mobile:px-[8px] mobile:whitespace-nowrap',
+                  'pt-[6px] pb-[5px] focus-visible:-outline-offset-2 cursor-pointer min-w-[80px] px-[12px] text-center rounded-[6px] mobile:flex-1 mobile:min-w-fit mobile:px-[8px] mobile:whitespace-nowrap',
                   calendar.listState === option.value &&
                     'text-textItemFocused bg-boxFocused'
                 )}
               >
                 {option.label}
-              </div>
+              </button>
             ))}
           </div>
           <div className="flex-1 mobile:hidden" />
@@ -447,22 +467,25 @@ export const Filters = () => {
           integrations={calendar.integrations}
         />
         <SelectChannels />
+        <SelectTags />
       </div>
-      {calendar.integrations.length > 1 && (
-        <div
+      {(calendar.integrations.length > 1 || hasTags) && (
+        <button
+          type="button"
           onClick={() => setFiltersOpen(true)}
+          aria-label={t('filters', 'Filters')}
           className={clsx(
             'hidden mobile:flex mobile:order-2 relative w-[42px] h-[42px] rounded-[8px] border justify-center items-center cursor-pointer',
-            calendar.selectedChannels
-              ? 'border-[#612BD3] text-[#612BD3]'
+            filtered
+              ? 'border-btnPrimary text-btnPrimary'
               : 'border-newTableBorder'
           )}
         >
           <FilterIcon />
-          {calendar.selectedChannels && (
-            <div className="absolute top-[6px] end-[6px] w-[6px] h-[6px] rounded-full bg-[#612BD3]" />
+          {filtered && (
+            <div className="absolute top-[6px] end-[6px] w-[6px] h-[6px] rounded-full bg-btnPrimary" />
           )}
-        </div>
+        </button>
       )}
       <div
         className={clsx(
@@ -470,49 +493,60 @@ export const Filters = () => {
           isListView && 'hidden mobile:flex'
         )}
       >
-        <div
+        <button
+          type="button"
           className={clsx(
-            'pt-[6px] pb-[5px] cursor-pointer w-[74px] mobile:w-auto mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
+            'pt-[6px] pb-[5px] focus-visible:-outline-offset-2 cursor-pointer w-[74px] mobile:w-auto mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
             calendar.display === 'day' && 'text-textItemFocused bg-boxFocused'
           )}
           onClick={setDay}
+          aria-pressed={calendar.display === 'day'}
         >
           {t('day', 'Day')}
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={clsx(
-            'pt-[6px] pb-[5px] cursor-pointer w-[74px] mobile:w-auto mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
+            'pt-[6px] pb-[5px] focus-visible:-outline-offset-2 cursor-pointer w-[74px] mobile:w-auto mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
             calendar.display === 'week' && 'text-textItemFocused bg-boxFocused'
           )}
           onClick={setWeek}
+          aria-pressed={calendar.display === 'week'}
         >
           {t('week', 'Week')}
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={clsx(
-            'pt-[6px] pb-[5px] cursor-pointer w-[74px] mobile:w-auto mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
+            'pt-[6px] pb-[5px] focus-visible:-outline-offset-2 cursor-pointer w-[74px] mobile:w-auto mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
             calendar.display === 'month' && 'text-textItemFocused bg-boxFocused'
           )}
           onClick={setMonth}
+          aria-pressed={calendar.display === 'month'}
         >
           {t('month', 'Month')}
-        </div>
+        </button>
         {/* the list toggle joins the view switcher on phones */}
-        <div
+        <button
+          type="button"
           className={clsx(
-            'hidden mobile:block pt-[6px] pb-[5px] cursor-pointer mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
+            'hidden mobile:block pt-[6px] pb-[5px] focus-visible:-outline-offset-2 cursor-pointer mobile:flex-1 mobile:min-w-fit mobile:px-[6px] mobile:whitespace-nowrap text-center rounded-[6px]',
             isListView && 'text-textItemFocused bg-boxFocused'
           )}
           onClick={setList}
+          aria-pressed={isListView}
         >
           {t('list', 'List')}
-        </div>
+        </button>
       </div>
       <div className="flex flex-row p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500] mobile:hidden">
-        <div
+        <button
+          type="button"
           onClick={setCalendarView}
+          aria-label={t('calendar', 'Calendar')}
+          aria-pressed={!isListView}
           className={clsx(
-            'pt-[6px] pb-[5px] cursor-pointer flex justify-center items-center w-[34px] text-center rounded-[6px]',
+            'pt-[6px] pb-[5px] focus-visible:-outline-offset-2 cursor-pointer flex justify-center items-center w-[34px] text-center rounded-[6px]',
             !isListView && 'text-textItemFocused bg-boxFocused'
           )}
         >
@@ -532,11 +566,14 @@ export const Filters = () => {
               strokeLinejoin="round"
             />
           </svg>
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           onClick={setList}
+          aria-label={t('list', 'List')}
+          aria-pressed={isListView}
           className={clsx(
-            'pt-[6px] pb-[5px] flex justify-center items-center cursor-pointer w-[34px] text-center rounded-[6px]',
+            'pt-[6px] pb-[5px] focus-visible:-outline-offset-2 flex justify-center items-center cursor-pointer w-[34px] text-center rounded-[6px]',
             isListView && 'text-textItemFocused bg-boxFocused'
           )}
         >
@@ -556,11 +593,15 @@ export const Filters = () => {
               strokeLinejoin="round"
             />
           </svg>
-        </div>
+        </button>
       </div>
       {filtersOpen && (
         <BottomSheet
-          title={t('select_channels', 'Select Channels')}
+          title={
+            hasTags
+              ? t('filters', 'Filters')
+              : t('select_channels', 'Select Channels')
+          }
           onClose={() => setFiltersOpen(false)}
           button={{
             label: t('done', 'Done'),
@@ -574,6 +615,7 @@ export const Filters = () => {
             integrations={calendar.integrations}
           />
           <SelectChannels list={true} />
+          <SelectTags list={true} />
         </BottomSheet>
       )}
     </div>

@@ -28,7 +28,7 @@ ${plans}
 PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs. Access depends on the plan. AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI; the customer pays OpenAI directly, PostDelegate never charges for AI, and AI video is not available. Customers can also bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services built on the same open-source code are not PostDelegate connections.
 
 ## Channels available to connect today
-YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals, and cannot be connected today.
+YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble and Slack. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals, and cannot be connected today.
 
 ## Documentation
 ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `${SITE.url}${item.href} : ${item.title}. ${item.description}`).join('\n')}

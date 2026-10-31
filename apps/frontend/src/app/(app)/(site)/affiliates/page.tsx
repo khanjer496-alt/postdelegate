@@ -3,7 +3,6 @@ import { AffiliatesComponent } from '@gitroom/frontend/components/affiliates/aff
 import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: `PostDelegate Affiliates`,
-  description: '',
 };
 export default async function Page() {
   return (

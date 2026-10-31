@@ -52,12 +52,31 @@ import { ErrorsRepository } from '@gitroom/nestjs-libraries/database/prisma/erro
 import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
 import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.repository';
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
+import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.service';
+import { AnalyticsSnapshotService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.snapshot.service';
+import { AnalyticsReportService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.report.service';
 import { AffiliateRepository } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.repository';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { ReviewRepository } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.repository';
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
+import { ActivationRepository } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.repository';
+import { ActivationService } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.service';
 import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
+import { IdeasRepository } from '@gitroom/nestjs-libraries/database/prisma/ideas/ideas.repository';
+import { IdeasService } from '@gitroom/nestjs-libraries/database/prisma/ideas/ideas.service';
+import { PostsEvergreenRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.repository';
+import { PostsEvergreenService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.service';
+import { PostsImportRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.repository';
+import { PostsImportService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.service';
+import { WeeklySummaryRepository } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.repository';
+import { WeeklySummaryService } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
+import { ActivityLogRepository } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.repository';
+import { ActivityLogService } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.service';
+import { ApprovalsRepository } from '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.repository';
+import { ApprovalPolicyService } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
+import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.service';
 
 @Global()
 @Module({
@@ -120,11 +139,30 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     ErrorsService,
     AdminStatsRepository,
     AdminStatsService,
+    AnalyticsRepository,
+    AnalyticsService,
+    AnalyticsSnapshotService,
+    AnalyticsReportService,
     AffiliateRepository,
     AffiliateService,
     ReviewRepository,
     ReviewService,
+    ActivationRepository,
+    ActivationService,
     LoginLockoutService,
+    ActivityLogRepository,
+    ActivityLogService,
+    ApprovalsRepository,
+    ApprovalPolicyService,
+    ApprovalsService,
+    IdeasRepository,
+    IdeasService,
+    PostsEvergreenRepository,
+    PostsEvergreenService,
+    PostsImportRepository,
+    PostsImportService,
+    WeeklySummaryRepository,
+    WeeklySummaryService,
   ],
   get exports() {
     return this.providers;

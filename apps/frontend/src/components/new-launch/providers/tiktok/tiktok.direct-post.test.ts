@@ -2,8 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseTikTokCreatorInfo,
+  getTikTokCheckboxError,
   getTikTokDirectPostState,
+  getTikTokFieldsToValidate,
+  getTikTokPublishBlockedReason,
   isTikTokVideoPath,
+  TIKTOK_BRANDED_CONTENT_NOT_PRIVATE,
+  TIKTOK_COMMERCIAL_SELECTION_REQUIRED,
 } from './tiktok.direct-post.ts';
 
 const creator = {
@@ -86,4 +91,76 @@ test('video media detection supports documented formats with signed URLs', () =>
   assert.equal(isTikTokVideoPath('https://media.example/clip.webm#preview'), true);
   assert.equal(isTikTokVideoPath('https://media.example/mp4-banner.jpg'), false);
   assert.equal(isTikTokVideoPath('https://media.example/clip.m4v'), false);
+});
+
+const ready = { ...video, privacyLevel: 'PUBLIC_TO_EVERYONE' };
+const blockedReason = (
+  input: Partial<typeof ready>,
+  extra: { creatorFailed?: boolean; videoMetadataFailed?: boolean; musicUsageConsent?: boolean } = {}
+) => {
+  const state = { ...ready, ...input };
+  return getTikTokPublishBlockedReason({
+    state: getTikTokDirectPostState(state),
+    creatorInfo: state.creatorInfo,
+    creatorFailed: extra.creatorFailed ?? false,
+    mediaKind: state.mediaKind,
+    videoDurationSeconds: state.videoDurationSeconds,
+    videoMetadataFailed: extra.videoMetadataFailed,
+    musicUsageConsent: extra.musicUsageConsent ?? true,
+  });
+};
+
+test('a ready direct post has no blocking reason', () => {
+  assert.equal(blockedReason({}), undefined);
+  assert.equal(blockedReason({ disclose: true, ownBrand: true }), undefined);
+  assert.equal(blockedReason({ disclose: true, brandedContent: true }), undefined);
+});
+
+test('disclosure without a brand choice blocks with the TikTok wording', () => {
+  assert.equal(TIKTOK_COMMERCIAL_SELECTION_REQUIRED, 'You need to indicate if your content promotes yourself, a third party, or both.');
+  assert.equal(blockedReason({ disclose: true }), TIKTOK_COMMERCIAL_SELECTION_REQUIRED);
+  // the disclosure choice is asked first, even while other settings are missing
+  assert.equal(blockedReason({ disclose: true, privacyLevel: '' }, { musicUsageConsent: false }), TIKTOK_COMMERCIAL_SELECTION_REQUIRED);
+});
+
+test('a brand choice re-validates the disclosure, so its error clears at once', () => {
+  const commercial = ['disclose', 'brand_organic_toggle', 'brand_content_toggle'];
+  assert.deepEqual(getTikTokFieldsToValidate('brand_organic_toggle'), commercial);
+  assert.deepEqual(getTikTokFieldsToValidate('brand_content_toggle'), commercial);
+  assert.deepEqual(getTikTokFieldsToValidate('disclose'), commercial);
+  assert.deepEqual(getTikTokFieldsToValidate('duet'), ['duet']);
+});
+
+test('the missing brand choice is shown once, not again under the checkbox', () => {
+  assert.equal(getTikTokCheckboxError(TIKTOK_COMMERCIAL_SELECTION_REQUIRED), undefined);
+  assert.equal(getTikTokCheckboxError('Accept TikTok Music Usage Confirmation before posting.'), 'Accept TikTok Music Usage Confirmation before posting.');
+  assert.equal(getTikTokCheckboxError(undefined), undefined);
+});
+
+test('private branded content blocks with the TikTok wording', () => {
+  assert.equal(
+    blockedReason({ disclose: true, brandedContent: true, privacyLevel: 'SELF_ONLY' }),
+    TIKTOK_BRANDED_CONTENT_NOT_PRIVATE
+  );
+});
+
+test('a video longer than the creator max_video_post_duration_sec is blocked before posting', () => {
+  const reason = blockedReason({ videoDurationSeconds: 61 });
+  assert.match(reason!, /too long/);
+  assert.match(reason!, /60 seconds/);
+  assert.match(blockedReason({ videoDurationSeconds: undefined })!, /Checking video duration/);
+  assert.match(blockedReason({ videoDurationSeconds: undefined }, { videoMetadataFailed: true })!, /could not be read/);
+  // some files report no usable duration, which is unreadable rather than too long
+  assert.match(blockedReason({ videoDurationSeconds: Infinity })!, /could not be read/);
+  assert.match(blockedReason({ videoDurationSeconds: NaN })!, /could not be read/);
+});
+
+test('a creator that cannot post right now stops publishing with a try again later message', () => {
+  assert.match(blockedReason({ creatorInfo: undefined }, { creatorFailed: true })!, /Try again later/);
+  assert.match(blockedReason({ creatorInfo: undefined })!, /Checking the latest TikTok account settings/);
+});
+
+test('privacy and consent remain required', () => {
+  assert.match(blockedReason({ privacyLevel: '' })!, /who can see/i);
+  assert.match(blockedReason({}, { musicUsageConsent: false })!, /upload and publish/);
 });

@@ -16,6 +16,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { Request } from 'express';
+import { escape } from 'lodash';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
@@ -237,7 +238,9 @@ export class BillingController {
       await this._notificationService.sendEmail(
         process.env.EMAIL_FROM_ADDRESS,
         'Subscription Cancelled',
-        `Organization ${org.name} has cancelled their subscription because: ${body.feedback}`,
+        `Organization ${escape(
+          org.name
+        )} has cancelled their subscription because: ${escape(body.feedback)}`,
         user.email
       );
     }
@@ -345,7 +348,9 @@ export class BillingController {
       await this._notificationService.sendEmail(
         process.env.EMAIL_FROM_ADDRESS,
         'Refund issued from PostDelegate',
-        `Organization ${org.name} received a refund of ${refund.amount} ${refund.currency} and their subscription was cancelled`,
+        `Organization ${escape(org.name)} received a refund of ${
+          refund.amount
+        } ${refund.currency} and their subscription was cancelled`,
         user.email
       );
     }

@@ -2,7 +2,7 @@
 const { class: cls = '' } = Astro.props;
 ---
 <span class:list={['brand-logo', cls]}>
-  <img src="/mark.svg" width="34" height="34" alt="" />
+  <img src="/mark.svg?v=orbit-slot" width="34" height="34" alt="" />
   <span>PostDelegate</span>
 </span>
 <style>.brand-logo{display:inline-flex;align-items:center;gap:9px;color:#fff;white-space:nowrap;line-height:1}.brand-logo img{display:block;width:34px;height:34px;flex-shrink:0;border-radius:9px}.brand-logo>span{font-size:19px;font-weight:700;letter-spacing:-.8px}@media(max-width:450px){.brand-logo img{width:31px;height:31px}.brand-logo>span{font-size:18px}}</style>

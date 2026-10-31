@@ -35,6 +35,11 @@ import { AppsComponent } from '@gitroom/frontend/components/settings/apps.compon
 import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/third-party.component';
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
 import { AiSettings } from '@gitroom/frontend/components/settings/ai.settings.component';
+import { AffiliatesComponent } from '@gitroom/frontend/components/affiliates/affiliates.component';
+import { openReviewModal } from '@gitroom/frontend/components/reviews/review.form';
+import { ApprovalsSettings } from '@gitroom/frontend/components/approvals/approvals.settings';
+import { WorkspaceActivity } from '@gitroom/frontend/components/approvals/workspace.activity';
+import { useApprovalSettings } from '@gitroom/frontend/components/approvals/approvals.hooks';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -44,6 +49,8 @@ export const SettingsPopup: FC<{
   const toast = useToaster();
   const swr = useSWRConfig();
   const user = useUser();
+  // the workspace history names clients, approvers only
+  const { data: approvalSettings } = useApprovalSettings();
   const resolver = useMemo(() => {
     return classValidatorResolver(UserDetailDto);
   }, []);
@@ -98,6 +105,12 @@ export const SettingsPopup: FC<{
     if (user?.tier?.team_members && isGeneral && user?.role !== 'USER') {
       arr.push({ tab: 'teams', label: t('teams', 'Teams') });
     }
+    if (user?.role !== 'USER') {
+      arr.push({ tab: 'approvals', label: t('approval_settings_title', 'Approvals') });
+    }
+    if (approvalSettings?.canApprove) {
+      arr.push({ tab: 'activity', label: t('activity_title', 'Activity') });
+    }
     if (user?.tier?.webhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks') });
     }
@@ -113,9 +126,11 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'integrations', label: t('integrations', 'Integrations') });
     arr.push({ tab: 'plugs', label: t('plugs', 'Plugs') });
     arr.push({ tab: 'apps', label: t('apps', 'Apps') });
+    // every role, like the sidebar item it replaces
+    arr.push({ tab: 'affiliates', label: t('affiliates', 'Affiliates') });
 
     return arr;
-  }, [user, isGeneral, showLogout, t]);
+  }, [user, isGeneral, showLogout, t, approvalSettings?.canApprove]);
 
   const [tab, setTab] = useState(() => {
     const requested = url.get('tab');
@@ -133,10 +148,12 @@ export const SettingsPopup: FC<{
       <div className="bg-newBgColorInner p-[20px] mobile:p-[12px] flex flex-col transition-all w-[260px] mobile:w-full">
         <div className="flex flex-1 flex-col gap-[15px] mobile:flex-row mobile:gap-[8px] mobile:overflow-x-auto mobile:pb-[6px] scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
           {list.map(({ tab: tabKey, label }) => (
-            <div
+            <button
+              type="button"
               key={tabKey}
+              aria-current={tabKey === tab ? 'page' : undefined}
               className={clsx(
-                'cursor-pointer flex items-center gap-[12px] group/profile hover:bg-boxHover rounded-e-[8px] mobile:shrink-0 mobile:whitespace-nowrap mobile:rounded-[8px] mobile:px-[12px] mobile:py-[8px]',
+                'cursor-pointer flex items-center gap-[12px] text-start focus-visible:-outline-offset-2 group/profile hover:bg-boxHover rounded-e-[8px] mobile:shrink-0 mobile:whitespace-nowrap mobile:rounded-[8px] mobile:px-[12px] mobile:py-[8px] mobile:min-h-[40px]',
                 tabKey === tab && 'bg-boxHover'
               )}
               onClick={() => setTab(tabKey)}
@@ -150,10 +167,22 @@ export const SettingsPopup: FC<{
                 <SVGLine />
               </div>
               {label}
-            </div>
+            </button>
           ))}
         </div>
         <div>
+          <button
+            type="button"
+            onClick={() =>
+              openReviewModal(
+                modal.openModal,
+                t('review_leave', 'Leave a review')
+              )
+            }
+            className="mt-4 block text-[14px] text-textItemBlur underline underline-offset-4 hover:text-newTextColor mobile:mt-[8px]"
+          >
+            {t('review_leave', 'Leave a review')}
+          </button>
           {showLogout && (
             <div className="mt-4 mobile:mt-[8px]">
               <LogoutComponent />
@@ -207,6 +236,18 @@ export const SettingsPopup: FC<{
                   </div>
                 )}
 
+              {tab === 'approvals' && user?.role !== 'USER' && (
+                <div>
+                  <ApprovalsSettings />
+                </div>
+              )}
+
+              {tab === 'activity' && !!approvalSettings?.canApprove && (
+                <div>
+                  <WorkspaceActivity />
+                </div>
+              )}
+
               {tab === 'webhooks' && !!user?.tier?.webhooks && (
                 <div>
                   <Webhooks />
@@ -253,6 +294,12 @@ export const SettingsPopup: FC<{
                     <PublicComponent />
                   </div>
                 )}
+
+              {tab === 'affiliates' && (
+                <div>
+                  <AffiliatesComponent />
+                </div>
+              )}
 
               {tab === 'apps' && (
                 <div>
