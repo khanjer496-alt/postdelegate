@@ -1591,8 +1591,8 @@ export class PostsService {
     };
   }
 
-  async separatePosts(content: string, len: number) {
-    return this._openaiService.separatePosts(content, len);
+  async separatePosts(orgId: string, content: string, len: number) {
+    return this._openaiService.separatePosts(orgId, content, len);
   }
 
   async changeState(id: string, state: State, err?: any, body?: any) {

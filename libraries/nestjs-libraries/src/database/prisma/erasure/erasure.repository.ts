@@ -213,6 +213,11 @@ const organizationSteps = (org: string): Step[] => [
   { table: 'AutoPost', model: 'autoPost', where: { organizationId: org } },
   { table: 'ThirdParty', model: 'thirdParty', where: { organizationId: org } },
   {
+    table: 'AiCredential',
+    model: 'aiCredential',
+    where: { organizationId: org },
+  },
+  {
     table: 'Notifications',
     model: 'notifications',
     where: { organizationId: org },

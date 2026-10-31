@@ -97,6 +97,7 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
   },
   PostImport: { scope: 'org', note: 'deleted, holds import results only' },
   ThirdParty: { scope: 'org', note: 'deleted, holds a third party API key' },
+  AiCredential: { scope: 'org', note: 'deleted, holds the workspace OpenAI key' },
   Errors: { scope: 'org', note: 'deleted, bodies can hold post content' },
   Mentions: { scope: 'none', note: 'global cache of public social handles' },
   mastra_messages: { scope: 'org', note: AI_MEMORY },
