@@ -116,7 +116,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      await this._usersService.canStartTrial(org, user.email)
+      await this._usersService.canStartTrial(org)
     );
   }
 
@@ -138,7 +138,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      await this._usersService.canStartTrial(org, user.email)
+      await this._usersService.canStartTrial(org)
     );
   }
 
@@ -153,7 +153,7 @@ export class BillingController {
     if (await this.assertNoOtherSubscribedAccount(user)) {
       return { blocked: true };
     }
-    if (!(await this._usersService.canStartTrial(org, user.email))) {
+    if (!(await this._usersService.canStartTrial(org))) {
       return { trialUsed: true };
     }
 

@@ -29,11 +29,12 @@ export class UsersService {
     return this._usersRepository.getUserById(id);
   }
 
-  // One free trial per email, across all the logins and workspaces that share it
-  async canStartTrial(organization: { allowTrial: boolean }, email: string) {
+  // One free trial per owner email, across all the logins and workspaces that
+  // share it
+  async canStartTrial(organization: { id: string; allowTrial: boolean }) {
     return (
       organization.allowTrial &&
-      !(await this._usersRepository.getUserWithUsedTrialByEmail(email))
+      !(await this._usersRepository.getUserWithUsedTrialByOrg(organization.id))
     );
   }
 

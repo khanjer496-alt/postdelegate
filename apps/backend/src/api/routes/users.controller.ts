@@ -117,10 +117,7 @@ export class UsersController {
       isTrailing: !process.env.STRIPE_PUBLISHABLE_KEY
         ? false
         : organization?.isTrailing,
-      allowTrial: await this._userService.canStartTrial(
-        organization,
-        user.email
-      ),
+      allowTrial: await this._userService.canStartTrial(organization),
       streakSince: organization?.streakSince || null,
       publicApi:
         // @ts-ignore

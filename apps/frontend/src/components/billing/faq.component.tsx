@@ -18,7 +18,7 @@ const useFaqList = () => {
             ),
             description: t(
               'faq_free_trial_no_credit_card',
-              'Not during your free trial, and you do not need a credit card to start it. If you add a card, your first payment is charged when the trial ends. Without a card, your workspace moves to the Free plan when the trial ends. You can cancel anytime from settings without talking to a person'
+              'Not during your free trial, and you do not need a credit card to start it. If you add a card, your first payment is charged when the trial ends. Without a card, your workspace is paused when the trial ends until you choose a plan, and your posts are kept. You can cancel anytime from settings without talking to a person'
             ),
           },
         ]

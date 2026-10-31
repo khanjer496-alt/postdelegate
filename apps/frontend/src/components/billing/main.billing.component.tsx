@@ -476,6 +476,28 @@ export const MainBillingComponent: FC<{
   const addPaymentMethod = useAddPaymentMethod();
   const startTrial = useStartTrial();
 
+  // Features left out of the trial send here to end it, which needs a card
+  useEffect(() => {
+    if (!finishTrial || !renewal?.needsPaymentMethod) {
+      return;
+    }
+    setFinishTrial(false);
+    (async () => {
+      if (
+        await deleteDialog(
+          t(
+            'finish_trial_add_card_first',
+            'This feature is not part of the free trial. Add a card first, then you can end your trial and use it right away.'
+          ),
+          t('add_a_card', 'Add a card'),
+          t('trial', 'Trial')
+        )
+      ) {
+        addPaymentMethod();
+      }
+    })();
+  }, [finishTrial, renewal?.needsPaymentMethod]);
+
   useEffect(() => {
     if (queryParams.get('card') === 'added') {
       toast.show(
@@ -877,7 +899,7 @@ export const MainBillingComponent: FC<{
 
   return (
     <div className="flex flex-col gap-[24px]">
-      {finishTrial && (
+      {finishTrial && renewal && !renewal.needsPaymentMethod && (
         <FinishTrial
           close={() => {
             setFinishTrial(false);

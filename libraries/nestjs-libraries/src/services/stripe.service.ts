@@ -303,6 +303,12 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.cancel_at
     );
 
+    if (isCardlessTrial(event.data.object)) {
+      await this.notifyTrialStarted(event.data.object).catch((err) => {
+        console.error('stripe_trial_started_notice_failed', err);
+      });
+    }
+
     if (event.data.object.status === 'trialing') {
       this.trackSubscription(
         event.data.object.metadata,
@@ -369,7 +375,9 @@ export class StripeService extends PaymentProviderAbstract {
         event.type === 'customer.subscription.deleted' &&
         this.isCardlessTrialEnded(event.data.object)
       ) {
-        await this.notifyTrialEnded(customer).catch(() => {});
+        await this.notifyTrialEnded(customer).catch((err) => {
+          console.error('stripe_trial_ended_notice_failed', err);
+        });
       }
       return;
     }
@@ -403,36 +411,66 @@ export class StripeService extends PaymentProviderAbstract {
   }
 
   // Stripe sends it 3 days before the trial ends. A trial without a card is
-  // canceled when it ends, so ask the workspace to add one.
+  // canceled when it ends, so ask the workspace to add one. It never fails the
+  // webhook, a retry would send the reminder twice.
   async trialWillEnd(event: Stripe.CustomerSubscriptionTrialWillEndEvent) {
     const subscription = event.data.object;
-    if (
-      !isCardlessTrial(subscription) ||
-      (await this.hasPaymentMethod(subscription))
-    ) {
-      return { ok: true };
-    }
+    try {
+      if (!(await this.needsPaymentMethod(subscription))) {
+        return { ok: true };
+      }
 
+      const org = await this._organizationService.getOrgByCustomerId(
+        subscription.customer as string
+      );
+      if (!org) {
+        return { ok: true };
+      }
+
+      await this._notificationService.inAppNotification(
+        org.id,
+        'Your free trial ends soon',
+        `Your PostDelegate free trial ends on ${dayjs
+          .unix(subscription.trial_end!)
+          .format('MMMM D, YYYY')}. Add a card in Settings > Billing (${
+          process.env.FRONTEND_URL
+        }/billing) to keep your plan. Without a card, your workspace is paused until you choose a plan.`,
+        true,
+        false,
+        'info'
+      );
+    } catch (err) {
+      console.error('stripe_trial_will_end_failed', {
+        stripe_event_id: event.id,
+        stripe_subscription_id: subscription.id,
+        err,
+      });
+    }
+    return { ok: true };
+  }
+
+  private async notifyTrialStarted(subscription: Stripe.Subscription) {
     const org = await this._organizationService.getOrgByCustomerId(
       subscription.customer as string
     );
     if (!org) {
-      return { ok: true };
+      return;
     }
 
     await this._notificationService.inAppNotification(
       org.id,
-      'Your free trial ends soon',
-      `Your PostDelegate free trial ends on ${dayjs
+      'Your free trial has started',
+      `Welcome to PostDelegate! Your ${TRIAL_DAYS}-day free trial runs until ${dayjs
         .unix(subscription.trial_end!)
-        .format('MMMM D, YYYY')}. Add a card in Settings > Billing (${
+        .format(
+          'MMMM D, YYYY'
+        )}, no credit card needed. To keep your plan after that, add a card any time in Settings > Billing (${
         process.env.FRONTEND_URL
-      }/billing) to keep your plan. Without a card, your workspace moves to the Free plan and your scheduled posts are paused.`,
+      }/billing).`,
       true,
       false,
       'info'
     );
-    return { ok: true };
   }
 
   // Canceled by Stripe at the end of a trial that had no card
@@ -455,10 +493,20 @@ export class StripeService extends PaymentProviderAbstract {
     await this._notificationService.inAppNotification(
       org.id,
       'Your free trial has ended',
-      `Your PostDelegate free trial has ended and your workspace is on the Free plan, so your scheduled posts are paused. Choose a plan in Settings > Billing (${process.env.FRONTEND_URL}/billing) to pick up where you left off.`,
+      `Your PostDelegate free trial has ended and your workspace is paused. Your posts are kept: choose a plan in Settings > Billing (${process.env.FRONTEND_URL}/billing) to switch your channels back on and pick up where you left off.`,
       true,
       false,
       'info'
+    );
+  }
+
+  // A trial without a card that is not being canceled anyway
+  private async needsPaymentMethod(subscription: Stripe.Subscription) {
+    return (
+      isCardlessTrial(subscription) &&
+      !subscription.cancel_at_period_end &&
+      !subscription.cancel_at &&
+      !(await this.hasPaymentMethod(subscription))
     );
   }
 
@@ -942,8 +990,7 @@ export class StripeService extends PaymentProviderAbstract {
         (trialing ? sub.trial_end : sub?.items.data[0]?.current_period_end) ||
         null,
       trialing,
-      needsPaymentMethod:
-        !!sub && isCardlessTrial(sub) && !(await this.hasPaymentMethod(sub)),
+      needsPaymentMethod: !!sub && (await this.needsPaymentMethod(sub)),
     };
   }
 
@@ -1219,30 +1266,26 @@ export class StripeService extends PaymentProviderAbstract {
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
     if ((await this.getLiveSubscriptions(customer)).length) {
-      return { blocked: true };
+      return { subscribed: true };
     }
     const findPrice = await resolveTierPrice(stripe, body.billing, body.period);
     await this.updateCheckoutCustomer(customer, userId, body);
 
-    await stripe.subscriptions.create(
-      {
-        customer,
-        items: [{ price: findPrice!.id, quantity: 1 }],
-        trial_period_days: TRIAL_DAYS,
-        trial_settings: {
-          end_behavior: { missing_payment_method: 'cancel' },
-        },
-        metadata: {
-          service: 'gitroom',
-          ...body,
-          userId,
-          uniqueId: id,
-          ud: uniqueId,
-        },
+    await stripe.subscriptions.create({
+      customer,
+      items: [{ price: findPrice!.id, quantity: 1 }],
+      trial_period_days: TRIAL_DAYS,
+      trial_settings: {
+        end_behavior: { missing_payment_method: 'cancel' },
       },
-      // a double click must not start two trials
-      { idempotencyKey: `trial-${organizationId}` }
-    );
+      metadata: {
+        service: 'gitroom',
+        ...body,
+        userId,
+        uniqueId: id,
+        ud: uniqueId,
+      },
+    });
 
     return { id };
   }

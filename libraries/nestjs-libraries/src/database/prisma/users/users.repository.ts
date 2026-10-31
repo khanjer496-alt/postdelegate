@@ -153,12 +153,30 @@ export class UsersRepository {
     });
   }
 
-  // A workspace stops allowing a trial once it had a trial or a plan, so a
-  // login with this email that owns such a workspace already had one
-  getUserWithUsedTrialByEmail(email: string) {
+  // A workspace stops allowing a trial once it had a trial or a plan, so an
+  // owner email (also once deleted) that owns such a workspace already had one
+  async getUserWithUsedTrialByOrg(organizationId: string) {
+    const owners = await this._user.model.user.findMany({
+      where: {
+        organizations: {
+          some: { organizationId, role: Role.SUPERADMIN },
+        },
+      },
+      select: { email: true },
+    });
+    if (!owners.length) {
+      return null;
+    }
+
+    const hash = (value: string) =>
+      createHash('md5').update(value).digest('hex');
+
     return this._user.model.user.findFirst({
       where: {
-        email,
+        OR: owners.flatMap(({ email }) => [
+          { email: { equals: email, mode: 'insensitive' as const } },
+          { email: { startsWith: `deleted_${hash(email.toLowerCase())}_` } },
+        ]),
         organizations: {
           some: {
             role: Role.SUPERADMIN,

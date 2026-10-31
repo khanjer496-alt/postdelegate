@@ -567,8 +567,7 @@ describe('StripeService cardless trial', () => {
           uniqueId: result.id,
           ud: 'cookie',
         }),
-      }),
-      { idempotencyKey: 'trial-org_1' }
+      })
     );
   });
 
@@ -586,7 +585,7 @@ describe('StripeService cardless trial', () => {
         billing: 'TEAM',
         period: 'MONTHLY',
       } as any)
-    ).toEqual({ blocked: true });
+    ).toEqual({ subscribed: true });
     expect(mockStripe.subscriptions.create).not.toHaveBeenCalled();
   });
 
@@ -594,8 +593,18 @@ describe('StripeService cardless trial', () => {
     await service.processWebhook(
       subscriptionEvent('customer.subscription.created', {
         status: 'trialing',
+        trial_end: 1793664000,
         ...cardless,
       })
+    );
+
+    expect(notificationService.inAppNotification).toHaveBeenCalledWith(
+      'org_1',
+      'Your free trial has started',
+      expect.stringContaining('no credit card needed'),
+      true,
+      false,
+      'info'
     );
 
     expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalledWith(
@@ -655,6 +664,36 @@ describe('StripeService cardless trial', () => {
     );
 
     expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not remind a trial that is set to cancel', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        cancel_at_period_end: true,
+        ...cardless,
+      })
+    );
+
+    expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+  });
+
+  it('never fails the webhook when the reminder cannot be sent', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    notificationService.inAppNotification.mockRejectedValueOnce(
+      new Error('email down')
+    );
+
+    expect(
+      await service.processWebhook(
+        subscriptionEvent('customer.subscription.trial_will_end', {
+          status: 'trialing',
+          trial_end: 1793664000,
+          ...cardless,
+        })
+      )
+    ).toEqual({ ok: true });
   });
 
   it('moves the workspace to FREE and tells it when the trial ended without a card', async () => {

@@ -63,7 +63,7 @@ export const useStartTrial = () => {
 
   return useCallback(
     async (billing: string, period: string) => {
-      const { id, blocked, trialUsed } = await (
+      const { id, blocked, trialUsed, subscribed } = await (
         await fetch('/billing/start-trial', {
           method: 'POST',
           body: JSON.stringify({
@@ -98,6 +98,11 @@ export const useStartTrial = () => {
               'billing_trial_already_used',
               'This email already had a free trial. Choose a plan to continue.'
             )
+          : subscribed
+          ? t(
+              'billing_workspace_already_subscribed',
+              'This workspace already has a plan.'
+            )
           : t('billing_trial_failed', 'We could not start your free trial'),
         t('ok', 'OK'),
         t('trial', 'Trial')
@@ -130,7 +135,7 @@ const StartTrial: FC<{ tier: string; period: string }> = ({ tier, period }) => {
       <div className="text-[16px] text-textItemBlur">
         {t(
           'billing_start_free_trial_description',
-          'Try the {{plan}} plan free for 7 days, no credit card needed. Add a card any time before the trial ends to keep your plan. Without one, your workspace moves to the Free plan.',
+          'Try the {{plan}} plan free for 7 days, no credit card needed. Add a card any time before the trial ends to keep your plan. Without one, your workspace is paused until you choose a plan.',
           { plan: pricing[tier]?.label || capitalize(tier) }
         )}
       </div>
