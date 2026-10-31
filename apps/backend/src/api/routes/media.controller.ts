@@ -75,10 +75,6 @@ export class MediaController {
     @Body('prompt') prompt: string
   ) {
     const image = await this.generateImage(org, req, prompt, true);
-    if (!image) {
-      return false;
-    }
-
     const file = await this.storage.uploadSimple(image.output);
 
     return this._mediaService.saveFile(org.id, file.split('/').pop(), file);
