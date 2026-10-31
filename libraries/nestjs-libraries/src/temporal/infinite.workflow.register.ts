@@ -32,6 +32,26 @@ export class InfiniteWorkflowRegister implements OnModuleInit {
         }
       }
     }
+    // Daily analytics history and the scheduled analytics emails, on unless
+    // switched off; the activities check the same switches on every page
+    if (process.env.ANALYTICS_HISTORY_DISABLED !== 'true') {
+      await this.startSingleton('analyticsSnapshotWorkflowV1', 'analytics-snapshot-v1');
+    }
+    if (process.env.ANALYTICS_REPORTS_DISABLED !== 'true') {
+      await this.startSingleton('analyticsReportWorkflowV1', 'analytics-report-v1');
+    }
+  }
+
+  private async startSingleton(workflowType: string, workflowId: string) {
+    try {
+      const workflow = this._temporalService.client?.getRawClient()?.workflow;
+      if (!workflow) throw new Error('Temporal client is unavailable.');
+      await workflow.start(workflowType, { workflowId, taskQueue: 'main' });
+    } catch (error) {
+      if (!(error instanceof Error) || error.name !== 'WorkflowExecutionAlreadyStartedError') {
+        this._logger.warn(`Could not start ${workflowType}.`);
+      }
+    }
   }
 }
 

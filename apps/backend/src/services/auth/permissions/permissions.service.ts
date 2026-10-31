@@ -168,6 +168,14 @@ export class PermissionsService {
       }
 
       if (
+        section === Sections.ANALYTICS_REPORTS &&
+        options.analytics_reports
+      ) {
+        can(action, section);
+        continue;
+      }
+
+      if (
         section === Sections.IMPORT_FROM_CHANNELS &&
         options.import_from_channels
       ) {

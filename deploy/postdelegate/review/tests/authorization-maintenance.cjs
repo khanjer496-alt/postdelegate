@@ -195,6 +195,9 @@ test('bootstrap starts the new maintenance singleton only behind the exact enabl
   const instance = new InfiniteWorkflowRegister({ client: { getRawClient: () => ({ workflow: { start: async (name, options) => starts.push([name, options]) } }) } });
   delete process.env.RUN_CRON;
   delete process.env[flag];
+  // the analytics singletons have their own switches, covered below
+  process.env.ANALYTICS_HISTORY_DISABLED = 'true';
+  process.env.ANALYTICS_REPORTS_DISABLED = 'true';
   await instance.onModuleInit();
   assert.deepEqual(starts, []);
   process.env[flag] = 'false';
@@ -203,4 +206,28 @@ test('bootstrap starts the new maintenance singleton only behind the exact enabl
   process.env[flag] = 'true';
   await instance.onModuleInit();
   assert.deepEqual(starts, [['integrationAuthorizationMaintenanceWorkflowV1', { workflowId: 'integration-authorization-maintenance-v1', taskQueue: 'main' }]]);
+  delete process.env.ANALYTICS_HISTORY_DISABLED;
+  delete process.env.ANALYTICS_REPORTS_DISABLED;
+});
+
+test('bootstrap starts the analytics singletons unless each is switched off', async () => {
+  const { InfiniteWorkflowRegister } = loadSource('libraries/nestjs-libraries/src/temporal/infinite.workflow.register.ts');
+  const starts = [];
+  const instance = new InfiniteWorkflowRegister({ client: { getRawClient: () => ({ workflow: { start: async (name, options) => starts.push([name, options]) } }) } });
+  delete process.env.RUN_CRON;
+  delete process.env[flag];
+  delete process.env.ANALYTICS_HISTORY_DISABLED;
+  delete process.env.ANALYTICS_REPORTS_DISABLED;
+  await instance.onModuleInit();
+  assert.deepEqual(starts, [
+    ['analyticsSnapshotWorkflowV1', { workflowId: 'analytics-snapshot-v1', taskQueue: 'main' }],
+    ['analyticsReportWorkflowV1', { workflowId: 'analytics-report-v1', taskQueue: 'main' }],
+  ]);
+  starts.length = 0;
+  process.env.ANALYTICS_HISTORY_DISABLED = 'true';
+  process.env.ANALYTICS_REPORTS_DISABLED = 'true';
+  await instance.onModuleInit();
+  assert.deepEqual(starts, []);
+  delete process.env.ANALYTICS_HISTORY_DISABLED;
+  delete process.env.ANALYTICS_REPORTS_DISABLED;
 });

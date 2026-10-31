@@ -23,3 +23,5 @@ export * from './process.media.workflow';
 export * from './clipping.workflow';
 export * from './integration.data.deletion.workflow.v1';
 export * from './integration.authorization.maintenance.workflow.v1';
+export * from './analytics.snapshot.workflow.v1';
+export * from './analytics.report.workflow.v1';

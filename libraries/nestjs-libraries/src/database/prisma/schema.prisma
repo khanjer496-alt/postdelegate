@@ -1953,3 +1953,95 @@ model ReviewPrompt {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
+
+// Daily analytics history, written once a day per channel by
+// analyticsSnapshotWorkflowV1. The tables carry no relations on purpose:
+// every query is scoped by organizationId, rows are removed by retention and
+// by the erasure steps, and adding them puts no lock or delete restriction on
+// Organization or Integration.
+model AnalyticsAccountSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  integrationId  String
+  // UTC day of the snapshot, a re-run on the same day updates the row
+  date           DateTime @db.Date
+  followers      Int?
+  following      Int?
+  posts          Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([integrationId, date])
+  @@index([organizationId, date])
+  @@index([date])
+}
+
+// The latest metrics of one platform post, one row per channel and post
+model AnalyticsPost {
+  id             String   @id @default(cuid())
+  organizationId String
+  integrationId  String
+  // the id of the post on the platform
+  externalId     String
+  // the PostDelegate post it was published from, null when it was only read
+  // back from the platform's recent posts
+  postId         String?
+  publishedAt    DateTime
+  title          String?
+  url            String?
+  views          Int?
+  likes          Int?
+  comments       Int?
+  shares         Int?
+  clicks         Int?
+  lastSnapshotAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([integrationId, externalId])
+  @@index([organizationId, publishedAt])
+  @@index([publishedAt])
+}
+
+// The metrics of one platform post on one UTC day, kept for 90 days
+model AnalyticsPostSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  integrationId  String
+  externalId     String
+  date           DateTime @db.Date
+  views          Int?
+  likes          Int?
+  comments       Int?
+  shares         Int?
+  clicks         Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([integrationId, externalId, date])
+  @@index([organizationId, date])
+  @@index([date])
+}
+
+enum AnalyticsReportFrequency {
+  OFF
+  WEEKLY
+  MONTHLY
+}
+
+// The scheduled analytics email and the white-label report of a workspace
+model AnalyticsReportSettings {
+  id             String                   @id @default(cuid())
+  organizationId String                   @unique
+  frequency      AnalyticsReportFrequency @default(OFF)
+  // user ids of the workspace members who receive the email
+  recipients     String[]                 @default([])
+  // shown on the report instead of the workspace name and the PostDelegate logo
+  brandName      String?
+  logoUrl        String?
+  lastSentAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([frequency])
+}

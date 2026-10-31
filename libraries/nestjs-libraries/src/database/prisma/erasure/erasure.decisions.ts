@@ -168,4 +168,11 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     note: 'deleted (text, displayName, roleCompany)',
   },
   ReviewPrompt: { scope: 'user', note: 'deleted' },
+  AnalyticsAccountSnapshot: { scope: 'org', note: 'deleted, daily channel counts' },
+  AnalyticsPost: { scope: 'org', note: 'deleted, post titles, links and metrics' },
+  AnalyticsPostSnapshot: { scope: 'org', note: 'deleted, daily post metrics' },
+  AnalyticsReportSettings: {
+    scope: 'org',
+    note: 'deleted, recipient user ids and branding',
+  },
 };
