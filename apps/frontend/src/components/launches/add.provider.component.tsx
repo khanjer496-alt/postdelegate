@@ -288,7 +288,7 @@ const ExtensionNotFound: FC = () => {
       <div className="flex gap-[10px]">
         <Button
           type="button"
-          className="flex-1 !bg-transparent border border-tableBorder text-textColor"
+          className="flex-1 !bg-transparent shadow-none border border-tableBorder text-textColor"
           onClick={() => modals.closeCurrent()}
         >
           {t('cancel', 'Cancel')}
@@ -352,7 +352,7 @@ const ChromeExtensionWarning: FC<{
         </Button>
         <Button
           type="button"
-          className="flex-1 !bg-transparent border border-tableBorder text-textColor"
+          className="flex-1 !bg-transparent shadow-none border border-tableBorder text-textColor"
           onClick={() => {
             modals.closeCurrent();
             onCancel();
