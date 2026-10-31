@@ -25,6 +25,6 @@ The documentation lives at /docs. Pages are Markdown files in src/pages/docs (re
 
 The page structure, typography, monochrome shell, pill controls, colourful feature panels and channel layout follow the current Postiz website as a visual reference. PostDelegate keeps its own identity, original copy, original interface illustrations and a real screenshot of the current branded app. It does not reuse Postiz testimonials, awards, customer photos or website artwork.
 
-This site is adapted from Nasida Apps LLC's earlier PostDelegate Astro site (preserved BrightBean repository at c3a8298). Current product facts refer to the Postiz-based deployment. Social connections, public paid plans, AI and agent workflows remain a staged rollout; do not replace these disclosures with unverified launch claims.
+Current product facts refer to the live PostDelegate deployment. Paid plans and the 7-day trial are live; further social connections, AI and agent workflows open in stages. Do not replace these disclosures with unverified launch claims.
 
 The application is based on Postiz under AGPL-3.0; applicable website source is supplied under AGPL-3.0. Plus Jakarta Sans is redistributed with its SIL Open Font License in public/fonts/OFL.txt. Network glyphs are generated from Simple Icons (CC0); names/logos identify their respective services and imply no endorsement.
