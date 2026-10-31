@@ -60,6 +60,10 @@ import { FarcasterProvider } from '@gitroom/backend/services/auth/providers/farc
 import { WalletProvider } from '@gitroom/backend/services/auth/providers/wallet.provider';
 import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.provider';
 import { StripeController } from '@gitroom/backend/api/routes/stripe.controller';
+import { IdeasController } from '@gitroom/backend/api/routes/ideas.controller';
+import { EvergreenController } from '@gitroom/backend/api/routes/evergreen.controller';
+import { PostsImportController } from '@gitroom/backend/api/routes/posts.import.controller';
+import { WeeklySummaryController } from '@gitroom/backend/api/routes/weekly.summary.controller';
 
 const authenticatedController = [
   UsersController,
@@ -85,6 +89,10 @@ const authenticatedController = [
   AffiliatesController,
   ReviewsController,
   ActivationController,
+  IdeasController,
+  EvergreenController,
+  PostsImportController,
+  WeeklySummaryController,
 ];
 @Module({
   imports: [UploadModule],

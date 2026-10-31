@@ -59,6 +59,14 @@ import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews
 import { ActivationRepository } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.repository';
 import { ActivationService } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.service';
 import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
+import { IdeasRepository } from '@gitroom/nestjs-libraries/database/prisma/ideas/ideas.repository';
+import { IdeasService } from '@gitroom/nestjs-libraries/database/prisma/ideas/ideas.service';
+import { PostsEvergreenRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.repository';
+import { PostsEvergreenService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.service';
+import { PostsImportRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.repository';
+import { PostsImportService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.service';
+import { WeeklySummaryRepository } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.repository';
+import { WeeklySummaryService } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
 @Global()
@@ -129,6 +137,14 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     ActivationRepository,
     ActivationService,
     LoginLockoutService,
+    IdeasRepository,
+    IdeasService,
+    PostsEvergreenRepository,
+    PostsEvergreenService,
+    PostsImportRepository,
+    PostsImportService,
+    WeeklySummaryRepository,
+    WeeklySummaryService,
   ],
   get exports() {
     return this.providers;
