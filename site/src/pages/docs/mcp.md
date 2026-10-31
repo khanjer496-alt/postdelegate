@@ -8,7 +8,7 @@ MCP, the Model Context Protocol, is a standard way for an AI assistant to use to
 
 <div class="callout">
 
-**Bring your own assistant.** PostDelegate does not provide an AI of its own, and AI features inside the app are currently off. MCP is how you use the assistant you already have, such as Claude, ChatGPT or an editor like Cursor, with your calendar. Any usage costs on the assistant's side are between you and its provider.
+**Bring your own assistant.** PostDelegate does not provide an AI of its own: AI inside the app runs on your workspace's own OpenAI API key, added by an admin in **Settings → AI**. MCP is how you use the assistant you already have, such as Claude, ChatGPT or an editor like Cursor, with your calendar. Any usage costs on the assistant's side are between you and its provider.
 
 </div>
 

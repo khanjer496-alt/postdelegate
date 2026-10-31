@@ -154,7 +154,7 @@ pattern for third-party API keys. The mask is computed on read by decrypting and
    Postiz's global "popular posts" table using operator-paid AI. **Remove it**: delete the route from
    `public.controller.ts` (and its spec mock), and delete `AgentGraphInsertService` and its provider registration.
    No replacement.
-2. **MCP `ask_postiz`** (`start.mcp.ts` registers `agents: { postiz: agent }`) runs the agent model. The
+2. **MCP `ask_postdelegate`** (`start.mcp.ts` registers `agents: { postdelegate: agent }`) runs the agent model. The
    dynamic Mastra `model` function resolves the org from `requestContext.get('organization')`, then falls back
    to the async-storage `getAuth()` org (`chat/async.storage.ts`), then throws the "Add your OpenAI key" error.
    Memory `generateTitle` uses the same dynamic model. That's fine.

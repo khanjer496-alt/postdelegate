@@ -18,7 +18,7 @@ description: What each PostDelegate plan includes, how the 7-day trial works and
 
 All prices are in US dollars. Yearly prices are per year.
 
-AI features are currently off on every plan. PostDelegate does not provide its own AI. If you want an AI assistant to work with your calendar, bring your own through [MCP](/docs/mcp).
+PostDelegate never charges for AI. AI writing, the Agent and AI images run on your workspace's own OpenAI API key, added by an admin in **Settings → AI**, and OpenAI bills you directly for that use. AI video is not available. You can also bring your own assistant, such as ChatGPT or Claude, through [MCP](/docs/mcp).
 
 ## The 7-day trial
 

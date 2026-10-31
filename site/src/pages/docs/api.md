@@ -89,7 +89,7 @@ Read `message` or `msg` for the reason. Post validation errors name the channel,
 | [Channels and customers](/docs/api/channels) | `GET /integrations`, `GET /groups`, `GET /integration-settings/:id`, `POST /integration-trigger/:id`, `GET /social/:integration`, `DELETE /integrations/:id` |
 | [Analytics and more](/docs/api/more) | `GET /analytics/:integration`, `GET /analytics/post/:postId`, `GET /notifications`, `GET /find-slot/:id`, `GET /is-connected`, `GET /me` |
 
-The API also has operator-only routes and routes for AI image, video and clipping features. They are not part of the supported surface: AI is off, and customers bring their own assistant through [MCP](/docs/mcp).
+The API also has operator-only routes and routes for AI image, video and clipping features. They are not part of the supported surface. In the app, AI runs on the workspace's own OpenAI API key and AI video is not available; customers can also bring their own assistant through [MCP](/docs/mcp).
 
 ## Webhooks
 

@@ -91,6 +91,9 @@ export class CopilotController {
       mastra,
       requestContext: requestContext as any,
     });
+    // dashboard tabs still on the previous bundle ask for agent="postiz";
+    // remove this alias after the next release
+    agents.postiz = agents.postdelegate;
 
     const runtime = new CopilotRuntime({
       agents,
