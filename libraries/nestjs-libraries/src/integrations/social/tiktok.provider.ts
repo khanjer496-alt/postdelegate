@@ -45,7 +45,7 @@ type TikTokCreatorInfo = {
 )
 export class TiktokProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tiktok';
-  name = 'Tiktok';
+  name = 'TikTok';
   isBetweenSteps = false;
   convertToJPEG = true;
   scopes = [
@@ -67,6 +67,12 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   publishedLabel(settings: Partial<TikTokDto>) {
     return settings?.content_posting_method === 'UPLOAD'
       ? 'Sent to TikTok inbox'
+      : undefined;
+  }
+
+  publishedLinkLabel(settings: Partial<TikTokDto>) {
+    return settings?.content_posting_method === 'UPLOAD'
+      ? 'Open TikTok inbox'
       : undefined;
   }
 

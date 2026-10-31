@@ -63,6 +63,12 @@ export class TiktokBusinessProvider
       : undefined;
   }
 
+  publishedLinkLabel(settings: Partial<TikTokDto>) {
+    return settings?.content_posting_method === 'UPLOAD'
+      ? 'Open TikTok inbox'
+      : undefined;
+  }
+
   private baseUrl = 'https://business-api.tiktok.com/open_api/v1.3';
 
   // The TikTok developer portal only accepts redirect URLs that end with "/"

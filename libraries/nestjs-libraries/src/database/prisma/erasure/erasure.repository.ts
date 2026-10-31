@@ -451,9 +451,10 @@ export class ErasureRepository {
       })),
       extraWorkflowIds: [
         `streak_${org}`,
-        // v1 digests may still exist next to the v2 one
+        // v1 and v2 digests may still exist next to the v3 one
         `digest_email_workflow_${org}`,
         `digest_email_workflow_v2_${org}`,
+        `digest_email_workflow_v3_${org}`,
         ...autoposts.map(({ id }) => `autopost-${id}`),
         ...clippings.map(({ id }) => `clipping_${id}`),
         ...clips.map(({ id }) => `clipping_clip_${id}`),
