@@ -289,7 +289,7 @@ export const ApprovalsSettings: FC = () => {
               )}
               description={t(
                 'approval_require_api_description',
-                'Posts created with an API key, through the public API or the CLI, wait for approval too.'
+                'Posts from the public API (API keys and connected apps) and the CLI wait for approval too. MCP clients always follow the setting above.'
               )}
               checked={requireApiApproval}
               onChange={setRequireApiApproval}
