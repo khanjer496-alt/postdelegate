@@ -67,6 +67,10 @@ import {
 import { Button } from '@gitroom/react/form/button';
 import { ChevronUpIcon } from '@gitroom/frontend/components/ui/icons';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
+import {
+  EvergreenAction,
+  EvergreenBadge,
+} from '@gitroom/frontend/components/launches/evergreen/evergreen.card';
 
 // Extend dayjs with necessary plugins
 extend(isSameOrAfter);
@@ -1425,6 +1429,7 @@ const CalendarItem: FC<{
         >
           <Duplicate />
         </button>
+        <EvergreenAction post={post} className={actionClass} />
         <button
           type="button"
           aria-label={t('delete_post', 'Delete Post')}
@@ -1491,6 +1496,7 @@ const CalendarItem: FC<{
               publishedLabel={post.publishedLabel}
               compact={compact}
             />
+            <EvergreenBadge post={post} />
             {/* the day view slots already show their time */}
             {!compact && (showTime || display === 'week') && (
               <div className="ms-auto shrink-0 text-[11px] text-newTextColor/70 tabular-nums">

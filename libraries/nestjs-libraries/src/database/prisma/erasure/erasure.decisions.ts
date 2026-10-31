@@ -91,6 +91,11 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
   Webhooks: { scope: 'org', note: 'deleted, the URL may identify a person' },
   AutoPost: { scope: 'org', note: 'deleted' },
   Sets: { scope: 'org', note: 'deleted' },
+  Idea: {
+    scope: 'org',
+    note: 'deleted before tags; createdById is a plain id with no relation, gone with the row',
+  },
+  PostImport: { scope: 'org', note: 'deleted, holds import results only' },
   ThirdParty: { scope: 'org', note: 'deleted, holds a third party API key' },
   Errors: { scope: 'org', note: 'deleted, bodies can hold post content' },
   Mentions: { scope: 'none', note: 'global cache of public social handles' },
