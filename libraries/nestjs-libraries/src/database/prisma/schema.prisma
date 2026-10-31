@@ -46,6 +46,8 @@ model Organization {
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
   reviews             Review[]
+  ideas               Idea[]
+  postImports         PostImport[]
   // Affiliate attribution, set once at registration and never changed
   referredByAffiliateId String?
   referredByAffiliate   AffiliateProfile? @relation("AffiliateReferrals", fields: [referredByAffiliateId], references: [id])
@@ -65,12 +67,16 @@ model Tags {
   id           String       @id @default(uuid())
   name         String
   color        String
+  // a plain tag, a campaign or a content pillar; all of them label posts
+  kind         TagKind      @default(TAG)
+  description  String?
   orgId        String
   deletedAt    DateTime?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   organization Organization @relation(fields: [orgId], references: [id])
   posts        TagsPosts[]
+  ideas        Idea[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -159,6 +165,9 @@ model UserOrganization {
   role           Role         @default(USER)
   // When this member hid the getting started checklist of this workspace
   onboardingDismissedAt DateTime?
+  // Monday summary of this workspace, on for the admin who creates a workspace
+  weeklySummaryEmails Boolean  @default(false)
+  weeklySummarySentAt DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -167,6 +176,7 @@ model UserOrganization {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@index([disabled])
+  @@index([weeklySummaryEmails])
 }
 
 model GitHub {
@@ -495,6 +505,11 @@ model Post {
   creationMethod             CreationMethod            @default(UNKNOWN)
   lastMessageId              String?
   intervalInDays             Int?
+  // evergreen limits of a repeating post (intervalInDays): stop after this
+  // many re-shares or after this date, rotating the text through the variants
+  evergreenMaxShares         Int?
+  evergreenUntil             DateTime?
+  evergreenVariants          String?
   error                      String?
   createdAt                  DateTime                  @default(now())
   updatedAt                  DateTime                  @updatedAt
@@ -527,6 +542,41 @@ model Post {
   @@index([updatedAt])
   @@index([releaseURL])
   @@index([integrationId])
+}
+
+// An unscheduled post idea on the Ideas board
+model Idea {
+  id             String       @id @default(uuid())
+  organizationId String
+  title          String
+  notes          String?
+  media          String?
+  tagId          String?
+  status         IdeaStatus   @default(IDEA)
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  tag            Tags?        @relation(fields: [tagId], references: [id])
+
+  @@index([organizationId, deletedAt])
+  @@index([tagId])
+}
+
+// One CSV import, keyed by the file contents so the same upload never
+// creates its posts twice
+model PostImport {
+  id             String       @id @default(uuid())
+  organizationId String
+  hash           String
+  status         String       @default("processing")
+  result         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, hash])
 }
 
 model Notifications {
@@ -1814,6 +1864,18 @@ enum Provider {
   FARCASTER
   WALLET
   GENERIC
+}
+
+enum TagKind {
+  TAG
+  CAMPAIGN
+  PILLAR
+}
+
+enum IdeaStatus {
+  IDEA
+  DRAFTING
+  USED
 }
 
 enum Role {

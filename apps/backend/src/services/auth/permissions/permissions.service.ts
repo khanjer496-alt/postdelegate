@@ -39,6 +39,29 @@ export class PermissionsService {
     };
   }
 
+  // posts counted against the plan since the start of the billing month
+  private async postsThisMonth(orgId: string, created_at: Date) {
+    const createdAt =
+      (await this._subscriptionService.getSubscription(orgId))?.createdAt ||
+      created_at;
+    const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
+    const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
+    return this._postsService.countPostsFromDay(orgId, checkFrom.toDate());
+  }
+
+  // how many more posts the plan allows this month, null without billing;
+  // a bulk import creates many posts after a single policy check
+  async remainingPostsThisMonth(orgId: string, created_at: Date) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return null;
+    }
+    const { options } = await this.getPackageOptions(orgId);
+    return Math.max(
+      0,
+      options.posts_per_month - (await this.postsThisMonth(orgId, created_at))
+    );
+  }
+
   async check(
     orgId: string,
     created_at: Date,
@@ -118,17 +141,7 @@ export class PermissionsService {
 
       // check for posts per month
       if (section === Sections.POSTS_PER_MONTH) {
-        const createdAt =
-          (await this._subscriptionService.getSubscription(orgId))?.createdAt ||
-          created_at;
-        const totalMonthPast = Math.abs(
-          dayjs(createdAt).diff(dayjs(), 'month')
-        );
-        const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
-        const count = await this._postsService.countPostsFromDay(
-          orgId,
-          checkFrom.toDate()
-        );
+        const count = await this.postsThisMonth(orgId, created_at);
 
         if (count < options.posts_per_month) {
           can(action, section);

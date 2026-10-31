@@ -16,6 +16,16 @@ export class InfiniteWorkflowRegister implements OnModuleInit {
             taskQueue: 'main',
           });
       } catch (err) {}
+      // the Monday summary email; the activity does nothing without an email
+      // provider or with WEEKLY_SUMMARY_DISABLED=true
+      try {
+        await this._temporalService.client
+          ?.getRawClient()
+          ?.workflow?.start('weeklySummaryWorkflowV1', {
+            workflowId: 'weekly-summary-workflow-v1',
+            taskQueue: 'main',
+          });
+      } catch (err) {}
     }
     if (process.env.INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED === 'true') {
       try {

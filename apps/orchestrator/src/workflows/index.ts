@@ -25,3 +25,4 @@ export * from './integration.data.deletion.workflow.v1';
 export * from './integration.authorization.maintenance.workflow.v1';
 export * from './analytics.snapshot.workflow.v1';
 export * from './analytics.report.workflow.v1';
+export * from './weekly.summary.workflow.v1';

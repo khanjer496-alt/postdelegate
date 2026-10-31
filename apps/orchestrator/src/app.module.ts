@@ -12,6 +12,7 @@ import { VideoModule } from '@gitroom/nestjs-libraries/videos/video.module';
 import { HealthController } from '@gitroom/orchestrator/health.controller';
 import { IntegrationAuthorizationMaintenanceActivity } from '@gitroom/orchestrator/activities/integration.authorization.maintenance.activity';
 import { AnalyticsHistoryActivity } from '@gitroom/orchestrator/activities/analytics.history.activity';
+import { WeeklySummaryActivity } from '@gitroom/orchestrator/activities/weekly.summary.activity';
 
 const activities = [
   PostActivity,
@@ -23,6 +24,7 @@ const activities = [
   ClippingActivity,
   IntegrationAuthorizationMaintenanceActivity,
   AnalyticsHistoryActivity,
+  WeeklySummaryActivity,
 ];
 @Module({
   imports: [
