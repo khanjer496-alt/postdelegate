@@ -978,6 +978,6 @@
   "ai_key_save_failed": "Bu anahtar kaydedilemedi, lütfen tekrar deneyin",
   "ai_key_remove_failed": "Bu anahtar kaldırılamadı, lütfen tekrar deneyin",
   "ai_key_load_failed": "Yapay zeka anahtarınız yüklenemedi, lütfen sayfayı yenileyin",
-  "ai_key_required": "OpenAI anahtarı gerekli",
-  "open_ai_settings": "Yapay zeka ayarlarını aç"
+  "open_settings": "Ayarları aç",
+  "action_required": "İşlem gerekli"
 }

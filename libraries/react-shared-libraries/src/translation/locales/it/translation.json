@@ -978,6 +978,6 @@
   "ai_key_save_failed": "Impossibile salvare questa chiave, riprova",
   "ai_key_remove_failed": "Impossibile rimuovere questa chiave, riprova",
   "ai_key_load_failed": "Impossibile caricare la tua chiave IA, aggiorna la pagina",
-  "ai_key_required": "Chiave OpenAI richiesta",
-  "open_ai_settings": "Apri impostazioni IA"
+  "open_settings": "Apri impostazioni",
+  "action_required": "Azione richiesta"
 }

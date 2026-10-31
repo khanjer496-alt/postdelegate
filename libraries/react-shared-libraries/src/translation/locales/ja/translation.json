@@ -978,6 +978,6 @@
   "ai_key_save_failed": "このキーを保存できませんでした。もう一度お試しください",
   "ai_key_remove_failed": "このキーを削除できませんでした。もう一度お試しください",
   "ai_key_load_failed": "AIキーを読み込めませんでした。ページを再読み込みしてください",
-  "ai_key_required": "OpenAIキーが必要です",
-  "open_ai_settings": "AI設定を開く"
+  "open_settings": "設定を開く",
+  "action_required": "対応が必要です"
 }

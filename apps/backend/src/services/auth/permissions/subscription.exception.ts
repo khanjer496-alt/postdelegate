@@ -7,34 +7,49 @@ import {
 import { AuthorizationActions, Sections, SubscriptionException } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { MISSING_AI_KEY } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 
+// a member can't add the workspace's key, only an admin can
+const ASK_ADMIN_FOR_AI_KEY =
+  'Ask a workspace admin to add an OpenAI key in Settings → AI.';
+
 @Catch(SubscriptionException)
 export class SubscriptionExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
+    const request = ctx.getRequest();
     const status = exception.getStatus();
     const error: { section: Sections; action: AuthorizationActions } =
       exception.getResponse() as any;
 
-    const message = getErrorMessage(error);
+    const isMember = request?.org?.users?.[0]?.role === 'USER';
+    const message = getErrorMessage(error, isMember);
 
     // AI is denied only when the workspace has no OpenAI key of its own, which
-    // is fixed in Settings → AI, not by paying
+    // is fixed in Settings → AI, not by paying. A member gets no link, as the
+    // AI settings are for admins
+    const memberWithoutAi = error.section === Sections.AI && isMember;
     response.status(status).json({
       statusCode: status,
       message,
       section: error.section,
-      url:
-        process.env.FRONTEND_URL +
-        (error.section === Sections.AI ? '/settings?tab=ai' : '/billing'),
+      ...(memberWithoutAi
+        ? {}
+        : {
+            url:
+              process.env.FRONTEND_URL +
+              (error.section === Sections.AI ? '/settings?tab=ai' : '/billing'),
+          }),
     });
   }
 }
 
-const getErrorMessage = (error: {
-  section: Sections;
-  action: AuthorizationActions;
-}) => {
+const getErrorMessage = (
+  error: {
+    section: Sections;
+    action: AuthorizationActions;
+  },
+  isMember: boolean
+) => {
   switch (error.section) {
     case Sections.POSTS_PER_MONTH:
       switch (error.action) {
@@ -59,7 +74,7 @@ const getErrorMessage = (error: {
     case Sections.AI:
       switch (error.action) {
         default:
-          return MISSING_AI_KEY;
+          return isMember ? ASK_ADMIN_FOR_AI_KEY : MISSING_AI_KEY;
       }
     case Sections.CLIPPING_MINUTES:
       switch (error.action) {

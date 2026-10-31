@@ -978,6 +978,6 @@
   "ai_key_save_failed": "Der Schlüssel konnte nicht gespeichert werden, bitte versuche es erneut",
   "ai_key_remove_failed": "Der Schlüssel konnte nicht entfernt werden, bitte versuche es erneut",
   "ai_key_load_failed": "Dein KI-Schlüssel konnte nicht geladen werden, bitte lade die Seite neu",
-  "ai_key_required": "OpenAI-Schlüssel erforderlich",
-  "open_ai_settings": "KI-Einstellungen öffnen"
+  "open_settings": "Einstellungen öffnen",
+  "action_required": "Handlung erforderlich"
 }
