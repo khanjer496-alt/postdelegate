@@ -1,4 +1,4 @@
-import { IsBoolean } from 'class-validator';
+import { IsBoolean, IsOptional } from 'class-validator';
 
 export class EmailNotificationsDto {
   @IsBoolean()
@@ -9,5 +9,9 @@ export class EmailNotificationsDto {
 
   @IsBoolean()
   sendStreakEmails: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  sendOnboardingEmails?: boolean;
 }
 

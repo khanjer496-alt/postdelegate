@@ -676,6 +676,22 @@ describe('StripeService cardless trial', () => {
     );
   });
 
+  it('adds what a card keeps and the plan prices to the reminder email only', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        ...cardless,
+      })
+    );
+
+    const [, , email] = notificationService.sendEmailsToOrgAdmins.mock.calls[0];
+    expect(email).toContain('What you keep with a card');
+    expect(email).toContain('<strong>Starter</strong> at $19 a month');
+    const [, , inApp] = notificationService.inAppNotification.mock.calls[0];
+    expect(inApp).not.toContain('What you keep with a card');
+  });
+
   describe('auto-apply promotion', () => {
     const autoApply = {
       id: 'promo_1',

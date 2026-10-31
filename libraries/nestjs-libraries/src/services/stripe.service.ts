@@ -23,6 +23,7 @@ import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/paym
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import dayjs from 'dayjs';
 import { emailButton } from '@gitroom/nestjs-libraries/services/email.service';
+import { trialEndsSoonDetails } from '@gitroom/nestjs-libraries/database/prisma/trial-onboarding/trial.onboarding.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
@@ -452,7 +453,12 @@ export class StripeService extends PaymentProviderAbstract {
           .format('MMMM D, YYYY')}. Add a card in Settings > Billing (${
           process.env.FRONTEND_URL
         }/billing) to keep your plan. Without a card, your workspace is paused until you choose a plan.`,
-        'Add a card'
+        'Add a card',
+        // the email also says what a card keeps and what the plans cost
+        trialEndsSoonDetails(
+          subscription.metadata?.billing,
+          subscription.metadata?.period
+        )
       );
     } catch (err) {
       console.error('stripe_trial_will_end_failed', {
@@ -492,13 +498,16 @@ export class StripeService extends PaymentProviderAbstract {
     orgId: string,
     subject: string,
     message: string,
-    action: string
+    action: string,
+    emailDetails = ''
   ) {
     await this._notificationService.inAppNotification(orgId, subject, message);
     await this._notificationService.sendEmailsToOrgAdmins(
       orgId,
       subject,
-      message + emailButton(`${process.env.FRONTEND_URL}/billing`, action)
+      message +
+        emailDetails +
+        emailButton(`${process.env.FRONTEND_URL}/billing`, action)
     );
   }
 
