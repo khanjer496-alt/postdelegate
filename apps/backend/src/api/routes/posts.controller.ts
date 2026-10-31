@@ -328,6 +328,6 @@ export class PostsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: { content: string; len: number }
   ) {
-    return this._postsService.separatePosts(body.content, body.len);
+    return this._postsService.separatePosts(org.id, body.content, body.len);
   }
 }

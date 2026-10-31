@@ -579,6 +579,7 @@ export class ClippingService {
     }
 
     const picked = await this._openAi.pickClips(
+      clipping.organizationId,
       clipping.title || '',
       language,
       segments,

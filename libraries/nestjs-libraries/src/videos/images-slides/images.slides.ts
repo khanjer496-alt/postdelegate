@@ -1,4 +1,4 @@
-import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
+import { BadRequestException } from '@nestjs/common';
 import {
   ExposeVideoFunction,
   URL,
@@ -61,20 +61,13 @@ class ImagesSlidesParams {
   tools: [{ functionName: 'loadVoices', output: 'voice id' }],
   dto: ImagesSlidesParams,
   trial: true,
-  available:
-    !!process.env.ELEVENSLABS_API_KEY &&
-    !!process.env.TRANSLOADIT_AUTH &&
-    !!process.env.TRANSLOADIT_SECRET &&
-    !!process.env.OPENAI_API_KEY &&
-    !!process.env.FAL_KEY,
+  // fal.ai + ElevenLabs are platform-paid, PostDelegate is bring-your-own AI only
+  available: false,
 })
 export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
   override dto = ImagesSlidesParams;
   private storage = UploadFactory.createStorage();
-  constructor(
-    private _openaiService: OpenaiService,
-    private _falService: FalService
-  ) {
+  constructor(private _falService: FalService) {
     super();
   }
 
@@ -82,9 +75,11 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
     output: 'vertical' | 'horizontal',
     customParams: ImagesSlidesParams
   ): Promise<URL> {
-    const list = await this._openaiService.generateSlidesFromText(
-      customParams.prompt
-    );
+    throw new BadRequestException('This video type is not available');
+
+    // The slides used to come from the platform's OpenAI key, which no longer
+    // exists. Kept typed so the rest of the pipeline stays as it was.
+    const list: { imagePrompt: string; voiceText: string }[] = [];
 
     // Plain async calls so a failed image or voice request rejects Promise.all
     // and fails the job, instead of a promise that never settles and a job that
