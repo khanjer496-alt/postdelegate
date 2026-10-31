@@ -167,6 +167,7 @@ module.exports = {
         greenToast: '0px 0px 50px rgba(60, 124, 90, 0.3)',
         menu: 'var(--menu-shadow)',
         previewShadow: 'var(--preview-box-shadow)',
+        cta: 'inset 0 0 0 1px var(--new-btn-cta-edge)',
       },
       dropShadow: {
         glow: [

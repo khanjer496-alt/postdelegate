@@ -45,7 +45,7 @@ export const Button: FC<
       className={clsx(
         (props.disabled || loading) && 'opacity-50 pointer-events-none',
         `${
-          secondary ? 'bg-third' : 'bg-btnCta text-btnCtaText font-[600]'
+          secondary ? 'bg-third' : 'bg-btnCta shadow-cta text-btnCtaText font-[600]'
         } px-[24px] h-[40px] cursor-pointer items-center justify-center flex relative`,
         props?.className
       )}

@@ -36,7 +36,7 @@ export const BottomSheetButton: FC<{
       <button
         disabled={disabled}
         onClick={onClick}
-        className="w-full h-[44px] rounded-[10px] bg-btnCta text-btnCtaText text-[15px] font-[600] disabled:bg-btnSimple disabled:text-textItemBlur"
+        className="w-full h-[44px] rounded-[10px] bg-btnCta shadow-cta text-btnCtaText text-[15px] font-[600] disabled:bg-btnSimple disabled:text-textItemBlur"
       >
         {label}
       </button>

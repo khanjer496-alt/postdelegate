@@ -77,7 +77,7 @@ export const NewPost = () => {
   return (
     <button
       onClick={createAPost}
-      className="text-btnCtaText font-[600] flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-[10px] bg-btnCta hover:bg-btnCtaHover transition-colors flex justify-center items-center gap-[5px] outline-none"
+      className="text-btnCtaText font-[600] flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors flex justify-center items-center gap-[5px] outline-none"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
