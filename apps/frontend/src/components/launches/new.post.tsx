@@ -1,19 +1,28 @@
 import React, { useCallback } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { fromUtc } from '@gitroom/frontend/components/layout/set.timezone';
-import { useCalendar } from '@gitroom/frontend/components/launches/calendar.context';
+import {
+  Integrations,
+  useCalendar,
+} from '@gitroom/frontend/components/launches/calendar.context';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { SetSelectionModal } from '@gitroom/frontend/components/launches/calendar';
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
-// Opens the composer on the next free slot, used by the Create Post button and
-// the getting started checklist
-export const useCreatePost = () => {
+// Opens the composer on the next free slot. The Create Post button and the
+// getting started checklist read channels, sets and reload from the calendar;
+// the quick menu lives outside the calendar and passes its own.
+export const useCreatePost = (source?: {
+  integrations: Integrations[];
+  sets: { name: string; id: string; content: string[] }[];
+  reloadCalendarView: () => void;
+}) => {
   const fetch = useFetch();
   const modal = useModals();
-  const { integrations, reloadCalendarView, sets } = useCalendar();
+  const calendar = useCalendar();
+  const { integrations, sets, reloadCalendarView } = source || calendar;
   const t = useT();
 
   const createAPost = useCallback(async () => {
@@ -75,7 +84,8 @@ export const useCreatePost = () => {
       size: '80%',
       title: ``,
     });
-  }, [integrations, sets]);
+  }, [integrations, sets, reloadCalendarView]);
+
   return createAPost;
 };
 

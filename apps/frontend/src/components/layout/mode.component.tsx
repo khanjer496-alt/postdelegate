@@ -5,6 +5,8 @@ import useCookie from 'react-use-cookie';
 import EventEmitter from 'events';
 
 export const modeEmitter = new EventEmitter();
+// lets other components (the quick menu) flip the theme through this toggle
+export const modeToggleEmitter = new EventEmitter();
 
 const ModeComponent = () => {
   const [mode, setMode] = useCookie('mode', 'dark');
@@ -13,6 +15,13 @@ const ModeComponent = () => {
     modeEmitter.emit('mode', mode === 'dark' ? 'light' : 'dark');
     setMode(mode === 'dark' ? 'light' : 'dark');
   }, [mode]);
+
+  useEffect(() => {
+    modeToggleEmitter.on('toggle', changeMode);
+    return () => {
+      modeToggleEmitter.off('toggle', changeMode);
+    };
+  }, [changeMode]);
 
   useEffect(() => {
     document.body.classList.remove('dark', 'light');
