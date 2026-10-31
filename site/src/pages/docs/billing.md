@@ -25,11 +25,12 @@ AI features are currently off on every plan. PostDelegate does not provide its o
 Every plan starts with a free trial:
 
 - It lasts 7 days.
-- A card is required to start it.
-- To check the card, PostDelegate places a $1 authorization and voids it straight away. The $1 is not collected.
-- The first payment is charged when the trial ends, unless you cancel first.
+- No credit card is needed to start it.
+- To keep your plan after the trial, choose **Add a card** on the Billing page (or in the banner at the top of the app) before the trial ends. The first payment is charged when the trial ends.
+- If the trial ends without a card, your workspace moves to the Free plan. Your posts and channels are kept, but scheduled posts are paused until you choose a plan.
+- Each email address gets one free trial.
 
-The Billing page shows the date your trial ends and your first payment is charged.
+PostDelegate emails you a reminder 3 days before the trial ends, and again when it has ended. The Billing page shows the date your trial ends.
 
 ## Change or cancel
 

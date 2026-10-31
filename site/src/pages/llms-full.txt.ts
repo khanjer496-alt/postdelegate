@@ -21,7 +21,7 @@ Users can create a workspace. The workspace provides calendar, composer, media, 
 Channel connections are in rollout. Check the workspace or contact support for the account types and actions currently available. Google account sign-in does not by itself connect YouTube or Google Business Profile.
 
 ## Plans
-Prices are in US dollars. Every plan starts with a 7-day free trial that needs a card; cancelling before day 7 means no charge, otherwise the first payment is taken when the trial ends. There is no permanent free tier. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
+Prices are in US dollars. Every plan starts with a 7-day free trial that needs no credit card. A customer who adds a card before day 7 keeps the plan and the first payment is taken when the trial ends; without a card the workspace moves to the Free plan and scheduled posts pause. There is no permanent free tier. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
 ${plans}
 
 ## Automation and AI

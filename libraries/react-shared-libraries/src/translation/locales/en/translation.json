@@ -968,5 +968,18 @@
   "review_close": "Close",
   "review_name_required": "Add the name you want shown with your review",
   "review_save_failed": "Could not send your review, please try again",
-  "view_reviews": "View Reviews"
+  "view_reviews": "View Reviews",
+  "billing_no_credit_card_needed": "No credit card needed",
+  "no_credit_card_needed": "No credit card needed",
+  "billing_start_free_trial_title": "Start your 7-day free trial",
+  "billing_start_free_trial_description": "Try the {{plan}} plan free for 7 days, no credit card needed. Add a card any time before the trial ends to keep your plan. Without one, your workspace moves to the Free plan.",
+  "billing_start_free_trial": "Start free trial",
+  "billing_trial_already_used": "This email already had a free trial. Choose a plan to continue.",
+  "billing_trial_failed": "We could not start your free trial",
+  "billing_trial_without_card_ends_on": "Add a card to keep your plan. Your free trial ends on",
+  "billing_card_added": "Your card was added. Your plan continues when the trial ends.",
+  "add_a_card": "Add a card",
+  "trial_banner_one_day_left": "Your free trial ends tomorrow. Add a card to keep your plan and your scheduled posts.",
+  "trial_banner_days_left": "Your free trial ends in {{days}} days. Add a card to keep your plan and your scheduled posts.",
+  "faq_free_trial_no_credit_card": "Not during your free trial, and you do not need a credit card to start it. If you add a card, your first payment is charged when the trial ends. Without a card, your workspace moves to the Free plan when the trial ends. You can cancel anytime from settings without talking to a person"
 }

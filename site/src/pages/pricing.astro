@@ -17,7 +17,7 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
   ['Free trial', () => `${TRIAL_DAYS} days`],
 ];
 ---
-<Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month. Every plan starts with a ${TRIAL_DAYS}-day free trial; cancel before day ${TRIAL_DAYS} and you are not charged.`}>
+<Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month. Every plan starts with a ${TRIAL_DAYS}-day free trial, no credit card needed.`}>
   <PageHero eyebrow="Plans" title={`Pick a plan. Try it free for ${TRIAL_DAYS} days.`} lead="The plans differ in how many channels you connect, whether your team joins you and how many webhooks you run. Everything else comes with every plan.">
     <a href={SITE.signup} class="button">Start your free trial</a>
     <a href="/docs/billing" class="button button-outline">Read the billing guide</a>
@@ -35,7 +35,7 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
   <section class="pricing-questions"><div class="container">
     <h2>Before you get started</h2>
     <div class="question-grid">
-      <div><h3>How does the free trial work?</h3><p>Every plan starts with a {TRIAL_DAYS}-day free trial. A card is needed to start it, and we check it with a $1 authorization that is voided straight away. Cancel before day {TRIAL_DAYS} and you are not charged; otherwise the first payment is taken when the trial ends.</p></div>
+      <div><h3>How does the free trial work?</h3><p>Every plan starts with a {TRIAL_DAYS}-day free trial, and you do not need a credit card to start it. Add a card any time before day {TRIAL_DAYS} to keep your plan; the first payment is taken when the trial ends. Without a card, your workspace moves to the Free plan when the trial ends and your scheduled posts pause until you choose a plan.</p></div>
       <div><h3>Which channels can I connect?</h3><p>{AVAILABLE_NETWORKS.length} networks connect today, including YouTube, Bluesky, WordPress and Kick. Facebook, Instagram, TikTok, LinkedIn, X and others open as platform approvals come through. See <a href="/platforms">platform coverage</a>.</p></div>
       <div><h3>Can I change or cancel my plan?</h3><p>Workspace admins can change plan, update the payment method or cancel from <strong>Billing</strong> in the app. Cancellation takes effect at the end of the period you have already paid for.</p></div>
       <div><h3>What about AI and automation?</h3><p>AI features are off on every plan, and PostDelegate does not provide its own AI. Every plan includes the REST API and MCP server, so you can bring your own assistant.</p></div>

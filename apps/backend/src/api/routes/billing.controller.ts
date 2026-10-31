@@ -116,7 +116,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      org.allowTrial
+      await this._usersService.canStartTrial(org, user.email)
     );
   }
 
@@ -138,7 +138,31 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      org.allowTrial
+      await this._usersService.canStartTrial(org, user.email)
+    );
+  }
+
+  @Post('/start-trial')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async startTrial(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Body() body: BillingSubscribeDto,
+    @Req() req: Request
+  ) {
+    if (await this.assertNoOtherSubscribedAccount(user)) {
+      return { blocked: true };
+    }
+    if (!(await this._usersService.canStartTrial(org, user.email))) {
+      return { trialUsed: true };
+    }
+
+    const uniqueId = req?.cookies?.track;
+    return (await this.provider(org)).startTrial(
+      uniqueId,
+      org.id,
+      user.id,
+      body
     );
   }
 
@@ -168,6 +192,17 @@ export class BillingController {
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async modifyPayment(@GetOrgFromRequest() org: Organization) {
     const { url } = await (await this.provider(org)).portalLink(org.id);
+    return {
+      portal: url,
+    };
+  }
+
+  @Get('/add-payment-method')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async addPaymentMethod(@GetOrgFromRequest() org: Organization) {
+    const { url } = await (
+      await this.provider(org)
+    ).addPaymentMethodLink(org.id);
     return {
       portal: url,
     };

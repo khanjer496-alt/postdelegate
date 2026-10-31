@@ -1,7 +1,14 @@
 const mockStripe = {
   prices: { list: jest.fn(), create: jest.fn() },
   products: { list: jest.fn(), create: jest.fn() },
-  subscriptions: { list: jest.fn(), cancel: jest.fn() },
+  subscriptions: {
+    list: jest.fn(),
+    cancel: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+  customers: { retrieve: jest.fn(), update: jest.fn() },
+  paymentMethods: { list: jest.fn() },
   billingPortal: { sessions: { create: jest.fn() } },
   invoicePayments: { list: jest.fn() },
   charges: { retrieve: jest.fn() },
@@ -27,6 +34,10 @@ jest.mock('@gitroom/nestjs-libraries/track/track.service', () => ({
   TrackService: class {},
 }));
 jest.mock('@gitroom/helpers/auth/auth.service', () => ({ AuthService: {} }));
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service',
+  () => ({ NotificationService: class {} })
+);
 
 import {
   resolveTierPrice,
@@ -464,5 +475,257 @@ describe('StripeService affiliate events', () => {
     expect(affiliateService.recordInvoicePayment).not.toHaveBeenCalled();
     expect(affiliateService.reverseCommission).not.toHaveBeenCalled();
     expect(mockStripe.invoicePayments.list).not.toHaveBeenCalled();
+  });
+});
+
+describe('StripeService cardless trial', () => {
+  const subscriptionService = {
+    createOrUpdateSubscription: jest.fn(),
+    deleteSubscription: jest.fn(),
+  };
+  const organizationService = {
+    getOrgById: jest.fn(),
+    getOrgByCustomerId: jest.fn(),
+  };
+  const userService = {
+    getUserById: jest.fn().mockResolvedValue({ email: 'a@b.com' }),
+  };
+  const trackService = { track: jest.fn() };
+  const notificationService = { inAppNotification: jest.fn() };
+  const service = new StripeService(
+    subscriptionService as any,
+    organizationService as any,
+    userService as any,
+    trackService as any,
+    {} as any,
+    notificationService as any
+  );
+
+  const cardless = {
+    trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+  };
+  const subscriptionEvent = (type: string, object: any) =>
+    ({
+      type,
+      data: {
+        object: {
+          id: 'sub_1',
+          customer: 'cus_1',
+          cancel_at: null,
+          metadata: {
+            service: 'gitroom',
+            billing: 'STANDARD',
+            period: 'MONTHLY',
+            uniqueId: 'u1',
+          },
+          ...object,
+        },
+      },
+    } as any);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+    mockStripe.paymentMethods.list.mockResolvedValue({ data: [] });
+    mockStripe.customers.retrieve.mockResolvedValue({
+      invoice_settings: { default_payment_method: null },
+    });
+    organizationService.getOrgByCustomerId.mockResolvedValue({
+      id: 'org_1',
+      allowTrial: true,
+    });
+  });
+
+  it('starts the trial without a card and cancels it when no card was added', async () => {
+    organizationService.getOrgById.mockResolvedValue({
+      id: 'org_1',
+      paymentId: 'cus_1',
+    });
+    mockStripe.prices.list.mockResolvedValueOnce({
+      data: [{ id: 'price_team_month', unit_amount: 2900 }],
+    });
+
+    const result = await service.startTrial('cookie', 'org_1', 'user_1', {
+      billing: 'TEAM',
+      period: 'MONTHLY',
+    } as any);
+
+    expect(result).toEqual({ id: expect.any(String) });
+    expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: 'cus_1',
+        items: [{ price: 'price_team_month', quantity: 1 }],
+        trial_period_days: 7,
+        trial_settings: {
+          end_behavior: { missing_payment_method: 'cancel' },
+        },
+        metadata: expect.objectContaining({
+          service: 'gitroom',
+          billing: 'TEAM',
+          period: 'MONTHLY',
+          uniqueId: result.id,
+          ud: 'cookie',
+        }),
+      }),
+      { idempotencyKey: 'trial-org_1' }
+    );
+  });
+
+  it('does not start a second subscription', async () => {
+    organizationService.getOrgById.mockResolvedValue({
+      id: 'org_1',
+      paymentId: 'cus_1',
+    });
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: [{ id: 'sub_live', status: 'trialing' }],
+    });
+
+    expect(
+      await service.startTrial('cookie', 'org_1', 'user_1', {
+        billing: 'TEAM',
+        period: 'MONTHLY',
+      } as any)
+    ).toEqual({ blocked: true });
+    expect(mockStripe.subscriptions.create).not.toHaveBeenCalled();
+  });
+
+  it('records a trial that has no card', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.created', {
+        status: 'trialing',
+        ...cardless,
+      })
+    );
+
+    expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalledWith(
+      'stripe',
+      true,
+      'u1',
+      'cus_1',
+      expect.any(Number),
+      'STANDARD',
+      'MONTHLY',
+      null
+    );
+  });
+
+  it('still rejects a card trial that has no card', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.created', {
+        status: 'trialing',
+      })
+    );
+
+    expect(
+      subscriptionService.createOrUpdateSubscription
+    ).not.toHaveBeenCalled();
+  });
+
+  it('reminds the workspace to add a card before the trial ends', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        ...cardless,
+      })
+    );
+
+    expect(notificationService.inAppNotification).toHaveBeenCalledWith(
+      'org_1',
+      'Your free trial ends soon',
+      expect.stringContaining('Add a card'),
+      true,
+      false,
+      'info'
+    );
+  });
+
+  it('does not remind when a card was added', async () => {
+    mockStripe.customers.retrieve.mockResolvedValue({
+      invoice_settings: { default_payment_method: 'pm_1' },
+    });
+
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        ...cardless,
+      })
+    );
+
+    expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+  });
+
+  it('moves the workspace to FREE and tells it when the trial ended without a card', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.deleted', {
+        status: 'canceled',
+        trial_end: 1793664000,
+        ended_at: 1793664000,
+        ...cardless,
+      })
+    );
+
+    expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
+      'cus_1',
+      'stripe'
+    );
+    expect(notificationService.inAppNotification).toHaveBeenCalledWith(
+      'org_1',
+      'Your free trial has ended',
+      expect.any(String),
+      true,
+      false,
+      'info'
+    );
+  });
+
+  it('does not send the trial ended notice for a subscription canceled before the trial ended', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.deleted', {
+        status: 'canceled',
+        trial_end: 1793664000,
+        ended_at: 1793000000,
+        ...cardless,
+      })
+    );
+
+    expect(subscriptionService.deleteSubscription).toHaveBeenCalled();
+    expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not end a trial early before a card was added', async () => {
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: [
+        { id: 'sub_1', status: 'trialing', customer: 'cus_1', ...cardless },
+      ],
+    });
+
+    await expect(
+      service.finishTrial({ paymentId: 'cus_1' } as any)
+    ).rejects.toThrow();
+    expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
+  });
+
+  it('asks for a card while the trial has none', async () => {
+    organizationService.getOrgById.mockResolvedValue({ paymentId: 'cus_1' });
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: [
+        {
+          id: 'sub_1',
+          status: 'trialing',
+          customer: 'cus_1',
+          trial_end: 1793664000,
+          ...cardless,
+        },
+      ],
+    });
+
+    expect(await service.getRenewalDate('org_1')).toEqual({
+      renewsAt: 1793664000,
+      trialing: true,
+      needsPaymentMethod: true,
+    });
   });
 });

@@ -79,6 +79,16 @@ export abstract class PaymentProviderAbstract {
     return this.notSupported();
   }
 
+  // Free trial that starts without a payment method
+  async startTrial(
+    uniqueId: string,
+    organizationId: string,
+    userId: string,
+    body: BillingSubscribeDto
+  ): Promise<any> {
+    return this.notSupported();
+  }
+
   // Price difference preview when switching plans
   async prorate(
     organizationId: string,
@@ -103,16 +113,24 @@ export abstract class PaymentProviderAbstract {
     return this.notSupported();
   }
 
+  // Page where the customer adds the payment method a trial converts with
+  async addPaymentMethodLink(organizationId: string): Promise<{ url: string }> {
+    return this.notSupported();
+  }
+
   // Billing history (invoices) of the organization
   async getInvoices(organizationId: string): Promise<PaymentInvoice[]> {
     return this.notSupported();
   }
 
-  // Unix seconds of the next charge (the trial end while trialing), null when unknown
-  async getRenewalDate(
-    organizationId: string
-  ): Promise<{ renewsAt: number | null; trialing: boolean }> {
-    return { renewsAt: null, trialing: false };
+  // Unix seconds of the next charge (the trial end while trialing), null when
+  // unknown. needsPaymentMethod: a trial that ends unless a card is added.
+  async getRenewalDate(organizationId: string): Promise<{
+    renewsAt: number | null;
+    trialing: boolean;
+    needsPaymentMethod: boolean;
+  }> {
+    return { renewsAt: null, trialing: false, needsPaymentMethod: false };
   }
 
   // Post-checkout poll: is this subscription id active for the org

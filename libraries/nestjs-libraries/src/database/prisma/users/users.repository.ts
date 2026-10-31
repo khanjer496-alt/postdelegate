@@ -153,6 +153,23 @@ export class UsersRepository {
     });
   }
 
+  // A workspace stops allowing a trial once it had a trial or a plan, so a
+  // login with this email that owns such a workspace already had one
+  getUserWithUsedTrialByEmail(email: string) {
+    return this._user.model.user.findFirst({
+      where: {
+        email,
+        organizations: {
+          some: {
+            role: Role.SUPERADMIN,
+            organization: { allowTrial: false },
+          },
+        },
+      },
+      select: { id: true },
+    });
+  }
+
   activateUser(id: string) {
     return this._user.model.user.update({
       where: {

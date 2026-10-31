@@ -1,5 +1,5 @@
 // Subscription plans as configured in the app (libraries/.../subscriptions/pricing.ts) and
-// documented at /docs/billing. Prices are US dollars; every plan starts with a 7-day card trial.
+// documented at /docs/billing. Prices are US dollars; every plan starts with a 7-day free trial that needs no card.
 export interface Plan {
   slug: string;
   name: string;
