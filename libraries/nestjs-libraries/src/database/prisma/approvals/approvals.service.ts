@@ -114,6 +114,7 @@ export class ApprovalsService {
         memberIds.includes(id)
       ),
       requireAgentApproval: !!body.requireAgentApproval,
+      requireApiApproval: !!body.requireApiApproval,
       agentIntegrationIds: integrations.map((p) => p.id),
       agentMaxPostsPerDay: body.agentMaxPostsPerDay || null,
     });

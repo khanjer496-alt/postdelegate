@@ -27,6 +27,11 @@ const settings = (over: Partial<typeof DEFAULT_APPROVAL_SETTINGS> = {}) => ({
 });
 
 const agent = { type: 'agent' as const, source: 'Claude (MCP)' };
+const apiAgent = {
+  type: 'agent' as const,
+  source: 'Public API key',
+  viaApi: true,
+};
 const member = { type: 'user' as const, userId: 'u-member', role: 'USER' };
 const admin = { type: 'user' as const, userId: 'u-admin', role: 'ADMIN' };
 
@@ -71,6 +76,33 @@ describe('decideApproval', () => {
     expect(
       decideApproval(settings({ requireAgentApproval: true }), agent, false)
     ).toEqual({ hold: true, approvalStatus: 'IN_REVIEW', previous: undefined });
+  });
+
+  it('does not hold public API or CLI posts by default', () => {
+    expect(
+      decideApproval(settings({ requireAgentApproval: true }), apiAgent, false)
+    ).toEqual({ hold: false, previous: undefined });
+    // the API setting alone does nothing without the AI setting
+    expect(
+      decideApproval(settings({ requireApiApproval: true }), apiAgent, false)
+        .hold
+    ).toBe(false);
+  });
+
+  it('holds public API and CLI posts when the workspace also asks for API approval', () => {
+    expect(
+      decideApproval(
+        settings({ requireAgentApproval: true, requireApiApproval: true }),
+        apiAgent,
+        false
+      )
+    ).toEqual({ hold: true, approvalStatus: 'IN_REVIEW', previous: undefined });
+  });
+
+  it('keeps a waiting post waiting when an API client saves it again', () => {
+    expect(
+      decideApproval(settings(), apiAgent, false, 'CHANGES_REQUESTED').hold
+    ).toBe(true);
   });
 
   it('does not hold member posts because of the agent setting', () => {

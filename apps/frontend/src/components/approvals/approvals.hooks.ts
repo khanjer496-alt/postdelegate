@@ -22,6 +22,7 @@ export interface ApprovalSettings {
   requireApproval: boolean;
   approverIds: string[];
   requireAgentApproval: boolean;
+  requireApiApproval: boolean;
   agentIntegrationIds: string[];
   agentMaxPostsPerDay: number | null;
   isAdmin: boolean;

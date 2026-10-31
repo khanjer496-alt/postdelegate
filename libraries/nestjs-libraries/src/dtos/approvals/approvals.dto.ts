@@ -27,6 +27,11 @@ export class UpdateApprovalSettingsDto {
   @IsBoolean()
   requireAgentApproval: boolean;
 
+  // posts from the public API and the CLI also wait, with requireAgentApproval
+  @IsOptional()
+  @IsBoolean()
+  requireApiApproval?: boolean;
+
   @IsArray()
   @ArrayMaxSize(500)
   @IsString({ each: true })

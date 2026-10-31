@@ -244,13 +244,16 @@ export class PublicIntegrationsController {
     );
   }
 
-  // Posts from the public API, the CLI or a connected app are agent posts
+  // Posts from the public API, the CLI or a connected app keep their source
+  // and the agent guardrails, but only wait for approval when the workspace
+  // also asks for API approval
   private agentActor(
     creationMethod: 'CLI' | 'API',
     oauthAppName?: string
   ): ApprovalActor {
     return {
       type: 'agent',
+      viaApi: true,
       source:
         creationMethod === 'CLI'
           ? 'PostDelegate CLI'

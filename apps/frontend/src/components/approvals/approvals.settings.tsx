@@ -100,6 +100,7 @@ export const ApprovalsSettings: FC = () => {
   const [requireApproval, setRequireApproval] = useState(false);
   const [approverIds, setApproverIds] = useState<string[]>([]);
   const [requireAgentApproval, setRequireAgentApproval] = useState(false);
+  const [requireApiApproval, setRequireApiApproval] = useState(false);
   const [agentIntegrationIds, setAgentIntegrationIds] = useState<string[]>([]);
   const [maxPerDay, setMaxPerDay] = useState('');
   const [saving, setSaving] = useState(false);
@@ -111,6 +112,7 @@ export const ApprovalsSettings: FC = () => {
     setRequireApproval(data.requireApproval);
     setApproverIds(data.approverIds);
     setRequireAgentApproval(data.requireAgentApproval);
+    setRequireApiApproval(data.requireApiApproval);
     setAgentIntegrationIds(data.agentIntegrationIds);
     setMaxPerDay(data.agentMaxPostsPerDay ? String(data.agentMaxPostsPerDay) : '');
   }, [data]);
@@ -134,6 +136,7 @@ export const ApprovalsSettings: FC = () => {
         requireApproval,
         approverIds,
         requireAgentApproval,
+        requireApiApproval,
         agentIntegrationIds,
         agentMaxPostsPerDay: maxValue,
       }),
@@ -158,6 +161,7 @@ export const ApprovalsSettings: FC = () => {
     requireApproval,
     approverIds,
     requireAgentApproval,
+    requireApiApproval,
     agentIntegrationIds,
     fetch,
     toaster,
@@ -271,11 +275,27 @@ export const ApprovalsSettings: FC = () => {
           title={t('approval_require_agent', 'Require approval for AI-created posts')}
           description={t(
             'approval_require_agent_description',
-            'When this is on, posts from AI agents wait in Approvals until someone approves them.'
+            'When this is on, posts from MCP clients and the PostDelegate agent wait in Approvals until someone approves them.'
           )}
           checked={requireAgentApproval}
           onChange={setRequireAgentApproval}
         />
+        {requireAgentApproval && (
+          <div className="ps-[16px] border-s-2 border-newTableBorder">
+            <ToggleRow
+              title={t(
+                'approval_require_api',
+                'Also require approval for API and CLI posts'
+              )}
+              description={t(
+                'approval_require_api_description',
+                'Posts from the public API (API keys and connected apps) and the CLI wait for approval too. MCP clients always follow the setting above.'
+              )}
+              checked={requireApiApproval}
+              onChange={setRequireApiApproval}
+            />
+          </div>
+        )}
 
         <fieldset className="flex flex-col gap-[6px]">
           <legend className="text-[14px] font-[600] mb-[4px]">
