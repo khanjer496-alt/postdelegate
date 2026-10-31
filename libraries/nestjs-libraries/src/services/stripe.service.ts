@@ -419,16 +419,19 @@ export class StripeService extends PaymentProviderAbstract {
   // canceled when it ends, so ask the workspace to add one. It never fails the
   // webhook, a retry would send the reminder twice.
   async trialWillEnd(event: Stripe.CustomerSubscriptionTrialWillEndEvent) {
-    const subscription = event.data.object;
-    await this.applyTrialDiscount(subscription).catch((err) => {
-      console.error('stripe_trial_discount_failed', {
-        stripe_event_id: event.id,
-        stripe_subscription_id: subscription.id,
-        err,
-      });
-    });
-
     try {
+      // A retried event can be days old, so act on the subscription as it is now
+      const subscription = await stripe.subscriptions.retrieve(
+        event.data.object.id
+      );
+      await this.applyTrialDiscount(subscription).catch((err) => {
+        console.error('stripe_trial_discount_failed', {
+          stripe_event_id: event.id,
+          stripe_subscription_id: subscription.id,
+          err,
+        });
+      });
+
       if (!(await this.needsPaymentMethod(subscription))) {
         return { ok: true };
       }
@@ -452,7 +455,7 @@ export class StripeService extends PaymentProviderAbstract {
     } catch (err) {
       console.error('stripe_trial_will_end_failed', {
         stripe_event_id: event.id,
-        stripe_subscription_id: subscription.id,
+        stripe_subscription_id: event.data.object.id,
         err,
       });
     }
@@ -828,6 +831,7 @@ export class StripeService extends PaymentProviderAbstract {
       const promotionCodes = await stripe.promotionCodes.list({
         active: true,
         limit: 100,
+        expand: ['data.promotion.coupon'],
       });
 
       const now = Math.floor(Date.now() / 1000);
@@ -896,7 +900,7 @@ export class StripeService extends PaymentProviderAbstract {
   // drops it and keeps any other discount. Undefined when nothing changes.
   private async discountsWithoutAutoApply(subscriptionId: string) {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['discounts.promotion_code'],
+      expand: ['discounts.promotion_code.promotion.coupon'],
     });
     const discounts = (subscription.discounts || []).filter(
       (discount): discount is Stripe.Discount => typeof discount !== 'string'

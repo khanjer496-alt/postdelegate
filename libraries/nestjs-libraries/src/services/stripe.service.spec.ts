@@ -514,24 +514,23 @@ describe('StripeService cardless trial', () => {
   const cardless = {
     trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
   };
-  const subscriptionEvent = (type: string, object: any) =>
-    ({
-      type,
-      data: {
-        object: {
-          id: 'sub_1',
-          customer: 'cus_1',
-          cancel_at: null,
-          metadata: {
-            service: 'gitroom',
-            billing: 'STANDARD',
-            period: 'MONTHLY',
-            uniqueId: 'u1',
-          },
-          ...object,
-        },
+  // subscriptions.retrieve returns the subscription of the latest event
+  let latest: any;
+  const subscriptionEvent = (type: string, object: any) => {
+    latest = {
+      id: 'sub_1',
+      customer: 'cus_1',
+      cancel_at: null,
+      metadata: {
+        service: 'gitroom',
+        billing: 'STANDARD',
+        period: 'MONTHLY',
+        uniqueId: 'u1',
       },
-    } as any);
+      ...object,
+    };
+    return { type, data: { object: latest } } as any;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -539,6 +538,7 @@ describe('StripeService cardless trial', () => {
     mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
     mockStripe.paymentMethods.list.mockResolvedValue({ data: [] });
     mockStripe.promotionCodes.list.mockResolvedValue({ data: [] });
+    mockStripe.subscriptions.retrieve.mockImplementation(async () => latest);
     mockStripe.customers.retrieve.mockResolvedValue({
       invoice_settings: { default_payment_method: null },
     });
@@ -680,8 +680,10 @@ describe('StripeService cardless trial', () => {
     const autoApply = {
       id: 'promo_1',
       code: 'LAUNCH',
-      metadata: { autoapply: 'true' },
-      promotion: { coupon: 'coupon_1' },
+      metadata: {},
+      promotion: {
+        coupon: { id: 'coupon_1', metadata: { autoapply: 'true' } },
+      },
       expires_at: null,
       max_redemptions: null,
       times_redeemed: 0,
@@ -708,6 +710,25 @@ describe('StripeService cardless trial', () => {
       expect(mockStripe.subscriptions.update).toHaveBeenCalledWith('sub_1', {
         discounts: [{ promotion_code: 'promo_1' }],
       });
+    });
+
+    it('is not added again by a late retry after the trial converted', async () => {
+      const event = subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        discounts: [],
+        ...monthly('month'),
+        ...cardless,
+      });
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
+        ...latest,
+        status: 'active',
+        discounts: ['di_1'],
+      });
+
+      await service.processWebhook(event);
+
+      expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
     });
 
     it('is not added to a yearly trial', async () => {
@@ -819,7 +840,7 @@ describe('StripeService cardless trial', () => {
       });
       mockStripe.subscriptions.retrieve.mockImplementation(
         async (id: string, params: any) =>
-          params?.expand?.includes('discounts.promotion_code')
+          params?.expand?.includes('discounts.promotion_code.promotion.coupon')
             ? {
                 discounts: [
                   { id: 'di_auto', promotion_code: autoApply },
@@ -829,6 +850,7 @@ describe('StripeService cardless trial', () => {
                       ...autoApply,
                       id: 'promo_2',
                       metadata: {},
+                      promotion: { coupon: { id: 'coupon_2', metadata: {} } },
                     },
                   },
                 ],

@@ -160,8 +160,9 @@ export class NotificationService {
   // Account matters (billing, the plan) only the admins can act on
   async sendEmailsToOrgAdmins(orgId: string, subject: string, message: string) {
     const admins = await this._organizationRepository.getOrgAdmins(orgId);
-    for (const admin of admins) {
-      await this.sendEmail(admin.user.email, subject, message);
+    // one person can be an admin through two logins with the same email
+    for (const email of new Set(admins.map((admin) => admin.user.email))) {
+      await this.sendEmail(email, subject, message);
     }
   }
 
