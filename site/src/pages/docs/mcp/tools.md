@@ -47,5 +47,5 @@ PostDelegate does not provide AI generation: these tools depend on AI features t
 
 - Tools only act on the workspace you approved. A different workspace needs a separate sign-in.
 - Tools that change data are marked as such to clients, so assistants that support confirmation prompts will ask you first.
-- Connections through the API key addresses may also list a general `ask_postiz` tool that relies on AI features. It does nothing useful while AI is off, and you can ignore it.
+- Connections through the API key addresses may also list a general `ask_postdelegate` tool that relies on AI features. It does nothing useful while AI is off, and you can ignore it.
 - Content from your posts and videos is just data for the assistant to show you. Be wary of any assistant that treats text in a post as instructions.

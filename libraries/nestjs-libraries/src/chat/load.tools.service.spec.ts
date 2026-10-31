@@ -50,6 +50,15 @@ describe('LoadToolsService agent model', () => {
     service = new LoadToolsService({} as any, aiCredentialService as any);
   });
 
+  it('is named postdelegate, so MCP clients see ask_postdelegate', async () => {
+    await service.agent();
+
+    expect(agentConfigs[agentConfigs.length - 1]).toMatchObject({
+      id: 'postdelegate',
+      name: 'postdelegate',
+    });
+  });
+
   it('is a function, so no key is read when the agent is built', async () => {
     const model = await buildModel();
 

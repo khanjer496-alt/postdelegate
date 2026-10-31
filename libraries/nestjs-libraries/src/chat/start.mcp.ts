@@ -68,7 +68,7 @@ export const startMcp = async (app: INestApplication) => {
     oauthService.getSelfHostedByAccessToken(token);
 
   const mastra = await mastraService.mastra();
-  const agent = mastra.getAgent('postiz');
+  const agent = mastra.getAgent('postdelegate');
   const agentTools = await agent.listTools();
   const tools = {
     ...agentTools,
@@ -143,14 +143,14 @@ export const startMcp = async (app: INestApplication) => {
     name: 'PostDelegate MCP',
     version: '1.0.0',
     tools,
-    agents: { postiz: agent },
+    agents: { postdelegate: agent },
     appResources,
   };
 
   const server = new MCPServer({ ...serverConfig, protocolVersion: '2026-07-28' });
 
   // The directory-facing servers don't register the agent - it would be
-  // exposed as an annotation-less catch-all ask_postiz tool, which the
+  // exposed as an annotation-less catch-all ask_postdelegate tool, which the
   // ChatGPT and Claude directory reviews reject
   const oauthServer = new MCPServer({
     name: 'PostDelegate MCP',
