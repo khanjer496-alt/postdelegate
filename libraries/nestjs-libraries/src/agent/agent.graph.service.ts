@@ -6,8 +6,6 @@ import {
 } from '@langchain/core/messages';
 import { END, START, StateGraph } from '@langchain/langgraph';
 import { ChatOpenAI, DallEAPIWrapper } from '@langchain/openai';
-import { TavilySearch } from '@langchain/tavily';
-import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import dayjs from 'dayjs';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
@@ -17,11 +15,6 @@ import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { generationError } from '@gitroom/nestjs-libraries/openai/generation.error';
 import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
-
-const tools = !process.env.TAVILY_API_KEY
-  ? []
-  : [new TavilySearch({ maxResults: 3 })];
-const toolNode = new ToolNode(tools);
 
 // built per run from the workspace's own key
 type GraphModels = {
@@ -129,8 +122,10 @@ export class AgentGraphService {
       },
     });
 
+  // There is no web search step: it was Tavily, a search PostDelegate would
+  // pay for on every workspace's run. Without its tool results the research
+  // is empty, exactly as it was whenever TAVILY_API_KEY was not set
   async startCall(state: WorkflowChannelsState, models: GraphModels) {
-    const runTools = models.model.bindTools(tools);
     const response = await ChatPromptTemplate.fromTemplate(
       `
     Today is ${dayjs().format()}, You are an assistant that gets a social media post or requests for a social media post.
@@ -139,7 +134,7 @@ export class AgentGraphService {
     {text}
     `
     )
-      .pipe(runTools)
+      .pipe(models.model)
       .invoke({
         text: state.messages[state.messages.length - 1].content,
       });
@@ -390,7 +385,6 @@ export class AgentGraphService {
     const state = AgentGraphService.state();
     const workflow = state
       .addNode('agent', (state) => this.startCall(state, models))
-      .addNode('research', toolNode)
       .addNode('save-research', this.saveResearch.bind(this))
       .addNode('find-category', (state) => this.findCategories(state, models))
       .addNode('find-topic', (state) => this.findTopic(state, models))
@@ -406,8 +400,7 @@ export class AgentGraphService {
       .addNode('upload-pictures', this.uploadPictures.bind(this))
       .addNode('post-time', this.postDateTime.bind(this))
       .addEdge(START, 'agent')
-      .addEdge('agent', 'research')
-      .addEdge('research', 'save-research')
+      .addEdge('agent', 'save-research')
       .addEdge('save-research', 'find-category')
       .addEdge('find-category', 'find-topic')
       .addEdge('find-topic', 'find-popular-posts')
