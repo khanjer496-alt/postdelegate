@@ -65,7 +65,8 @@ export const useChecklist = () => {
   );
 };
 
-// Shared by the calendar banner and the channel list, one request for both
+// Shared by the calendar banner and the channel list, one request for both.
+// It revalidates on focus: a post may have failed while the tab was away.
 export const useNeedsAttention = () => {
   const fetch = useFetch();
   return useSWR<NeedsAttention>(

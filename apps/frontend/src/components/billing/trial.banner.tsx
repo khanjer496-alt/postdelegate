@@ -113,13 +113,18 @@ const TrialCountdownInner: FC<{ orgId: string }> = ({ orgId }) => {
           type="button"
           onClick={add}
           disabled={loading}
+          data-tooltip-id="tooltip"
+          data-tooltip-content={t(
+            'trial_countdown_add_card_hint',
+            'Add a card to keep your plan and your scheduled posts when the trial ends.'
+          )}
           className="h-full flex items-center gap-[6px] ps-[12px] pe-[10px] hover:opacity-80 disabled:opacity-60 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-btnPrimary rounded-s-full"
         >
           <span
             aria-hidden="true"
             className={clsx(
               'w-[6px] h-[6px] rounded-full shrink-0',
-              urgent ? 'bg-red-500' : 'bg-btnCta'
+              urgent ? 'bg-red-500' : 'bg-btnPrimary dark:bg-btnCta'
             )}
           />
           <span className="mobile:hidden">{text}</span>
@@ -140,7 +145,7 @@ const TrialCountdownInner: FC<{ orgId: string }> = ({ orgId }) => {
         >
           <span
             aria-hidden="true"
-            className="w-[6px] h-[6px] rounded-full shrink-0 bg-btnCta"
+            className="w-[6px] h-[6px] rounded-full shrink-0 bg-btnPrimary dark:bg-btnCta"
           />
           <span className="mobile:hidden">{text}</span>
           <span className="hidden mobile:inline">

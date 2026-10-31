@@ -19,6 +19,7 @@ interface Step {
   hint: string;
   done: boolean;
   blocked: boolean;
+  optional?: boolean;
   action: () => void;
 }
 
@@ -117,9 +118,10 @@ export const FirstRunChecklist: FC = () => {
       list.push({
         id: 'teammate',
         title: t('checklist_invite', 'Invite a teammate'),
-        hint: t('checklist_invite_hint', 'Plan and review posts together'),
+        hint: t('checklist_invite_hint', 'Optional, plan posts together'),
         done: teammate,
         blocked: false,
+        optional: true,
         action: () => router.push('/settings?tab=teams'),
       });
     }
@@ -127,20 +129,25 @@ export const FirstRunChecklist: FC = () => {
   }, [data, canInvite, addChannel, createPost, router, t]);
 
   const done = steps.filter((step) => step.done).length;
-  const visible = !!data && !data.dismissed && steps.length > done;
+  // the optional teammate step never keeps the card around on its own
+  const visible =
+    !!data &&
+    !data.dismissed &&
+    steps.some((step) => !step.done && !step.optional);
   const nextStep = steps.find((step) => !step.done && !step.blocked);
 
-  // channels and posts change in the calendar, check the steps again
-  const firstRender = useRef(true);
+  // a channel was added or a post created, check the steps again
+  const calendarState = `${integrations.length}:${posts.length}`;
+  const lastCalendarState = useRef(calendarState);
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
+    if (lastCalendarState.current === calendarState) {
       return;
     }
+    lastCalendarState.current = calendarState;
     if (visible) {
       mutate();
     }
-  }, [integrations, posts]);
+  }, [calendarState, visible, mutate]);
 
   const dismiss = useCallback(async () => {
     if (!data) {
@@ -148,7 +155,12 @@ export const FirstRunChecklist: FC = () => {
     }
     mutate({ ...data, dismissed: true }, false);
     try {
-      await fetch('/activation/checklist/dismiss', { method: 'POST' });
+      const response = await fetch('/activation/checklist/dismiss', {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        mutate();
+      }
     } catch (e) {
       mutate();
     }
@@ -213,7 +225,7 @@ export const FirstRunChecklist: FC = () => {
         className="h-[6px] rounded-full bg-btnSimple overflow-hidden"
       >
         <div
-          className="h-full rounded-full bg-btnCta transition-[width] duration-500"
+          className="h-full rounded-full bg-btnPrimary dark:bg-btnCta transition-[width] duration-500"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -230,7 +242,7 @@ export const FirstRunChecklist: FC = () => {
                 className={clsx(
                   'w-full h-full text-start flex items-center gap-[10px] rounded-[10px] p-[10px] border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-btnPrimary',
                   isNext
-                    ? 'border-btnCta bg-boxHover hover:bg-boxFocused'
+                    ? 'border-btnPrimary dark:border-btnCta bg-boxHover hover:bg-boxFocused'
                     : 'border-newTableBorder',
                   !step.done && !step.blocked && !isNext && 'hover:bg-boxHover',
                   step.blocked && 'cursor-not-allowed',
@@ -241,7 +253,7 @@ export const FirstRunChecklist: FC = () => {
                   className={clsx(
                     'w-[24px] h-[24px] shrink-0 rounded-full flex items-center justify-center text-[12px] font-[600]',
                     step.done
-                      ? 'bg-btnCta text-btnCtaText'
+                      ? 'bg-btnPrimary text-white dark:bg-btnCta dark:text-btnCtaText'
                       : 'border border-newSep text-textItemBlur'
                   )}
                   aria-hidden="true"
@@ -257,7 +269,7 @@ export const FirstRunChecklist: FC = () => {
                   >
                     {step.title}
                   </span>
-                  <span className="text-[12px] text-textItemBlur truncate">
+                  <span className="text-[12px] text-textItemBlur line-clamp-2">
                     {step.done ? t('checklist_done', 'Done') : step.hint}
                   </span>
                 </span>

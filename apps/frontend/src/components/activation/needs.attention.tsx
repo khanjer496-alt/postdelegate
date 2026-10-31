@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useEffect, useRef, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -72,20 +72,32 @@ export const NeedsAttention: FC<{
 }> = ({ refreshChannel, continueIntegration }) => {
   const t = useT();
   const { integrations, posts } = useCalendar();
-  const { editPost } = usePostActions();
   const { data, mutate } = useNeedsAttention();
+  // a post fixed from here may sit outside the week in view
+  const { editPost } = usePostActions(() => mutate());
   const channelText = useChannelAttentionText();
   const [open, setOpen] = useState(true);
 
-  // a post was fixed or a channel reconnected, look again
-  const firstRender = useRef(true);
+  // look again when a failed post in view changes or a channel's connection
+  // does, not on every calendar load
+  const calendarState = useMemo(
+    () =>
+      [
+        ...integrations.map(
+          (p: any) => `${p.id}:${!!p.refreshNeeded}:${!!p.inBetweenSteps}`
+        ),
+        ...posts.filter((p) => p.state === 'ERROR').map((p) => p.id),
+      ].join(','),
+    [integrations, posts]
+  );
+  const lastCalendarState = useRef(calendarState);
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
+    if (lastCalendarState.current === calendarState) {
       return;
     }
+    lastCalendarState.current = calendarState;
     mutate();
-  }, [integrations, posts]);
+  }, [calendarState, mutate]);
 
   const total = (data?.failedPostsTotal || 0) + (data?.channels.length || 0);
   if (!data || !total) {
@@ -211,7 +223,7 @@ export const NeedsAttention: FC<{
           <li className="px-[12px] text-[12px] text-textItemBlur">
             {t(
               'attention_more_failed',
-              'Plus {{count}} more from the last 30 days',
+              '{{count}} more from the last 30 days',
               { count: hiddenPosts }
             )}
           </li>
