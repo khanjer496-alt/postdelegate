@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "Không thể xóa khóa này, vui lòng thử lại",
   "ai_key_load_failed": "Không thể tải khóa AI của bạn, vui lòng tải lại trang",
   "open_settings": "Mở cài đặt",
-  "action_required": "Cần thực hiện thao tác"
+  "action_required": "Cần thực hiện thao tác",
+  "ai_key_too_many_attempts": "Quá nhiều lần thử. Vui lòng thử lại sau một giờ."
 }

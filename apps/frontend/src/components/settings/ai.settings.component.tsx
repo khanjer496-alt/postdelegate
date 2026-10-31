@@ -66,6 +66,18 @@ export const AiSettings: FC = () => {
       setSaving(false);
     }
 
+    // saving is limited per hour, and the throttler's own text is not for users
+    if (response.status === 429) {
+      toaster.show(
+        t(
+          'ai_key_too_many_attempts',
+          'Too many attempts. Try again in an hour.'
+        ),
+        'warning'
+      );
+      return;
+    }
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       const message = Array.isArray(error?.message)

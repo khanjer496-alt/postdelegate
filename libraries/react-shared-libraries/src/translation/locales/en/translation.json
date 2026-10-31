@@ -981,5 +981,6 @@
   "ai_key_remove_failed": "Could not remove this key, please try again",
   "ai_key_load_failed": "Could not load your AI key, please refresh the page",
   "open_settings": "Open settings",
-  "action_required": "Action required"
+  "action_required": "Action required",
+  "ai_key_too_many_attempts": "Too many attempts. Try again in an hour."
 }

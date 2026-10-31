@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "Impossibile rimuovere questa chiave, riprova",
   "ai_key_load_failed": "Impossibile caricare la tua chiave IA, aggiorna la pagina",
   "open_settings": "Apri impostazioni",
-  "action_required": "Azione richiesta"
+  "action_required": "Azione richiesta",
+  "ai_key_too_many_attempts": "Troppi tentativi. Riprova tra un'ora."
 }

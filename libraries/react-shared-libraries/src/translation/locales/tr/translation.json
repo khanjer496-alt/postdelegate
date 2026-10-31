@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "Bu anahtar kaldırılamadı, lütfen tekrar deneyin",
   "ai_key_load_failed": "Yapay zeka anahtarınız yüklenemedi, lütfen sayfayı yenileyin",
   "open_settings": "Ayarları aç",
-  "action_required": "İşlem gerekli"
+  "action_required": "İşlem gerekli",
+  "ai_key_too_many_attempts": "Çok fazla deneme yapıldı. Bir saat sonra tekrar deneyin."
 }

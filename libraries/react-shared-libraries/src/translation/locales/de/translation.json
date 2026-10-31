@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "Der Schlüssel konnte nicht entfernt werden, bitte versuche es erneut",
   "ai_key_load_failed": "Dein KI-Schlüssel konnte nicht geladen werden, bitte lade die Seite neu",
   "open_settings": "Einstellungen öffnen",
-  "action_required": "Handlung erforderlich"
+  "action_required": "Handlung erforderlich",
+  "ai_key_too_many_attempts": "Zu viele Versuche. Versuche es in einer Stunde erneut."
 }

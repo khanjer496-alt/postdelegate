@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "このキーを削除できませんでした。もう一度お試しください",
   "ai_key_load_failed": "AIキーを読み込めませんでした。ページを再読み込みしてください",
   "open_settings": "設定を開く",
-  "action_required": "対応が必要です"
+  "action_required": "対応が必要です",
+  "ai_key_too_many_attempts": "試行回数が多すぎます。1時間後にもう一度お試しください。"
 }

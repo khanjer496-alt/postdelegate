@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "无法删除此密钥，请重试",
   "ai_key_load_failed": "无法加载你的 AI 密钥，请刷新页面",
   "open_settings": "打开设置",
-  "action_required": "需要操作"
+  "action_required": "需要操作",
+  "ai_key_too_many_attempts": "尝试次数过多，请一小时后再试。"
 }

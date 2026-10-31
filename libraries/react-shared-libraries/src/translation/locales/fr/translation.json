@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "Impossible de supprimer cette clé, veuillez réessayer",
   "ai_key_load_failed": "Impossible de charger votre clé IA, veuillez actualiser la page",
   "open_settings": "Ouvrir les paramètres",
-  "action_required": "Action requise"
+  "action_required": "Action requise",
+  "ai_key_too_many_attempts": "Trop de tentatives. Réessayez dans une heure."
 }

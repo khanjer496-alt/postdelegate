@@ -979,5 +979,6 @@
   "ai_key_remove_failed": "No se pudo eliminar esta clave, inténtalo de nuevo",
   "ai_key_load_failed": "No se pudo cargar tu clave de IA, actualiza la página",
   "open_settings": "Abrir ajustes",
-  "action_required": "Acción necesaria"
+  "action_required": "Acción necesaria",
+  "ai_key_too_many_attempts": "Demasiados intentos. Vuelve a intentarlo en una hora."
 }
