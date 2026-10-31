@@ -26,6 +26,8 @@ const pick=(keys:string[])=>keys.map(k=>NETWORKS.find(n=>n.key===k)).filter((n):
 const innerKeys=['youtube','bluesky','wordpress','devto'];
 const orbitInner=AVAILABLE_NETWORKS.filter(n=>innerKeys.includes(n.key));
 const orbitMiddle=AVAILABLE_NETWORKS.filter(n=>!innerKeys.includes(n.key));
+// The comet sits in the gap halfway round the middle ring, whatever its size.
+const cometAngle=(Math.floor(orbitMiddle.length/2)-0.5)*360/orbitMiddle.length;
 const orbitOuter=pick(['instagram','linkedin','tiktok','x','threads','facebook','pinterest','mastodon','reddit','discord','telegram','google_business']).filter(n=>!n.available);
 const orbitLabel=`${liveCount} networks connect today: ${AVAILABLE_NETWORKS.map(n=>n.name).join(', ')}. Instagram, LinkedIn, TikTok, X and other networks are coming soon.`;
 const days=[1,2,3,4,5,6,7];
@@ -88,7 +90,7 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
       <div class="hero-visual">
         <div class="orbit" role="img" aria-label={orbitLabel}>
           <span class="orbit-ring ring-outer" style="--r:46.5cqw">{orbitOuter.map((n,i)=><span class="orbit-slot" style={`--a:${i*360/orbitOuter.length+15}deg`}><span class="orbit-body orbit-soon"><NetworkBadge n={n} size="sm"/></span></span>)}</span>
-          <span class="orbit-ring ring-middle" style="--r:34cqw">{orbitMiddle.map((n,i)=><span class="orbit-slot" style={`--a:${i*360/orbitMiddle.length}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md"/></span></span>)}<span class="orbit-slot" style="--a:150deg"><span class="orbit-comet"></span></span></span>
+          <span class="orbit-ring ring-middle" style="--r:34cqw">{orbitMiddle.map((n,i)=><span class="orbit-slot" style={`--a:${i*360/orbitMiddle.length}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md"/></span></span>)}<span class="orbit-slot" style={`--a:${cometAngle}deg`}><span class="orbit-comet"></span></span></span>
           <span class="orbit-ring ring-inner" style="--r:21.5cqw">{orbitInner.map((n,i)=><span class="orbit-slot" style={`--a:${i*90+45}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md"/></span></span>)}</span>
           <span class="orbit-core"><img src="/mark.svg?v=orbit-slot" width="56" height="56" alt=""/><b>Your calendar</b></span>
           <span class="orbit-card orbit-card-scheduled"><i class="card-check">✓</i><span><b>Scheduled</b><small>YouTube · Tue 09:00</small></span></span>

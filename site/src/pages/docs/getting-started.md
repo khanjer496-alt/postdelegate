@@ -8,7 +8,7 @@ PostDelegate is a hosted social media scheduler. You write a post once, pick the
 
 <div class="callout">
 
-**Early access.** Today you can connect YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals. See [Channels overview](/docs/channels) for the current list.
+**Early access.** Today you can connect YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble and Slack. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals. See [Channels overview](/docs/channels) for the current list.
 
 </div>
 
@@ -29,8 +29,8 @@ If anything goes wrong while signing up, email [support@postdelegate.com](mailto
 A channel is one destination for your posts, such as a Bluesky profile or a WordPress site.
 
 1. Open the **Calendar** page and choose **Add Channel**.
-2. Pick a network. Some networks send you to the network's own sign-in page (YouTube). Others ask you to paste a credential into PostDelegate, such as an app password, an API key or a site address.
-3. Follow the guide for your network: [YouTube](/docs/channels/youtube), [Bluesky](/docs/channels/bluesky), [DEV.to](/docs/channels/devto), [Hashnode](/docs/channels/hashnode), [Lemmy](/docs/channels/lemmy), [Listmonk](/docs/channels/listmonk), [Medium](/docs/channels/medium), [Nostr](/docs/channels/nostr), [WordPress](/docs/channels/wordpress).
+2. Pick a network. Some networks send you to the network's own sign-in page (YouTube, Kick, Twitch, Tumblr, Dribbble and Slack). Others ask you to paste a credential into PostDelegate, such as an app password, an API key or a site address.
+3. Follow the guide for your network: [YouTube](/docs/channels/youtube), [Bluesky](/docs/channels/bluesky), [DEV.to](/docs/channels/devto), [Hashnode](/docs/channels/hashnode), [Lemmy](/docs/channels/lemmy), [Listmonk](/docs/channels/listmonk), [Medium](/docs/channels/medium), [Nostr](/docs/channels/nostr), [WordPress](/docs/channels/wordpress), [Kick](/docs/channels/kick), [Twitch](/docs/channels/twitch), [Tumblr](/docs/channels/tumblr), [Dribbble](/docs/channels/dribbble), [Slack](/docs/channels/slack).
 
 Your channels appear on the left of the calendar. Open a channel's menu to rename it, move it to a customer group, edit its time slots, disable it or delete it.
 
