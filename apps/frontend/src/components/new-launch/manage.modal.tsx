@@ -34,7 +34,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { capitalize } from 'lodash';
+import { capitalize, uniq } from 'lodash';
 import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
 import { CopilotPopup } from '@copilotkit/react-ui';
 import { DummyCodeComponent } from '@gitroom/frontend/components/new-launch/dummy.code.component';
@@ -113,6 +113,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     setSelectedIntegrations,
     locked,
     publishBlocked,
+    publishBlockedReason,
     current,
     activateExitButton,
     setHide,
@@ -136,6 +137,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setSelectedIntegrations: state.setSelectedIntegrations,
       locked: state.locked,
       publishBlocked: state.publishBlocked,
+      publishBlockedReason: state.publishBlockedReason,
       activateExitButton: state.activateExitButton,
     }))
   );
@@ -172,6 +174,18 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     : selectedIntegrations.some(
         ({ integration }) => publishBlocked[integration.id]
       );
+  // what the blocking channel asks for, shown on the disabled actions
+  const publishingBlockedReason = !publishingBlocked
+    ? undefined
+    : existingData.integration
+    ? publishBlockedReason[channel.integration]
+    : selectedIntegrations
+        .map(({ integration }) =>
+          publishBlocked[integration.id]
+            ? publishBlockedReason[integration.id]
+            : undefined
+        )
+        .find(Boolean);
 
   useEffect(() => {
     if (hide) {
@@ -870,10 +884,40 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
         if (!addEditSets) {
           mutate();
+          // a provider can say what happens next once its post is sent out,
+          // now or as a schedule whose date already came
+          const postSubmitMessages = uniq(
+            posts
+              .filter(
+                (post: any) =>
+                  saveTypeOf(post.integration.id) === 'now' ||
+                  (saveTypeOf(post.integration.id) === 'schedule' &&
+                    !dayjs().isBefore(
+                      (channelDates[post.integration.id] || date).utc()
+                    ))
+              )
+              .map((post: any) => {
+                const message = getProviderSettingsMeta(
+                  Providers.find(
+                    (p) =>
+                      p.identifier ===
+                      integrationById(post.integration.id)?.integration
+                        .identifier
+                  )?.component
+                )?.postSubmitMessage;
+                return typeof message === 'function'
+                  ? message(post.settings)
+                  : message;
+              })
+              .filter(Boolean)
+          );
+          const savedMessage = !existingData.integration
+            ? t('added_successfully', 'Added successfully')
+            : t('updated_successfully', 'Updated successfully');
           toaster.show(
-            !existingData.integration
-              ? t('added_successfully', 'Added successfully')
-              : t('updated_successfully', 'Updated successfully')
+            postSubmitMessages.length
+              ? `${savedMessage}. ${postSubmitMessages.join(' ')}`
+              : savedMessage
           );
         }
         if (customClose) {
@@ -1316,7 +1360,21 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               </button>
             )}
             {!addEditSets && (
-              <div ref={postNowRef} className="group cursor-pointer relative">
+              <div
+                ref={postNowRef}
+                className={clsx(
+                  'group relative',
+                  publishingBlockedReason
+                    ? 'cursor-not-allowed'
+                    : 'cursor-pointer'
+                )}
+                {...(publishingBlockedReason
+                  ? {
+                      'data-tooltip-id': 'tooltip',
+                      'data-tooltip-content': publishingBlockedReason,
+                    }
+                  : {})}
+              >
                 <button
                   disabled={
                     selectedIntegrations.length === 0 ||
@@ -1326,8 +1384,17 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   }
                   onClick={schedule('schedule')}
                   aria-keyshortcuts={shortcutKeys}
-                  title={`${scheduleLabel} (${shortcutHint})`}
-                  className="text-btnCtaText relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]"
+                  aria-description={publishingBlockedReason}
+                  title={
+                    publishingBlockedReason
+                      ? undefined
+                      : `${scheduleLabel} (${shortcutHint})`
+                  }
+                  className={clsx(
+                    'text-btnCtaText relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]',
+                    // a disabled button gets no hover, the wrapper shows why
+                    publishingBlockedReason && 'pointer-events-none'
+                  )}
                 >
                   {loading && (
                     <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
@@ -1377,9 +1444,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       locked ||
                       publishingBlocked
                     }
+                    aria-description={publishingBlockedReason}
                     className={clsx(
                       'rounded-[8px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner',
-                      showPostNow ? 'flex' : 'hidden group-hover:flex'
+                      showPostNow ? 'flex' : 'hidden group-hover:flex',
+                      publishingBlockedReason && 'pointer-events-none'
                     )}
                   >
                     <div className="text-white rounded-[8px] bg-[#D82D7E] h-[44px] w-full flex justify-center items-center post-now">

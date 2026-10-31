@@ -30,11 +30,13 @@ let existingData = {};
 let settingsValidById = {};
 let malformedSettingsById = {};
 const dialogs = new Map();
+const toasts = [];
+let providerMeta = {};
 const t = (_key, fallback) => fallback;
 const infrastructure = {
   '@gitroom/frontend/components/layout/set.timezone': { newDayjs: () => dayjs() },
   '@gitroom/frontend/components/launches/helpers/use.existing.data': { useExistingData: () => existingData },
-  '@gitroom/frontend/components/new-launch/providers/high.order.provider': { getProviderSettingsMeta: () => ({}) },
+  '@gitroom/frontend/components/new-launch/providers/high.order.provider': { getProviderSettingsMeta: () => providerMeta },
   '@gitroom/frontend/components/new-launch/providers/show.all.providers': {
     Providers: [],
     ShowAllProviders: React.forwardRef((props, ref) => {
@@ -43,7 +45,7 @@ const infrastructure = {
     }),
   },
   '@gitroom/react/translation/get.transation.service.client': { useT: () => t },
-  '@gitroom/react/toaster/toaster': { useToaster: () => ({ show: () => {} }) },
+  '@gitroom/react/toaster/toaster': { useToaster: () => ({ show: (text) => toasts.push(text) }) },
   '@gitroom/react/helpers/delete.dialog': { deleteDialog: async () => false },
   '@gitroom/helpers/utils/custom.fetch': { useFetch: () => async (url, options) => {
     const body = JSON.parse(options.body);
@@ -94,6 +96,8 @@ store = loadSource(path.join(sourceRoot, 'components/new-launch/store.ts')).useL
 const { ManageModal } = loadSource(path.join(sourceRoot, 'components/new-launch/manage.modal.tsx'));
 beforeEach(() => {
   calls.length = 0;
+  toasts.length = 0;
+  providerMeta = {};
   existingData = {};
   settingsValidById = {};
   malformedSettingsById = {};
@@ -127,6 +131,34 @@ test('per-channel publish blockers deduplicate unchanged values and reset cleanl
   assert.equal(store.getState(), blocked);
   store.getState().reset();
   assert.deepEqual(store.getState().publishBlocked, {});
+});
+
+test('a blocking reason is stored per channel and shown on the disabled desktop action', () => {
+  store.getState().setPublishBlocked('selected', true, 'Choose a disclosure option.');
+  assert.equal(store.getState().publishBlockedReason.selected, 'Choose a disclosure option.');
+  const { container } = mount();
+  const anchor = container.querySelector('[data-tooltip-id="tooltip"][data-tooltip-content="Choose a disclosure option."]');
+  assert.ok(anchor);
+  assert.equal(anchor.querySelector('button').disabled, true);
+  act(() => { store.getState().setPublishBlocked('selected', false, 'ignored'); });
+  assert.equal(store.getState().publishBlockedReason.selected, undefined);
+  assert.equal(container.querySelector('[data-tooltip-content="Choose a disclosure option."]'), null);
+});
+
+test('a provider post submit message follows the saved toast only for posts sent out now', async () => {
+  providerMeta = { postSubmitMessage: (settings) => settings.mode === 'inbox' ? undefined : 'The platform may take a few minutes.' };
+  mount();
+  await act(async () => { await capturedActions.find((action) => action.label === 'Post Now').onClick(); });
+  await waitFor(() => assert.deepEqual(toasts, ['Added successfully. The platform may take a few minutes.']));
+  toasts.length = 0;
+  await act(async () => { await capturedActions.find((action) => action.label === 'Save as Draft').onClick(); });
+  await waitFor(() => assert.deepEqual(toasts, ['Added successfully']));
+  // a schedule for later sends nothing yet
+  toasts.length = 0;
+  act(() => { store.getState().setDate(dayjs().add(1, 'day')); });
+  await act(async () => { await capturedActions.find((action) => action.label === 'Add to calendar').onClick(); });
+  await waitFor(() => assert.deepEqual(toasts, ['Added successfully']));
+  assert.equal(calls.some((request) => request.url === '/posts' && request.body.type === 'schedule'), true);
 });
 
 test('desktop and mobile publishing actions are disabled while drafts remain available', async () => {
