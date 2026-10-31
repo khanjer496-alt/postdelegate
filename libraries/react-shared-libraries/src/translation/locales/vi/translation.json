@@ -966,5 +966,14 @@
   "review_close": "Đóng",
   "review_name_required": "Thêm tên bạn muốn hiển thị cùng đánh giá",
   "review_save_failed": "Không thể gửi đánh giá của bạn, vui lòng thử lại",
-  "view_reviews": "Xem đánh giá"
+  "view_reviews": "Xem đánh giá",
+  "ai_settings": "AI",
+  "ai_settings_description": "Tính năng viết bằng AI, Agent và hình ảnh của PostDelegate chạy trên tài khoản OpenAI của riêng bạn. Bạn trả tiền trực tiếp cho OpenAI theo mức sử dụng. Gói ChatGPT Plus không bao gồm việc sử dụng API.",
+  "get_an_api_key": "Lấy khóa API",
+  "ai_openai_key": "Khóa OpenAI: {{maskedKey}}",
+  "replace": "Thay thế",
+  "ai_key_remove_confirm": "Xóa khóa AI này? Các tính năng AI sẽ bị tắt cho không gian làm việc này.",
+  "ai_key_saved": "Đã lưu khóa AI",
+  "ai_key_removed": "Đã xóa khóa AI",
+  "ai_key_save_failed": "Không thể lưu khóa này, vui lòng thử lại"
 }

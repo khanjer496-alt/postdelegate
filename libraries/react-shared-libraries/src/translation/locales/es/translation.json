@@ -966,5 +966,14 @@
   "review_close": "Cerrar",
   "review_name_required": "Añade el nombre que quieres que se muestre con tu reseña",
   "review_save_failed": "No se pudo enviar tu reseña, inténtalo de nuevo",
-  "view_reviews": "Ver reseñas"
+  "view_reviews": "Ver reseñas",
+  "ai_settings": "IA",
+  "ai_settings_description": "La escritura con IA, el Agente y las imágenes de PostDelegate funcionan con tu propia cuenta de OpenAI. Pagas a OpenAI directamente por lo que uses. Una suscripción a ChatGPT Plus no incluye el uso de la API.",
+  "get_an_api_key": "Obtener una clave de API",
+  "ai_openai_key": "Clave de OpenAI: {{maskedKey}}",
+  "replace": "Reemplazar",
+  "ai_key_remove_confirm": "¿Eliminar esta clave de IA? Las funciones de IA se desactivarán para este espacio de trabajo.",
+  "ai_key_saved": "Clave de IA guardada",
+  "ai_key_removed": "Clave de IA eliminada",
+  "ai_key_save_failed": "No se pudo guardar esta clave, inténtalo de nuevo"
 }

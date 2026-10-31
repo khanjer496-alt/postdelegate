@@ -966,5 +966,14 @@
   "review_close": "閉じる",
   "review_name_required": "レビューとともに表示する名前を入力してください",
   "review_save_failed": "レビューを送信できませんでした。もう一度お試しください",
-  "view_reviews": "レビューを表示"
+  "view_reviews": "レビューを表示",
+  "ai_settings": "AI",
+  "ai_settings_description": "PostDelegate の AI ライティング、エージェント、画像はあなた自身の OpenAI アカウントで動作します。利用した分は OpenAI に直接お支払いいただきます。ChatGPT Plus のサブスクリプションには API の利用は含まれません。",
+  "get_an_api_key": "API キーを取得",
+  "ai_openai_key": "OpenAI キー: {{maskedKey}}",
+  "replace": "置き換える",
+  "ai_key_remove_confirm": "この AI キーを削除しますか？このワークスペースの AI 機能はオフになります。",
+  "ai_key_saved": "AI キーを保存しました",
+  "ai_key_removed": "AI キーを削除しました",
+  "ai_key_save_failed": "このキーを保存できませんでした。もう一度お試しください"
 }

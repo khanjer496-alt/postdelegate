@@ -968,5 +968,14 @@
   "review_close": "Close",
   "review_name_required": "Add the name you want shown with your review",
   "review_save_failed": "Could not send your review, please try again",
-  "view_reviews": "View Reviews"
+  "view_reviews": "View Reviews",
+  "ai_settings": "AI",
+  "ai_settings_description": "PostDelegate's AI writing, Agent and images run on your own OpenAI account. You pay OpenAI directly for what you use. A ChatGPT Plus subscription doesn't include API usage.",
+  "get_an_api_key": "Get an API key",
+  "ai_openai_key": "OpenAI key: {{maskedKey}}",
+  "replace": "Replace",
+  "ai_key_remove_confirm": "Remove this AI key? AI features will turn off for this workspace.",
+  "ai_key_saved": "AI key saved",
+  "ai_key_removed": "AI key removed",
+  "ai_key_save_failed": "Could not save this key, please try again"
 }

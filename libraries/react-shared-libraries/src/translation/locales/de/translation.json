@@ -966,5 +966,14 @@
   "review_close": "Schließen",
   "review_name_required": "Gib den Namen an, der mit deiner Bewertung angezeigt werden soll",
   "review_save_failed": "Deine Bewertung konnte nicht gesendet werden, bitte versuche es erneut",
-  "view_reviews": "Bewertungen ansehen"
+  "view_reviews": "Bewertungen ansehen",
+  "ai_settings": "KI",
+  "ai_settings_description": "Die KI-Texte, der Agent und die Bilder von PostDelegate laufen über dein eigenes OpenAI-Konto. Du bezahlst OpenAI direkt für deine Nutzung. Ein ChatGPT-Plus-Abo enthält keine API-Nutzung.",
+  "get_an_api_key": "API-Schlüssel holen",
+  "ai_openai_key": "OpenAI-Schlüssel: {{maskedKey}}",
+  "replace": "Ersetzen",
+  "ai_key_remove_confirm": "Diesen KI-Schlüssel entfernen? KI-Funktionen werden für diesen Workspace deaktiviert.",
+  "ai_key_saved": "KI-Schlüssel gespeichert",
+  "ai_key_removed": "KI-Schlüssel entfernt",
+  "ai_key_save_failed": "Der Schlüssel konnte nicht gespeichert werden, bitte versuche es erneut"
 }

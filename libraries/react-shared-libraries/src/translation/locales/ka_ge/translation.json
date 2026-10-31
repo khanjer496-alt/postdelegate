@@ -592,5 +592,14 @@
     "review_close": "დახურვა",
     "review_name_required": "დაამატეთ სახელი, რომელიც შეფასებასთან ერთად გამოჩნდება",
     "review_save_failed": "შეფასების გაგზავნა ვერ მოხერხდა, სცადეთ ხელახლა",
-    "view_reviews": "შეფასებების ნახვა"
+    "view_reviews": "შეფასებების ნახვა",
+    "ai_settings": "AI",
+    "ai_settings_description": "PostDelegate-ის AI წერა, აგენტი და სურათები მუშაობს თქვენს საკუთარ OpenAI ანგარიშზე. გამოყენებულისთვის OpenAI-ს პირდაპირ უხდით. ChatGPT Plus გამოწერა API-ის გამოყენებას არ მოიცავს.",
+    "get_an_api_key": "API გასაღების მიღება",
+    "ai_openai_key": "OpenAI გასაღები: {{maskedKey}}",
+    "replace": "ჩანაცვლება",
+    "ai_key_remove_confirm": "წავშალოთ ეს AI გასაღები? ამ სამუშაო სივრცეში AI ფუნქციები გამოირთვება.",
+    "ai_key_saved": "AI გასაღები შენახულია",
+    "ai_key_removed": "AI გასაღები წაშლილია",
+    "ai_key_save_failed": "გასაღების შენახვა ვერ მოხერხდა, სცადეთ ხელახლა"
 }

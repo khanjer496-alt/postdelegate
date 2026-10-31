@@ -966,5 +966,14 @@
   "review_close": "إغلاق",
   "review_name_required": "أضف الاسم الذي تريد عرضه مع تقييمك",
   "review_save_failed": "تعذر إرسال تقييمك، يرجى المحاولة مرة أخرى",
-  "view_reviews": "عرض التقييمات"
+  "view_reviews": "عرض التقييمات",
+  "ai_settings": "الذكاء الاصطناعي",
+  "ai_settings_description": "تعمل كتابة الذكاء الاصطناعي والوكيل والصور في PostDelegate على حساب OpenAI الخاص بك. تدفع لـ OpenAI مباشرةً مقابل ما تستخدمه. اشتراك ChatGPT Plus لا يشمل استخدام الـ API.",
+  "get_an_api_key": "احصل على مفتاح API",
+  "ai_openai_key": "مفتاح OpenAI: {{maskedKey}}",
+  "replace": "استبدال",
+  "ai_key_remove_confirm": "إزالة مفتاح الذكاء الاصطناعي هذا؟ ستتوقف ميزات الذكاء الاصطناعي في مساحة العمل هذه.",
+  "ai_key_saved": "تم حفظ مفتاح الذكاء الاصطناعي",
+  "ai_key_removed": "تمت إزالة مفتاح الذكاء الاصطناعي",
+  "ai_key_save_failed": "تعذر حفظ هذا المفتاح، يرجى المحاولة مرة أخرى"
 }
