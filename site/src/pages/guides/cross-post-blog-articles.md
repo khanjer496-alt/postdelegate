@@ -103,4 +103,6 @@ An assistant can help adapt one article to each platform's format, for example c
 
 Each channel has a scheduler page with the short version: [WordPress](/wordpress-scheduler), [DEV.to](/devto-scheduler), [Hashnode](/hashnode-scheduler) and [Medium](/medium-scheduler). The channel docs are [DEV.to](/docs/channels/devto), [Hashnode](/docs/channels/hashnode), [Medium](/docs/channels/medium) and [WordPress](/docs/channels/wordpress).
 
+For a closer look at one part of this, read [cross-posting to Medium and Hashnode without duplicate content](/guides/cross-post-to-medium-and-hashnode), [how to schedule DEV.to articles](/guides/schedule-dev-to-articles) or [how to schedule WordPress posts](/guides/schedule-wordpress-posts).
+
 Ready? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.
