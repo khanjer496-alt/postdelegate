@@ -8,7 +8,9 @@ import { SetSelectionModal } from '@gitroom/frontend/components/launches/calenda
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
-export const NewPost = () => {
+// Opens the composer on the next free slot, used by the Create Post button and
+// the getting started checklist
+export const useCreatePost = () => {
   const fetch = useFetch();
   const modal = useModals();
   const { integrations, reloadCalendarView, sets } = useCalendar();
@@ -74,6 +76,12 @@ export const NewPost = () => {
       title: ``,
     });
   }, [integrations, sets]);
+  return createAPost;
+};
+
+export const NewPost = () => {
+  const createAPost = useCreatePost();
+  const t = useT();
   return (
     <button
       onClick={createAPost}

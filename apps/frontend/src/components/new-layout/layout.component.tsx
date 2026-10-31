@@ -42,7 +42,7 @@ import { StreakComponent } from '@gitroom/frontend/components/layout/streak.comp
 import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-condition.component';
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
-import { TrialBanner } from '@gitroom/frontend/components/billing/trial.banner';
+import { TrialCountdown } from '@gitroom/frontend/components/billing/trial.banner';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 import { setSentryUser } from '@gitroom/react/sentry/initialize.sentry.client';
 import { setUserTimezone } from '@gitroom/frontend/components/layout/set.timezone';
@@ -112,7 +112,6 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
               ) : (
                 <>
                   <AnnouncementBanner />
-                  <TrialBanner />
                   <div className="flex-1 flex gap-[8px] mobile:gap-0">
                     <Support />
                     <ReviewPrompt />
@@ -170,7 +169,8 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         <div className="text-[24px] mobile:text-[20px] font-[600] flex flex-1 min-w-0">
                           <Title />
                         </div>
-                        <div className="flex gap-[20px] mobile:gap-[14px] mobile:items-center text-textItemBlur">
+                        <div className="flex gap-[20px] mobile:gap-[14px] items-center text-textItemBlur">
+                          <TrialCountdown />
                           <StreakComponent />
                           <div className="w-[1px] h-[20px] bg-blockSeparator mobile:hidden" />
                           <OrganizationSelector />

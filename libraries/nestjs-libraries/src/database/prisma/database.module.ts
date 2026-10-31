@@ -54,6 +54,8 @@ import { AffiliateRepository } from '@gitroom/nestjs-libraries/database/prisma/a
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { ReviewRepository } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.repository';
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
+import { ActivationRepository } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.repository';
+import { ActivationService } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.service';
 import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 
@@ -120,6 +122,8 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     AffiliateService,
     ReviewRepository,
     ReviewService,
+    ActivationRepository,
+    ActivationService,
     LoginLockoutService,
   ],
   get exports() {
