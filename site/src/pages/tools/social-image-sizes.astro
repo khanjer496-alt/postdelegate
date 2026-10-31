@@ -19,7 +19,7 @@ const sections: Section[] = [
     ['Post images', 'No size published', 'Up to four images per post.'],
   ], sources: [['Bluesky developer docs: posts', 'https://docs.bsky.app/docs/advanced-guides/posts']], note: 'Bluesky does not publish recommended pixel sizes. PostDelegate scales an image down before posting it to Bluesky if the file is larger than about 1 MB.' },
   { key: 'dribbble', rows: [
-    ['Shot (through PostDelegate)', '800×600 or 400×300', 'The PostDelegate Dribbble connection accepts these two sizes exactly.'],
+    ['Shot (through PostDelegate)', '800×600 or 400×300', 'Images of at least 400×300 are cropped from the centre to 800×600 or 400×300. GIFs must already be exactly one of those sizes.'],
     ['Avatar', 'No size published', 'JPG, GIF or PNG, up to 800 KB.'],
     ['Pro masthead banner', 'At least 1600×1200', 'JPG or PNG, up to 5 MB.'],
   ], sources: [['Dribbble Help: your profile', 'https://help.dribbble.com/en/articles/11056066-creating-managing-your-dribbble-profile']] },

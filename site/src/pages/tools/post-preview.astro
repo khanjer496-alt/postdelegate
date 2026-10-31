@@ -93,13 +93,13 @@ const field = 'w-full rounded-xl border border-line-hover bg-surface-1 px-4 py-3
   <CtaBand title="Write it once, plan it everywhere." text="Draft a post, adjust it for each channel and schedule it on one calendar. Try PostDelegate free for 7 days, no card needed." />
 </Base>
 <script>
-  import { captionLength, type Rule } from '../../scripts/caption-count';
+  import { captionLength, TOKEN_START, type Rule } from '../../scripts/caption-count';
   type Card = { key: string; name: string; limit: number; available: boolean; fold: { chars: number; lines: number } | null; rule: Rule };
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   const cards: Card[] = JSON.parse($('preview').dataset.cards!);
   const cap = $<HTMLTextAreaElement>('cap'), link = $<HTMLInputElement>('link');
   const items = Array.from(document.querySelectorAll<HTMLElement>('#cards > li'));
-  const TOKEN = /(https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]}]|#[\p{L}\p{N}_]+|@[A-Za-z0-9_][A-Za-z0-9_.-]*(?:@[\p{L}\p{N}_.-]*[\p{L}\p{N}_])?)/gu;
+  const TOKEN = new RegExp(TOKEN_START + String.raw`(?:https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]}]|#[\p{L}\p{N}_]+|@[A-Za-z0-9_]+(?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?(?:@[\p{L}\p{N}_.-]*[\p{L}\p{N}_])?)`, 'gu');
   const EXAMPLE = 'We just published our guide to planning a month of social media in one afternoon.\n\nIt covers how to pick three themes, batch your drafts and leave room for news, with a template you can copy.\n\nRead it here: https://example.com/guides/plan-a-month\n\n#socialmedia #contentplanning @postdelegate';
   let seg: Intl.Segmenter | null = null;
   const graphemes = (t: string) => { if (typeof Intl.Segmenter !== 'function') return Array.from(t); seg ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' }); return Array.from(seg.segment(t), (s) => s.segment); };

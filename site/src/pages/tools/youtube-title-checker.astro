@@ -32,7 +32,7 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
         <div><label for="keyword" class="mb-2 block text-sm font-bold">Main keyword <span class="font-normal text-ink-3">(optional)</span></label><input id="keyword" type="text" autocomplete="off" placeholder="schedule youtube videos" class={field} /></div>
         {meters.map((m) => (
           <div>
-            <div class="mb-2 flex items-baseline gap-3"><label for={m.id} class="text-sm font-bold capitalize">{m.id}</label><span id={`${m.id}-count`} class="ml-auto text-sm tabular-nums text-ink-3" aria-live="polite">0 / {m.limit.toLocaleString('en-US')} {m.unit}</span></div>
+            <div class="mb-2 flex items-baseline gap-3"><label for={m.id} class="text-sm font-bold capitalize">{m.id}</label><span id={`${m.id}-count`} class="ml-auto text-sm tabular-nums text-ink-3">0 / {m.limit.toLocaleString('en-US')} {m.unit}</span></div>
             {m.id === 'description'
               ? <textarea id={m.id} rows="7" aria-describedby={`${m.id}-note`} class="w-full rounded-2xl border border-line-hover bg-surface-1 p-4 text-base text-ink placeholder:text-ink-3 focus:border-brand-300" placeholder="What the video is about, chapters, links…"></textarea>
               : <input id={m.id} type="text" autocomplete="off" aria-describedby={`${m.id}-note`} placeholder={m.id === 'title' ? 'How to schedule YouTube videos in 5 minutes' : 'youtube tips, video scheduling, creator tools'} class={field} />}
@@ -91,6 +91,8 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
   const keyword = $<HTMLInputElement>('keyword'), title = $<HTMLInputElement>('title'), desc = $<HTMLTextAreaElement>('description'), tags = $<HTMLInputElement>('tags');
   const preview = $('preview'), checks = $('checks');
   const fmt = (n: number) => n.toLocaleString('en-US');
+  // Only touch the DOM when something changed, so the live checks list is not re-announced.
+  const set = (el: HTMLElement, text: string, cls?: string) => { if (el.textContent !== text) el.textContent = text; if (cls !== undefined && el.className !== cls) el.className = cls; };
 
   // Tags: commas count, and a tag with a space counts as if wrapped in quotation marks.
   const tagLength = (raw: string) => {
@@ -100,15 +102,15 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
 
   const meter = (id: string, n: number, limit: number, unit: string, extra = '') => {
     const ratio = n / limit;
-    $(`${id}-count`).textContent = `${fmt(n)} / ${fmt(limit)} ${unit}${extra}`;
-    $(`${id}-count`).className = 'ml-auto text-sm tabular-nums ' + (n > limit ? 'font-bold text-red-300' : 'text-ink-3');
+    set($(`${id}-count`), `${fmt(n)} / ${fmt(limit)} ${unit}${extra}`, 'ml-auto text-sm tabular-nums ' + (n > limit ? 'font-bold text-red-300' : 'text-ink-3'));
     const bar = $(`${id}-bar`);
     bar.style.width = Math.min(100, ratio * 100) + '%';
     bar.className = 'h-full rounded-full transition-[width] duration-200 ' + (n > limit ? 'bg-red-400' : ratio > 0.9 ? 'bg-amber-400' : 'bg-brand');
   };
 
   type Check = { level: 'ok' | 'warn' | 'info'; text: string };
-  const update = () => {
+  let lastChecks = '';
+  const counts = () => {
     const t = title.value, d = desc.value, k = keyword.value.trim();
     const tLen = captionLength(t, R.title), dLen = captionLength(d, R.description), gLen = tagLength(tags.value);
     const dChars = Array.from(d).length;
@@ -117,8 +119,13 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
     meter('tags', gLen, R.tags.limit, 'characters');
 
     const chars = Array.from(t.trim());
-    preview.textContent = chars.length ? (chars.length > R.mobile ? chars.slice(0, R.mobile).join('').trimEnd() + '…' : chars.join('')) : 'Your title appears here';
+    set(preview, chars.length ? (chars.length > R.mobile ? chars.slice(0, R.mobile).join('').trimEnd() + '…' : chars.join('')) : 'Your title appears here');
 
+    return { t, d, k, tLen, dLen, gLen };
+  };
+
+  const update = () => {
+    const { t, d, k, tLen, dLen, gLen } = counts();
     const list: Check[] = [];
     if (t.trim()) {
       if (tLen > R.title.limit) list.push({ level: 'warn', text: `The title is ${fmt(tLen - R.title.limit)} characters over the limit.` });
@@ -144,6 +151,9 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
     if (dLen > R.description.limit) list.push({ level: 'warn', text: `The description is ${fmt(dLen - R.description.limit)} bytes over the limit.` });
     if (gLen > R.tags.limit) list.push({ level: 'warn', text: `The tags are ${fmt(gLen - R.tags.limit)} characters over the limit.` });
 
+    const key = JSON.stringify(list);
+    if (key === lastChecks) return;
+    lastChecks = key;
     checks.replaceChildren();
     if (!list.length) { const li = document.createElement('li'); li.className = 'text-ink-3'; li.textContent = 'Start typing a title to see checks.'; checks.append(li); return; }
     for (const c of list) {
@@ -155,7 +165,9 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
       li.append(mark, label, text); checks.append(li);
     }
   };
-  [keyword, title, desc, tags].forEach((el) => el.addEventListener('input', update));
+  // Counts update as you type; the checks list, which screen readers announce, settles after a pause.
+  let timer = 0;
+  [keyword, title, desc, tags].forEach((el) => el.addEventListener('input', () => { counts(); clearTimeout(timer); timer = window.setTimeout(update, 300); }));
   $('example').addEventListener('click', () => {
     keyword.value = 'schedule youtube videos';
     title.value = 'How to Schedule YouTube Videos in 5 Minutes (Step by Step Guide for Beginners)';

@@ -5,7 +5,7 @@ import CtaBand from '../../components/CtaBand.astro';
 import Faq from '../../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../../data/site';
 // Sizes follow the official pages listed on /tools/social-image-sizes where a platform publishes one.
-// Dribbble sizes are the ones the PostDelegate Dribbble connection accepts. X and Bluesky publish no
+// Dribbble sizes are the two the PostDelegate Dribbble connection posts at. X and Bluesky publish no
 // post image size, so those presets use common shapes.
 const groups = [
   { label: 'Posts', items: [
@@ -23,7 +23,7 @@ const faq = [
   { q: 'Is my image uploaded anywhere?', a: 'No. The image is read and resized by your browser on your own device. It is never uploaded, and nothing is saved after you close the page.' },
   { q: 'What is the difference between cover and contain?', a: '<strong>Cover</strong> fills the whole size and crops what does not fit, so nothing is left empty. <strong>Contain</strong> fits the whole image inside the size and fills the leftover space with a colour you choose, so nothing is cropped.' },
   { q: 'Should I save as PNG or JPEG?', a: 'JPEG makes much smaller files for photos and is what most networks prefer. PNG keeps sharp edges on text, logos and screenshots, and it can keep a transparent background. If a network has a file size limit, check the size shown under the preview before you save.' },
-  { q: 'Which Dribbble size does PostDelegate need?', a: 'The PostDelegate Dribbble connection accepts shot images of exactly 800×600 or 400×300 pixels. Pick one of the Dribbble presets and the image will be the right size. See the <a href="/dribbble-scheduler">Dribbble scheduler</a>.' },
+  { q: 'Which Dribbble size does PostDelegate need?', a: 'Images of at least 400×300 are cropped from the centre to 800×600 or 400×300. GIFs must already be exactly one of those sizes. Use a Dribbble preset to choose the crop yourself instead of leaving it to the centre. See the <a href="/dribbble-scheduler">Dribbble scheduler</a>.' },
   { q: 'Where do these sizes come from?', a: 'Where a platform publishes a size on its own help pages, the preset uses it; the <a href="/tools/social-image-sizes">social media image sizes</a> page lists each one with its source. X and Bluesky do not publish a size for images in posts, so those presets use common shapes.' },
 ];
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };
@@ -34,7 +34,7 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
   <PageHero eyebrow="Free tool" title="Social media image resizer" lead="Resize an image to a social media size and save it as PNG or JPEG. Everything happens in your browser: the image never leaves your device." />
   <section class="section"><div class="container-x max-w-5xl">
     <div class="grid gap-10 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-      <form id="controls" class="grid content-start gap-5" onsubmit="return false">
+      <form id="controls" class="grid content-start gap-5">
         <div>
           <p class="mb-2 text-sm font-bold">Image</p>
           <input id="file" type="file" accept="image/*" class="peer sr-only" aria-describedby="privacy" />
@@ -77,7 +77,7 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
           </div>
         </fieldset>
         <div id="q-wrap"><label for="quality" class="mb-2 flex text-sm font-bold">JPEG quality <output id="q-out" for="quality" class="ml-auto font-normal tabular-nums text-ink-3">90</output></label><input id="quality" type="range" min="50" max="100" value="90" class="w-full accent-[#7357ff]" /></div>
-        <button id="save" type="button" class="btn btn-primary" disabled>Download image</button>
+        <button id="save" type="button" class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50" disabled>Download image</button>
       </form>
       <div class="min-w-0">
         <h2 class="text-sm font-bold">Preview</h2>
@@ -127,6 +127,9 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
   let name = 'image';
   let blob: Blob | null = null;
   let version = 0;
+  let sourceId = 0;
+  // The last downscaled copy, reused while the image and the number of halving steps stay the same.
+  let scaled: { id: number; steps: number; img: HTMLCanvasElement } | null = null;
 
   const value = (n: string) => (form.querySelector(`input[name="${n}"]:checked`) as HTMLInputElement).value;
   const clamp = (v: string) => Math.min(4096, Math.max(16, Math.round(Number(v)) || 16));
@@ -143,10 +146,24 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
     const img = new Image(); img.src = data; await img.decode(); return img;
   };
 
+  const release = () => {
+    if (source && 'close' in source) source.close();
+    if (scaled) scaled.img.width = 0;
+    source = null; scaled = null;
+  };
+  const clear = (message: string) => {
+    release(); version++; blob = null; save.disabled = true;
+    canvas.classList.add('hidden'); canvas.width = 0; empty.hidden = false;
+    info.textContent = ''; warn.textContent = message;
+    drop.querySelector('span')!.textContent = 'Choose an image';
+  };
+
   const load = async (f: File | undefined) => {
     if (!f) return;
-    if (!f.type.startsWith('image/')) { warn.textContent = 'That file is not an image. Choose a JPEG, PNG, WebP or GIF.'; return; }
-    try { source = await read(f); } catch { source = null; warn.textContent = 'This browser could not open that image. Try a JPEG or PNG.'; return; }
+    if (!f.type.startsWith('image/')) { clear('That file is not an image. Choose a JPEG, PNG, WebP or GIF.'); return; }
+    let next: ImageBitmap | HTMLImageElement;
+    try { next = await read(f); } catch { clear('This browser could not open that image. Try a JPEG or PNG.'); return; }
+    release(); source = next; sourceId++;
     name = f.name.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 60) || 'image';
     drop.querySelector('span')!.textContent = f.name;
     render();
@@ -171,11 +188,21 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
       else if (pos.value === 'left') dx = 0; else if (pos.value === 'right') dx = w - dw;
     }
     // Halve large images in steps first; one big downscale looks jagged in some browsers.
-    let img: CanvasImageSource = source, iw = sw, ih = sh;
-    while (iw / 2 >= dw && ih / 2 >= dh) {
-      const step = document.createElement('canvas'); step.width = Math.round(iw / 2); step.height = Math.round(ih / 2);
-      const sctx = step.getContext('2d')!; sctx.imageSmoothingQuality = 'high'; sctx.drawImage(img, 0, 0, step.width, step.height);
-      img = step; iw = step.width; ih = step.height;
+    let steps = 0;
+    for (let iw = sw, ih = sh; iw / 2 >= dw && ih / 2 >= dh; iw /= 2, ih /= 2) steps++;
+    let img: CanvasImageSource = source;
+    if (steps && scaled?.id === sourceId && scaled.steps === steps) img = scaled.img;
+    else if (steps) {
+      if (scaled) scaled.img.width = 0;
+      let from: CanvasImageSource = source, iw = sw, ih = sh;
+      for (let i = 0; i < steps; i++) {
+        const step = document.createElement('canvas'); step.width = Math.round(iw / 2); step.height = Math.round(ih / 2);
+        const sctx = step.getContext('2d')!; sctx.imageSmoothingQuality = 'high'; sctx.drawImage(from, 0, 0, step.width, step.height);
+        if (from instanceof HTMLCanvasElement) from.width = 0;
+        from = step; iw = step.width; ih = step.height;
+      }
+      scaled = { id: sourceId, steps, img: from as HTMLCanvasElement };
+      img = from;
     }
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
@@ -203,6 +230,7 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
   ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('border-brand-300'); }));
   ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('border-brand-300')));
   drop.addEventListener('drop', (e) => { e.preventDefault(); load((e as DragEvent).dataTransfer?.files[0]); });
+  form.addEventListener('submit', (e) => e.preventDefault());
   form.addEventListener('change', render);
   [cw, ch, quality, bg].forEach((el) => el.addEventListener('input', later));
   save.addEventListener('click', () => {
