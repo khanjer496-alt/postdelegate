@@ -975,5 +975,7 @@
   "ai_key_remove_confirm": "Rimuovere questa chiave IA? Le funzioni IA verranno disattivate per questo workspace.",
   "ai_key_saved": "Chiave IA salvata",
   "ai_key_removed": "Chiave IA rimossa",
-  "ai_key_save_failed": "Impossibile salvare questa chiave, riprova"
+  "ai_key_save_failed": "Impossibile salvare questa chiave, riprova",
+  "ai_key_required": "Chiave OpenAI richiesta",
+  "open_ai_settings": "Apri impostazioni IA"
 }

@@ -975,5 +975,7 @@
   "ai_key_remove_confirm": "Bu yapay zeka anahtarı kaldırılsın mı? Bu çalışma alanında yapay zeka özellikleri kapanacak.",
   "ai_key_saved": "Yapay zeka anahtarı kaydedildi",
   "ai_key_removed": "Yapay zeka anahtarı kaldırıldı",
-  "ai_key_save_failed": "Bu anahtar kaydedilemedi, lütfen tekrar deneyin"
+  "ai_key_save_failed": "Bu anahtar kaydedilemedi, lütfen tekrar deneyin",
+  "ai_key_required": "OpenAI anahtarı gerekli",
+  "open_ai_settings": "Yapay zeka ayarlarını aç"
 }

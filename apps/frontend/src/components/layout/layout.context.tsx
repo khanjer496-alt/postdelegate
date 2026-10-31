@@ -5,6 +5,7 @@ import { FetchWrapperComponent } from '@gitroom/helpers/utils/custom.fetch';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useReturnUrl } from '@gitroom/frontend/app/(app)/auth/return.url.component';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export default function LayoutContext(params: { children: ReactNode }) {
   if (params?.children) {
     // eslint-disable-next-line react/no-children-prop
@@ -24,6 +25,7 @@ export function setCookie(cname: string, cvalue: string, exdays: number) {
 function LayoutContextInner(params: { children: ReactNode }) {
   const returnUrl = useReturnUrl();
   const { backendUrl, isGeneral, isSecured } = useVariables();
+  const t = useT();
   const afterRequest = useCallback(
     async (url: string, options: RequestInit, response: Response) => {
       if (
@@ -104,17 +106,29 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
 
       if (response.status === 402) {
+        const body = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
+
+        // AI is refused only while the workspace has no OpenAI key of its own,
+        // which is added in Settings, not on the billing page
+        if (body?.section === 'ai') {
+          if (
+            await deleteDialog(
+              body.message,
+              t('open_ai_settings', 'Open AI settings'),
+              t('ai_key_required', 'OpenAI key required')
+            )
+          ) {
+            window.open('/settings?tab=ai', '_blank');
+            return false;
+          }
+          return true;
+        }
+
         if (
-          await deleteDialog(
-            (
-              await response
-                .clone()
-                .json()
-                .catch(() => ({}))
-            ).message,
-            'Move to billing',
-            'Payment Required'
-          )
+          await deleteDialog(body.message, 'Move to billing', 'Payment Required')
         ) {
           window.open('/billing', '_blank');
           return false;
@@ -123,7 +137,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
       return true;
     },
-    []
+    [t]
   );
   return (
     <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>

@@ -977,5 +977,7 @@
   "ai_key_remove_confirm": "Remove this AI key? AI features will turn off for this workspace.",
   "ai_key_saved": "AI key saved",
   "ai_key_removed": "AI key removed",
-  "ai_key_save_failed": "Could not save this key, please try again"
+  "ai_key_save_failed": "Could not save this key, please try again",
+  "ai_key_required": "OpenAI key required",
+  "open_ai_settings": "Open AI settings"
 }

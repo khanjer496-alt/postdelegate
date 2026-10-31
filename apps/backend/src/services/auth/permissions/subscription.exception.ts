@@ -5,6 +5,7 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { AuthorizationActions, Sections, SubscriptionException } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { MISSING_AI_KEY } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 
 @Catch(SubscriptionException)
 export class SubscriptionExceptionFilter implements ExceptionFilter {
@@ -17,10 +18,15 @@ export class SubscriptionExceptionFilter implements ExceptionFilter {
 
     const message = getErrorMessage(error);
 
+    // AI is denied only when the workspace has no OpenAI key of its own, which
+    // is fixed in Settings → AI, not by paying
     response.status(status).json({
       statusCode: status,
       message,
-      url: process.env.FRONTEND_URL + '/billing',
+      section: error.section,
+      url:
+        process.env.FRONTEND_URL +
+        (error.section === Sections.AI ? '/settings?tab=ai' : '/billing'),
     });
   }
 }
@@ -53,7 +59,7 @@ const getErrorMessage = (error: {
     case Sections.AI:
       switch (error.action) {
         default:
-          return 'AI features are not available.';
+          return MISSING_AI_KEY;
       }
     case Sections.CLIPPING_MINUTES:
       switch (error.action) {

@@ -975,5 +975,7 @@
   "ai_key_remove_confirm": "Diesen KI-Schlüssel entfernen? KI-Funktionen werden für diesen Workspace deaktiviert.",
   "ai_key_saved": "KI-Schlüssel gespeichert",
   "ai_key_removed": "KI-Schlüssel entfernt",
-  "ai_key_save_failed": "Der Schlüssel konnte nicht gespeichert werden, bitte versuche es erneut"
+  "ai_key_save_failed": "Der Schlüssel konnte nicht gespeichert werden, bitte versuche es erneut",
+  "ai_key_required": "OpenAI-Schlüssel erforderlich",
+  "open_ai_settings": "KI-Einstellungen öffnen"
 }

@@ -975,5 +975,7 @@
   "ai_key_remove_confirm": "¿Eliminar esta clave de IA? Las funciones de IA se desactivarán para este espacio de trabajo.",
   "ai_key_saved": "Clave de IA guardada",
   "ai_key_removed": "Clave de IA eliminada",
-  "ai_key_save_failed": "No se pudo guardar esta clave, inténtalo de nuevo"
+  "ai_key_save_failed": "No se pudo guardar esta clave, inténtalo de nuevo",
+  "ai_key_required": "Se necesita una clave de OpenAI",
+  "open_ai_settings": "Abrir ajustes de IA"
 }
