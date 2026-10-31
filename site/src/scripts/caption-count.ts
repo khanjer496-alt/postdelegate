@@ -1,8 +1,10 @@
 // Port of static/js/caption-count.js and providers/x.py weighted_length from the app repo.
 export interface Rule { unit: string; urlCost?: number; noMentionDomain?: boolean }
 
-const URL_RE = /(?<![=/\p{L}\p{N}_])https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]}]/gu;
-const MENTION_RE = /(?<![=/\p{L}\p{N}_])@([A-Za-z0-9_]+(?:[A-Za-z0-9_.-]+[A-Za-z0-9_]+)?)(?:@[\p{L}\p{N}_.-]+[\p{L}\p{N}_])/gu;
+// A link or mention only starts after a space or punctuation, so me@example.com and abc#tag do not match.
+export const TOKEN_START = String.raw`(?<![=/\p{L}\p{N}_])`;
+const URL_RE = new RegExp(TOKEN_START + String.raw`https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]}]`, 'gu');
+const MENTION_RE = new RegExp(TOKEN_START + String.raw`@([A-Za-z0-9_]+(?:[A-Za-z0-9_.-]+[A-Za-z0-9_]+)?)(?:@[\p{L}\p{N}_.-]+[\p{L}\p{N}_])`, 'gu');
 const EMOJI_RE = /[\p{Emoji_Presentation}️\u{1F000}-\u{1FAFF}]/u;
 const enc = new TextEncoder();
 let seg: Intl.Segmenter | null = null;
