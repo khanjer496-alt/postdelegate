@@ -23,7 +23,7 @@ export default async function AuthLayout({
         <div className="flex flex-col py-[40px] px-[20px] flex-1 lg:w-[600px] lg:flex-none rounded-[16px] ring-1 ring-[#262B37] text-white p-[12px] bg-[#11141C]">
           <div className="w-full max-w-[440px] mx-auto justify-center gap-[20px] h-full flex flex-col text-white">
             <LogoTextComponent />
-            <div className="flex">{children}</div>
+            <main className="flex">{children}</main>
           </div>
         </div>
         <div className="auth-brand-panel text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center rounded-[16px] ring-1 ring-[#262B37]">
