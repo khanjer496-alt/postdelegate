@@ -2,9 +2,13 @@ app.postdelegate.com {
     encode zstd gzip
     header {
         -Server
+        -X-Powered-By
         X-Content-Type-Options nosniff
         Referrer-Policy strict-origin-when-cross-origin
-        Strict-Transport-Security "max-age=31536000"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Nothing embeds the app; refuse framing so the login page cannot be clickjacked.
+        X-Frame-Options SAMEORIGIN
+        Content-Security-Policy "frame-ancestors 'self'"
     }
     # Only Cloudflare may reach the origin, so CF-Connecting-IP (used for
     # per-visitor rate limits, TRUST_CF_CONNECTING_IP) cannot be forged.
