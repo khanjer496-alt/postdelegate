@@ -9,6 +9,7 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { AiCredentialsController } from './ai.credentials.controller';
 
 const policiesOf = (name: keyof AiCredentialsController) =>
@@ -26,6 +27,22 @@ describe('AiCredentialsController authorization', () => {
 
   it('getCredential is open to any member', () => {
     expect(policiesOf('getCredential')).toBeUndefined();
+  });
+});
+
+describe('AiCredentialsController rate limits', () => {
+  const proto: any = AiCredentialsController.prototype;
+
+  it('limits saving a key per client address, so it can not test keys', () => {
+    expect(Reflect.getMetadata('__guards__', proto.saveCredential)).toContain(
+      ThrottlerRealIpGuard
+    );
+    expect(
+      Reflect.getMetadata('THROTTLER:LIMITdefault', proto.saveCredential)
+    ).toBe(10);
+    expect(
+      Reflect.getMetadata('THROTTLER:TTLdefault', proto.saveCredential)
+    ).toBe(60 * 60 * 1000);
   });
 });
 
