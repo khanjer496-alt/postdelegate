@@ -45,3 +45,8 @@ AGENTS.md export-ignore
 /deploy/postdelegate/plan-postiz-backup-retention.py export-ignore
 /deploy/postdelegate/initialize.py export-ignore
 /deploy/postdelegate/bootstrap-owner.py export-ignore
+
+# Marketing site has its own source download (postdelegate.com/website-source.tar.gz).
+/site export-ignore
+# Internal review notes for the legal pages; only the *.html policies are served.
+/deploy/postdelegate/legal-public/index.html export-ignore
