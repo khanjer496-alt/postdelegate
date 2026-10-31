@@ -995,5 +995,18 @@
   "one_channel_needs_attention": "1 channel needs attention before scheduling",
   "channels_need_attention": "{{count}} channels need attention before scheduling",
   "open_settings": "Open settings",
-  "show_channel": "Show"
+  "show_channel": "Show",
+  "post_templates": "Post Templates",
+  "template_save_failed": "Could not save the template",
+  "template_saved": "Template saved",
+  "are_you_sure_delete_template": "Are you sure you want to delete this template?",
+  "save_post_as_template": "Save this post as a template",
+  "template_name": "Template name",
+  "save_template": "Save template",
+  "template_write_first": "Write something in the editor first, then save it here.",
+  "your_templates": "Your templates",
+  "no_templates_yet": "No templates yet. Save a post you reuse often and insert it in one click.",
+  "untitled_template": "Untitled template",
+  "insert": "Insert",
+  "delete_template": "Delete template"
 }
