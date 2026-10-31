@@ -71,6 +71,12 @@ import {
   MediaSettingsSection,
   useMediaSettingsValues,
 } from '@gitroom/frontend/components/new-launch/media.settings.section';
+import { ChannelChecks } from '@gitroom/frontend/components/new-launch/channel.checks.component';
+
+// the modifier key of the shortcuts, as the keyboard labels it
+const isMac = () =>
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -896,6 +902,39 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     ]
   );
 
+  // Cmd/Ctrl + Enter runs the primary action, like the main button would
+  const primaryDisabled =
+    selectedIntegrations.length === 0 ||
+    loading ||
+    locked ||
+    (!addEditSets && publishingBlocked);
+  const onShortcut = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        e.key !== 'Enter' ||
+        !(e.metaKey || e.ctrlKey) ||
+        e.shiftKey ||
+        e.altKey ||
+        e.nativeEvent.isComposing
+      ) {
+        return;
+      }
+      e.preventDefault();
+      if (primaryDisabled) {
+        return;
+      }
+      schedule(addEditSets ? 'draft' : 'schedule')();
+    },
+    [primaryDisabled, schedule, addEditSets]
+  );
+  const shortcutHint = isMac() ? '⌘ ↵' : 'Ctrl ↵';
+  const shortcutKeys = isMac() ? 'Meta+Enter' : 'Control+Enter';
+
+  const showChannelSettings = useCallback(
+    (where: 'fix' | 'preview') => setShowSettings(where === 'fix'),
+    []
+  );
+
   const scheduleLabel = dummy
     ? t('create_output', 'Create output')
     : !existingData?.integration
@@ -978,7 +1017,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   );
 
   return (
-    <div className="w-full h-full flex-1 p-[40px] mobile:p-0 mobile:h-auto mobile:min-h-full flex relative">
+    <div
+      className="w-full h-full flex-1 p-[40px] mobile:p-0 mobile:h-auto mobile:min-h-full flex relative"
+      onKeyDown={onShortcut}
+    >
       <div className="flex flex-1 min-w-0 bg-newBgColorInner rounded-[20px] mobile:rounded-none flex-col">
         <MobileTopBar
           onBack={askClose}
@@ -1082,6 +1124,19 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     >
                       {!hide && <EditorWrapper totalPosts={1} value="" />}
                     </div>
+                    {/* a set is saved without these checks */}
+                    {!dummy && !addEditSets && (
+                      <div
+                        className={clsx(
+                          mobileTab === 'preview' && 'mobile:hidden'
+                        )}
+                      >
+                        <ChannelChecks
+                          providers={ref}
+                          onFix={showChannelSettings}
+                        />
+                      </div>
+                    )}
                     <div
                       id="social-empty"
                       className={clsx(
@@ -1121,7 +1176,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     <div
                       onClick={() => setShowSettings(!showSettings)}
                       className={clsx(
-                        'bg-[#612BD3] rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
+                        'bg-btnPrimary rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
                         showSettings ? '!rounded-b-none' : ''
                       )}
                     >
@@ -1236,13 +1291,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             )}
             {addEditSets && (
               <button
-                className="text-white text-[15px] font-[600] min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
+                className="text-btnCtaText text-[15px] font-[600] min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]"
                 disabled={
                   selectedIntegrations.length === 0 || loading || locked
                 }
                 onClick={schedule('draft')}
+                aria-keyshortcuts={shortcutKeys}
+                title={`${t('save_set', 'Save Set')} (${shortcutHint})`}
               >
-                Save Set
+                {t('save_set', 'Save Set')}
+                <ShortcutHint hint={shortcutHint} />
               </button>
             )}
             {!addEditSets && (
@@ -1255,11 +1313,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     publishingBlocked
                   }
                   onClick={schedule('schedule')}
-                  className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
+                  aria-keyshortcuts={shortcutKeys}
+                  title={`${scheduleLabel} (${shortcutHint})`}
+                  className="text-btnCtaText relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]"
                 >
                   {loading && (
                     <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-                      <div className="animate-spin h-[20px] w-[20px] border-4 border-white border-t-transparent rounded-full" />
+                      <div className="animate-spin h-[20px] w-[20px] border-4 border-btnCtaText border-t-transparent rounded-full" />
                     </div>
                   )}
                   <div
@@ -1272,6 +1332,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       ? t('check_circles_above', 'Check the circles above')
                       : scheduleLabel}
                   </div>
+                  {selectedIntegrations.length > 0 && (
+                    <ShortcutHint
+                      hint={shortcutHint}
+                      className={clsx(loading && 'invisible')}
+                    />
+                  )}
                   {!dummy && (
                     <div
                       onClick={(e) => {
@@ -1282,7 +1348,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     >
                       <DropdownArrowSmallIcon
                         className={clsx(
-                          'group-hover:rotate-180 text-white',
+                          'group-hover:rotate-180 text-btnCtaText',
                           showPostNow && 'rotate-180'
                         )}
                       />
@@ -1465,6 +1531,22 @@ After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} f
     </div>
   );
 };
+
+// the keyboard shortcut of a button, next to its label
+const ShortcutHint: FC<{ hint: string; className?: string }> = ({
+  hint,
+  className,
+}) => (
+  <kbd
+    aria-hidden="true"
+    className={clsx(
+      'font-sans text-[11px] font-[600] leading-none px-[5px] py-[3px] rounded-[4px] border border-white/30 text-white/80 whitespace-nowrap',
+      className
+    )}
+  >
+    {hint}
+  </kbd>
+);
 
 const Scrollable: FC<{
   className: string;

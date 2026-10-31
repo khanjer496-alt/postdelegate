@@ -11,14 +11,18 @@ import { SetSelectionModal } from '@gitroom/frontend/components/launches/calenda
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
-// opens the composer on the next free slot, also used by the quick menu
-export const useCreatePost = (
-  integrations: Integrations[],
-  sets: { name: string; id: string; content: string[] }[],
-  reloadCalendarView: () => void
-) => {
+// Opens the composer on the next free slot. The Create Post button and the
+// getting started checklist read channels, sets and reload from the calendar;
+// the quick menu lives outside the calendar and passes its own.
+export const useCreatePost = (source?: {
+  integrations: Integrations[];
+  sets: { name: string; id: string; content: string[] }[];
+  reloadCalendarView: () => void;
+}) => {
   const fetch = useFetch();
   const modal = useModals();
+  const calendar = useCalendar();
+  const { integrations, sets, reloadCalendarView } = source || calendar;
   const t = useT();
 
   const createAPost = useCallback(async () => {
@@ -86,14 +90,12 @@ export const useCreatePost = (
 };
 
 export const NewPost = () => {
-  const { integrations, reloadCalendarView, sets } = useCalendar();
+  const createAPost = useCreatePost();
   const t = useT();
-  const createAPost = useCreatePost(integrations, sets, reloadCalendarView);
-
   return (
     <button
       onClick={createAPost}
-      className="text-white flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-md bg-btnPrimary flex justify-center items-center gap-[5px] outline-none"
+      className="text-btnCtaText font-[600] flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors flex justify-center items-center gap-[5px] outline-none"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -105,7 +107,7 @@ export const NewPost = () => {
       >
         <path
           d="M10.5001 4.16699V15.8337M4.66675 10.0003H16.3334"
-          stroke="white"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"

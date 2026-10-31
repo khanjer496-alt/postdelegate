@@ -194,11 +194,11 @@ export const CommandPaletteDialog: FC<{ onClose: () => void }> = ({
     );
   }, [mutate]);
 
-  const createPost = useCreatePost(
+  const createPost = useCreatePost({
     integrations,
-    sets || [],
-    reloadCalendarView
-  );
+    sets: sets || [],
+    reloadCalendarView,
+  });
   const addChannel = useAddProvider(() => mutateIntegrations());
 
   useEffect(() => {
