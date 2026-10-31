@@ -16,6 +16,9 @@ ENV STORAGE_PROVIDER=cloudflare
 
 # The provider changes are used by both HTTP handlers and Temporal workers.
 # Rebuild all three applications with the pinned image's installed dependencies.
+# COPY only adds and overwrites, so clear the upstream public assets first:
+# files deleted from this repo (old upstream logos) must not survive in the image.
+RUN rm -rf /app/apps/frontend/public
 COPY apps/frontend /app/apps/frontend
 COPY apps/backend /app/apps/backend
 COPY apps/orchestrator /app/apps/orchestrator
