@@ -22,6 +22,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Medium', href: '/docs/channels/medium', description: 'Connect with a Medium integration token.' },
     { title: 'Nostr', href: '/docs/channels/nostr', description: 'Connect with a hex private key.' },
     { title: 'WordPress', href: '/docs/channels/wordpress', description: 'Connect with an application password.' },
+    { title: 'Kick', href: '/docs/channels/kick', description: 'Connect a Kick channel with Kick sign-in.' },
     { title: 'Coming soon', href: '/docs/channels/coming-soon', description: 'Networks waiting on platform approval.' },
   ] },
   { title: 'REST API', items: [

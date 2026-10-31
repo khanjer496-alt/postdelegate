@@ -5,20 +5,22 @@ import PageHero from '../components/PageHero.astro';
 import CtaBand from '../components/CtaBand.astro';
 import { NETWORKS } from '../data/networks';
 import { SITE } from '../data/site';
+const networks = [...NETWORKS].sort((a, b) => Number(!!b.available) - Number(!!a.available));
+const href = (network: typeof NETWORKS[number]) => network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon';
 ---
-<Base title="Platform coverage and channel rollout — PostDelegate" description="Explore the social providers in PostDelegate's Postiz foundation. Hosted connections are rolling out during early access.">
-  <PageHero eyebrow="Platform coverage" title="Your content belongs in one calendar." lead="Explore the networks in our Postiz foundation. PostDelegate connections are being rolled out, with availability confirmed in your workspace.">
+<Base title="Platform coverage and channel rollout — PostDelegate" description="See which networks you can connect to PostDelegate today and which are coming soon as platform approvals come through.">
+  <PageHero eyebrow="Platform coverage" title="Your content belongs in one calendar." lead="Connect the networks marked available today. The rest are coming soon, opening as each platform approves PostDelegate.">
     <a href={SITE.signup} class="button">Create a workspace</a>
     <a href="/support" class="button button-outline">Ask about a channel</a>
   </PageHero>
   <section class="section"><div class="container">
-    <p class="coverage-note muted">Source-provider coverage is not the same as a live connection. Account types, permissions and the channel rollout affect what is available.</p>
+    <p class="coverage-note muted">Networks marked available can be connected from Add Channel in your workspace. Account types and permissions still affect what each connection can do. See the <a href="/docs/channels">channel guides</a> for details.</p>
     <ul class="network-grid">
-      {NETWORKS.map((network) => (
-        <li><a href={network.scheduler ? `/${network.scheduler}` : '/support'} class="network-card">
+      {networks.map((network) => (
+        <li><a href={href(network)} class="network-card">
           <NetworkBadge n={network} size="lg" />
-          <span class="network-copy"><strong>{network.name}</strong><span>In the Postiz foundation</span></span>
-          <span class="rollout-label">Rollout pending</span>
+          <span class="network-copy"><strong>{network.name}</strong><span>{network.available ? 'Connect it in your workspace' : 'Not connectable yet'}</span></span>
+          <span class={network.available ? 'rollout-label is-available' : 'rollout-label'}>{network.available ? 'Available' : 'Coming soon'}</span>
         </a></li>
       ))}
     </ul>
@@ -35,6 +37,8 @@ import { SITE } from '../data/site';
   .network-copy strong { font-size: 15px; font-weight: 750; }
   .network-copy > span { font-size: 11px; color: #b2b2ba; }
   .rollout-label { padding: 5px 8px; border: 1px solid #454545; border-radius: 100px; color: #b9b9c0; font-size: 10px; white-space: nowrap; }
+  .rollout-label.is-available { border-color: #c8ff4d66; color: #c8ff4d; }
+  .coverage-note a { color: #d1bfff; text-decoration: underline; text-underline-offset: 4px; }
   @media (max-width: 1000px) { .network-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 580px) { .network-grid { grid-template-columns: 1fr; } }
 </style>

@@ -5,7 +5,7 @@ import { PLANS } from '../data/plans';
 import { DOC_SECTIONS } from '../data/docs';
 export const GET: APIRoute = () => {
   const audiences = PLANS.map((plan) => `- ${plan.name}: ${plan.description}`).join('\n');
-  const networks = NETWORKS.map((network) => `- ${network.name}: source-provider coverage; hosted rollout pending.`).join('\n');
+  const networks = NETWORKS.map((network) => `- ${network.name}: ${network.available ? 'available to connect today' : 'coming soon; cannot be connected today'}.`).join('\n');
   const body = `# PostDelegate: product facts
 
 PostDelegate is an independently operated, open-source social publishing workspace.
@@ -34,8 +34,8 @@ YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress an
 ## Documentation
 ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `${SITE.url}${item.href} : ${item.title}. ${item.description}`).join('\n')}
 
-## Source-provider coverage
-This list describes the Postiz foundation. It is not a list of live production connections:
+## Channel directory
+Every network in the PostDelegate channel directory and whether it can be connected today:
 ${networks}
 
 ## Browser tools
