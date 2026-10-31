@@ -182,6 +182,26 @@ const organizationSteps = (org: string): Step[] => [
   },
   { table: 'Webhooks', model: 'webhooks', where: { organizationId: org } },
   {
+    table: 'AnalyticsAccountSnapshot',
+    model: 'analyticsAccountSnapshot',
+    where: { organizationId: org },
+  },
+  {
+    table: 'AnalyticsPostSnapshot',
+    model: 'analyticsPostSnapshot',
+    where: { organizationId: org },
+  },
+  {
+    table: 'AnalyticsPost',
+    model: 'analyticsPost',
+    where: { organizationId: org },
+  },
+  {
+    table: 'AnalyticsReportSettings',
+    model: 'analyticsReportSettings',
+    where: { organizationId: org },
+  },
+  {
     table: 'Integration',
     model: 'integration',
     where: { organizationId: org },

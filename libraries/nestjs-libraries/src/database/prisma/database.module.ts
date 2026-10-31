@@ -52,6 +52,8 @@ import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.service';
+import { AnalyticsSnapshotService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.snapshot.service';
+import { AnalyticsReportService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.report.service';
 import { AffiliateRepository } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.repository';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { ReviewRepository } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.repository';
@@ -130,6 +132,8 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     AdminStatsService,
     AnalyticsRepository,
     AnalyticsService,
+    AnalyticsSnapshotService,
+    AnalyticsReportService,
     AffiliateRepository,
     AffiliateService,
     ReviewRepository,
