@@ -14,7 +14,7 @@ export const GET: APIRoute = () => {
 - Plans: Starter $19, Team $29, Pro $39 and Ultimate $79 per month ($180, $276, $372 and $756 per year, US dollars). Every plan starts with a 7-day free trial that needs no credit card. Add a card any time before the trial ends to keep the plan; the first payment is taken when the trial ends. If the trial ends without a card, the workspace is paused until a plan is chosen; posts are kept, and channels and team members are switched back on when subscribing to a plan that includes them. One free trial per email address. Details at ${SITE.url}/pricing and ${SITE.url}/docs/billing.
 - Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
 - AI features inside the app are off. Customers bring their own AI assistant through MCP.
-- Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
+- Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble and Slack. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
 - The application is open source under AGPL-3.0: ${SITE.source}. It is based on the Postiz project; PostDelegate is not affiliated with or endorsed by Postiz.
 
 ## Documentation

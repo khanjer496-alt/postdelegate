@@ -23,6 +23,10 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Nostr', href: '/docs/channels/nostr', description: 'Connect with a hex private key.' },
     { title: 'WordPress', href: '/docs/channels/wordpress', description: 'Connect with an application password.' },
     { title: 'Kick', href: '/docs/channels/kick', description: 'Connect a Kick channel with Kick sign-in.' },
+    { title: 'Twitch', href: '/docs/channels/twitch', description: 'Connect a Twitch channel with Twitch sign-in.' },
+    { title: 'Tumblr', href: '/docs/channels/tumblr', description: 'Connect a Tumblr blog with Tumblr sign-in.' },
+    { title: 'Dribbble', href: '/docs/channels/dribbble', description: 'Publish shots with Dribbble sign-in.' },
+    { title: 'Slack', href: '/docs/channels/slack', description: 'Add PostDelegate to a Slack workspace.' },
     { title: 'Coming soon', href: '/docs/channels/coming-soon', description: 'Networks waiting on platform approval.' },
   ] },
   { title: 'REST API', items: [
