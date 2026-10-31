@@ -1012,6 +1012,13 @@
   "attention_channel_expires_tomorrow": "Access expires tomorrow. Reconnect so posts keep going out.",
   "attention_channel_expires_days": "Access expires in {{days}} days. Reconnect so posts keep going out.",
   "channel_health_click_to_reconnect": "Click to reconnect.",
+  "trial_countdown_today": "Your trial ends today",
+  "trial_countdown_one_day": "1 day left in your trial",
+  "trial_countdown_days": "{{days}} days left in your trial",
+  "trial_countdown_label": "Free trial",
+  "trial_countdown_short": "{{days}}d left",
+  "trial_countdown_add_card": "Add card",
+  "trial_countdown_dismiss": "Hide for now",
   "sign_up_free_trial_no_card": "Start your 7-day free trial. No credit card required.",
   "faq_free_trial_no_credit_card": "Not during your free trial, and you do not need a credit card to start it. If you add a card, your first payment is charged when the trial ends. Without a card, your workspace is paused when the trial ends until you choose a plan, and your posts are kept. You can cancel anytime from settings without talking to a person"
 }
