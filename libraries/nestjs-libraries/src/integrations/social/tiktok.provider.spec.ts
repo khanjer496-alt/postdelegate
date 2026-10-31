@@ -302,3 +302,16 @@ describe('TiktokProvider recentPosts', () => {
     ).rejects.toBeInstanceOf(BadBody);
   });
 });
+
+describe('TiktokProvider.publishedLabel', () => {
+  it('labels an inbox upload instead of calling it published', () => {
+    const instance = new TiktokProvider();
+    expect(instance.publishedLabel({ content_posting_method: 'UPLOAD' })).toBe(
+      'Sent to TikTok inbox'
+    );
+    expect(
+      instance.publishedLabel({ content_posting_method: 'DIRECT_POST' })
+    ).toBeUndefined();
+    expect(instance.publishedLabel({})).toBeUndefined();
+  });
+});

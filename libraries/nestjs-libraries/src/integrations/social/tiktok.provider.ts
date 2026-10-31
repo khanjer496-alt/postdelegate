@@ -63,6 +63,13 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     return 2000;
   }
 
+  // UPLOAD only drops the media into the creator's TikTok inbox
+  publishedLabel(settings: Partial<TikTokDto>) {
+    return settings?.content_posting_method === 'UPLOAD'
+      ? 'Sent to TikTok inbox'
+      : undefined;
+  }
+
   private isVideo(path: string) {
     return /\.(mp4|mov|webm)(?:[?#]|$)/i.test(path || '');
   }
