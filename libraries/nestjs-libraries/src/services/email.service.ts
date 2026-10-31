@@ -12,9 +12,9 @@ const FONT =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 // A call-to-action button built from a table, so it renders in every email
-// client (Outlook ignores padding on links)
+// client (Outlook ignores padding on links, so the cell carries it too)
 export const emailButton = (href: string, label: string) =>
-  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 8px"><tr><td style="border-radius:999px;background:#7357ff"><a href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${FONT};font-size:15px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;border-radius:999px">${escape(
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 8px"><tr><td style="border-radius:999px;background:#7357ff;mso-padding-alt:14px 28px"><a class="pd-btn" href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${FONT};font-size:15px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;border-radius:999px">${escape(
     label
   )}</a></td></tr></table>`;
 
@@ -39,6 +39,7 @@ const emailLayout = (subject: string, html: string) => {
     .pd-text, .pd-brand { color: #f2f2f6 !important; }
     .pd-muted, .pd-muted a { color: #9a9aa8 !important; }
     .pd-body a { color: #b9a8ff !important; }
+    .pd-body a.pd-btn { color: #ffffff !important; }
   }
   @media (max-width: 620px) {
     .pd-card { padding: 28px 22px !important; }
@@ -46,10 +47,10 @@ const emailLayout = (subject: string, html: string) => {
 </style>
 </head>
 <body style="margin:0;padding:0;background:#f4f3f8">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">${title}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="pd-bg" style="background:#f4f3f8">
   <tr>
     <td align="center" style="padding:36px 16px">
+      <!--[if mso]><table role="presentation" width="560" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px">
         <tr>
           <td style="padding:0 6px 18px">
@@ -61,7 +62,7 @@ const emailLayout = (subject: string, html: string) => {
         </tr>
         <tr>
           <td class="pd-card" style="background:#ffffff;border:1px solid #e7e5ef;border-radius:18px;padding:36px 40px">
-            <div style="width:44px;height:4px;border-radius:2px;background:#c8ff4d;margin-bottom:22px;font-size:0;line-height:0">&nbsp;</div>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px"><tr><td width="44" height="4" style="width:44px;height:4px;border-radius:2px;background:#c8ff4d;font-size:0;line-height:0">&nbsp;</td></tr></table>
             <h1 class="pd-text" style="margin:0 0 14px;font-family:${FONT};font-size:23px;font-weight:700;line-height:1.3;letter-spacing:-0.3px;color:#0d0d0d">${title}</h1>
             <div class="pd-text pd-body" style="font-family:${FONT};font-size:15px;line-height:1.65;color:#2b2b33">${html}</div>
           </td>
@@ -77,6 +78,7 @@ const emailLayout = (subject: string, html: string) => {
           </td>
         </tr>
       </table>
+      <!--[if mso]></td></tr></table><![endif]-->
     </td>
   </tr>
 </table>
