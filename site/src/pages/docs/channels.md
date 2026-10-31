@@ -24,6 +24,7 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | [Tumblr](/docs/channels/tumblr) | Tumblr sign-in, then choose a blog | Posts with text, images or a video |
 | [Dribbble](/docs/channels/dribbble) | Dribbble sign-in | Shots, one image each |
 | [Slack](/docs/channels/slack) | Add PostDelegate to a workspace | Messages to a channel |
+| [Telegram](/docs/channels/telegram) | Add @PostDelegateBot, then send a connect command | Messages to a channel or group |
 
 ## Coming soon
 
@@ -35,7 +36,9 @@ There are two kinds of connection.
 
 **Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. YouTube, Kick, Twitch, Tumblr, Dribbble and Slack work this way.
 
-**Paste a credential.** You enter an app password, API key or site address into PostDelegate. The other eight networks work this way. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
+**Paste a credential.** You enter an app password, API key or site address into PostDelegate. The other eight networks work this way.
+
+**Add a bot.** For Telegram you add @PostDelegateBot to your channel or group and send a short connect command there. No password or key is involved. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
 
 Whichever kind it is, you start from **Add Channel** on the calendar page.
 

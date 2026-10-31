@@ -302,6 +302,35 @@ export const SCHEDULERS: Scheduler[] = [
     ],
   },
   {
+    slug: "telegram-scheduler", key: "telegram", name: "Telegram",
+    action: "Schedule Telegram Posts",
+    description: "Schedule Telegram posts to your channel or group with photos, videos and albums. Add @PostDelegateBot and send one command. 7-day free trial, no card.",
+    h1: "Schedule posts to your Telegram channel.",
+    intro: "Add @PostDelegateBot to a Telegram channel or group, send one connect command, then schedule messages with text, photos, videos and files.",
+    about: [
+      "Telegram channels are a direct line to an audience, and groups are where communities talk. PostDelegate sends each scheduled post as a message from @PostDelegateBot, so announcements, links and media go out at the time you set without anyone online to press send.",
+      "Text can run to 4,096 characters with basic formatting. One photo, video or file is sent with your text as its caption, and several attachments go out as an album of up to 10. With an attachment Telegram limits the caption to 1,024 characters. Follow-up entries are sent as replies to the first message.",
+    ],
+    steps: [
+      { name: "Add the bot to your chat", text: "In Telegram, add @PostDelegateBot to your channel or group. In a channel, make it an admin that can post messages; only admins can post in channels. Use the Telegram app on your phone or computer for this, because the web version does not let you make a bot a channel admin." },
+      { name: "Start the connection", text: "In PostDelegate, choose Add Channel on the calendar page, then Telegram, and choose Connect Telegram. PostDelegate shows a short command such as /connect AB12." },
+      { name: "Send the command", text: "Copy the command and send it as a message in the channel or group. PostDelegate spots it within a few seconds and the chat appears on your calendar. If the bot is an admin, it removes the command for you." },
+      { name: "Write and schedule", text: "Choose Create Post, select the Telegram chat, write the message and attach photos, videos or files. Pick a date and time and choose Add to Calendar." },
+    ],
+    plan: ["Add @PostDelegateBot to a channel or group, then connect from Add Channel.", "Write a message with formatting, links and attachments.", "Add follow-up entries to send replies to the first message."],
+    settings: [
+      { label: "Text", note: "Up to 4,096 characters. With an attachment, Telegram limits the caption to 1,024 characters." },
+      { label: "Attachments", note: "Photos, videos or other files. Up to 10 items per album; more are sent as further albums." },
+    ],
+    limits: ["Channels need @PostDelegateBot as an admin that can post. Telegram's web version cannot appoint a bot as channel admin, so use the phone or desktop app for that step.", "Posts come from @PostDelegateBot, not from your own Telegram account."],
+    docs: "/docs/channels/telegram",
+    faq: [
+      { q: "Do I need to give PostDelegate my Telegram password or phone number?", a: "No. You add @PostDelegateBot to your channel or group and send a short connect command there. PostDelegate never asks for your Telegram login." },
+      { q: "Why can't I add the bot as a channel admin on Telegram Web?", a: "Telegram's web version does not offer that option. Open the Telegram app on your phone or computer, make @PostDelegateBot an admin of the channel, then finish connecting from PostDelegate in any browser. Groups can be connected from the web." },
+      { q: "Can I post to a private Telegram channel or group?", a: "Yes. The bot works in private and public chats. It only needs to be a member of the group, or an admin of the channel, before you send the connect command." },
+    ],
+  },
+  {
     slug: "slack-scheduler", key: "slack", name: "Slack",
     action: "Schedule Slack Messages",
     description: "Schedule Slack messages with text and images to the channel you pick, with replies sent in a thread. Add PostDelegate to your workspace. 7-day free trial.",
