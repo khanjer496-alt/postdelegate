@@ -5,7 +5,7 @@ import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/s
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.subscribe.dto';
-import { groupBy } from 'lodash';
+import { escape, groupBy } from 'lodash';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
@@ -23,7 +23,6 @@ import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/paym
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import dayjs from 'dayjs';
 import { emailButton } from '@gitroom/nestjs-libraries/services/email.service';
-import { trialEndsSoonDetails } from '@gitroom/nestjs-libraries/database/prisma/trial-onboarding/trial.onboarding.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
@@ -123,6 +122,68 @@ export function isCardlessTrial(subscription: Stripe.Subscription) {
       'cancel'
   );
 }
+
+const EMAIL_FONT =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+// What a card keeps going and what the plans cost, added to the trial ending
+// reminder email. Prices come from the pricing config; with a discount on the
+// subscription the list price would be wrong, so the plan line says so instead.
+export const trialEndsSoonDetails = (
+  tier: string | undefined,
+  period: string | undefined,
+  discounted: boolean,
+  app = process.env.FRONTEND_URL || ''
+) => {
+  const plans = Object.values(pricing).filter(
+    (plan) => plan.month_price > 0 && plan.label
+  );
+  const current = tier ? pricing[tier] : undefined;
+  const yearly = period === 'YEARLY';
+  const cell = `background:#f7f6fb;border:1px solid #e7e5ef;padding:10px 14px;font-family:${EMAIL_FONT}`;
+
+  const html: string[] = [
+    `<h2 class="pd-text" style="margin:28px 0 12px;font-family:${EMAIL_FONT};font-size:16px;font-weight:700;line-height:1.35;color:#0d0d0d">What a card keeps going</h2>`,
+    `<ul style="margin:0 0 16px;padding-left:22px"><li style="margin:0 0 6px">Your connected channels stay on.</li><li style="margin:0 0 6px">Scheduled posts keep publishing at their planned times.</li></ul>`,
+    `<p style="margin:0 0 16px">Without a card, publishing stops when the trial ends and your channels are switched off. Your posts and drafts are kept, so choosing a plan later picks up where you left off.</p>`,
+  ];
+
+  if (current?.label && current.month_price > 0) {
+    html.push(
+      discounted
+        ? `<p style="margin:0 0 16px">Your <strong>${escape(
+            current.label
+          )}</strong> plan has a discount, so you'll pay less than the list price below. Billing shows the exact amount.</p>`
+        : `<p style="margin:0 0 16px">Your plan is <strong>${escape(
+            current.label
+          )}</strong> at $${yearly ? current.year_price : current.month_price} a ${
+            yearly ? 'year' : 'month'
+          }.</p>`
+    );
+  }
+
+  html.push(
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;border-collapse:separate;border-spacing:0 6px">${plans
+      .map(
+        (plan) =>
+          `<tr><td class="pd-item" style="${cell};border-right:0;border-radius:12px 0 0 12px;font-size:14px;font-weight:${
+            plan.current === current?.current ? 700 : 400
+          };color:#0d0d0d"><span class="pd-text">${escape(
+            plan.label!
+          )}</span></td><td class="pd-item" style="${cell};border-left:0;border-right:0;font-size:13px;color:#7a7a88"><span class="pd-muted">${
+            plan.channel || 0
+          } channels</span></td><td class="pd-item" align="right" style="${cell};border-left:0;border-radius:0 12px 12px 0;font-size:14px;color:#0d0d0d;white-space:nowrap"><span class="pd-text">$${
+            plan.month_price
+          } / month</span></td></tr>`
+      )
+      .join('')}</table>`,
+    `<p class="pd-muted" style="margin:16px 0 0;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#7a7a88">List prices in US dollars. Yearly billing costs less, and you can switch plans in <a href="${escape(
+      `${app}/billing`
+    )}" target="_blank">Billing</a> at any time.</p>`
+  );
+
+  return html.join('');
+};
 
 @PaymentProvider({ provider: STRIPE_PROVIDER })
 export class StripeService extends PaymentProviderAbstract {
@@ -426,13 +487,16 @@ export class StripeService extends PaymentProviderAbstract {
       const subscription = await stripe.subscriptions.retrieve(
         event.data.object.id
       );
-      await this.applyTrialDiscount(subscription).catch((err) => {
-        console.error('stripe_trial_discount_failed', {
-          stripe_event_id: event.id,
-          stripe_subscription_id: subscription.id,
-          err,
-        });
-      });
+      const discountAdded = await this.applyTrialDiscount(subscription).catch(
+        (err) => {
+          console.error('stripe_trial_discount_failed', {
+            stripe_event_id: event.id,
+            stripe_subscription_id: subscription.id,
+            err,
+          });
+          return false;
+        }
+      );
 
       if (!(await this.needsPaymentMethod(subscription))) {
         return { ok: true };
@@ -457,7 +521,9 @@ export class StripeService extends PaymentProviderAbstract {
         // the email also says what a card keeps and what the plans cost
         trialEndsSoonDetails(
           subscription.metadata?.billing,
-          subscription.metadata?.period
+          subscription.metadata?.period,
+          // the subscription was read before the promotion was added
+          discountAdded || !!subscription.discounts?.length
         )
       );
     } catch (err) {
@@ -893,6 +959,7 @@ export class StripeService extends PaymentProviderAbstract {
   // A monthly trial gets the auto-apply promotion the monthly checkout
   // pre-fills. It is added when the trial is about to convert, so a one-time
   // coupon is not used up by the $0 trial invoice.
+  // True when it added the promotion
   private async applyTrialDiscount(subscription: Stripe.Subscription) {
     if (
       !isCardlessTrial(subscription) ||
@@ -901,17 +968,18 @@ export class StripeService extends PaymentProviderAbstract {
       subscription.discounts?.length ||
       subscription.items.data[0]?.price?.recurring?.interval !== 'month'
     ) {
-      return;
+      return false;
     }
 
     const promotion = await this.findAutoApplyPromotion();
     if (!promotion) {
-      return;
+      return false;
     }
 
     await stripe.subscriptions.update(subscription.id, {
       discounts: [{ promotion_code: promotion.id }],
     });
+    return true;
   }
 
   // The auto-apply promotion is for monthly plans only, so a switch to yearly

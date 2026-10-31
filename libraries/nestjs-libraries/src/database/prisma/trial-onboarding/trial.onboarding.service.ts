@@ -6,7 +6,6 @@ import {
   emailButton,
   emailCard,
 } from '@gitroom/nestjs-libraries/services/email.service';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 const HOUR = 60 * 60 * 1000;
 const PAGE = 200;
@@ -33,7 +32,7 @@ export type TrialOnboardingStep =
 export type TrialOnboardingEmail =
   | { step: 'day_1'; variant: 'connect_channel' }
   | { step: 'day_1'; variant: 'first_post'; channels: number }
-  | { step: 'day_3' };
+  | { step: 'day_3'; channels: number; agentApproval: boolean };
 
 const paragraph = (html: string) => `<p style="margin:0 0 16px">${html}</p>`;
 
@@ -73,6 +72,16 @@ export const trialOnboardingEmail = (
     return {
       subject: 'Let Claude or ChatGPT draft a week of posts',
       html: [
+        ...(email.channels
+          ? []
+          : [
+              paragraph(
+                `First, ${link(
+                  `${app}/launches?onboarding=true`,
+                  'connect a channel'
+                )}. An assistant can only draft posts for channels you've connected.`
+              ),
+            ]),
         paragraph(
           'If you already use Claude or ChatGPT, you can connect it to PostDelegate and hand it the planning. Ask for something like:'
         ),
@@ -95,16 +104,28 @@ export const trialOnboardingEmail = (
           status: 'Custom connector',
           title: 'ChatGPT',
           message:
-            'Add PostDelegate under Settings, then Connectors in ChatGPT.',
+            'Add PostDelegate under Settings, then Connectors in ChatGPT, on ChatGPT plans that support custom connectors.',
           link: { href: `${DOCS}/mcp/chatgpt`, label: 'Connect ChatGPT' },
         }),
-        heading('Nothing goes out without you'),
-        paragraph(
-          `Posts that Claude or ChatGPT create wait in your Approvals inbox until you approve them, so you can read, edit or reject each one first. You can change this in Settings &gt; Approvals. ${link(
-            `${DOCS}/approvals`,
-            'How approvals work'
-          )}`
-        ),
+        ...(email.agentApproval
+          ? [
+              heading('Nothing goes out without you'),
+              paragraph(
+                `Posts that Claude or ChatGPT create wait in your Approvals inbox until you approve them, so you can read, edit or reject each one first. You can change this in Settings &gt; Approvals. ${link(
+                  `${DOCS}/approvals`,
+                  'How approvals work'
+                )}`
+              ),
+            ]
+          : [
+              heading('Review before anything goes out'),
+              paragraph(
+                `Ask for drafts and check them on the calendar before you schedule. To hold every post from an AI assistant until someone approves it, turn on Require approval for AI-created posts in Settings &gt; Approvals. ${link(
+                  `${DOCS}/approvals`,
+                  'How approvals work'
+                )}`
+              ),
+            ]),
         heading('Prefer to write inside PostDelegate?'),
         paragraph(
           'Add your own OpenAI API key in Settings &gt; AI to turn on AI writing and the Agent for the whole workspace. You pay OpenAI directly for what you use. PostDelegate never charges for AI.'
@@ -169,63 +190,6 @@ export const trialOnboardingEmail = (
   };
 };
 
-// The plan details of the trial ending reminder, from the pricing config
-export const trialEndsSoonDetails = (
-  tier?: string,
-  period?: string,
-  app = process.env.FRONTEND_URL || ''
-) => {
-  const plans = Object.values(pricing).filter(
-    (plan) => plan.month_price > 0 && plan.label
-  );
-  const current = tier ? pricing[tier] : undefined;
-  const yearly = period === 'YEARLY';
-
-  const html: string[] = [
-    heading('What you keep with a card'),
-    list([
-      'Your connected channels stay connected.',
-      'Scheduled posts go out at their planned times.',
-      'Posts waiting in Approvals stay there for you to review.',
-    ]),
-  ];
-
-  if (current?.label && current.month_price > 0) {
-    html.push(
-      paragraph(
-        `Your plan is <strong>${escape(current.label)}</strong> at $${
-          yearly ? current.year_price : current.month_price
-        } a ${yearly ? 'year' : 'month'}.`
-      )
-    );
-  }
-
-  html.push(
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;border-collapse:separate;border-spacing:0 6px">${plans
-      .map(
-        (plan) =>
-          `<tr><td class="pd-item" style="padding:10px 14px;background:#f7f6fb;border:1px solid #e7e5ef;border-right:0;border-radius:12px 0 0 12px;font-family:${FONT};font-size:14px;font-weight:${
-            plan.current === current?.current ? 700 : 400
-          };color:#0d0d0d"><span class="pd-text">${escape(
-            plan.label!
-          )}</span></td><td class="pd-item" style="padding:10px 14px;background:#f7f6fb;border:1px solid #e7e5ef;border-left:0;border-right:0;font-family:${FONT};font-size:13px;color:#7a7a88"><span class="pd-muted">${escape(
-            plural(plan.channel || 0, 'channel', 'channels')
-          )}</span></td><td class="pd-item" align="right" style="padding:10px 14px;background:#f7f6fb;border:1px solid #e7e5ef;border-left:0;border-radius:0 12px 12px 0;font-family:${FONT};font-size:14px;color:#0d0d0d;white-space:nowrap"><span class="pd-text">$${
-            plan.month_price
-          } / month</span></td></tr>`
-      )
-      .join('')}</table>`,
-    muted(
-      `Prices in US dollars. Yearly billing costs less, and you can switch plans in ${link(
-        `${app}/billing`,
-        'Billing'
-      )} at any time.`
-    )
-  );
-
-  return html.join('');
-};
-
 @Injectable()
 export class TrialOnboardingService {
   private readonly _logger = new Logger(TrialOnboardingService.name);
@@ -239,10 +203,17 @@ export class TrialOnboardingService {
     step: TrialOnboardingStep,
     orgId: string
   ): Promise<TrialOnboardingEmail | undefined> {
-    if (step === 'day_3') {
-      return { step };
-    }
     const channels = await this._trialOnboardingRepository.countChannels(orgId);
+    if (step === 'day_3') {
+      const settings = await this._trialOnboardingRepository.getAgentApproval(
+        orgId
+      );
+      return {
+        step,
+        channels,
+        agentApproval: !!settings?.requireAgentApproval,
+      };
+    }
     if (!channels) {
       return { step, variant: 'connect_channel' };
     }
@@ -334,7 +305,15 @@ export class TrialOnboardingService {
             }
             sent++;
           } catch (err) {
-            this._logger.warn('Could not send a trial onboarding email.');
+            this._logger.warn(
+              `Could not send a trial onboarding email. org=${
+                trial.organizationId
+              } step=${step} code=${
+                (err as { code?: string })?.code ||
+                (err as Error)?.name ||
+                'unknown'
+              }`
+            );
           }
         }
 

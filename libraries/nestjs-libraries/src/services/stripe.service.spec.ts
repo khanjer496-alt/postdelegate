@@ -44,6 +44,7 @@ jest.mock(
 import {
   resolveTierPrice,
   StripeService,
+  trialEndsSoonDetails,
 } from '@gitroom/nestjs-libraries/services/stripe.service';
 
 describe('resolveTierPrice', () => {
@@ -686,10 +687,25 @@ describe('StripeService cardless trial', () => {
     );
 
     const [, , email] = notificationService.sendEmailsToOrgAdmins.mock.calls[0];
-    expect(email).toContain('What you keep with a card');
+    expect(email).toContain('What a card keeps going');
     expect(email).toContain('<strong>Starter</strong> at $19 a month');
     const [, , inApp] = notificationService.inAppNotification.mock.calls[0];
-    expect(inApp).not.toContain('What you keep with a card');
+    expect(inApp).not.toContain('What a card keeps going');
+  });
+
+  it('drops the list price from the reminder when a discount applies', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.trial_will_end', {
+        status: 'trialing',
+        trial_end: 1793664000,
+        ...cardless,
+        discounts: ['di_1'],
+      })
+    );
+
+    const [, , email] = notificationService.sendEmailsToOrgAdmins.mock.calls[0];
+    expect(email).not.toContain('at $19 a month');
+    expect(email).toContain('plan has a discount');
   });
 
   describe('auto-apply promotion', () => {
@@ -1032,5 +1048,42 @@ describe('StripeService cardless trial', () => {
       trialing: true,
       needsPaymentMethod: true,
     });
+  });
+});
+
+describe('trialEndsSoonDetails', () => {
+  it('shows the plan of the trial and every paid plan from the pricing', () => {
+    const html = trialEndsSoonDetails(
+      'STANDARD',
+      'MONTHLY',
+      false,
+      'https://app.test'
+    );
+    expect(html).toContain('<strong>Starter</strong> at $19 a month');
+    for (const plan of ['Starter', 'Team', 'Pro', 'Ultimate']) {
+      expect(html).toContain(plan);
+    }
+    expect(html).not.toContain('FREE');
+    expect(html).toContain('https://app.test/billing');
+    expect(html).toContain('publishing stops when the trial ends');
+    expect(html).not.toMatch(/postiz|open source/i);
+  });
+
+  it('uses the yearly price of a yearly trial', () => {
+    expect(trialEndsSoonDetails('PRO', 'YEARLY', false)).toContain(
+      '<strong>Pro</strong> at $372 a year'
+    );
+  });
+
+  it('says a discount applies instead of the list price', () => {
+    const html = trialEndsSoonDetails('STANDARD', 'MONTHLY', true);
+    expect(html).not.toContain('at $19 a month');
+    expect(html).toContain('<strong>Starter</strong> plan has a discount');
+  });
+
+  it('leaves out the plan line when the plan is unknown', () => {
+    const html = trialEndsSoonDetails(undefined, undefined, false);
+    expect(html).not.toContain('Your plan is');
+    expect(html).toContain('What a card keeps going');
   });
 });

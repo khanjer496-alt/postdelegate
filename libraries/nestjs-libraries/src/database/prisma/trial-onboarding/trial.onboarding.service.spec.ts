@@ -1,7 +1,6 @@
 import {
   TRIAL_ONBOARDING_FROM,
   TrialOnboardingService,
-  trialEndsSoonDetails,
   trialOnboardingEmail,
 } from '@gitroom/nestjs-libraries/database/prisma/trial-onboarding/trial.onboarding.service';
 
@@ -34,15 +33,39 @@ describe('trialOnboardingEmail', () => {
 
   it('points to the connectors, approvals and Settings > AI on day 3', () => {
     const { subject, html } = trialOnboardingEmail(
-      { step: 'day_3' },
+      { step: 'day_3', channels: 2, agentApproval: true },
       'Acme',
       'https://app.test'
     );
     expect(subject).toBe('Let Claude or ChatGPT draft a week of posts');
     expect(html).toContain('https://postdelegate.com/docs/mcp/claude');
     expect(html).toContain('https://postdelegate.com/docs/mcp/chatgpt');
+    expect(html).toContain('plans that support custom connectors');
     expect(html).toContain('https://postdelegate.com/docs/approvals');
     expect(html).toContain('https://app.test/settings?tab=ai');
+    expect(html).toContain('Nothing goes out without you');
+    expect(html).not.toContain('connect a channel');
+  });
+
+  it('only promises approval when the workspace requires it', () => {
+    const { html } = trialOnboardingEmail(
+      { step: 'day_3', channels: 2, agentApproval: false },
+      'Acme'
+    );
+    expect(html).not.toContain('Nothing goes out without you');
+    expect(html).toContain('Require approval for AI-created posts');
+  });
+
+  it('asks for a channel first on day 3 when there is none', () => {
+    const { html } = trialOnboardingEmail(
+      { step: 'day_3', channels: 0, agentApproval: true },
+      'Acme',
+      'https://app.test'
+    );
+    expect(html.indexOf('connect a channel')).toBeLessThan(
+      html.indexOf('Claude')
+    );
+    expect(html).toContain('https://app.test/launches?onboarding=true');
   });
 
   it('never says Postiz or open source', () => {
@@ -52,40 +75,18 @@ describe('trialOnboardingEmail', () => {
         { step: 'day_1', variant: 'first_post', channels: 2 },
         'A'
       ),
-      trialOnboardingEmail({ step: 'day_3' }, 'A'),
-      { subject: '', html: trialEndsSoonDetails('STANDARD', 'MONTHLY') },
+      trialOnboardingEmail(
+        { step: 'day_3', channels: 0, agentApproval: false },
+        'A'
+      ),
+      trialOnboardingEmail(
+        { step: 'day_3', channels: 1, agentApproval: true },
+        'A'
+      ),
     ];
     for (const { subject, html } of all) {
       expect(`${subject} ${html}`).not.toMatch(/postiz|open source/i);
     }
-  });
-});
-
-describe('trialEndsSoonDetails', () => {
-  it('shows the plan of the trial and every paid plan from the pricing', () => {
-    const html = trialEndsSoonDetails(
-      'STANDARD',
-      'MONTHLY',
-      'https://app.test'
-    );
-    expect(html).toContain('<strong>Starter</strong> at $19 a month');
-    for (const plan of ['Starter', 'Team', 'Pro', 'Ultimate']) {
-      expect(html).toContain(plan);
-    }
-    expect(html).not.toContain('FREE');
-    expect(html).toContain('https://app.test/billing');
-  });
-
-  it('uses the yearly price of a yearly trial', () => {
-    expect(trialEndsSoonDetails('PRO', 'YEARLY')).toContain(
-      '<strong>Pro</strong> at $372 a year'
-    );
-  });
-
-  it('leaves out the plan line when the plan is unknown', () => {
-    const html = trialEndsSoonDetails(undefined, undefined);
-    expect(html).not.toContain('Your plan is');
-    expect(html).toContain('What you keep with a card');
   });
 });
 
@@ -106,6 +107,9 @@ describe('TrialOnboardingService.sendDueEmails', () => {
       ]),
       countChannels: jest.fn().mockResolvedValue(0),
       countPosts: jest.fn().mockResolvedValue(0),
+      getAgentApproval: jest
+        .fn()
+        .mockResolvedValue({ requireAgentApproval: true }),
       claimSend: jest.fn().mockResolvedValue(true),
     };
     const email = {
@@ -198,10 +202,34 @@ describe('TrialOnboardingService.sendDueEmails', () => {
       }
       return [{ user: { email: 'b@test.com' } }];
     });
+    const warn = jest
+      .spyOn((service as any)._logger, 'warn')
+      .mockImplementation(() => undefined);
 
     expect(await service.sendDueEmails(now)).toEqual({ checked: 2, sent: 1 });
     expect(email.sendEmail.mock.calls[0][1]).toBe(
       'Let Claude or ChatGPT draft a week of posts'
+    );
+    // the org and the error code, never an address
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('org=a step=day_3 code=Error')
+    );
+    expect(warn.mock.calls[0][0]).not.toContain('@');
+  });
+
+  it('reads the approval policy, a workspace without settings has none', async () => {
+    const { service, repo, email } = make();
+    repo.getTrials.mockImplementation(async (step: string) =>
+      step === 'day_3' ? [trial('a')] : []
+    );
+    repo.countChannels.mockResolvedValue(1);
+    repo.getAgentApproval.mockResolvedValue(null);
+
+    await service.sendDueEmails(now);
+
+    expect(repo.getAgentApproval).toHaveBeenCalledWith('a');
+    expect(email.sendEmail.mock.calls[0][2]).toContain(
+      'Require approval for AI-created posts'
     );
   });
 

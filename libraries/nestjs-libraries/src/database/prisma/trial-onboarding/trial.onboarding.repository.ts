@@ -9,7 +9,8 @@ export class TrialOnboardingRepository {
     private _trialOnboardingEmail: PrismaRepository<'trialOnboardingEmail'>,
     private _userOrg: PrismaRepository<'userOrganization'>,
     private _integration: PrismaRepository<'integration'>,
-    private _post: PrismaRepository<'post'>
+    private _post: PrismaRepository<'post'>,
+    private _approvalSettings: PrismaRepository<'approvalSettings'>
   ) {}
 
   // The workspaces whose trial started in the window and that didn't get this
@@ -86,11 +87,27 @@ export class TrialOnboardingRepository {
     });
   }
 
+  // channels that can publish: not removed, switched off or half connected
   countChannels(orgId: string) {
     return this._integration.model.integration.count({
       where: {
         organizationId: orgId,
         deletedAt: null,
+        disabled: false,
+        inBetweenSteps: false,
+      },
+    });
+  }
+
+  // whether posts from AI agents wait for approval; a workspace without a
+  // settings row publishes them directly
+  getAgentApproval(orgId: string) {
+    return this._approvalSettings.model.approvalSettings.findUnique({
+      where: {
+        organizationId: orgId,
+      },
+      select: {
+        requireAgentApproval: true,
       },
     });
   }
