@@ -24,10 +24,20 @@ export class AiCredentialService {
 
   async saveCredential(orgId: string, body: AiCredentialDto) {
     try {
-      await new OpenAI({ apiKey: body.apiKey }).models.list();
+      await new OpenAI({
+        apiKey: body.apiKey,
+        timeout: 15000,
+        maxRetries: 0,
+      }).models.list();
     } catch (err) {
+      const status = (err as { status?: number } | undefined)?.status;
+      if (status === 401 || status === 403) {
+        throw new BadRequestException(
+          "OpenAI rejected this key. Check it's an active API key with access to models."
+        );
+      }
       throw new BadRequestException(
-        "OpenAI rejected this key. Check it's an active API key with access to models."
+        "Couldn't reach OpenAI to check this key. Try again in a minute."
       );
     }
 

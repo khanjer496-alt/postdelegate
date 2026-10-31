@@ -1,11 +1,14 @@
 process.env.JWT_SECRET = 'test-jwt-secret-for-ai-credentials';
 
 const modelsList = jest.fn();
+const openAiCtor = jest.fn().mockImplementation(() => ({
+  models: { list: modelsList },
+}));
 jest.mock('openai', () => ({
   __esModule: true,
-  default: jest.fn().mockImplementation(() => ({
-    models: { list: modelsList },
-  })),
+  default: function (this: unknown, ...args: unknown[]) {
+    return openAiCtor(...args);
+  },
 }));
 
 import { BadRequestException } from '@nestjs/common';
@@ -24,6 +27,7 @@ describe('AiCredentialService', () => {
   const realEnvKey = process.env.OPENAI_API_KEY;
 
   beforeEach(() => {
+    openAiCtor.mockClear();
     modelsList.mockReset().mockResolvedValue({ data: [] });
     repository = {
       getByOrg: jest.fn().mockResolvedValue(null),
@@ -63,7 +67,9 @@ describe('AiCredentialService', () => {
   });
 
   it('saveCredential rejects a key OpenAI refuses', async () => {
-    modelsList.mockRejectedValue(new Error(`401 Incorrect API key ${KEY}`));
+    modelsList.mockRejectedValue(
+      Object.assign(new Error(`401 Incorrect API key ${KEY}`), { status: 401 })
+    );
 
     const attempt = service.saveCredential('org-1', {
       provider: 'openai',
@@ -78,6 +84,61 @@ describe('AiCredentialService', () => {
       expect(String(err.message)).not.toContain(KEY);
     });
     expect(repository.upsert).not.toHaveBeenCalled();
+  });
+
+  it('saveCredential treats a 403 as a rejected key', async () => {
+    modelsList.mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }));
+
+    await expect(
+      service.saveCredential('org-1', { provider: 'openai', apiKey: KEY })
+    ).rejects.toThrow(
+      "OpenAI rejected this key. Check it's an active API key with access to models."
+    );
+  });
+
+  it.each([429, 500, 503, undefined])(
+    'saveCredential reports an unreachable OpenAI (status %s) without blaming the key',
+    async (status) => {
+      modelsList.mockRejectedValue(
+        Object.assign(new Error(`failure for ${KEY}`), { status })
+      );
+
+      const attempt = service.saveCredential('org-1', {
+        provider: 'openai',
+        apiKey: KEY,
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(
+        "Couldn't reach OpenAI to check this key. Try again in a minute."
+      );
+      await attempt.catch((err) => {
+        expect(String(err.message)).not.toContain(KEY);
+      });
+      expect(repository.upsert).not.toHaveBeenCalled();
+    }
+  );
+
+  it('saveCredential validates with a short timeout and no retries', async () => {
+    await service.saveCredential('org-1', { provider: 'openai', apiKey: KEY });
+
+    expect(openAiCtor).toHaveBeenCalledWith({
+      apiKey: KEY,
+      timeout: 15000,
+      maxRetries: 0,
+    });
+  });
+
+  it('getOpenAiClient constructs OpenAI with the decrypted key', async () => {
+    repository.getByOrg.mockResolvedValue({
+      provider: 'openai',
+      apiKey: AuthService.fixedEncryption(KEY),
+    });
+
+    const client = await service.getOpenAiClient('org-1');
+
+    expect(openAiCtor).toHaveBeenCalledWith({ apiKey: KEY });
+    expect(client).toBeDefined();
   });
 
   it('getCredential returns the mask of the stored key', async () => {
