@@ -521,11 +521,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     const ownBrand = this.assetBoolean(settings.brand_organic_toggle);
     if (settings.disclose && !branded && !ownBrand) {
       invalid(
-        'Select at least one brand option when commercial content disclosure is enabled.'
+        'You need to indicate if your content promotes yourself, a third party, or both.'
       );
     }
     if (branded && settings.privacy_level === 'SELF_ONLY') {
-      invalid('Branded content cannot use private visibility.');
+      invalid('Branded content visibility cannot be set to private.');
     }
   }
 
