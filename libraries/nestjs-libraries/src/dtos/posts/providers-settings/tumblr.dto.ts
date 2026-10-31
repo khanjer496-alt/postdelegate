@@ -13,6 +13,7 @@ const optionalUrlRegex =
 export class TumblrDto {
   @IsOptional()
   @IsString()
+  @ValidateIf((o) => o.title)
   @MinLength(1)
   @MaxLength(4096)
   title?: string;
