@@ -59,9 +59,8 @@ Many communities live in more than one place. These connections work today:
 
 - **Slack**, for community or team workspaces. Messages go to the channel you pick, with images and thread replies. See [how to schedule Slack announcements](/guides/slack-scheduled-announcements).
 - **Twitch and Kick chat**, for stream reminders while people are watching. See [scheduling Twitch and Kick chat announcements](/guides/twitch-and-kick-chat-announcements).
+- **Telegram**, for channels and groups. Posts go out through @PostDelegateBot, with photos, videos and albums. See [how to schedule posts to a Telegram channel or group](/guides/telegram-channel-scheduling).
 - **Bluesky**, for public announcements. See [how to schedule Bluesky posts](/guides/schedule-bluesky-posts).
-
-Telegram is also in early rollout. See [how to schedule posts to a Telegram channel or group](/guides/telegram-channel-scheduling) for where it stands.
 
 ### 3. Set up review before anything is public
 
