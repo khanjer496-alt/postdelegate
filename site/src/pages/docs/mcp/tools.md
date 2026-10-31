@@ -37,15 +37,15 @@ Your assistant discovers these tools by itself when it connects. You do not call
 
 Local files cannot be fetched by an assistant. Upload them through the app, the widget, or the [upload API](/docs/api/uploads).
 
-## AI media tools, not available today
+## AI media tools
 
 The server also defines tools for generating images and video and for turning long YouTube videos into short clips: `generateImageTool`, `generateVideoOptions`, `videoFunctionTool`, `generateVideoTool`, `videoStatusTool`, `clippingTool`, `clippingStatusTool` and `clippingWidgetTicketTool`.
 
-PostDelegate does not provide AI generation: these tools depend on AI features that are currently off, and the clipping tools only exist when the service is set up for them. If one appears in your assistant's tool list it will answer with an error such as no credits available. Use your own assistant's image and video features instead, then bring the result into PostDelegate with `uploadFromUrlTool`.
+PostDelegate does not provide AI generation of its own. `generateImageTool` needs your workspace's own OpenAI key, added by an admin in Settings → AI. The video tools are not available on any plan and answer with an error such as no credits available, and the clipping tools only exist when the service is set up for them. You can also use your own assistant's image and video features, then bring the result into PostDelegate with `uploadFromUrlTool`.
 
 ## What an assistant sees
 
 - Tools only act on the workspace you approved. A different workspace needs a separate sign-in.
 - Tools that change data are marked as such to clients, so assistants that support confirmation prompts will ask you first.
-- Connections through the API key addresses may also list a general `ask_postdelegate` tool that relies on AI features. It does nothing useful while AI is off, and you can ignore it.
+- Connections through the API key addresses may also list a general `ask_postdelegate` tool that passes your request to the PostDelegate agent. It needs your workspace's own OpenAI key, added by an admin in Settings → AI. Without a key it answers with an error.
 - Content from your posts and videos is just data for the assistant to show you. Be wary of any assistant that treats text in a post as instructions.
