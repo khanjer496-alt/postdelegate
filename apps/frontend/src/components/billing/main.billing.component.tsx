@@ -219,7 +219,7 @@ type PlanAction = {
 };
 
 const planButton = {
-  primary: 'bg-btnCta text-btnCtaText hover:bg-btnCtaHover',
+  primary: 'bg-btnCta shadow-cta text-btnCtaText hover:bg-btnCtaHover',
   simple: 'bg-btnSimple text-btnText hover:opacity-80',
   current: 'bg-newBgLineColor text-textItemBlur',
   danger: 'bg-red-500 text-white hover:bg-red-600',
@@ -1067,7 +1067,7 @@ export const MainBillingComponent: FC<{
               <button
                 type="button"
                 onClick={addPaymentMethod}
-                className="h-[44px] px-[16px] rounded-[8px] bg-btnCta text-btnCtaText text-[14px] font-[600] hover:bg-btnCtaHover transition-colors"
+                className="h-[44px] px-[16px] rounded-[8px] bg-btnCta shadow-cta text-btnCtaText text-[14px] font-[600] hover:bg-btnCtaHover transition-colors"
               >
                 {t('add_a_card', 'Add a card')}
               </button>

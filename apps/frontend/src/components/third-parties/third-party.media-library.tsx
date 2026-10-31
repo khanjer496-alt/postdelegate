@@ -167,7 +167,7 @@ const ThirdPartyMediaLibraryBrowser: FC<{
         <button
           onClick={importSelected}
           disabled={!selected.length || importing}
-          className="cursor-pointer text-btnCtaText font-[600] disabled:opacity-80 disabled:cursor-not-allowed h-[52px] px-[20px] items-center justify-center bg-btnCta hover:bg-btnCtaHover transition-colors flex rounded-[10px] gap-[8px]"
+          className="cursor-pointer text-btnCtaText font-[600] disabled:opacity-80 disabled:cursor-not-allowed h-[52px] px-[20px] items-center justify-center bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors flex rounded-[10px] gap-[8px]"
         >
           {importing && (
             <div className="animate-spin h-[16px] w-[16px] border-2 border-btnCtaText border-t-transparent rounded-full" />

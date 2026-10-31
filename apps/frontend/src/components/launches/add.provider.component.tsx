@@ -46,7 +46,7 @@ export const AddProviderButton: FC<{
   return (
     <div className="flex group-[.sidebar]:block gap-[8px]">
       <button
-        className="flex-1 group-[.sidebar]:w-[100%] group-[.sidebar]:flex-none text-btnCtaText font-[600] bg-btnCta hover:bg-btnCtaHover transition-colors h-[44px] pt-[12px] pb-[14px] ps-[16px] pe-[20px] justify-center items-center flex rounded-[10px] gap-[8px]"
+        className="flex-1 group-[.sidebar]:w-[100%] group-[.sidebar]:flex-none text-btnText bg-btnSimple h-[44px] pt-[12px] pb-[14px] ps-[16px] pe-[20px] justify-center items-center flex rounded-[8px] gap-[8px]"
         onClick={add}
       >
         <div>
@@ -288,7 +288,7 @@ const ExtensionNotFound: FC = () => {
       <div className="flex gap-[10px]">
         <Button
           type="button"
-          className="flex-1 !bg-transparent border border-tableBorder text-textColor"
+          className="flex-1 !bg-transparent shadow-none border border-tableBorder text-textColor"
           onClick={() => modals.closeCurrent()}
         >
           {t('cancel', 'Cancel')}
@@ -352,7 +352,7 @@ const ChromeExtensionWarning: FC<{
         </Button>
         <Button
           type="button"
-          className="flex-1 !bg-transparent border border-tableBorder text-textColor"
+          className="flex-1 !bg-transparent shadow-none border border-tableBorder text-textColor"
           onClick={() => {
             modals.closeCurrent();
             onCancel();
