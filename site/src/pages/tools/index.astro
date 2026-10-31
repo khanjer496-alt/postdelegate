@@ -1,9 +1,17 @@
 ---
 import Doc from '../../layouts/Doc.astro';
+const tools = [
+  ['/tools/caption-checker', 'Caption checker', 'Preview caption length with the displayed planning estimates.'],
+  ['/tools/thread-splitter', 'Thread splitter', 'Split long text into numbered posts for Bluesky, X, Threads, Mastodon or Nostr.'],
+  ['/tools/post-preview', 'Social post preview', 'See how a caption reads on simple post cards, and count hashtags, mentions and links.'],
+  ['/tools/youtube-title-checker', 'YouTube title checker', 'Check a title, description and tags against YouTube’s limits and preview the title on a phone.'],
+  ['/tools/image-resizer', 'Image resizer', 'Resize an image to a social media size. The image never leaves your device.'],
+  ['/tools/social-image-sizes', 'Social media image sizes', 'Image sizes for each network, taken from the platforms’ own help pages.'],
+  ['/tools/utm-builder', 'UTM link builder', 'Add source, medium and campaign to a link.'],
+];
 ---
-<Doc title="Free social media tools — PostDelegate" description="Free tools that run in your browser with no account: a per-network caption checker and a UTM link builder." h1="Free social media tools" eyebrow="Tools" lead="They run in your browser. Nothing is uploaded or saved.">
+<Doc title="Free social media tools — PostDelegate" description="Free social media tools that run in your browser with no account: caption checker, thread splitter, post preview, YouTube title checker, image resizer and more." h1="Free social media tools" eyebrow="Tools" lead="They run in your browser. Nothing is uploaded or saved.">
   <ul class="!list-none !pl-0 grid gap-4 sm:grid-cols-2">
-    <li><a href="/tools/caption-checker" class="card card-hover block p-6 no-underline"><span class="block text-lg font-extrabold text-ink">Caption checker</span><span class="mt-2 block text-sm">Preview caption length with the displayed planning estimates.</span></a></li>
-    <li><a href="/tools/utm-builder" class="card card-hover block p-6 no-underline"><span class="block text-lg font-extrabold text-ink">UTM link builder</span><span class="mt-2 block text-sm">Add source, medium and campaign to a link.</span></a></li>
+    {tools.map(([href, name, text]) => <li><a href={href} class="card card-hover block p-6 no-underline"><span class="block text-lg font-extrabold text-ink">{name}</span><span class="mt-2 block text-sm">{text}</span></a></li>)}
   </ul>
 </Doc>
