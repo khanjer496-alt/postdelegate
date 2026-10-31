@@ -8,7 +8,10 @@ import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
 import dayjs from 'dayjs';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
-import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
+import {
+  EmailService,
+  emailButton,
+} from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
@@ -266,7 +269,10 @@ export class AuthService {
       id: user.id,
       email: user.email,
     });
-    return `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${token}">here</a> to activate your account<br />The link will expire in 2 days`;
+    return `Welcome to PostDelegate! Confirm your email address to activate your account.${emailButton(
+      `${process.env.FRONTEND_URL}/auth/activate/${token}`,
+      'Activate my account'
+    )}The link expires in 2 days. If you did not create this account, you can ignore this email.`;
   }
 
   async forgot(email: string) {
@@ -284,7 +290,10 @@ export class AuthService {
     this.sendInBackground(
       user.email,
       'Reset your password',
-      `You have requested to reset your password. <br />Click <a href="${process.env.FRONTEND_URL}/auth/forgot/${resetValues}">here</a> to reset your password<br />The link will expire in 20 minutes`
+      `We received a request to reset the password of your PostDelegate account.${emailButton(
+        `${process.env.FRONTEND_URL}/auth/forgot/${resetValues}`,
+        'Reset my password'
+      )}The link expires in 20 minutes. If you did not ask for this, you can ignore this email and your password stays the same.`
     );
     return true;
   }
