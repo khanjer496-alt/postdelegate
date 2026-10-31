@@ -25,7 +25,7 @@ If the bot is an admin, it deletes your `/connect` message and posts a short con
 ## What gets published
 
 - Each post is sent as a message from @PostDelegateBot, not from your own Telegram account.
-- Text can be up to 4,096 characters, with bold, italics, links and other basic formatting.
+- Text can be up to 4,096 characters. Bold and underline carry over; other formatting is removed, so paste links as plain URLs, which Telegram turns into links.
 - Attach photos, videos or other files. A single attachment is sent with your text as its caption. Several attachments are sent as an album of up to 10 items, with the text on the first album.
 - With an attachment, Telegram limits the caption to 1,024 characters. Keep longer text for posts without media, or put it in a follow-up entry.
 - Follow-up entries in a post are sent as replies to the first message.

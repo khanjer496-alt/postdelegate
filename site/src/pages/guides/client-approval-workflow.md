@@ -113,6 +113,6 @@ Use the **From AI agents** tab in Approvals to review agent posts on their own, 
 
 ## Next steps
 
-The [approvals docs](/docs/approvals) cover every setting used here. The [team and customers docs](/docs/team) and the [scheduling docs](/docs/posts) cover the rest. If you cross-post articles for clients, read the [cross-posting guide](/guides/cross-post-blog-articles).
+The [approvals docs](/docs/approvals) cover every setting used here. The [team and customers docs](/docs/team) and the [scheduling docs](/docs/posts) cover the rest. If you cross-post articles for clients, read the [cross-posting guide](/guides/cross-post-blog-articles). To load a month of client posts at once, see [bulk scheduling from a CSV](/guides/bulk-schedule-social-posts-csv), and for agent drafts, [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails).
 
 Ready to try it? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.

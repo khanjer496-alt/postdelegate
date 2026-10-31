@@ -117,6 +117,6 @@ See the [Posts API](/docs/api/posts) for every field.
 
 ## Next steps
 
-The [Bluesky scheduler page](/bluesky-scheduler) is the short version of this guide, and the [Bluesky channel guide](/docs/channels/bluesky) is the reference for fields and limits. If you write for other networks too, the [character limits guide](/guides/social-media-character-limits) compares them.
+The [Bluesky scheduler page](/bluesky-scheduler) is the short version of this guide, and the [Bluesky channel guide](/docs/channels/bluesky) is the reference for fields and limits. If you write for other networks too, the [character limits guide](/guides/social-media-character-limits) compares them. To schedule many posts at once, see [bulk scheduling from a CSV](/guides/bulk-schedule-social-posts-csv), and for another open network, [how to schedule Nostr notes](/guides/nostr-scheduling).
 
 Ready? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.

@@ -309,7 +309,7 @@ export const SCHEDULERS: Scheduler[] = [
     intro: "Add @PostDelegateBot to a Telegram channel or group, send one connect command, then schedule messages with text, photos, videos and files.",
     about: [
       "Telegram channels are a direct line to an audience, and groups are where communities talk. PostDelegate sends each scheduled post as a message from @PostDelegateBot, so announcements, links and media go out at the time you set without anyone online to press send.",
-      "Text can run to 4,096 characters with basic formatting. One photo, video or file is sent with your text as its caption, and several attachments go out as an album of up to 10. With an attachment Telegram limits the caption to 1,024 characters. Follow-up entries are sent as replies to the first message.",
+      "Text can run to 4,096 characters, with bold and underline kept and links pasted as plain URLs. One photo, video or file is sent with your text as its caption, and several attachments go out as an album of up to 10. With an attachment Telegram limits the caption to 1,024 characters. Follow-up entries are sent as replies to the first message.",
     ],
     steps: [
       { name: "Add the bot to your chat", text: "In Telegram, add @PostDelegateBot to your channel or group. In a channel, make it an admin that can post messages; only admins can post in channels. Use the Telegram app on your phone or computer for this, because the web version does not let you make a bot a channel admin." },
@@ -317,7 +317,7 @@ export const SCHEDULERS: Scheduler[] = [
       { name: "Send the command", text: "Copy the command and send it as a message in the channel or group. PostDelegate spots it within a few seconds and the chat appears on your calendar. If the bot is an admin, it removes the command for you." },
       { name: "Write and schedule", text: "Choose Create Post, select the Telegram chat, write the message and attach photos, videos or files. Pick a date and time and choose Add to Calendar." },
     ],
-    plan: ["Add @PostDelegateBot to a channel or group, then connect from Add Channel.", "Write a message with formatting, links and attachments.", "Add follow-up entries to send replies to the first message."],
+    plan: ["Add @PostDelegateBot to a channel or group, then connect from Add Channel.", "Write a message with bold or underlined text, links and attachments.", "Add follow-up entries to send replies to the first message."],
     settings: [
       { label: "Text", note: "Up to 4,096 characters. With an attachment, Telegram limits the caption to 1,024 characters." },
       { label: "Attachments", note: "Photos, videos or other files. Up to 10 items per album; more are sent as further albums." },

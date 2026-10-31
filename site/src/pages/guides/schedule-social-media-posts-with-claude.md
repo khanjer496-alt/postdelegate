@@ -117,6 +117,6 @@ Claude can only work with channels that are connected in PostDelegate. Facebook,
 
 ## Next steps
 
-Try the flow once with a draft on a channel you control, then make it routine. The [MCP overview](/docs/mcp) covers the other ways to sign in, the [Claude and Cowork page](/claude-cowork) shows how it fits a content workflow, and the [Bluesky scheduler page](/bluesky-scheduler) is a good first channel. If you plan to use ChatGPT as well, read [how to schedule with ChatGPT](/guides/schedule-social-media-posts-with-chatgpt).
+Try the flow once with a draft on a channel you control, then make it routine. The [MCP overview](/docs/mcp) covers the other ways to sign in, the [Claude and Cowork page](/claude-cowork) shows how it fits a content workflow, and the [Bluesky scheduler page](/bluesky-scheduler) is a good first channel. If you plan to use ChatGPT as well, read [how to schedule with ChatGPT](/guides/schedule-social-media-posts-with-chatgpt). To set limits on what Claude can publish, read [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails).
 
 Ready to try it? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.

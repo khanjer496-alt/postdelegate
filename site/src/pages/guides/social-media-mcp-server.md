@@ -105,6 +105,6 @@ If you are comparing servers, these questions separate a useful one from a risky
 
 ## Next steps
 
-Pick one assistant, connect it, and ask for a single draft on a channel you control. The [MCP overview](/docs/mcp) explains the server addresses and sign-in options, and the [MCP page](/mcp) summarizes the setup. For a first channel, the [Bluesky](/bluesky-scheduler) and [WordPress](/wordpress-scheduler) scheduler pages show what each connection needs.
+Pick one assistant, connect it, and ask for a single draft on a channel you control. The [MCP overview](/docs/mcp) explains the server addresses and sign-in options, and the [MCP page](/mcp) summarizes the setup. For a first channel, the [Bluesky](/bluesky-scheduler) and [WordPress](/wordpress-scheduler) scheduler pages show what each connection needs. Before you let an assistant schedule on its own, read [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails).
 
 Want to try it? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.

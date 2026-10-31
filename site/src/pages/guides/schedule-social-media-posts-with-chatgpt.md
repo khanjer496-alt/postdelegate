@@ -106,6 +106,6 @@ The connector depends on your ChatGPT plan and settings, and PostDelegate cannot
 
 ## Next steps
 
-The [ChatGPT setup page](/docs/mcp/chatgpt) keeps the current connector steps. To see what an assistant can and cannot do, read [what a social media MCP server is](/guides/social-media-mcp-server). If you use Claude too, the [Claude guide](/guides/schedule-social-media-posts-with-claude) is nearly identical. For a first channel, the [Bluesky scheduler page](/bluesky-scheduler) is a quick one to connect.
+The [ChatGPT setup page](/docs/mcp/chatgpt) keeps the current connector steps. To see what an assistant can and cannot do, read [what a social media MCP server is](/guides/social-media-mcp-server). If you use Claude too, the [Claude guide](/guides/schedule-social-media-posts-with-claude) is nearly identical. For a first channel, the [Bluesky scheduler page](/bluesky-scheduler) is a quick one to connect. To set limits on what ChatGPT can publish, read [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails).
 
 Want to try it? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.
