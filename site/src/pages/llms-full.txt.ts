@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
 import { SITE } from '../data/site';
 import { NETWORKS } from '../data/networks';
-import { PLANS } from '../data/plans';
+import { PLANS, planFeatures } from '../data/plans';
 import { DOC_SECTIONS } from '../data/docs';
 export const GET: APIRoute = () => {
-  const audiences = PLANS.map((plan) => `- ${plan.name}: ${plan.description}`).join('\n');
+  const plans = PLANS.map((plan) => `- ${plan.name}: $${plan.monthly}/month or $${plan.yearly}/year; ${planFeatures(plan).join(', ')}.`).join('\n');
   const networks = NETWORKS.map((network) => `- ${network.name}: ${network.available ? 'available to connect today' : 'coming soon; cannot be connected today'}.`).join('\n');
   const body = `# PostDelegate: product facts
 
@@ -21,9 +21,8 @@ Users can create a workspace. The workspace provides calendar, composer, media, 
 Channel connections are in rollout. Check the workspace or contact support for the account types and actions currently available. Google account sign-in does not by itself connect YouTube or Google Business Profile.
 
 ## Plans
-Paid checkout is not guaranteed to be open for every account. The documentation at ${SITE.url}/docs/billing describes the configured plans (Starter, Team, Pro, Ultimate) and the 7-day card trial as plan information only; it is not a promise that checkout is available today. No permanent free tier is promised.
-The pricing cards describe audiences, not approved paid packages:
-${audiences}
+Prices are in US dollars. Every plan starts with a 7-day free trial that needs a card; cancelling before day 7 means no charge, otherwise the first payment is taken when the trial ends. There is no permanent free tier. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
+${plans}
 
 ## Automation and AI
 PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs. Access depends on the plan. AI features inside the app are off: PostDelegate does not provide an AI, and customers bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services built on the same open-source code are not PostDelegate connections.

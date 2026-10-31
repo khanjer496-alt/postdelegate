@@ -1,14 +1,8 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Plans and billing
-description: What each PostDelegate plan includes, how the 7-day trial works and how to cancel. Billing may not be switched on for your account yet.
+description: What each PostDelegate plan includes, how the 7-day trial works and how to cancel.
 ---
-
-<div class="callout warn">
-
-**Billing may not be enabled for your account yet.** This page describes the plans as they are configured in PostDelegate. It is not a promise that checkout is open today. If you cannot see a **Billing** page in the app, or your account has no plan to choose, that is expected during early access. Questions go to [support@postdelegate.com](mailto:support@postdelegate.com).
-
-</div>
 
 ## Plans
 
@@ -28,7 +22,7 @@ AI features are currently off on every plan. PostDelegate does not provide its o
 
 ## The 7-day trial
 
-When a trial is offered for your account:
+Every plan starts with a free trial:
 
 - It lasts 7 days.
 - A card is required to start it.
@@ -45,4 +39,4 @@ To cancel, choose **Cancel Subscription** on the Billing page. Cancellation take
 
 ## Billing and the API
 
-When billing is enabled on PostDelegate, API keys and MCP connections only work for a workspace with an active subscription. Requests without one return `401` with `No subscription found`. See the [API overview](/docs/api#errors).
+API keys and MCP connections only work for a workspace with an active subscription. Requests without one return `401` with `No subscription found`. See the [API overview](/docs/api#errors).

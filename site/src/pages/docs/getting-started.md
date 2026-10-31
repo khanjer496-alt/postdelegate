@@ -52,7 +52,7 @@ The calendar has **Day**, **Week**, **Month** and **List** views. A scheduled po
 | **Calendar** | Your channels, scheduled posts, drafts and the composer. |
 | **Analytics** | Per-channel statistics for the networks that provide them. |
 | **Media** | Your media library. See [Media library](/docs/media). |
-| **Billing** | Plan and payment details, when billing is enabled for your account. See [Plans and billing](/docs/billing). |
+| **Billing** | Plan and payment details. See [Plans and billing](/docs/billing). |
 | **Settings** | Profile, [team](/docs/team), [webhooks](/docs/webhooks), the **Agents / Dev** tab with your API key and MCP setup, sets, signatures and OAuth apps. Some tabs depend on your plan. |
 
 ## Next steps

@@ -11,7 +11,7 @@ export const GET: APIRoute = () => {
 - The workspace includes a calendar, composer, media library and publishing workflow.
 - Social channel connections are in rollout. A provider in the source or on a platform page is not a promise of a live hosted connection.
 - Google sign-in is separate from connecting a social publishing account.
-- Paid checkout is not guaranteed to be open for every account. Plan information (Starter, Team, Pro, Ultimate) and the 7-day card trial are described at ${SITE.url}/docs/billing as plan information, not a promise of checkout availability.
+- Plans: Starter $19, Team $29, Pro $39 and Ultimate $79 per month ($180, $276, $372 and $756 per year, US dollars). Every plan starts with a 7-day free trial that needs a card; cancelling before day 7 means no charge. Details at ${SITE.url}/pricing and ${SITE.url}/docs/billing.
 - Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
 - AI features inside the app are off. Customers bring their own AI assistant through MCP.
 - Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
@@ -22,7 +22,7 @@ ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.titl
 
 ## Pages
 - [Product facts](${SITE.url}/llms-full.txt)
-- [Plans and early access](${SITE.url}/pricing)
+- [Plans and pricing](${SITE.url}/pricing)
 - [Platform rollout](${SITE.url}/platforms)
 - [Agents and automation](${SITE.url}/agents)
 - [REST API](${SITE.url}/api)
