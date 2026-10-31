@@ -10,7 +10,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV MAIN_URL=https://app.postdelegate.com
 ENV FRONTEND_URL=https://app.postdelegate.com
 ENV NEXT_PUBLIC_BACKEND_URL=https://app.postdelegate.com/api
-ENV NEXT_PUBLIC_VERSION=v2.25.3
 ENV IS_GENERAL=true
 ENV STORAGE_PROVIDER=cloudflare
 
