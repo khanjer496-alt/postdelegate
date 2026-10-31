@@ -61,6 +61,7 @@ jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service',
   () => ({
     AiCredentialService: class {},
+    MISSING_AI_KEY: 'Add your OpenAI key in Settings → AI',
   })
 );
 jest.mock('@gitroom/nestjs-libraries/openai/openai.service', () => ({
@@ -215,5 +216,53 @@ describe('ClippingService workspace key', () => {
     });
     expect(openAi.pickClips).not.toHaveBeenCalled();
     expect(clippingRepository.updateClipping).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'a refused key',
+      Object.assign(new Error('401 Incorrect API key provided'), {
+        status: 401,
+      }),
+      'OpenAI rejected your key. Replace it in Settings → AI.',
+    ],
+    [
+      'an account with no API credit',
+      Object.assign(new Error('429 You exceeded your current quota'), {
+        status: 429,
+        code: 'insufficient_quota',
+      }),
+      'Your OpenAI account has no API credit. Add billing at platform.openai.com.',
+    ],
+  ])(
+    'pickClips stops the clipping without a retry on %s',
+    async (_, error, message) => {
+      aiCredentialService.hasCredential.mockResolvedValue(true);
+      openAi.pickClips.mockRejectedValue(error);
+
+      const picked = service.pickClips('clipping-1');
+
+      await expect(picked).rejects.toBeInstanceOf(ClippingStop);
+      await expect(picked).rejects.toMatchObject({
+        message,
+        type: 'clipping_stop',
+        nonRetryable: true,
+      });
+      expect(clippingRepository.createClips).not.toHaveBeenCalled();
+    }
+  );
+
+  it('pickClips lets any other OpenAI error retry', async () => {
+    aiCredentialService.hasCredential.mockResolvedValue(true);
+    const error = Object.assign(new Error('429 Rate limit reached'), {
+      status: 429,
+      code: 'rate_limit_exceeded',
+    });
+    openAi.pickClips.mockRejectedValue(error);
+
+    const picked = service.pickClips('clipping-1');
+
+    await expect(picked).rejects.toBe(error);
+    await expect(picked).rejects.not.toBeInstanceOf(ClippingStop);
   });
 });

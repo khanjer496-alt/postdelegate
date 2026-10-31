@@ -20,6 +20,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generator/create.generated.posts.dto';
 import { AgentGraphService } from '@gitroom/nestjs-libraries/agent/agent.graph.service';
+import { generationError } from '@gitroom/nestjs-libraries/openai/generation.error';
 import { Response } from 'express';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
@@ -289,12 +290,10 @@ export class PostsController {
       // The stream has already started, so we cannot surface a normal HTTP
       // error here. Emit a final error event on the open stream instead, so the
       // client can stop and show the message rather than hang on a truncated
-      // stream. HttpExceptions carry a curated, user-facing message (e.g. the
-      // AI safety rejection); anything else gets a generic message.
-      const message =
-        err instanceof HttpException
-          ? err.message
-          : 'Something went wrong while generating your posts, please try again.';
+      // stream. generationError keeps curated HttpExceptions (e.g. the missing
+      // key) and turns provider errors into a user-facing message (a refused
+      // key, no API credit, a safety rejection) or a generic one.
+      const { message } = generationError(err);
       res.write(JSON.stringify({ name: 'error', error: true, message }) + '\n');
     }
 

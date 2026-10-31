@@ -17,7 +17,11 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { DeepgramService } from '@gitroom/nestjs-libraries/deepgram/deepgram.service';
-import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
+import {
+  AiCredentialService,
+  MISSING_AI_KEY,
+} from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
+import { openAiKeyErrorMessage } from '@gitroom/nestjs-libraries/openai/generation.error';
 import { organizationId } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
 import { truncateForTemporal } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -62,8 +66,6 @@ const STALE_HOURS = 4;
 // itself (a provider's answer, a stack) is only logged
 const SOMETHING_WENT_WRONG =
   'Something went wrong while clipping this video, the clipping minutes were given back.';
-// The clips are picked on the workspace's own OpenAI key
-const MISSING_AI_KEY = 'Add your OpenAI key in Settings → AI';
 
 @Injectable()
 export class ClippingService {
@@ -596,13 +598,24 @@ export class ClippingService {
       throw new ClippingStop('No speech was found in this video.');
     }
 
-    const picked = await this._openAi.pickClips(
-      clipping.organizationId,
-      clipping.title || '',
-      language,
-      segments,
-      clipping.maxClips
-    );
+    let picked: Awaited<ReturnType<OpenaiService['pickClips']>>;
+    try {
+      picked = await this._openAi.pickClips(
+        clipping.organizationId,
+        clipping.title || '',
+        language,
+        segments,
+        clipping.maxClips
+      );
+    } catch (err) {
+      // a refused key or an account with no API credit: retrying can't fix
+      // it, so the clipping stops and the minutes are given back
+      const keyMessage = openAiKeyErrorMessage(err);
+      if (keyMessage) {
+        throw new ClippingStop(keyMessage);
+      }
+      throw err;
+    }
 
     const clips = picked
       .filter(

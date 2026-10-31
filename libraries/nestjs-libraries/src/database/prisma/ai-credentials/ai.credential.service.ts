@@ -4,6 +4,9 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { AiCredentialRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.repository';
 import { AiCredentialDto } from '@gitroom/nestjs-libraries/dtos/ai-credentials/ai.credential.dto';
 
+// What a workspace without a key reads, wherever AI is asked for
+export const MISSING_AI_KEY = 'Add your OpenAI key in Settings → AI';
+
 const mask = (key: string) => `${key.slice(0, 3)}…${key.slice(-4)}`;
 
 @Injectable()
@@ -61,7 +64,7 @@ export class AiCredentialService {
   async getOpenAiKey(orgId: string) {
     const credential = await this._aiCredentialRepository.getByOrg(orgId);
     if (!credential) {
-      throw new BadRequestException('Add your OpenAI key in Settings → AI');
+      throw new BadRequestException(MISSING_AI_KEY);
     }
 
     return AuthService.fixedDecryption(credential.apiKey);

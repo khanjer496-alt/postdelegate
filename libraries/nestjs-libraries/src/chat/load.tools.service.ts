@@ -8,7 +8,10 @@ import { ModuleRef } from '@nestjs/core';
 import { toolList } from '@gitroom/nestjs-libraries/chat/tools/tool.list';
 import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import dayjs from 'dayjs';
-import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
+import {
+  AiCredentialService,
+  MISSING_AI_KEY,
+} from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 import { getAuth } from '@gitroom/nestjs-libraries/chat/async.storage';
 
 export const AgentState = object({
@@ -128,7 +131,7 @@ export class LoadToolsService {
           (organization ? JSON.parse(organization)?.id : undefined) ||
           getAuth()?.id;
         if (!orgId) {
-          throw new BadRequestException('Add your OpenAI key in Settings → AI');
+          throw new BadRequestException(MISSING_AI_KEY);
         }
 
         return createOpenAI({
