@@ -32,6 +32,6 @@ To delete your account or ask what we hold about you, follow the instructions on
 - Rotate your API key in **Settings > Agents / Dev** if you think it leaked. The old key stops working immediately.
 - Revoke an AI assistant's access in **Settings > Apps > Approved Apps**.
 
-## Open source
+## Licenses
 
-PostDelegate's application is based on the open-source Postiz project under AGPL-3.0. The modified application source is available at [app.postdelegate.com/source](https://app.postdelegate.com/source).
+PostDelegate includes open-source software licensed under AGPL-3.0; see [Licenses](https://postdelegate.com/licenses).

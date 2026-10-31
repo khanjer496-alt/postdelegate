@@ -40,7 +40,7 @@ const trialSteps=[
 const personas:{kind:'creator'|'team'|'developer';kicker:string;title:string;copy:string;tools:string[]}[]=[
  {kind:'creator',kicker:'On your own',title:'Creators & marketers',copy:'A place for the ideas, drafts and assets that make your next post. Give your content a little more room to come together.',tools:['Visual calendar','Composer','Media library']},
  {kind:'team',kicker:'With a team',title:'Brands & teams',copy:'Bring a clearer view to your content calendar. Organize your workspace around the brands and channels you manage.',tools:['Shared calendar','Workspaces','Team members']},
- {kind:'developer',kicker:'From your code',title:'Developers & builders',copy:'An open-source foundation with a public REST API and an MCP server on every plan. Build the workflow your team needs.',tools:['REST API','MCP server','AGPL-3.0']},
+ {kind:'developer',kicker:'From your code',title:'Developers & builders',copy:'A public REST API and an MCP server on every plan. Connect your own code, scripts and agents, and build the workflow your team needs.',tools:['REST API','MCP server','Webhooks']},
 ];
 // Hotspots on the real workspace screenshot (percent of the 1280x720 image), set on
 // the corner of each control so the pin never hides the label it points at.
@@ -76,7 +76,7 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
     <div class="home-wide hero-layout">
       <div class="hero-copy">
         <ul class="hero-proof" aria-label="PostDelegate at a glance">
-          <li><a href={SITE.source}>Open source <span>AGPL-3.0</span></a></li>
+          <li><a href="/pricing">{TRIAL_DAYS}-day free trial <span>No credit card</span></a></li>
           <li><a href="/docs/mcp">REST API + MCP <span>Every plan</span></a></li>
           <li><a href="/platforms">{liveCount} channels <span>Connect today</span></a></li>
         </ul>
@@ -167,7 +167,7 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
     <div class="container channels-foot"><a class="button button-outline" href="/platforms">Explore all channels <span aria-hidden="true">↗</span></a><p class="rollout-caption">Account types and permissions still affect what each connection can do. Check the directory for current availability.</p></div>
   </section>
   <CtaBand eyebrow={`${TRIAL_DAYS} days free`} title="Try it with your own content." text="Connect a channel, plan a real week of posts and see how PostDelegate fits the way you work." />
-  <section class="proof-section section" aria-labelledby="proof-title"><div class="container"><div class="reveal"><span class="eyebrow">A FOUNDATION YOU CAN CHECK</span><h2 class="section-heading" id="proof-title">Make it part of<br/>your own working day.</h2></div><div class="proof-grid"><a class="reveal" href={SITE.signup}><span class="proof-icon" aria-hidden="true">▦</span><h3>Try it for {TRIAL_DAYS} days</h3><p>Open the calendar, connect a channel and schedule a real post. {CTA_NOTE}.</p><span class="proof-link">{CTA_SHORT} ↗</span></a><a class="reveal" href={SITE.source}><span class="proof-icon" aria-hidden="true">&lt;/&gt;</span><h3>Built on open source</h3><p>The application is open source under AGPL-3.0. You can read the code behind it.</p><span class="proof-link">View the source ↗</span></a><a class="reveal" href="/docs"><span class="proof-icon" aria-hidden="true">↗</span><h3>Documented in the open</h3><p>Guides for every connectable channel, the REST API and MCP, written from the code.</p><span class="proof-link">Read the docs ↗</span></a></div></div></section>
+  <section class="proof-section section" aria-labelledby="proof-title"><div class="container"><div class="reveal"><span class="eyebrow">SEE FOR YOURSELF</span><h2 class="section-heading" id="proof-title">Make it part of<br/>your own working day.</h2></div><div class="proof-grid"><a class="reveal" href={SITE.signup}><span class="proof-icon" aria-hidden="true">▦</span><h3>Try it for {TRIAL_DAYS} days</h3><p>Open the calendar, connect a channel and schedule a real post. {CTA_NOTE}.</p><span class="proof-link">{CTA_SHORT} ↗</span></a><a class="reveal" href="/api"><span class="proof-icon" aria-hidden="true">&lt;/&gt;</span><h3>Built for your tools</h3><p>A public REST API and an MCP server on every plan, so your scripts and assistants can plan posts too.</p><span class="proof-link">Explore the API ↗</span></a><a class="reveal" href="/docs"><span class="proof-icon" aria-hidden="true">↗</span><h3>Documented in the open</h3><p>Guides for every connectable channel, the REST API and MCP, written from the code.</p><span class="proof-link">Read the docs ↗</span></a></div></div></section>
   <Testimonials />
   <section class="section home-pricing" id="pricing" aria-label="Plans and pricing"><div class="container"><Pricing /><p class="home-pricing-more"><a class="text-link" href="/pricing">Compare every plan <span aria-hidden="true">↗</span></a></p></div></section>
   <section class="section home-faq" id="faq" aria-labelledby="faq-title"><div class="container"><h2 class="section-heading reveal" id="faq-title">Frequently asked <span class="ink-underline">questions.<OrbitAccent kind="arc"/></span></h2><Faq items={FAQ}/></div></section><CtaBand />
