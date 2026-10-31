@@ -21,6 +21,7 @@ describe('Sentry request body scrubbing', () => {
     'https://app.example.com/api/ai-credentials',
     'https://app.example.com/api/ai-credentials/',
     'https://app.example.com/ai-credentials?x=1',
+    'https://app.example.com/ai-credentials#x',
   ])('drops the body of %s', (url) => {
     const event = dropSecretRequestBody({
       request: {
@@ -32,6 +33,17 @@ describe('Sentry request body scrubbing', () => {
 
     expect(event.request).toEqual({ url, method: 'POST' });
     expect(JSON.stringify(event)).not.toContain(KEY);
+  });
+
+  it('keeps the body of a path that only starts like a secret one', () => {
+    const event = dropSecretRequestBody({
+      request: {
+        url: 'https://app.example.com/api/ai-credentials-export',
+        data: '{"type":"draft"}',
+      },
+    });
+
+    expect(event.request?.data).toBe('{"type":"draft"}');
   });
 
   it('keeps the body of any other request', () => {
