@@ -4,7 +4,7 @@ import { DOC_SECTIONS } from '../data/docs';
 export const GET: APIRoute = () => {
   const body = `# PostDelegate
 
-> An open-source social publishing workspace, operated independently by ${SITE.operator}.
+> A social media scheduler with one visual calendar, operated independently by ${SITE.operator}.
 
 ## Current stage
 - PostDelegate is in early access. Start a 7-day free trial, no credit card needed, at ${SITE.signup}.
@@ -15,7 +15,7 @@ export const GET: APIRoute = () => {
 - Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
 - AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI. The customer pays OpenAI directly; PostDelegate never charges for AI. AI video is not available. Customers can also bring their own AI assistant, such as ChatGPT or Claude, through MCP.
 - Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble and Slack. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
-- The application is open source under AGPL-3.0: ${SITE.source}. It is based on the Postiz project; PostDelegate is not affiliated with or endorsed by Postiz.
+- Application source code (AGPL-3.0): ${SITE.source}. License details: ${SITE.url}/licenses.
 
 ## Documentation
 ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.title}](${SITE.url}${item.href}): ${item.description}`).join('\n')}
@@ -27,7 +27,7 @@ ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.titl
 - [Agents and automation](${SITE.url}/agents)
 - [REST API](${SITE.url}/api)
 - [MCP](${SITE.url}/mcp)
-- [Open-source origins](${SITE.url}/compare/postiz)
+- [Compare PostDelegate and Postiz](${SITE.url}/compare/postiz)
 - [Browser-based tools](${SITE.url}/tools)
 - [Support](${SITE.url}/support)
 - [Privacy](${SITE.legal.privacy})

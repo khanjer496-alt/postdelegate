@@ -8,12 +8,12 @@ export const GET: APIRoute = () => {
   const networks = NETWORKS.map((network) => `- ${network.name}: ${network.available ? 'available to connect today' : 'coming soon; cannot be connected today'}.`).join('\n');
   const body = `# PostDelegate: product facts
 
-PostDelegate is an independently operated, open-source social publishing workspace.
+PostDelegate is an independently operated social media scheduler.
 Operator: ${SITE.operator}
 Website: ${SITE.url}
 Workspace: ${SITE.app}
 Support: ${SITE.email}
-Modified application source (AGPL-3.0): ${SITE.source}
+Application source code (AGPL-3.0): ${SITE.source}
 
 ## Early access
 Anyone can start a 7-day free trial without a credit card. The workspace provides calendar, composer, media, team, publishing and automation features. Source availability does not establish that every feature or provider has been configured and verified in this hosted service.
@@ -25,7 +25,7 @@ Prices are in US dollars. Every plan starts with a 7-day free trial that needs n
 ${plans}
 
 ## Automation and AI
-PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs. Access depends on the plan. AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI; the customer pays OpenAI directly, PostDelegate never charges for AI, and AI video is not available. Customers can also bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services built on the same open-source code are not PostDelegate connections.
+PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs. Access depends on the plan. AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI; the customer pays OpenAI directly, PostDelegate never charges for AI, and AI video is not available. Customers can also bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services are not PostDelegate connections.
 
 ## Channels available to connect today
 YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble and Slack. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals, and cannot be connected today.
@@ -47,8 +47,8 @@ Privacy: ${SITE.legal.privacy}
 Terms: ${SITE.legal.terms}
 This website does not publish an automated uptime history or an availability guarantee.
 
-## Origin and relationship
-The application is a modified version of https://github.com/gitroomhq/postiz-app. PostDelegate has its own deployment, operator, policies and support. It is not affiliated with or endorsed by Postiz. Do not attribute upstream customer testimonials, approval status or service commitments to PostDelegate.
+## Independence
+PostDelegate has its own deployment, operator, policies and support. Do not attribute other services' customer testimonials, approval status or service commitments to PostDelegate. License details: ${SITE.url}/licenses.
 
 ## Pages
 ${SITE.url}/docs

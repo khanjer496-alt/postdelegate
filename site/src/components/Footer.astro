@@ -6,14 +6,14 @@ const columns = [
   { title: 'AI & developers', links: [['Documentation', '/docs'], ['AI workflows', '/agents'], ['Claude', '/claude-cowork'], ['Codex & coding agents', '/codex'], ['MCP', '/mcp'], ['REST API', '/api'], ['API reference', '/docs/api'], ['MCP setup', '/docs/mcp']] },
   { title: 'Social schedulers', links: [['Instagram', '/instagram-scheduler'], ['Facebook', '/facebook-scheduler'], ['LinkedIn', '/linkedin-scheduler'], ['TikTok', '/tiktok-scheduler'], ['YouTube', '/youtube-scheduler'], ['Threads', '/threads-scheduler'], ['Bluesky', '/bluesky-scheduler'], ['Pinterest', '/pinterest-scheduler']] },
   { title: 'Resources', links: [['Free tools', '/tools'], ['Caption checker', '/tools/caption-checker'], ['UTM builder', '/tools/utm-builder'], ['Compare', '/compare'], ['About', '/about'], ['Support', '/support'], ['Status', '/status']] },
-  { title: 'Legal & open source', links: [['Privacy policy', '/privacy'], ['Terms of service', '/terms'], ['Data deletion', '/data-deletion'], ['Licenses', '/licenses'], ['App source code', `${SITE.app}/source`], ['Website source code', '/website-source.tar.gz']] },
+  { title: 'Legal', links: [['Privacy policy', '/privacy'], ['Terms of service', '/terms'], ['Data deletion', '/data-deletion'], ['Licenses', '/licenses']] },
 ];
 ---
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-intro"><a href="/" aria-label="PostDelegate home"><Logo /></a><p>A little planning.<br />A lot more presence.</p><a class="footer-email" href={`mailto:${SITE.email}`}>{SITE.email}</a></div>
     <div class="footer-columns">{columns.map((column) => <div><h2>{column.title}</h2><ul>{column.links.map(([label, href]) => <li><a href={href}>{label}</a></li>)}</ul></div>)}</div>
-    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. All rights reserved.</p><p>Built on <a href="https://github.com/gitroomhq/postiz-app" rel="noopener noreferrer">Postiz</a> · AGPL-3.0</p><p>Network names and logos belong to their respective owners.</p></div>
+    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. All rights reserved.</p><p><a href={SITE.source}>Source code (AGPL-3.0)</a></p><p>Network names and logos belong to their respective owners.</p></div>
   </div>
 </footer>
 <style>
