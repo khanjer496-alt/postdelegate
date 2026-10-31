@@ -18,8 +18,13 @@ export const useAiCredential = () => {
   const fetch = useFetch();
 
   const load = useCallback(async (): Promise<AiCredential | null> => {
+    const response = await fetch('/ai-credentials');
+    // an error body is not a credential: SWR keeps it as an error instead
+    if (!response.ok) {
+      throw new Error(`Could not load the AI key (${response.status})`);
+    }
     // No saved key comes back as an empty body, not as JSON
-    const body = await (await fetch('/ai-credentials')).text();
+    const body = await response.text();
     return body ? JSON.parse(body) : null;
   }, []);
 
@@ -31,7 +36,7 @@ export const AiSettings: FC = () => {
   const fetch = useFetch();
   const toaster = useToaster();
   const { mutate: globalMutate } = useSWRConfig();
-  const { data, isLoading, mutate } = useAiCredential();
+  const { data, error, isLoading, mutate } = useAiCredential();
   const [apiKey, setApiKey] = useState('');
   const [replacing, setReplacing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,6 +57,12 @@ export const AiSettings: FC = () => {
         method: 'POST',
         body: JSON.stringify({ provider: 'openai', apiKey: apiKey.trim() }),
       });
+    } catch {
+      toaster.show(
+        t('ai_key_save_failed', 'Could not save this key, please try again'),
+        'warning'
+      );
+      return;
     } finally {
       setSaving(false);
     }
@@ -87,9 +98,19 @@ export const AiSettings: FC = () => {
     ) {
       return;
     }
-    await fetch('/ai-credentials', {
+    // on any failure the key is still saved, so the saved state stays as it is
+    const response = await fetch('/ai-credentials', {
       method: 'DELETE',
-    });
+    }).catch(() => undefined);
+    if (!response?.ok) {
+      toaster.show(
+        t('ai_key_remove_failed', 'Could not remove this key, please try again'),
+        'warning'
+      );
+      return;
+    }
+
+    setApiKey('');
     setReplacing(false);
     await refresh();
     toaster.show(t('ai_key_removed', 'AI key removed'), 'success');
@@ -109,6 +130,14 @@ export const AiSettings: FC = () => {
       <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
         {isLoading ? (
           <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        ) : error && data === undefined ? (
+          // never shown as "no key": a failed load says nothing about the key
+          <div className="text-[14px] text-red-400">
+            {t(
+              'ai_key_load_failed',
+              'Could not load your AI key, please refresh the page'
+            )}
+          </div>
         ) : (
           <>
             {!!data && (
@@ -150,7 +179,7 @@ export const AiSettings: FC = () => {
                       label=""
                       name="openaiApiKey"
                       type="password"
-                      autoComplete="off"
+                      autoComplete="new-password"
                       disableForm={true}
                       removeError={true}
                       placeholder="sk-..."

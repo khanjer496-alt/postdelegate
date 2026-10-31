@@ -978,6 +978,8 @@
   "ai_key_saved": "AI key saved",
   "ai_key_removed": "AI key removed",
   "ai_key_save_failed": "Could not save this key, please try again",
+  "ai_key_remove_failed": "Could not remove this key, please try again",
+  "ai_key_load_failed": "Could not load your AI key, please refresh the page",
   "ai_key_required": "OpenAI key required",
   "open_ai_settings": "Open AI settings"
 }

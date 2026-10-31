@@ -976,6 +976,8 @@
   "ai_key_saved": "Đã lưu khóa AI",
   "ai_key_removed": "Đã xóa khóa AI",
   "ai_key_save_failed": "Không thể lưu khóa này, vui lòng thử lại",
+  "ai_key_remove_failed": "Không thể xóa khóa này, vui lòng thử lại",
+  "ai_key_load_failed": "Không thể tải khóa AI của bạn, vui lòng tải lại trang",
   "ai_key_required": "Cần khóa OpenAI",
   "open_ai_settings": "Mở cài đặt AI"
 }

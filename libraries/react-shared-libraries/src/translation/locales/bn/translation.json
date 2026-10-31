@@ -976,6 +976,8 @@
   "ai_key_saved": "AI কী সংরক্ষিত হয়েছে",
   "ai_key_removed": "AI কী সরানো হয়েছে",
   "ai_key_save_failed": "এই কী সংরক্ষণ করা যায়নি, অনুগ্রহ করে আবার চেষ্টা করুন",
+  "ai_key_remove_failed": "এই কী সরানো যায়নি, আবার চেষ্টা করুন",
+  "ai_key_load_failed": "আপনার AI কী লোড করা যায়নি, পৃষ্ঠাটি রিফ্রেশ করুন",
   "ai_key_required": "OpenAI কী প্রয়োজন",
   "open_ai_settings": "AI সেটিংস খুলুন"
 }

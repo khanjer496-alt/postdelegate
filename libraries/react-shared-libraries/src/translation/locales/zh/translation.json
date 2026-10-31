@@ -976,6 +976,8 @@
   "ai_key_saved": "AI 密钥已保存",
   "ai_key_removed": "AI 密钥已移除",
   "ai_key_save_failed": "无法保存此密钥，请重试",
+  "ai_key_remove_failed": "无法删除此密钥，请重试",
+  "ai_key_load_failed": "无法加载你的 AI 密钥，请刷新页面",
   "ai_key_required": "需要 OpenAI 密钥",
   "open_ai_settings": "打开 AI 设置"
 }

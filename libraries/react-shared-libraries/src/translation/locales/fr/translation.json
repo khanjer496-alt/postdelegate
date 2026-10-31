@@ -976,6 +976,8 @@
   "ai_key_saved": "Clé IA enregistrée",
   "ai_key_removed": "Clé IA supprimée",
   "ai_key_save_failed": "Impossible d’enregistrer cette clé, veuillez réessayer",
+  "ai_key_remove_failed": "Impossible de supprimer cette clé, veuillez réessayer",
+  "ai_key_load_failed": "Impossible de charger votre clé IA, veuillez actualiser la page",
   "ai_key_required": "Clé OpenAI requise",
   "open_ai_settings": "Ouvrir les paramètres IA"
 }
