@@ -9,3 +9,4 @@ pnpm install --frozen-lockfile >/dev/null
 pnpm build
 npx --yes wrangler@4 pages deploy dist --project-name postdelegate --branch main \
   --commit-hash "$(git rev-parse HEAD)" --commit-message "$(git log -1 --format=%s)"
+node scripts/indexnow.mjs || echo "IndexNow ping failed; the deploy itself succeeded." >&2
