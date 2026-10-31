@@ -67,6 +67,10 @@ const useModalStore = create<State>((set) => ({
   closeAll: () => set({ modalManager: [] }),
 }));
 
+// true while any modal is open
+export const useHasOpenModal = () =>
+  useModalStore((state) => state.modalManager.length > 0);
+
 const CurrentModalContext = createContext({ id: '' });
 
 interface ModalManagerInterface extends ModalManagerStoreInterface {
