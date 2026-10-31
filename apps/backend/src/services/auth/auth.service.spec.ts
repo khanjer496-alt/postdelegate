@@ -1,7 +1,10 @@
 // the real services pull in every social provider, the spec injects fakes
 jest.mock('@gitroom/nestjs-libraries/database/prisma/users/users.service', () => ({ UsersService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/database/prisma/organizations/organization.service', () => ({ OrganizationService: class {} }));
-jest.mock('@gitroom/nestjs-libraries/services/email.service', () => ({ EmailService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/services/email.service', () => ({
+  EmailService: class {},
+  emailButton: (href: string, label: string) => `<a href="${href}">${label}</a>`,
+}));
 jest.mock('@gitroom/backend/services/auth/providers/providers.manager', () => ({ AuthProviderManager: class {} }));
 jest.mock('@gitroom/nestjs-libraries/newsletter/newsletter.service', () => ({
   NewsletterService: { register: jest.fn().mockResolvedValue(undefined) },
