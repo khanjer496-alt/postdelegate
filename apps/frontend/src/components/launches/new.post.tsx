@@ -8,7 +8,9 @@ import { SetSelectionModal } from '@gitroom/frontend/components/launches/calenda
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
-export const NewPost = () => {
+// Opens the composer on the next free slot, used by the Create Post button and
+// the getting started checklist
+export const useCreatePost = () => {
   const fetch = useFetch();
   const modal = useModals();
   const { integrations, reloadCalendarView, sets } = useCalendar();
@@ -74,10 +76,16 @@ export const NewPost = () => {
       title: ``,
     });
   }, [integrations, sets]);
+  return createAPost;
+};
+
+export const NewPost = () => {
+  const createAPost = useCreatePost();
+  const t = useT();
   return (
     <button
       onClick={createAPost}
-      className="text-white flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-md bg-btnPrimary flex justify-center items-center gap-[5px] outline-none"
+      className="text-btnCtaText font-[600] flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors flex justify-center items-center gap-[5px] outline-none"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -89,7 +97,7 @@ export const NewPost = () => {
       >
         <path
           d="M10.5001 4.16699V15.8337M4.66675 10.0003H16.3334"
-          stroke="white"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"

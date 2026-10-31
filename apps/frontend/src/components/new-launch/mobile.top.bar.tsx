@@ -17,7 +17,7 @@ export interface MobileTopBarAction {
 }
 
 const actionColors = {
-  primary: 'bg-btnPrimary text-white',
+  primary: 'bg-btnCta shadow-cta text-btnCtaText',
   secondary: 'bg-[#D82D7E] text-white',
   tertiary: 'bg-btnSimple text-btnText',
 };
@@ -50,13 +50,13 @@ export const MobileTopBar: FC<{
           disabled={disabled || (single && actions[0].disabled)}
           onClick={() => (single ? actions[0].onClick() : setOpen(!open))}
           className={clsx(
-            'relative min-w-[92px] h-[34px] rounded-[6px] flex justify-center items-center gap-[8px] text-[13px] font-[600] bg-btnPrimary text-white disabled:bg-btnSimple disabled:text-textItemBlur disabled:cursor-not-allowed',
+            'relative min-w-[92px] h-[34px] rounded-[6px] flex justify-center items-center gap-[8px] text-[13px] font-[600] bg-btnCta shadow-cta text-btnCtaText disabled:bg-btnSimple disabled:text-textItemBlur disabled:cursor-not-allowed',
             single ? 'px-[16px]' : 'ps-[24px] pe-[12px]'
           )}
         >
           {loading && (
             <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-              <div className="animate-spin h-[20px] w-[20px] border-4 border-white border-t-transparent rounded-full" />
+              <div className="animate-spin h-[20px] w-[20px] border-4 border-btnCtaText border-t-transparent rounded-full" />
             </div>
           )}
           <div className={clsx(loading && 'invisible')}>

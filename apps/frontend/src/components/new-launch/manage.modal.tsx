@@ -1176,7 +1176,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     <div
                       onClick={() => setShowSettings(!showSettings)}
                       className={clsx(
-                        'bg-[#612BD3] rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
+                        'bg-btnPrimary rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
                         showSettings ? '!rounded-b-none' : ''
                       )}
                     >
@@ -1291,7 +1291,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             )}
             {addEditSets && (
               <button
-                className="text-white text-[15px] font-[600] min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
+                className="text-btnCtaText text-[15px] font-[600] min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]"
                 disabled={
                   selectedIntegrations.length === 0 || loading || locked
                 }
@@ -1315,11 +1315,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   onClick={schedule('schedule')}
                   aria-keyshortcuts={shortcutKeys}
                   title={`${scheduleLabel} (${shortcutHint})`}
-                  className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#612BD3] ps-[20px] pe-[16px]"
+                  className="text-btnCtaText relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors ps-[20px] pe-[16px]"
                 >
                   {loading && (
                     <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-                      <div className="animate-spin h-[20px] w-[20px] border-4 border-white border-t-transparent rounded-full" />
+                      <div className="animate-spin h-[20px] w-[20px] border-4 border-btnCtaText border-t-transparent rounded-full" />
                     </div>
                   )}
                   <div
@@ -1348,7 +1348,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     >
                       <DropdownArrowSmallIcon
                         className={clsx(
-                          'group-hover:rotate-180 text-white',
+                          'group-hover:rotate-180 text-btnCtaText',
                           showPostNow && 'rotate-180'
                         )}
                       />

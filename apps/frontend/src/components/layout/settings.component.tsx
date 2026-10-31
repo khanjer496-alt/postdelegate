@@ -34,6 +34,8 @@ import { GlobalSettings } from '@gitroom/frontend/components/settings/global.set
 import { AppsComponent } from '@gitroom/frontend/components/settings/apps.component';
 import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/third-party.component';
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
+import { AffiliatesComponent } from '@gitroom/frontend/components/affiliates/affiliates.component';
+import { openReviewModal } from '@gitroom/frontend/components/reviews/review.form';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -109,6 +111,8 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'integrations', label: t('integrations', 'Integrations') });
     arr.push({ tab: 'plugs', label: t('plugs', 'Plugs') });
     arr.push({ tab: 'apps', label: t('apps', 'Apps') });
+    // every role, like the sidebar item it replaces
+    arr.push({ tab: 'affiliates', label: t('affiliates', 'Affiliates') });
 
     return arr;
   }, [user, isGeneral, showLogout, t]);
@@ -150,6 +154,18 @@ export const SettingsPopup: FC<{
           ))}
         </div>
         <div>
+          <button
+            type="button"
+            onClick={() =>
+              openReviewModal(
+                modal.openModal,
+                t('review_leave', 'Leave a review')
+              )
+            }
+            className="mt-4 block text-[14px] text-textItemBlur underline underline-offset-4 hover:text-newTextColor mobile:mt-[8px]"
+          >
+            {t('review_leave', 'Leave a review')}
+          </button>
           {showLogout && (
             <div className="mt-4 mobile:mt-[8px]">
               <LogoutComponent />
@@ -244,6 +260,12 @@ export const SettingsPopup: FC<{
                     <PublicComponent />
                   </div>
                 )}
+
+              {tab === 'affiliates' && (
+                <div>
+                  <AffiliatesComponent />
+                </div>
+              )}
 
               {tab === 'apps' && (
                 <div>
