@@ -1,7 +1,9 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Organization } from '@prisma/client';
+import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
+import { userActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import {
   AuthorizationActions,
@@ -33,6 +35,7 @@ export class PostsImportController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async import(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Body() body: ImportPostsDto
   ) {
     // the policy above checks the plan once, the import creates many posts
@@ -40,6 +43,11 @@ export class PostsImportController {
       org.id,
       org.createdAt
     );
-    return this._importService.import(org.id, body, remaining);
+    return this._importService.import(
+      org.id,
+      body,
+      remaining,
+      userActor(user, org as any)
+    );
   }
 }

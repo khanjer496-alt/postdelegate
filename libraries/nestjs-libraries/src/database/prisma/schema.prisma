@@ -46,6 +46,9 @@ model Organization {
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
   reviews             Review[]
+  approvalSettings    ApprovalSettings?
+  approvalLinks       ApprovalLink[]
+  activityLogs        ActivityLog[]
   ideas               Idea[]
   postImports         PostImport[]
   // Affiliate attribution, set once at registration and never changed
@@ -503,6 +506,11 @@ model Post {
   submittedForOrganizationId String?
   approvedSubmitForOrder     APPROVED_SUBMIT_FOR_ORDER @default(NO)
   creationMethod             CreationMethod            @default(UNKNOWN)
+  // Where the post is in the review flow, NONE when it never needed one
+  approvalStatus             ApprovalStatus            @default(NONE)
+  // Set when an AI agent created the post (MCP, public API, CLI, in-app
+  // agent): the MCP client, OAuth app or "API key" it came from
+  agentSource                String?
   lastMessageId              String?
   intervalInDays             Int?
   // evergreen limits of a repeating post (intervalInDays): stop after this
@@ -2014,6 +2022,97 @@ model ReviewPrompt {
   reviewedAt   DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+enum ApprovalStatus {
+  NONE
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+}
+
+// One row per workspace. A workspace without a row uses the defaults below,
+// so workspaces created before approvals keep publishing as they did. New
+// workspaces get a row with requireAgentApproval on.
+model ApprovalSettings {
+  id                         String       @id @default(uuid())
+  organizationId             String       @unique
+  organization               Organization @relation(fields: [organizationId], references: [id])
+  // Posts by members who can't approve wait for an approver
+  requireApproval            Boolean      @default(false)
+  // Members who can approve besides the admins
+  approverIds                String[]     @default([])
+  // Posts created by AI agents wait for an approver
+  requireAgentApproval       Boolean      @default(false)
+  // Channels agents may post to, empty means every channel
+  agentIntegrationIds        String[]     @default([])
+  // Posts agents may create per day (UTC), null means no limit
+  agentMaxPostsPerDay        Int?
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+}
+
+// A share link a client opens without an account to approve posts. Only the
+// SHA-256 of the token is stored.
+model ApprovalLink {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  tokenHash      String       @unique
+  // The main posts (not comments) the link shows
+  postIds        String[]
+  createdById    String?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastViewedAt   DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([expiresAt])
+}
+
+enum ActivityAction {
+  CREATED
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+  PUBLISHED
+  LINK_CREATED
+  LINK_REVOKED
+  LINK_VIEWED
+  GUARDRAIL_BLOCKED
+  SETTINGS_CHANGED
+}
+
+enum ActivityActor {
+  USER
+  AGENT
+  CLIENT
+  SYSTEM
+}
+
+// Append-only history of a workspace and its posts, rows are never updated
+model ActivityLog {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  postId         String?
+  action         ActivityAction
+  actorType      ActivityActor
+  actorUserId    String?
+  // The member's name, the agent source or the name a client entered
+  actorName      String?
+  // Only for clients, the email they entered
+  actorEmail     String?
+  comment        String?
+  linkId         String?
+  createdAt      DateTime       @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([postId, createdAt])
 }
 
 // Daily analytics history, written once a day per channel by

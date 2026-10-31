@@ -70,6 +70,11 @@ import { PostsImportService } from '@gitroom/nestjs-libraries/database/prisma/po
 import { WeeklySummaryRepository } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.repository';
 import { WeeklySummaryService } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
+import { ActivityLogRepository } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.repository';
+import { ActivityLogService } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.service';
+import { ApprovalsRepository } from '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.repository';
+import { ApprovalPolicyService } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
+import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.service';
 
 @Global()
 @Module({
@@ -141,6 +146,11 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     ActivationRepository,
     ActivationService,
     LoginLockoutService,
+    ActivityLogRepository,
+    ActivityLogService,
+    ApprovalsRepository,
+    ApprovalPolicyService,
+    ApprovalsService,
     IdeasRepository,
     IdeasService,
     PostsEvergreenRepository,

@@ -241,6 +241,21 @@ const organizationSteps = (org: string): Step[] => [
   { table: 'OAuthApp', model: 'oAuthApp', where: { organizationId: org } },
   { table: 'Review', model: 'review', where: { organizationId: org } },
   {
+    table: 'ActivityLog',
+    model: 'activityLog',
+    where: { organizationId: org },
+  },
+  {
+    table: 'ApprovalLink',
+    model: 'approvalLink',
+    where: { organizationId: org },
+  },
+  {
+    table: 'ApprovalSettings',
+    model: 'approvalSettings',
+    where: { organizationId: org },
+  },
+  {
     table: 'Subscription',
     model: 'subscription',
     where: { organizationId: org },
@@ -263,6 +278,18 @@ const sharedOrganizationSteps = (user: string, org: string): Step[] => [
     data: { userId: null, displayName: null },
   },
   {
+    table: 'ActivityLog.actorUserId',
+    model: 'activityLog',
+    where: { actorUserId: user, organizationId: org },
+    data: { actorUserId: null, actorName: null },
+  },
+  {
+    table: 'ApprovalLink.createdById',
+    model: 'approvalLink',
+    where: { createdById: user, organizationId: org },
+    data: { createdById: null },
+  },
+  {
     table: 'OAuthAuthorization',
     model: 'oAuthAuthorization',
     where: { userId: user, organizationId: org },
@@ -280,6 +307,18 @@ const userSteps = (user: string): Step[] => [
     model: 'comments',
     where: { userId: user },
     data: { userId: null, displayName: null },
+  },
+  {
+    table: 'ActivityLog.actorUserId',
+    model: 'activityLog',
+    where: { actorUserId: user },
+    data: { actorUserId: null, actorName: null },
+  },
+  {
+    table: 'ApprovalLink.createdById',
+    model: 'approvalLink',
+    where: { createdById: user },
+    data: { createdById: null },
   },
   {
     table: 'Post.lastMessageId',

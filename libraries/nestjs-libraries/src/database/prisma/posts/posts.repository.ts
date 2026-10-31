@@ -3,6 +3,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Post as PostBody } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import {
   APPROVED_SUBMIT_FOR_ORDER,
+  ApprovalStatus,
   CreationMethod,
   Post,
   Prisma,
@@ -260,6 +261,8 @@ export class PostsRepository {
         evergreenUntil: true,
         group: true,
         creationMethod: true,
+        approvalStatus: true,
+        agentSource: true,
         settings: true,
         tags: {
           where: {
@@ -393,6 +396,8 @@ export class PostsRepository {
           intervalInDays: true,
           group: true,
           creationMethod: true,
+          approvalStatus: true,
+          agentSource: true,
           tags: {
             where: {
               tag: {
@@ -677,7 +682,10 @@ export class PostsRepository {
     keepGroup = false,
     // Shared by the posts saved together for several channels, so opening one
     // of them in the editor brings the others.
-    batchId?: string
+    batchId?: string,
+    // the review state to store (undefined keeps it) and, on create, the
+    // agent that created the post
+    approval: { approvalStatus?: ApprovalStatus; agentSource?: string } = {}
   ) {
     const posts: Post[] = [];
     const uuid = uuidv4();
@@ -753,6 +761,12 @@ export class PostsRepository {
         intervalInDays: inter ? +inter : null,
         approvedSubmitForOrder: APPROVED_SUBMIT_FOR_ORDER.NO,
         ...(type === 'create' ? { creationMethod } : {}),
+        ...(approval.approvalStatus
+          ? { approvalStatus: approval.approvalStatus }
+          : {}),
+        ...(type === 'create' && approval.agentSource
+          ? { agentSource: approval.agentSource }
+          : {}),
         ...(state === 'update'
           ? {}
           : {
@@ -878,6 +892,14 @@ export class PostsRepository {
     }
 
     return { previousPost, posts };
+  }
+
+  // Keeps a post and its comments as a draft until an approver approves it
+  holdForReview(orgId: string, group: string) {
+    return this._post.model.post.updateMany({
+      where: { organizationId: orgId, group, deletedAt: null },
+      data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' },
+    });
   }
 
   async submit(id: string, order: string, buyerOrganizationId: string) {

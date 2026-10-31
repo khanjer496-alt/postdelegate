@@ -34,6 +34,7 @@ import {
   ResolveCommentDto,
 } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { ClientIp } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
+import { userActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -217,6 +218,7 @@ export class PostsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Body() rawBody: any
   ) {
     // Server-side validation — never trust the client to have validated.
@@ -258,7 +260,13 @@ export class PostsController {
     }
 
     const body = await this._postsService.mapTypeToPost(rawBody, org.id);
-    return this._postsService.createPost(org.id, body, 'WEB');
+    return this._postsService.createPost(
+      org.id,
+      body,
+      'WEB',
+      false,
+      userActor(user, org as any)
+    );
   }
 
   @Post('/generator/draft')

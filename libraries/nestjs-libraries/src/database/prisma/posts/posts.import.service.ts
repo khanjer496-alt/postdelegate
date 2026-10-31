@@ -14,6 +14,7 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { ImportPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/import.posts.dto';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
+import { ApprovalActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
 import { plainTextToHtml } from '@gitroom/helpers/utils/plain.text.to.html';
 
 dayjs.extend(utc);
@@ -658,11 +659,13 @@ export class PostsImportService {
   // Creates the valid rows as scheduled posts. The same file (and timezone)
   // is only ever imported once: a second request returns the first result.
   // `remaining` is how many posts the plan still allows this month (null
-  // for no limit); rows past it are skipped.
+  // for no limit); rows past it are skipped. `actor` is the member importing,
+  // their rows wait for an approver like posts saved in the composer.
   async import(
     orgId: string,
     body: ImportPostsDto,
-    remaining: number | null = null
+    remaining: number | null = null,
+    actor?: ApprovalActor
   ) {
     const hash = importHash(body.csv, this.timezone(body));
     const claim = await this._importRepository.claim(orgId, hash);
@@ -740,7 +743,13 @@ export class PostsImportService {
             this.toCreatePost(row, media),
             orgId
           );
-          await this._postsService.createPost(orgId, request, 'WEB');
+          await this._postsService.createPost(
+            orgId,
+            request,
+            'WEB',
+            false,
+            actor
+          );
           posts += row.channels.length;
           results.push({ row: row.row, status: 'created' });
           // the progress keeps the claim fresh and survives a crash
