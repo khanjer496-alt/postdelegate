@@ -124,7 +124,7 @@ test('direct posting refuses interactions disabled by the creator', async () => 
 
 test('commercial disclosure requires a brand selection', async () => {
   const { instance } = provider();
-  await assert.rejects(publish(instance, post({ disclose: true })), /brand|disclos/i);
+  await assert.rejects(publish(instance, post({ disclose: true })), /promotes yourself, a third party, or both/);
 });
 
 test('branded content cannot be private', async () => {
