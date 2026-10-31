@@ -19,6 +19,7 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | [Medium](/docs/channels/medium) | Integration token | Stories in Markdown |
 | [Nostr](/docs/channels/nostr) | Hex private key | Notes |
 | [WordPress](/docs/channels/wordpress) | Site address, username and application password | Posts and pages |
+| [Kick](/docs/channels/kick) | Kick sign-in | Chat messages |
 
 ## Coming soon
 
@@ -28,7 +29,7 @@ Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and several other n
 
 There are two kinds of connection.
 
-**Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. YouTube works this way.
+**Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. YouTube and Kick work this way.
 
 **Paste a credential.** You enter an app password, API key or site address into PostDelegate. The other eight networks work this way. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
 

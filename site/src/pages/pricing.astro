@@ -4,20 +4,41 @@ import Pricing from '../components/Pricing.astro';
 import PageHero from '../components/PageHero.astro';
 import CtaBand from '../components/CtaBand.astro';
 import { SITE } from '../data/site';
+import { PLANS, TRIAL_DAYS } from '../data/plans';
+import { AVAILABLE_NETWORKS } from '../data/networks';
+const rows: [string, (plan: typeof PLANS[number]) => string][] = [
+  ['Monthly price', (plan) => `$${plan.monthly}`],
+  ['Yearly price', (plan) => `$${plan.yearly.toLocaleString('en-US')}`],
+  ['Channels', (plan) => String(plan.channels)],
+  ['Posts per month', () => 'No practical limit'],
+  ['Team members', (plan) => (plan.teamMembers ? 'Yes' : 'No')],
+  ['Public API and MCP', () => 'Yes'],
+  ['Webhooks', (plan) => plan.webhooks.toLocaleString('en-US')],
+  ['Free trial', () => `${TRIAL_DAYS} days`],
+];
 ---
-<Base title="Plans and early access — PostDelegate" description="Create a PostDelegate workspace during early access. Paid plans, prices and allowances will be announced before checkout opens.">
-  <PageHero eyebrow="Plans" title="A workspace now. Plans to follow." lead="PostDelegate is in early access. Explore the workspace while we prepare the channel rollout and subscription plans.">
-    <a href={SITE.signup} class="button">Create a workspace</a>
-    <a href="/support" class="button button-outline">Ask a question</a>
+<Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month. Every plan starts with a ${TRIAL_DAYS}-day free trial; cancel before day ${TRIAL_DAYS} and you are not charged.`}>
+  <PageHero eyebrow="Plans" title={`Pick a plan. Try it free for ${TRIAL_DAYS} days.`} lead="The plans differ in how many channels you connect, whether your team joins you and how many webhooks you run. Everything else comes with every plan.">
+    <a href={SITE.signup} class="button">Start your free trial</a>
+    <a href="/docs/billing" class="button button-outline">Read the billing guide</a>
   </PageHero>
   <section class="section"><div class="container"><Pricing heading={false} /></div></section>
+  <section class="plan-compare"><div class="container">
+    <h2>Compare plans</h2>
+    <div class="compare-scroll">
+      <table>
+        <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{PLANS.map((plan) => <th scope="col">{plan.name}</th>)}</tr></thead>
+        <tbody>{rows.map(([label, value]) => <tr><th scope="row">{label}</th>{PLANS.map((plan) => <td>{value(plan)}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  </div></section>
   <section class="pricing-questions"><div class="container">
     <h2>Before you get started</h2>
     <div class="question-grid">
-      <div><h3>Can I subscribe today?</h3><p>Paid checkout is not active. We will publish the price, channel allowance, included features and billing terms before asking you to subscribe.</p></div>
-      <div><h3>Are all channels available?</h3><p>Channel connections are being rolled out. See <a href="/platforms">platform coverage</a> and check the workspace for current availability.</p></div>
-      <div><h3>Is there a trial?</h3><p>No paid trial offer is being advertised at this stage. Early access does not promise a permanent free tier or future plan allowances.</p></div>
-      <div><h3>What about AI and automation?</h3><p>The Postiz foundation includes agent, API and AI features. PostDelegate availability and any included usage will be confirmed separately.</p></div>
+      <div><h3>How does the free trial work?</h3><p>Every plan starts with a {TRIAL_DAYS}-day free trial. A card is needed to start it, and we check it with a $1 authorization that is voided straight away. Cancel before day {TRIAL_DAYS} and you are not charged; otherwise the first payment is taken when the trial ends.</p></div>
+      <div><h3>Which channels can I connect?</h3><p>{AVAILABLE_NETWORKS.length} networks connect today, including YouTube, Bluesky, WordPress and Kick. Facebook, Instagram, TikTok, LinkedIn, X and others open as platform approvals come through. See <a href="/platforms">platform coverage</a>.</p></div>
+      <div><h3>Can I change or cancel my plan?</h3><p>Workspace admins can change plan, update the payment method or cancel from <strong>Billing</strong> in the app. Cancellation takes effect at the end of the period you have already paid for.</p></div>
+      <div><h3>What about AI and automation?</h3><p>AI features are off on every plan, and PostDelegate does not provide its own AI. Every plan includes the REST API and MCP server, so you can bring your own assistant.</p></div>
     </div>
   </div></section>
   <CtaBand />
@@ -29,5 +50,14 @@ import { SITE } from '../data/site';
   h3 { font-size: 18px; font-weight: 750; margin-bottom: 10px; }
   .question-grid p { color: var(--muted, #b9b9b9); font-size: 15px; line-height: 1.85; }
   .question-grid a { color: var(--text, #fff); text-decoration: underline; text-underline-offset: 4px; }
+  .question-grid strong { color: var(--text, #fff); }
+  .plan-compare { padding: 0 0 100px; background: var(--bg, #0d0d0d); }
+  .compare-scroll { max-width: 880px; margin: auto; overflow-x: auto; border: 1px solid #303030; border-radius: 22px; background: #171717; }
+  table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; }
+  thead th { color: var(--text, #fff); font-size: 15px; font-weight: 750; }
+  th, td { padding: 15px 18px; border-bottom: 1px solid #303030; text-align: left; }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+  tbody th { color: var(--muted, #b9b9b9); font-weight: 600; }
+  td { color: var(--text, #fff); }
   @media (max-width: 600px) { .question-grid { grid-template-columns: 1fr; gap: 26px; } }
 </style>

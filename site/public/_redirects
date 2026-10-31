@@ -2,8 +2,6 @@
 /privacy/ https://app.postdelegate.com/legal/privacy/ 301
 /terms https://app.postdelegate.com/legal/terms/ 301
 /terms/ https://app.postdelegate.com/legal/terms/ 301
-/licenses https://app.postdelegate.com/source 302
-/licenses/ https://app.postdelegate.com/source 302
 /data-deletion /support#data-requests 302
 /data-deletion/ /support#data-requests 302
 /postdelegate-workspace-preview.png /images/postdelegate-workspace.jpg 301

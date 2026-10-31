@@ -1,5 +1,5 @@
 ---
-import { PLANS } from '../data/plans';
+import { PLANS, TRIAL_DAYS, planFeatures } from '../data/plans';
 import { SITE } from '../data/site';
 interface Props { heading?: boolean }
 const { heading = true } = Astro.props;
@@ -7,9 +7,9 @@ const { heading = true } = Astro.props;
 <div class="pricing">
   {heading && (
     <div class="pricing-heading">
-      <p class="eyebrow">Early access</p>
+      <p class="eyebrow">Plans</p>
       <h2>Find your publishing rhythm.</h2>
-      <p class="muted">Start with a workspace. Paid plans and their full details will be announced before checkout opens.</p>
+      <p class="muted">Every plan starts with a {TRIAL_DAYS}-day free trial. A card is needed to start it; cancel before day {TRIAL_DAYS} and you are not charged.</p>
     </div>
   )}
   <div class="plan-grid">
@@ -20,18 +20,17 @@ const { heading = true } = Astro.props;
           {plan.popular && <span class="plan-badge">Built for collaboration</span>}
         </div>
         <p class="plan-tagline">{plan.tagline}</p>
-        <p class="plan-status">Plans coming soon</p>
+        <p class="plan-price"><strong>${plan.monthly}</strong><span>/month</span></p>
+        <p class="plan-yearly">or ${plan.yearly.toLocaleString('en-US')} a year, save ${plan.monthly * 12 - plan.yearly}</p>
         <p class="plan-description muted">{plan.description}</p>
-        <a href={plan.slug === 'custom' ? `mailto:${SITE.email}` : SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>
-          {plan.slug === 'custom' ? 'Talk to us' : 'Create a workspace'}
-        </a>
+        <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>Start free trial</a>
         <ul>
-          {plan.features.map((feature) => <li><span aria-hidden="true">✓</span>{feature}</li>)}
+          {planFeatures(plan).map((feature) => <li><span aria-hidden="true">✓</span>{feature}</li>)}
         </ul>
       </article>
     ))}
   </div>
-  <p class="pricing-note muted">These are use cases, not paid packages. Checkout is not active, and no prices, trial terms or usage allowances are being offered here.</p>
+  <p class="pricing-note muted">Prices in US dollars. AI features are off on every plan; bring your own assistant through <a href="/docs/mcp">MCP</a>. More networks, including Facebook, Instagram, TikTok, LinkedIn and X, open as platform approvals come through. See <a href="/docs/billing">plans and billing</a> for the details.</p>
 </div>
 <style>
   .pricing-heading { text-align: center; max-width: 730px; margin: 0 auto 48px; }
@@ -44,7 +43,11 @@ const { heading = true } = Astro.props;
   .plan-topline h3 { font-size: 24px; line-height: 1.15; font-weight: 800; letter-spacing: -.035em; }
   .plan-badge { padding: 5px 9px; border-radius: 100px; color: #fff; background: #151515; font-size: 10px; line-height: 1.3; font-weight: 700; }
   .plan-tagline { margin-top: 12px; font-size: 14px; line-height: 1.6; }
-  .plan-status { margin-top: 28px; font-size: 23px; line-height: 1.25; font-weight: 800; letter-spacing: -.035em; }
+  .plan-price { display: flex; align-items: baseline; gap: 6px; margin-top: 26px; }
+  .plan-price strong { font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -.05em; }
+  .plan-price span { color: #b9b9b9; font-size: 14px; }
+  .plan-yearly { margin-top: 9px; color: #b9b9b9; font-size: 12px; line-height: 1.6; }
+  .plan-featured .plan-price span, .plan-featured .plan-yearly { color: #62626b; }
   .plan-description { color: #b9b9b9; margin: 12px 0 24px; font-size: 14px; line-height: 1.75; min-height: 76px; }
   .plan-card .button { width: 100%; margin-top: auto; color: #fff; border-color: #777; background: transparent; }
   .plan-card .button:hover { color: #151515; background: #fff; border-color: #fff; }
@@ -56,6 +59,7 @@ const { heading = true } = Astro.props;
   .plan-card li { display: flex; align-items: flex-start; gap: 9px; }
   .plan-card li > span { flex: none; font-weight: 800; }
   .pricing-note { max-width: 750px; margin: 28px auto 0; text-align: center; font-size: 13px; line-height: 1.8; }
+  .pricing-note a { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
   @media (max-width: 1000px) { .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) { .plan-grid { grid-template-columns: 1fr; } .plan-topline { min-height: auto; } .plan-description { min-height: auto; } }
 </style>

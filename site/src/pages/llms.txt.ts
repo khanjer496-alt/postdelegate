@@ -4,31 +4,30 @@ import { DOC_SECTIONS } from '../data/docs';
 export const GET: APIRoute = () => {
   const body = `# PostDelegate
 
-> A social publishing workspace built on open-source Postiz, operated independently by ${SITE.operator}.
+> An open-source social publishing workspace, operated independently by ${SITE.operator}.
 
 ## Current stage
 - PostDelegate is in early access. Create a workspace at ${SITE.signup}.
-- The workspace uses the native Postiz calendar, composer, media library and publishing foundation.
+- The workspace includes a calendar, composer, media library and publishing workflow.
 - Social channel connections are in rollout. A provider in the source or on a platform page is not a promise of a live hosted connection.
 - Google sign-in is separate from connecting a social publishing account.
-- Paid checkout is not guaranteed to be open for every account. Plan information (Starter, Team, Pro, Ultimate) and the 7-day card trial are described at ${SITE.url}/docs/billing as plan information, not a promise of checkout availability.
+- Plans: Starter $19, Team $29, Pro $39 and Ultimate $79 per month ($180, $276, $372 and $756 per year, US dollars). Every plan starts with a 7-day free trial that needs a card; cancelling before day 7 means no charge. Details at ${SITE.url}/pricing and ${SITE.url}/docs/billing.
 - Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
 - AI features inside the app are off. Customers bring their own AI assistant through MCP.
-- Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr and WordPress. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
-- The modified application is available under AGPL-3.0: ${SITE.source}.
-- PostDelegate is not affiliated with or endorsed by Postiz.
+- Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
+- The application is open source under AGPL-3.0: ${SITE.source}. It is based on the Postiz project; PostDelegate is not affiliated with or endorsed by Postiz.
 
 ## Documentation
 ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.title}](${SITE.url}${item.href}): ${item.description}`).join('\n')}
 
 ## Pages
 - [Product facts](${SITE.url}/llms-full.txt)
-- [Plans and early access](${SITE.url}/pricing)
+- [Plans and pricing](${SITE.url}/pricing)
 - [Platform rollout](${SITE.url}/platforms)
 - [Agents and automation](${SITE.url}/agents)
 - [REST API](${SITE.url}/api)
 - [MCP](${SITE.url}/mcp)
-- [Our Postiz foundation](${SITE.url}/compare/postiz)
+- [Open-source origins](${SITE.url}/compare/postiz)
 - [Browser-based tools](${SITE.url}/tools)
 - [Support](${SITE.url}/support)
 - [Privacy](${SITE.legal.privacy})

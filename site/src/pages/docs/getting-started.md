@@ -8,7 +8,7 @@ PostDelegate is a hosted social media scheduler. You write a post once, pick the
 
 <div class="callout">
 
-**Early access.** Today you can connect YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr and WordPress. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals. See [Channels overview](/docs/channels) for the current list.
+**Early access.** Today you can connect YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals. See [Channels overview](/docs/channels) for the current list.
 
 </div>
 
@@ -52,7 +52,7 @@ The calendar has **Day**, **Week**, **Month** and **List** views. A scheduled po
 | **Calendar** | Your channels, scheduled posts, drafts and the composer. |
 | **Analytics** | Per-channel statistics for the networks that provide them. |
 | **Media** | Your media library. See [Media library](/docs/media). |
-| **Billing** | Plan and payment details, when billing is enabled for your account. See [Plans and billing](/docs/billing). |
+| **Billing** | Plan and payment details. See [Plans and billing](/docs/billing). |
 | **Settings** | Profile, [team](/docs/team), [webhooks](/docs/webhooks), the **Agents / Dev** tab with your API key and MCP setup, sets, signatures and OAuth apps. Some tabs depend on your plan. |
 
 ## Next steps

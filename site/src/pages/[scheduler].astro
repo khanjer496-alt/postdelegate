@@ -2,22 +2,28 @@
 import Doc from '../layouts/Doc.astro';
 import { SCHEDULERS } from '../data/schedulers';
 import { SITE } from '../data/site';
+import { NETWORKS } from '../data/networks';
 export function getStaticPaths() { return SCHEDULERS.map((s) => ({ params: { scheduler: s.slug }, props: { s } })); }
 const { s } = Astro.props;
+const available = NETWORKS.some((network) => network.key === s.key && network.available);
 const others = SCHEDULERS.filter((other) => other.slug !== s.slug).slice(0, 6);
 const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
   { '@type': 'ListItem', position: 1, name: 'Platforms', item: `${SITE.url}/platforms` },
   { '@type': 'ListItem', position: 2, name: s.name, item: `${SITE.url}/${s.slug}` }] };
 ---
-<Doc title={`${s.name} coverage and rollout — PostDelegate`} description={s.intro} h1={s.h1} eyebrow={`${s.name} · rollout preview`} lead={s.intro} jsonLd={[crumbs]}>
+<Doc title={available ? `${s.name} scheduling — PostDelegate` : `${s.name} coverage and rollout — PostDelegate`} description={s.intro} h1={s.h1} eyebrow={available ? `${s.name} · available now` : `${s.name} · coming soon`} lead={s.intro} jsonLd={[crumbs]}>
   <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
   <a slot="actions" href="/tools/caption-checker" class="button button-outline">Try the caption checker</a>
-  <aside class="doc-note"><strong>Channel rollout in progress.</strong> This page describes the Postiz foundation. It does not confirm that {s.name} is ready for every PostDelegate user. Check your workspace or <a href="/support">contact support</a> for availability.</aside>
-  <h2>In the publishing foundation</h2>
+  {available
+    ? <aside class="doc-note"><strong>Available now.</strong> Connect {s.name} from <strong>Add Channel</strong> on the calendar page. The <a href={s.docs}>{s.name} guide</a> has the exact fields and post settings.</aside>
+    : <aside class="doc-note"><strong>Coming soon.</strong> {s.name} cannot be connected on PostDelegate yet. It opens once the platform approves PostDelegate. See the <a href="/docs/channels">networks you can connect today</a>, or <a href="/support">contact support</a> to tell us you need it.</aside>}
+  <h2>{available ? `Publishing to ${s.name}` : 'What is planned'}</h2>
   <ul>{s.plan.map((point) => <li>{point}</li>)}</ul>
   <h2>Before connecting</h2>
   <ul>{s.limits.map((point) => <li>{point}</li>)}</ul>
-  <p>Use the <a href={s.docs} target="_blank" rel="noreferrer">upstream Postiz reference</a> to understand the provider. Its documentation describes the underlying platform, not the state of our hosted rollout.</p>
+  {available
+    ? <p>Read the <a href={s.docs}>{s.name} guide</a> in our documentation for connection steps, post settings and troubleshooting.</p>
+    : <p>See <a href={s.docs}>Coming soon</a> in our documentation for the networks waiting on platform approval.</p>}
   <h2>Review the whole post</h2>
   <p>Check the destination, wording, media and time before scheduling. Look at the result in your workspace after publication; a queued item is not a published-post confirmation.</p>
   <p>For automation, see our <a href="/agents">integration previews</a>. No agent connection is implied by this platform page.</p>
