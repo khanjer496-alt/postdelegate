@@ -17,18 +17,17 @@ interface AiCredential {
 export const useAiCredential = () => {
   const fetch = useFetch();
 
-  const load = useCallback(async (): Promise<AiCredential | null> => {
+  const load = useCallback(async () => {
     const response = await fetch('/ai-credentials');
     // an error body is not a credential: SWR keeps it as an error instead
     if (!response.ok) {
       throw new Error(`Could not load the AI key (${response.status})`);
     }
-    // No saved key comes back as an empty body, not as JSON
-    const body = await response.text();
-    return body ? JSON.parse(body) : null;
+    // no saved key comes back as {}
+    return response.json();
   }, []);
 
-  return useSWR<AiCredential | null>('ai-credentials', load);
+  return useSWR<Partial<AiCredential>>('ai-credentials', load);
 };
 
 export const AiSettings: FC = () => {
@@ -116,7 +115,7 @@ export const AiSettings: FC = () => {
     toaster.show(t('ai_key_removed', 'AI key removed'), 'success');
   }, [fetch, refresh, toaster, t]);
 
-  const showInput = !data || replacing;
+  const showInput = !data?.maskedKey || replacing;
 
   return (
     <div className="flex flex-col">
@@ -140,7 +139,7 @@ export const AiSettings: FC = () => {
           </div>
         ) : (
           <>
-            {!!data && (
+            {!!data?.maskedKey && (
               <div className="flex items-center justify-between gap-[16px] mobile:flex-col mobile:items-start">
                 <div className="text-[14px] break-all">
                   {t('ai_openai_key', 'OpenAI key: {{maskedKey}}', {

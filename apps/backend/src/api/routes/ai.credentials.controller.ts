@@ -22,8 +22,8 @@ export class AiCredentialsController {
   constructor(private _aiCredentialService: AiCredentialService) {}
 
   @Get('/')
-  getCredential(@GetOrgFromRequest() org: Organization) {
-    return this._aiCredentialService.getCredential(org.id);
+  async getCredential(@GetOrgFromRequest() org: Organization) {
+    return (await this._aiCredentialService.getCredential(org.id)) || {};
   }
 
   @UseGuards(ThrottlerRealIpGuard)
@@ -41,6 +41,6 @@ export class AiCredentialsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteCredential(@GetOrgFromRequest() org: Organization) {
     await this._aiCredentialService.deleteCredential(org.id);
-    return { deleted: true };
+    return { success: true };
   }
 }

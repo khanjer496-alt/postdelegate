@@ -69,6 +69,11 @@ describe('AiCredentialsController delegation', () => {
     expect(service.getCredential).toHaveBeenCalledWith('org-1');
   });
 
+  it('reads an empty object when the org has no key', async () => {
+    service.getCredential.mockResolvedValueOnce(null);
+    await expect(controller.getCredential(org)).resolves.toEqual({});
+  });
+
   it('saves for the org and returns only the mask', async () => {
     const body = { provider: 'openai', apiKey: 'sk-secret-secret-secret-1234' } as const;
     const result = await controller.saveCredential(org, body);
@@ -78,7 +83,7 @@ describe('AiCredentialsController delegation', () => {
 
   it('deletes for the org', async () => {
     await expect(controller.deleteCredential(org)).resolves.toEqual({
-      deleted: true,
+      success: true,
     });
     expect(service.deleteCredential).toHaveBeenCalledWith('org-1');
   });

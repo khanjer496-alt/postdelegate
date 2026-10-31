@@ -45,16 +45,11 @@ describe('AiCredentialService', () => {
     }
   });
 
-  it('saveCredential stores the encrypted key, not the plaintext', async () => {
+  it('saveCredential hands the checked key to the repository, which encrypts it', async () => {
     await service.saveCredential('org-1', { provider: 'openai', apiKey: KEY });
 
     expect(repository.upsert).toHaveBeenCalledTimes(1);
-    const [orgId, provider, stored] = repository.upsert.mock.calls[0];
-    expect(orgId).toBe('org-1');
-    expect(provider).toBe('openai');
-    expect(stored).toBe(AuthService.fixedEncryption(KEY));
-    expect(stored).not.toBe(KEY);
-    expect(stored).not.toContain(KEY);
+    expect(repository.upsert).toHaveBeenCalledWith('org-1', 'openai', KEY);
   });
 
   it('saveCredential returns only the mask', async () => {

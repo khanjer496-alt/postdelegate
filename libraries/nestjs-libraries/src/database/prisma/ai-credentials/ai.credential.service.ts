@@ -44,11 +44,7 @@ export class AiCredentialService {
       );
     }
 
-    await this._aiCredentialRepository.upsert(
-      orgId,
-      body.provider,
-      AuthService.fixedEncryption(body.apiKey)
-    );
+    await this._aiCredentialRepository.upsert(orgId, body.provider, body.apiKey);
 
     return { provider: body.provider, maskedKey: mask(body.apiKey) };
   }
