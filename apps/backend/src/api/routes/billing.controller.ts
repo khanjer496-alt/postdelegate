@@ -309,7 +309,7 @@ export class BillingController {
     if (refund.refunded) {
       await this._notificationService.sendEmail(
         process.env.EMAIL_FROM_ADDRESS,
-        'Refund issued from Chatbase',
+        'Refund issued from PostDelegate',
         `Organization ${org.name} received a refund of ${refund.amount} ${refund.currency} and their subscription was cancelled`,
         user.email
       );
