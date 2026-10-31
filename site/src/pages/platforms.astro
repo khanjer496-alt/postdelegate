@@ -4,13 +4,13 @@ import NetworkBadge from '../components/NetworkBadge.astro';
 import PageHero from '../components/PageHero.astro';
 import CtaBand from '../components/CtaBand.astro';
 import { NETWORKS } from '../data/networks';
-import { SITE } from '../data/site';
+import { SITE, CTA_LABEL } from '../data/site';
 const networks = [...NETWORKS].sort((a, b) => Number(!!b.available) - Number(!!a.available));
 const href = (network: typeof NETWORKS[number]) => network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon';
 ---
 <Base title="Platform coverage and channel rollout — PostDelegate" description="See which networks you can connect to PostDelegate today and which are coming soon as platform approvals come through.">
   <PageHero eyebrow="Platform coverage" title="Your content belongs in one calendar." lead="Connect the networks marked available today. The rest are coming soon, opening as each platform approves PostDelegate.">
-    <a href={SITE.signup} class="button">Create a workspace</a>
+    <a href={SITE.signup} class="button">{CTA_LABEL}</a>
     <a href="/support" class="button button-outline">Ask about a channel</a>
   </PageHero>
   <section class="section"><div class="container">

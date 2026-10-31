@@ -1,6 +1,6 @@
 ---
 import Doc from '../layouts/Doc.astro';
-import { SITE } from '../data/site';
+import { SITE, CTA_LABEL } from '../data/site';
 const guides = [
   { title: 'MCP connections', text: 'How compatible AI clients connect to PostDelegate and what they can do.', href: '/mcp' },
   { title: 'The REST API', text: 'The developer interface behind drafts, media and publishing workflows.', href: '/api' },
@@ -9,7 +9,7 @@ const guides = [
 ];
 ---
 <Doc title="AI agents and automation — PostDelegate" description="Connect your own AI assistant or software to PostDelegate through MCP and the REST API, with every post under your review." h1="Bring your workflow. Keep your calendar." eyebrow="AI agents and automation" lead="Use the assistant you already have. PostDelegate offers an MCP server and a REST API so your tools can prepare content while you keep the final say.">
-  <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
+  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/docs" class="button button-outline">Read the docs</a>
   <div class="document-grid">
     {guides.map((guide) => <a href={guide.href} class="document-card"><h2>{guide.title}</h2><p>{guide.text}</p><span>Explore the integration →</span></a>)}

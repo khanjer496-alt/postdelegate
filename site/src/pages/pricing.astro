@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import Pricing from '../components/Pricing.astro';
 import PageHero from '../components/PageHero.astro';
 import CtaBand from '../components/CtaBand.astro';
-import { SITE } from '../data/site';
+import { SITE, CTA_LABEL, CTA_NOTE } from '../data/site';
 import { PLANS, TRIAL_DAYS } from '../data/plans';
 import { AVAILABLE_NETWORKS } from '../data/networks';
 const rows: [string, (plan: typeof PLANS[number]) => string][] = [
@@ -19,8 +19,9 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
 ---
 <Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month. Every plan starts with a ${TRIAL_DAYS}-day free trial, no credit card needed.`}>
   <PageHero eyebrow="Plans" title={`Pick a plan. Try it free for ${TRIAL_DAYS} days.`} lead="The plans differ in how many channels you connect, whether your team joins you and how many webhooks you run. Everything else comes with every plan.">
-    <a href={SITE.signup} class="button">Start your free trial</a>
+    <a href={SITE.signup} class="button">{CTA_LABEL}</a>
     <a href="/docs/billing" class="button button-outline">Read the billing guide</a>
+    <p class="trial-note"><span aria-hidden="true"></span>{CTA_NOTE} · One trial per email</p>
   </PageHero>
   <section class="section"><div class="container"><Pricing heading={false} /></div></section>
   <section class="plan-compare"><div class="container">
@@ -35,7 +36,7 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
   <section class="pricing-questions"><div class="container">
     <h2>Before you get started</h2>
     <div class="question-grid">
-      <div><h3>How does the free trial work?</h3><p>Every plan starts with a {TRIAL_DAYS}-day free trial, and you do not need a credit card to start it. Add a card any time before day {TRIAL_DAYS} to keep your plan; the first payment is taken when the trial ends. Without a card, your workspace moves to the Free plan when the trial ends and your scheduled posts pause until you choose a plan.</p></div>
+      <div><h3>How does the free trial work?</h3><p>Every plan starts with a {TRIAL_DAYS}-day free trial, and you do not need a credit card to start it. Add a card any time before the trial ends to keep your plan; the first payment is taken when the trial ends. If it ends without a card, your workspace is paused until you choose a plan. Your posts are kept, and your channels and team members are switched back on when you subscribe. Each email address gets one free trial.</p></div>
       <div><h3>Which channels can I connect?</h3><p>{AVAILABLE_NETWORKS.length} networks connect today, including YouTube, Bluesky, WordPress and Kick. Facebook, Instagram, TikTok, LinkedIn, X and others open as platform approvals come through. See <a href="/platforms">platform coverage</a>.</p></div>
       <div><h3>Can I change or cancel my plan?</h3><p>Workspace admins can change plan, update the payment method or cancel from <strong>Billing</strong> in the app. Cancellation takes effect at the end of the period you have already paid for.</p></div>
       <div><h3>What about AI and automation?</h3><p>AI features are off on every plan, and PostDelegate does not provide its own AI. Every plan includes the REST API and MCP server, so you can bring your own assistant.</p></div>
@@ -44,6 +45,8 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
   <CtaBand />
 </Base>
 <style>
+  .trial-note { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; color: #d6d6d6; font-size: 13px; font-weight: 600; }
+  .trial-note span { width: 7px; height: 7px; border-radius: 50%; background: #c8ff4d; }
   .pricing-questions { padding: 0 0 80px; background: var(--bg, #0d0d0d); }
   h2 { text-align: center; font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -.04em; margin-bottom: 36px; }
   .question-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 50px; max-width: 880px; margin: auto; }

@@ -1,6 +1,6 @@
 ---
 import Logo from './Logo.astro';
-import { SITE } from '../data/site';
+import { SITE, CTA_SHORT } from '../data/site';
 const groups = [
   { label: 'AI & workflows', links: [
     { label: 'AI agents', href: '/agents', description: 'Bring publishing to your AI workflow.' },
@@ -49,7 +49,8 @@ const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/'
       <a href="/pricing" class="nav-link" aria-current={path === '/pricing' ? 'page' : undefined}>Pricing</a>
       <a href="/docs" class="nav-link" aria-current={path === '/docs' || path.startsWith('/docs/') ? 'page' : undefined}>Docs</a>
     </nav>
-    <div class="desktop-actions"><a href={SITE.login} class="sign-in">Sign in</a><a href={SITE.signup} class="create-account">Create account <span aria-hidden="true">↗</span></a></div>
+    <div class="desktop-actions"><a href={SITE.login} class="sign-in">Sign in</a><a href={SITE.signup} class="create-account">{CTA_SHORT} <span aria-hidden="true">↗</span></a></div>
+    <a href={SITE.signup} class="mobile-cta">{CTA_SHORT}</a>
     <details class="mobile-menu" data-mobile-menu>
       <summary class="mobile-toggle" aria-label="Open navigation menu"><span class="menu-label">Menu</span><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14" /></svg></summary>
       <div class="mobile-panel">
@@ -58,7 +59,7 @@ const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/'
           <a class="mobile-direct" href="/pricing">Pricing</a>
           <a class="mobile-direct" href="/docs" aria-current={path === '/docs' || path.startsWith('/docs/') ? 'page' : undefined}>Docs</a>
         </nav>
-        <div class="mobile-actions"><a href={SITE.login} class="sign-in">Sign in</a><a href={SITE.signup} class="create-account">Create account <span aria-hidden="true">↗</span></a></div>
+        <div class="mobile-actions"><a href={SITE.login} class="sign-in">Sign in</a><a href={SITE.signup} class="create-account">{CTA_SHORT} <span aria-hidden="true">↗</span></a></div>
       </div>
     </details>
   </div>
@@ -71,10 +72,13 @@ const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/'
   summary{list-style:none}summary::-webkit-details-marker{display:none}.nav-dropdown{position:relative}.nav-dropdown>summary svg{transition:transform .2s}.nav-dropdown[open]>summary svg{transform:rotate(180deg)}.nav-dropdown:not([open])>.dropdown-panel,.mobile-menu:not([open])>.mobile-panel,.mobile-group:not([open])>div{display:none}
   .dropdown-panel{position:absolute;top:calc(100% + 10px);left:-22px;display:grid;width:290px;padding:10px;background:#171717;border:1px solid #303030;border-radius:18px;box-shadow:0 18px 50px #0008;max-height:calc(100dvh - 120px);overflow:auto}.dropdown-panel a{display:flex;flex-direction:column;gap:5px;border-radius:10px;padding:12px;color:#fff;font-size:13px;font-weight:600;text-decoration:none}.dropdown-panel a:hover,.dropdown-panel a:focus-visible{background:#262626}.dropdown-panel small{font-size:11px;font-weight:400;line-height:1.5;color:var(--muted,#a6a6a6)}.channels-dropdown .dropdown-panel{width:390px;grid-template-columns:1fr 1fr}.channels-dropdown .dropdown-panel a{min-height:44px;justify-content:center}
   .create-account{display:inline-flex;min-height:48px;align-items:center;justify-content:center;gap:12px;border:1px solid #fff;border-radius:999px;background:#fff;color:#111;padding:0 20px;font-size:14px;font-weight:650;text-decoration:none;transition:background .15s,transform .15s}.create-account:hover{background:#dedede;border-color:#dedede;transform:translateY(-1px)}.create-account span{font-size:17px;line-height:1}
-  .mobile-menu{display:none}.mobile-toggle{display:flex;align-items:center;justify-content:center;gap:9px;min-width:44px;min-height:44px;padding:0 12px;border:1px solid #333;border-radius:999px;cursor:pointer}.menu-label{font-size:12px}.mobile-panel{position:fixed;top:72px;left:0;right:0;max-height:calc(100dvh - 72px);overflow:auto;overscroll-behavior:contain;background:#111;border-bottom:1px solid #333;padding:18px 24px 28px;box-shadow:0 20px 30px #0007}.mobile-group{border-bottom:1px solid #2c2c2c}.mobile-group>summary,.mobile-direct{display:flex;min-height:55px;align-items:center;justify-content:space-between;color:#fff;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer}.mobile-group>summary span{font-size:20px;font-weight:400}.mobile-group[open]>summary span{transform:rotate(45deg)}.mobile-group>div{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;padding-bottom:14px}.mobile-group a{display:flex;min-height:44px;align-items:center;color:#b7b7b7;font-size:13px;text-decoration:none}.mobile-direct{border-bottom:1px solid #2c2c2c}.mobile-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:22px}.mobile-actions .create-account{flex:1;max-width:240px}
+  .mobile-menu{display:none}.mobile-cta{display:none;align-items:center;min-height:40px;margin-left:auto;padding:0 15px;border-radius:999px;background:#fff;color:#111;font-size:13px;font-weight:700;white-space:nowrap;text-decoration:none}.mobile-toggle{display:flex;align-items:center;justify-content:center;gap:9px;min-width:44px;min-height:44px;padding:0 12px;border:1px solid #333;border-radius:999px;cursor:pointer}.menu-label{font-size:12px}.mobile-panel{position:fixed;top:72px;left:0;right:0;max-height:calc(100dvh - 72px);overflow:auto;overscroll-behavior:contain;background:#111;border-bottom:1px solid #333;padding:18px 24px 28px;box-shadow:0 20px 30px #0007}.mobile-group{border-bottom:1px solid #2c2c2c}.mobile-group>summary,.mobile-direct{display:flex;min-height:55px;align-items:center;justify-content:space-between;color:#fff;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer}.mobile-group>summary span{font-size:20px;font-weight:400}.mobile-group[open]>summary span{transform:rotate(45deg)}.mobile-group>div{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;padding-bottom:14px}.mobile-group a{display:flex;min-height:44px;align-items:center;color:#b7b7b7;font-size:13px;text-decoration:none}.mobile-direct{border-bottom:1px solid #2c2c2c}.mobile-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:22px}.mobile-actions .create-account{flex:1;max-width:240px}
   :is(a,summary):focus-visible{outline:2px solid var(--accent,#7357ff);outline-offset:5px;border-radius:8px}
   @media(max-width:1120px){.header-inner{gap:18px}.desktop-nav{gap:15px;margin-left:0}.desktop-actions{gap:15px;margin-left:0}.create-account{padding-inline:16px}}
   @media(max-width:1020px){.header-inner{width:calc(100% - 40px);height:72px}.desktop-nav,.desktop-actions{display:none}.mobile-menu{display:block}}
+  @media(max-width:1020px){.header-inner{gap:10px}.mobile-cta{display:inline-flex}}
+  @media(max-width:420px){.menu-label{display:none}.mobile-toggle{padding:0 11px}.mobile-cta{padding:0 13px;font-size:12px}}
+  @media(max-width:340px){.mobile-cta{display:none}}
   @media(prefers-reduced-motion:reduce){.create-account,.nav-dropdown>summary svg{transition:none}}
 </style>
 <script>

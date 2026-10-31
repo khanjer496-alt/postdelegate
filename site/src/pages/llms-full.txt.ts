@@ -16,12 +16,12 @@ Support: ${SITE.email}
 Modified application source (AGPL-3.0): ${SITE.source}
 
 ## Early access
-Users can create a workspace. The workspace provides calendar, composer, media, team, publishing and automation features. Source availability does not establish that every feature or provider has been configured and verified in this hosted service.
+Anyone can start a 7-day free trial without a credit card. The workspace provides calendar, composer, media, team, publishing and automation features. Source availability does not establish that every feature or provider has been configured and verified in this hosted service.
 
 Channel connections are in rollout. Check the workspace or contact support for the account types and actions currently available. Google account sign-in does not by itself connect YouTube or Google Business Profile.
 
 ## Plans
-Prices are in US dollars. Every plan starts with a 7-day free trial that needs no credit card. A customer who adds a card before day 7 keeps the plan and the first payment is taken when the trial ends; without a card the workspace moves to the Free plan and scheduled posts pause. There is no permanent free tier. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
+Prices are in US dollars. Every plan starts with a 7-day free trial that needs no credit card. A customer who adds a card any time before the trial ends keeps the plan, and the first payment is taken when the trial ends. If the trial ends without a card, the workspace is paused until a plan is chosen: posts are kept, and channels and team members are switched back on when the customer subscribes. There is no permanent free tier. Each email address gets one free trial. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
 ${plans}
 
 ## Automation and AI
