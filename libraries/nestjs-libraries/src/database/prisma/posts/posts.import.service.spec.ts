@@ -280,6 +280,18 @@ describe('PostsImportService', () => {
     );
   });
 
+  it('saves the rows as the member importing, so approvals apply', async () => {
+    const { service, postsService } = make();
+    const actor = { type: 'user' as const, userId: 'u-1', role: 'USER' };
+    await service.import(
+      'org-1',
+      { csv: csv(['2026-11-03 09:30,Acme X,Hello,']), timezone: 'UTC' },
+      null,
+      actor
+    );
+    expect(postsService.createPost.mock.calls[0][4]).toBe(actor);
+  });
+
   it('returns the first result when the same file comes again', async () => {
     const { service, postsService, repo } = make();
     repo.claim.mockResolvedValueOnce({

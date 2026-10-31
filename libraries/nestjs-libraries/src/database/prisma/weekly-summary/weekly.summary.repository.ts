@@ -108,14 +108,14 @@ export class WeeklySummaryRepository {
     return {
       organizationId: orgId,
       state,
-      parentPostId: null,
-      deletedAt: null,
+      parentPostId: null as string | null,
+      deletedAt: null as Date | null,
       publishDate: {
         gte: from,
         lt: to,
       },
       integration: {
-        deletedAt: null,
+        deletedAt: null as Date | null,
       },
     };
   }
