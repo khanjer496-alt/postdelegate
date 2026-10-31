@@ -276,6 +276,21 @@ describe('PostsService approvals on save', () => {
     expect(output[0]).toMatchObject({ postId: 'p-1', approvalStatus: 'IN_REVIEW' });
   });
 
+  it('schedules a public API post that is not held, keeping its source and the guardrails', async () => {
+    const apiAgent = { type: 'agent' as const, source: 'Public API key', viaApi: true };
+    const { service, postRepository, policy } = makeApprovalService({ hold: false });
+    await service.createPost('org-1', body(), 'API', false, apiAgent);
+    expect(policy.assertAgentGuardrails).toHaveBeenCalledWith('org-1', apiAgent, ['i-1'], {
+      countsTowardLimit: true,
+    });
+    const call = postRepository.createOrUpdatePost.mock.calls[0];
+    expect(call[0]).toBe('schedule');
+    expect(call[call.length - 1]).toEqual({
+      approvalStatus: undefined,
+      agentSource: 'Public API key',
+    });
+  });
+
   it('keeps the old behaviour when nobody is passed (auto post, internal callers)', async () => {
     const { service, postRepository, policy } = makeApprovalService(undefined);
     await service.createPost('org-1', body(), 'AUTOPOST');

@@ -2043,8 +2043,11 @@ model ApprovalSettings {
   requireApproval            Boolean      @default(false)
   // Members who can approve besides the admins
   approverIds                String[]     @default([])
-  // Posts created by AI agents wait for an approver
+  // Posts created by AI agents (MCP clients, the in-app agent) wait for an
+  // approver
   requireAgentApproval       Boolean      @default(false)
+  // With requireAgentApproval, posts from the public API and the CLI wait too
+  requireApiApproval         Boolean      @default(false)
   // Channels agents may post to, empty means every channel
   agentIntegrationIds        String[]     @default([])
   // Posts agents may create per day (UTC), null means no limit

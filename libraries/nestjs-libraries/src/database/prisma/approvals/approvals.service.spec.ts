@@ -315,6 +315,7 @@ describe('ApprovalsService tenant scoping', () => {
       requireApproval: true,
       approverIds: ['u-member', 'u-from-other-org'],
       requireAgentApproval: true,
+      requireApiApproval: true,
       agentIntegrationIds: ['i-1', 'i-other-org'],
       agentMaxPostsPerDay: 10,
     };
@@ -327,6 +328,7 @@ describe('ApprovalsService tenant scoping', () => {
       requireApproval: true,
       approverIds: ['u-member'],
       requireAgentApproval: true,
+      requireApiApproval: true,
       agentIntegrationIds: ['i-1'],
       agentMaxPostsPerDay: 10,
     });

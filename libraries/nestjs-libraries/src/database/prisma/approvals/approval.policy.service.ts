@@ -18,10 +18,12 @@ import { escape } from 'lodash';
 dayjs.extend(utc);
 
 // Who is saving or acting on a post. Agents are MCP clients, the public API,
-// the CLI and the in-app agent; `source` says which one.
+// the CLI and the in-app agent; `source` says which one. `viaApi` marks the
+// public API and the CLI: their posts only count as AI-created for approval
+// when the workspace also asks for API approval.
 export type ApprovalActor =
   | { type: 'user'; userId: string; role?: string; name?: string }
-  | { type: 'agent'; source: string };
+  | { type: 'agent'; source: string; viaApi?: boolean };
 
 export type ApprovalSettingsView = ApprovalSettingsData;
 
@@ -54,6 +56,7 @@ export const DEFAULT_APPROVAL_SETTINGS: ApprovalSettingsView = {
   requireApproval: false,
   approverIds: [],
   requireAgentApproval: false,
+  requireApiApproval: false,
   agentIntegrationIds: [],
   agentMaxPostsPerDay: null,
 };
@@ -103,6 +106,7 @@ export class ApprovalPolicyService {
       requireApproval: row.requireApproval,
       approverIds: row.approverIds || [],
       requireAgentApproval: row.requireAgentApproval,
+      requireApiApproval: row.requireApiApproval,
       agentIntegrationIds: row.agentIntegrationIds || [],
       agentMaxPostsPerDay: row.agentMaxPostsPerDay ?? null,
     };
@@ -429,7 +433,8 @@ export const updateCanHold = (existing?: ExistingPost | null) => {
 };
 
 // The review rules, kept apart from the database so they read in one place.
-// - an agent's post waits when the workspace asks for agent approval
+// - an agent's post waits when the workspace asks for agent approval; posts
+//   from the public API and the CLI only when it asks for API approval too
 // - a member who can't approve waits when the workspace asks for approval,
 //   or when the post is already waiting
 // - an approver scheduling a waiting post approves it
@@ -442,7 +447,9 @@ export const decideApproval = (
   const waiting = !!previous && AWAITING.includes(previous);
   const hold =
     actor.type === 'agent'
-      ? settings.requireAgentApproval || waiting
+      ? (settings.requireAgentApproval &&
+          (!actor.viaApi || settings.requireApiApproval)) ||
+        waiting
       : !canApprove && (settings.requireApproval || waiting);
 
   if (hold) {
