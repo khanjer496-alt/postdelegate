@@ -208,7 +208,7 @@ const ConnectAiKey: FC = () => {
   const user = useUser();
 
   return (
-    <div className="bg-newBgColorInner p-[20px] flex flex-1 flex-col gap-[16px] items-center justify-center text-center">
+    <div className="bg-newBgColorInner p-[20px] mobile:p-[12px] flex flex-1 flex-col gap-[16px] items-center justify-center text-center">
       <h2 className="text-[20px] font-[500]">
         {t('agent_connect_key_title', 'Connect your OpenAI key to start')}
       </h2>
@@ -221,7 +221,7 @@ const ConnectAiKey: FC = () => {
       {user?.role !== 'USER' ? (
         <Link
           href="/settings?tab=ai"
-          className="text-white whitespace-nowrap pt-[12px] pb-[14px] ps-[16px] pe-[20px] min-h-[44px] rounded-md bg-btnPrimary flex justify-center items-center outline-none"
+          className="text-btnCtaText font-[600] whitespace-nowrap pt-[12px] pb-[14px] ps-[16px] pe-[20px] min-h-[44px] rounded-[10px] bg-btnCta shadow-cta hover:bg-btnCtaHover transition-colors flex justify-center items-center outline-none"
         >
           {t('agent_connect_key_button', 'Add your OpenAI key')}
         </Link>

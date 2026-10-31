@@ -1117,7 +1117,6 @@
   "channel_chars_count": "{{count}} of {{limit}} characters",
   "one_channel_needs_attention": "1 channel needs attention before scheduling",
   "channels_need_attention": "{{count}} channels need attention before scheduling",
-  "open_settings": "Open settings",
   "show_channel": "Show",
   "post_templates": "Post Templates",
   "template_save_failed": "Could not save the template",
