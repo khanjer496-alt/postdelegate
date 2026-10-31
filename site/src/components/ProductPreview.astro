@@ -28,7 +28,7 @@ const navigation = [
   <figcaption class="pp-browser"><span class="pp-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="pp-address">Your content, in one place</span><span class="pp-example"><i></i>Illustrative workspace</span></figcaption>
   <div class="pp-workspace" aria-hidden="true">
     <aside class="pp-sidebar">
-      <div class="pp-brand"><span class="pp-mark"><img src="/mark.svg" alt="" width="25" height="25"/></span><strong>PostDelegate<small>WORKSPACE</small></strong></div>
+      <div class="pp-brand"><span class="pp-mark"><img src="/mark.svg?v=orbit-slot" alt="" width="25" height="25"/></span><strong>PostDelegate<small>WORKSPACE</small></strong></div>
       <div class="pp-picker"><span>S</span><b>Studio workspace</b><i>⌄</i></div>
       <span class="pp-aside-label">YOUR STUDIO</span>
       <div class="pp-navigation">{navigation.map(({ name, path }) => <div class:list={['pp-nav', { 'pp-active': name === 'Calendar' }]}><svg viewBox="0 0 20 20"><path d={path} /></svg><span>{name}</span>{name === 'Calendar' && <i></i>}</div>)}</div>
