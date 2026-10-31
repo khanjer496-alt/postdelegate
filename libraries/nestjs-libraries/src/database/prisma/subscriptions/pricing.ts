@@ -129,7 +129,3 @@ export const pricing: PricingInterface = {
     clipping_minutes: 0,
   },
 };
-
-// AI is only available when the tier includes it AND an AI provider key is configured (backend only)
-export const isAiAvailable = (tier?: PricingInnerInterface) =>
-  !!tier?.ai && !!process.env.OPENAI_API_KEY;
