@@ -1,0 +1,139 @@
+process.env.JWT_SECRET = 'test-jwt-secret-for-ai-credentials';
+
+const modelsList = jest.fn();
+jest.mock('openai', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    models: { list: modelsList },
+  })),
+}));
+
+import { BadRequestException } from '@nestjs/common';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
+
+const KEY = 'sk-proj-xxxxxxxxxxxxxxxxxxxxa9F2';
+
+describe('AiCredentialService', () => {
+  let repository: {
+    getByOrg: jest.Mock;
+    upsert: jest.Mock;
+    deleteByOrg: jest.Mock;
+  };
+  let service: AiCredentialService;
+  const realEnvKey = process.env.OPENAI_API_KEY;
+
+  beforeEach(() => {
+    modelsList.mockReset().mockResolvedValue({ data: [] });
+    repository = {
+      getByOrg: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteByOrg: jest.fn().mockResolvedValue({ count: 1 }),
+    };
+    service = new AiCredentialService(repository as any);
+  });
+
+  afterEach(() => {
+    if (realEnvKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = realEnvKey;
+    }
+  });
+
+  it('saveCredential stores the encrypted key, not the plaintext', async () => {
+    await service.saveCredential('org-1', { provider: 'openai', apiKey: KEY });
+
+    expect(repository.upsert).toHaveBeenCalledTimes(1);
+    const [orgId, provider, stored] = repository.upsert.mock.calls[0];
+    expect(orgId).toBe('org-1');
+    expect(provider).toBe('openai');
+    expect(stored).toBe(AuthService.fixedEncryption(KEY));
+    expect(stored).not.toBe(KEY);
+    expect(stored).not.toContain(KEY);
+  });
+
+  it('saveCredential returns only the mask', async () => {
+    const result = await service.saveCredential('org-1', {
+      provider: 'openai',
+      apiKey: KEY,
+    });
+
+    expect(result).toEqual({ provider: 'openai', maskedKey: 'sk-…a9F2' });
+  });
+
+  it('saveCredential rejects a key OpenAI refuses', async () => {
+    modelsList.mockRejectedValue(new Error(`401 Incorrect API key ${KEY}`));
+
+    const attempt = service.saveCredential('org-1', {
+      provider: 'openai',
+      apiKey: KEY,
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+    await expect(attempt).rejects.toThrow(
+      "OpenAI rejected this key. Check it's an active API key with access to models."
+    );
+    await attempt.catch((err) => {
+      expect(String(err.message)).not.toContain(KEY);
+    });
+    expect(repository.upsert).not.toHaveBeenCalled();
+  });
+
+  it('getCredential returns the mask of the stored key', async () => {
+    repository.getByOrg.mockResolvedValue({
+      provider: 'openai',
+      apiKey: AuthService.fixedEncryption(KEY),
+    });
+
+    await expect(service.getCredential('org-1')).resolves.toEqual({
+      provider: 'openai',
+      maskedKey: 'sk-…a9F2',
+    });
+  });
+
+  it('getCredential returns null without a credential', async () => {
+    await expect(service.getCredential('org-1')).resolves.toBeNull();
+  });
+
+  it('hasCredential reflects whether a row exists', async () => {
+    await expect(service.hasCredential('org-1')).resolves.toBe(false);
+    repository.getByOrg.mockResolvedValue({
+      provider: 'openai',
+      apiKey: AuthService.fixedEncryption(KEY),
+    });
+    await expect(service.hasCredential('org-1')).resolves.toBe(true);
+  });
+
+  it('getOpenAiKey returns the decrypted key', async () => {
+    repository.getByOrg.mockResolvedValue({
+      provider: 'openai',
+      apiKey: AuthService.fixedEncryption(KEY),
+    });
+
+    await expect(service.getOpenAiKey('org-1')).resolves.toBe(KEY);
+  });
+
+  it('getOpenAiKey throws the missing-key error without a credential', async () => {
+    const attempt = service.getOpenAiKey('org-1');
+
+    await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+    await expect(attempt).rejects.toThrow(
+      'Add your OpenAI key in Settings → AI'
+    );
+  });
+
+  it('getOpenAiKey ignores process.env.OPENAI_API_KEY', async () => {
+    process.env.OPENAI_API_KEY = 'sk-env-yyyyyyyyyyyyyyyyyyyyyyyyyyyy';
+
+    await expect(service.getOpenAiKey('org-1')).rejects.toThrow(
+      'Add your OpenAI key in Settings → AI'
+    );
+  });
+
+  it('deleteCredential removes the row', async () => {
+    await service.deleteCredential('org-1');
+
+    expect(repository.deleteByOrg).toHaveBeenCalledWith('org-1');
+  });
+});

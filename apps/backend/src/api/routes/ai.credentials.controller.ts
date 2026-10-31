@@ -1,0 +1,38 @@
+import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Organization } from '@prisma/client';
+import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
+import { AiCredentialDto } from '@gitroom/nestjs-libraries/dtos/ai-credentials/ai.credential.dto';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+
+@ApiTags('AI Credentials')
+@Controller('/ai-credentials')
+export class AiCredentialsController {
+  constructor(private _aiCredentialService: AiCredentialService) {}
+
+  @Get('/')
+  getCredential(@GetOrgFromRequest() org: Organization) {
+    return this._aiCredentialService.getCredential(org.id);
+  }
+
+  @Post('/')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  saveCredential(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: AiCredentialDto
+  ) {
+    return this._aiCredentialService.saveCredential(org.id, body);
+  }
+
+  @Delete('/')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async deleteCredential(@GetOrgFromRequest() org: Organization) {
+    await this._aiCredentialService.deleteCredential(org.id);
+    return { deleted: true };
+  }
+}

@@ -36,6 +36,7 @@ import { WebhookController } from '@gitroom/backend/api/routes/webhooks.controll
 import { SignatureController } from '@gitroom/backend/api/routes/signature.controller';
 import { AutopostController } from '@gitroom/backend/api/routes/autopost.controller';
 import { SetsController } from '@gitroom/backend/api/routes/sets.controller';
+import { AiCredentialsController } from '@gitroom/backend/api/routes/ai.credentials.controller';
 import { ThirdPartyController } from '@gitroom/backend/api/routes/third-party.controller';
 import { MonitorController } from '@gitroom/backend/api/routes/monitor.controller';
 import { NoAuthIntegrationsController } from '@gitroom/backend/api/routes/no.auth.integrations.controller';
@@ -76,6 +77,7 @@ const authenticatedController = [
   AutopostController,
   SetsController,
   ThirdPartyController,
+  AiCredentialsController,
   OAuthAppController,
   ApprovedAppsController,
   OAuthAuthorizedController,
