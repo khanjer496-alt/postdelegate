@@ -221,7 +221,7 @@ export class AutopostService {
 
   async generateDescription(
     state: WorkflowChannelsState,
-    models?: AutopostModels
+    models: AutopostModels
   ) {
     if (!state.body.generateContent) {
       return {
@@ -239,8 +239,7 @@ export class AutopostService {
       };
     }
 
-    const structuredOutput =
-      models!.model.withStructuredOutput(generateContent);
+    const structuredOutput = models.model.withStructuredOutput(generateContent);
     const { socialMediaPostContent } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets raw 'description' of a content and generate a social media post content.
@@ -266,8 +265,8 @@ export class AutopostService {
     };
   }
 
-  async generatePicture(state: WorkflowChannelsState, models?: AutopostModels) {
-    const structuredOutput = models!.model.withStructuredOutput(dallePrompt);
+  async generatePicture(state: WorkflowChannelsState, models: AutopostModels) {
+    const structuredOutput = models.model.withStructuredOutput(dallePrompt);
     const { generatedTextToBeSentToDallE } =
       await ChatPromptTemplate.fromTemplate(
         `
@@ -282,7 +281,7 @@ export class AutopostService {
           content: state.load.description || state.description,
         });
 
-    const image = await models!.dalle.invoke(generatedTextToBeSentToDallE);
+    const image = await models.dalle.invoke(generatedTextToBeSentToDallE);
 
     return { ...state, image };
   }
@@ -389,6 +388,8 @@ export class AutopostService {
       return;
     }
 
+    // built once per run, and only when the run uses AI. Without AI the post
+    // keeps the autopost's own content and the picture step is never reached
     const models = needsAi
       ? await this.buildModels(getPost.organizationId)
       : undefined;
@@ -396,10 +397,12 @@ export class AutopostService {
     const state = AutopostService.state();
     const workflow = state
       .addNode('generate-description', (state) =>
-        this.generateDescription(state, models)
+        models
+          ? this.generateDescription(state, models)
+          : { ...state, description: state.body.content }
       )
       .addNode('generate-picture', (state) =>
-        this.generatePicture(state, models)
+        models ? this.generatePicture(state, models) : state
       )
       .addNode('schedule-post', this.schedulePost.bind(this))
       .addNode('update-url', this.updateUrl.bind(this))
