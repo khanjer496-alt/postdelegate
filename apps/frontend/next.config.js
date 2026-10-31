@@ -21,6 +21,7 @@ const nextConfig = {
     ];
   },
   reactStrictMode: false,
+  poweredByHeader: false,
   transpilePackages: ['crypto-hash'],
   // Enable production sourcemaps for Sentry
   productionBrowserSourceMaps: true,
