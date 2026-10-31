@@ -9,8 +9,8 @@
 /POSTDELEGATE-*.md export-ignore
 /GROK-*.md export-ignore
 /chatgpt-app-submission.json export-ignore
-/CLAUDE.md export-ignore
-/AGENTS.md export-ignore
+CLAUDE.md export-ignore
+AGENTS.md export-ignore
 /HANDOFF.md export-ignore
 /CODEX-*.md export-ignore
 /.claude export-ignore
