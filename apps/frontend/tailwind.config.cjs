@@ -91,7 +91,6 @@ module.exports = {
         btnCta: 'var(--new-btn-cta)',
         btnCtaHover: 'var(--new-btn-cta-hover)',
         btnCtaText: 'var(--new-btn-cta-text)',
-        orbitDot: 'var(--new-orbit-dot)',
         ai: 'var(--new-ai-btn)',
         boxHover: 'var(--new-box-hover)',
         newTableBorder: 'var(--new-table-border)',
@@ -127,7 +126,7 @@ module.exports = {
       },
       fontFamily: {
         sans: [
-          'var(--font-jakarta)',
+          'var(--font-jakarta, ui-sans-serif)',
           'ui-sans-serif',
           'system-ui',
           'sans-serif',

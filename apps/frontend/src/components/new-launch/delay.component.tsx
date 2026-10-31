@@ -103,7 +103,7 @@ export const DelayComponent: FC<{
                 key={option.value}
                 className={clsx(
                   'h-[32px] flex items-center justify-center rounded-[4px] cursor-pointer hover:bg-newBgColor text-[13px]',
-                  currentDelay === option.value && 'bg-[#7357ff] text-white hover:bg-[#7357ff]'
+                  currentDelay === option.value && 'bg-btnPrimary text-white hover:!bg-btnPrimary'
                 )}
               >
                 {option.label}

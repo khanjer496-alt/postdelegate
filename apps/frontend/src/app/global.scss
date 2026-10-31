@@ -20,7 +20,7 @@ body {
 
 ::selection {
   color: #ffffff;
-  background: #7357ff;
+  background: var(--new-btn-primary);
 }
 
 /* PostDelegate orbit loader (components/layout/loading.tsx and the shared Button) */
@@ -452,7 +452,7 @@ body * {
   -webkit-text-fill-color: white !important;
 }
 div div .set-font-family {
-  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif !important;
+  font-family: var(--font-jakarta, ui-sans-serif), system-ui, sans-serif !important;
   font-stretch: 100% !important;
   font-style: normal !important;
   font-weight: 400 !important;
