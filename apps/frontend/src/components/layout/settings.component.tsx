@@ -36,6 +36,9 @@ import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
 import { AffiliatesComponent } from '@gitroom/frontend/components/affiliates/affiliates.component';
 import { openReviewModal } from '@gitroom/frontend/components/reviews/review.form';
+import { ApprovalsSettings } from '@gitroom/frontend/components/approvals/approvals.settings';
+import { WorkspaceActivity } from '@gitroom/frontend/components/approvals/workspace.activity';
+import { useApprovalSettings } from '@gitroom/frontend/components/approvals/approvals.hooks';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -45,6 +48,8 @@ export const SettingsPopup: FC<{
   const toast = useToaster();
   const swr = useSWRConfig();
   const user = useUser();
+  // the workspace history names clients, approvers only
+  const { data: approvalSettings } = useApprovalSettings();
   const resolver = useMemo(() => {
     return classValidatorResolver(UserDetailDto);
   }, []);
@@ -96,6 +101,12 @@ export const SettingsPopup: FC<{
     if (user?.tier?.team_members && isGeneral && user?.role !== 'USER') {
       arr.push({ tab: 'teams', label: t('teams', 'Teams') });
     }
+    if (user?.role !== 'USER') {
+      arr.push({ tab: 'approvals', label: t('approval_settings_title', 'Approvals') });
+    }
+    if (approvalSettings?.canApprove) {
+      arr.push({ tab: 'activity', label: t('activity_title', 'Activity') });
+    }
     if (user?.tier?.webhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks') });
     }
@@ -115,7 +126,7 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'affiliates', label: t('affiliates', 'Affiliates') });
 
     return arr;
-  }, [user, isGeneral, showLogout, t]);
+  }, [user, isGeneral, showLogout, t, approvalSettings?.canApprove]);
 
   const [tab, setTab] = useState(() => {
     const requested = url.get('tab');
@@ -215,6 +226,18 @@ export const SettingsPopup: FC<{
                     <TeamsComponent />
                   </div>
                 )}
+
+              {tab === 'approvals' && user?.role !== 'USER' && (
+                <div>
+                  <ApprovalsSettings />
+                </div>
+              )}
+
+              {tab === 'activity' && !!approvalSettings?.canApprove && (
+                <div>
+                  <WorkspaceActivity />
+                </div>
+              )}
 
               {tab === 'webhooks' && !!user?.tier?.webhooks && (
                 <div>

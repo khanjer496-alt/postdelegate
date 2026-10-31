@@ -7,6 +7,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MenuItem } from '@gitroom/frontend/components/new-layout/menu-item';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { openReviewModal } from '@gitroom/frontend/components/reviews/review.form';
+import { useReviewCount } from '@gitroom/frontend/components/approvals/approvals.hooks';
 
 interface MenuItemInterface {
   name: string;
@@ -46,6 +47,28 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/launches',
+    },
+    {
+      name: t('approval_menu', 'Approvals'),
+      title: t('approval_menu_title', 'Posts waiting for approval'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="21"
+          height="21"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <path
+            d="M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      path: '/review',
     },
     {
       name: 'Agent',
@@ -262,6 +285,7 @@ export const useMenuItem = () => {
 export const TopMenu: FC = () => {
   const user = useUser();
   const { firstMenu, secondMenu } = useMenuItem();
+  const { data: reviewCount } = useReviewCount();
   const { isGeneral, billingEnabled } = useVariables();
   return (
     <>
@@ -298,6 +322,9 @@ export const TopMenu: FC = () => {
                   icon={item.icon}
                   key={item.name}
                   onClick={item.onClick}
+                  badge={
+                    item.path === '/review' ? reviewCount?.count : undefined
+                  }
                 />
               ))
         }
