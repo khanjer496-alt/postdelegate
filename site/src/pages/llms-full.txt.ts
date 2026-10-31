@@ -21,7 +21,7 @@ Anyone can start a 7-day free trial without a credit card. The workspace provide
 Channel connections are in rollout. Check the workspace or contact support for the account types and actions currently available. Google account sign-in does not by itself connect YouTube or Google Business Profile.
 
 ## Plans
-Prices are in US dollars. Every plan starts with a 7-day free trial that needs no credit card. A customer who adds a card any time before the trial ends keeps the plan, and the first payment is taken when the trial ends. If the trial ends without a card, the workspace is paused until a plan is chosen: posts are kept, and channels and team members are switched back on when the customer subscribes. There is no permanent free tier. Each email address gets one free trial. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
+Prices are in US dollars. Every plan starts with a 7-day free trial that needs no credit card. A customer who adds a card any time before the trial ends keeps the plan, and the first payment is taken when the trial ends. If the trial ends without a card, the workspace is paused until a plan is chosen: posts are kept, and channels and team members are switched back on when the customer subscribes to a plan that includes them. There is no permanent free tier. Each email address gets one free trial. Details: ${SITE.url}/pricing and ${SITE.url}/docs/billing.
 ${plans}
 
 ## Automation and AI

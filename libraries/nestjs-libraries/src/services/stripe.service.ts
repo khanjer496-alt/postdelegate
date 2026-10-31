@@ -191,6 +191,11 @@ export class StripeService extends PaymentProviderAbstract {
       return false;
     }
 
+    // only a trial needs the card checked, a paid subscription already charged it
+    if (event.data.object.status !== 'trialing') {
+      return true;
+    }
+
     const getOrgFromCustomer =
       await this._organizationService.getOrgByCustomerId(
         event.data.object.customer as string
@@ -473,14 +478,16 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
-  // Canceled by Stripe at the end of a trial that had no card
+  // Canceled by Stripe at the end of a trial that had no card, not a paid
+  // subscription that started as one and was canceled later
   private isCardlessTrialEnded(subscription: Stripe.Subscription) {
     return (
       subscription.trial_settings?.end_behavior?.missing_payment_method ===
         'cancel' &&
       !!subscription.trial_end &&
       !!subscription.ended_at &&
-      subscription.ended_at >= subscription.trial_end
+      subscription.ended_at >= subscription.trial_end &&
+      subscription.ended_at - subscription.trial_end < 3600
     );
   }
 

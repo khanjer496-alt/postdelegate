@@ -500,6 +500,7 @@ export const MainBillingComponent: FC<{
 
   useEffect(() => {
     if (queryParams.get('card') === 'added') {
+      router.replace('/billing');
       toast.show(
         t(
           'billing_card_added',
@@ -899,7 +900,7 @@ export const MainBillingComponent: FC<{
 
   return (
     <div className="flex flex-col gap-[24px]">
-      {finishTrial && renewal && !renewal.needsPaymentMethod && (
+      {finishTrial && renewal?.needsPaymentMethod !== true && (
         <FinishTrial
           close={() => {
             setFinishTrial(false);

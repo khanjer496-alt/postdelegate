@@ -81,7 +81,7 @@ const features=[
     <div class="container">
       <div class="trial-heading"><span class="eyebrow">How the free trial works</span><h2 class="section-heading" id="trial-title">Seven days to see<br/>if it <span class="ink-underline">fits.<Doodles kind="underline"/></span></h2></div>
       <ol class="trial-steps">{trialSteps.map((step,i)=><li><span class="step-number" aria-hidden="true">0{i+1}</span><h3>{step.title}</h3><p>{step.text}</p></li>)}</ol>
-      <div class="trial-footer"><a class="button" href={SITE.signup}>{CTA_SHORT} <span aria-hidden="true">↗</span></a><p>No card when the trial ends? Your workspace pauses until you choose a plan. Your posts are kept, and channels and team members switch back on when you subscribe. One trial per email.</p></div>
+      <div class="trial-footer"><a class="button" href={SITE.signup}>{CTA_SHORT} <span aria-hidden="true">↗</span></a><p>No card when the trial ends? Your workspace pauses until you choose a plan. Your posts are kept, and channels and team members switch back on with a plan that includes them. One trial per email.</p></div>
     </div>
   </section>
   <section class="audience-section section" aria-labelledby="audience-title"><div class="container"><h2 class="section-heading" id="audience-title">Who is PostDelegate for?</h2><div class="audience-grid">{audiences.map(a=><article><svg viewBox="0 0 24 24" fill="none" stroke={a.color} stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={a.shape}/></svg><h3>{a.title}</h3><p>{a.copy}</p></article>)}</div></div></section>

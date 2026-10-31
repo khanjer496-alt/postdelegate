@@ -11,6 +11,8 @@ import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/emai
 import { TimezoneDto } from '@gitroom/nestjs-libraries/dtos/users/timezone.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
+const hash = (value: string) => createHash('md5').update(value).digest('hex');
+
 @Injectable()
 export class UsersRepository {
   constructor(
@@ -168,9 +170,6 @@ export class UsersRepository {
       return null;
     }
 
-    const hash = (value: string) =>
-      createHash('md5').update(value).digest('hex');
-
     return this._user.model.user.findFirst({
       where: {
         OR: owners.flatMap(({ email }) => [
@@ -219,9 +218,6 @@ export class UsersRepository {
     if (!user || user.deletedAt) {
       return;
     }
-
-    const hash = (value: string) =>
-      createHash('md5').update(value).digest('hex');
 
     // Hash the identifying fields instead of removing the row, the random
     // suffix keeps [email, providerName] unique if the same email is deleted

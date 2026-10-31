@@ -734,6 +734,29 @@ describe('StripeService cardless trial', () => {
     expect(notificationService.inAppNotification).not.toHaveBeenCalled();
   });
 
+  it('does not send the trial ended notice when a converted subscription is canceled later', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.deleted', {
+        status: 'canceled',
+        trial_end: 1793664000,
+        ended_at: 1793664000 + 90 * 86400,
+        ...cardless,
+      })
+    );
+
+    expect(subscriptionService.deleteSubscription).toHaveBeenCalled();
+    expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not run the card check on a paid subscription', async () => {
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.updated', { status: 'active' })
+    );
+
+    expect(mockStripe.paymentMethods.list).not.toHaveBeenCalled();
+    expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalled();
+  });
+
   it('does not end a trial early before a card was added', async () => {
     mockStripe.subscriptions.list.mockResolvedValue({
       data: [

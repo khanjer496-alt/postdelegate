@@ -14,7 +14,7 @@ PostDelegate is a hosted social media scheduler. You write a post once, pick the
 
 ## 1. Start your free trial
 
-Signing up starts a 7-day free trial. No credit card is needed. Add one any time before the trial ends to keep your plan; see [Plans and billing](/docs/billing) for what happens when the trial ends.
+After signing up, pick a plan and start your 7-day free trial. No credit card is needed. Add one any time before the trial ends to keep your plan; see [Plans and billing](/docs/billing) for what happens when the trial ends.
 
 1. Open [app.postdelegate.com](https://app.postdelegate.com/auth).
 2. Create an account with your email, a password and your company name (it becomes your workspace name, at least 3 characters), or use Google sign-in. If your account needs email activation, open the link in the message we send you.
