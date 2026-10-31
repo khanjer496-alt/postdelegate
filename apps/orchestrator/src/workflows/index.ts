@@ -13,6 +13,7 @@ export * from './post-workflows/post.workflow.v1.1.2';
 export * from './autopost.workflow';
 export * from './digest.email.workflow';
 export * from './digest.email.workflow.v2';
+export * from './digest.email.workflow.v3';
 export * from './missing.post.workflow';
 export * from './send.email.workflow';
 export * from './refresh.token.workflow';

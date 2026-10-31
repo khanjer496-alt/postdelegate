@@ -259,6 +259,8 @@ export interface SocialProvider
   // the calendar label of a published post when these settings did not make it
   // public, e.g. media sent to an inbox to finish in the app
   publishedLabel?(settings: any): string | undefined;
+  // the label of the link to such a post, e.g. in the digest email
+  publishedLinkLabel?(settings: any): string | undefined;
   dto?: any;
   maxLength: (additionalSettings?: any, settings?: any) => number;
   checkValidity(
