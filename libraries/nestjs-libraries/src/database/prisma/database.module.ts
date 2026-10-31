@@ -60,6 +60,11 @@ import { ActivationRepository } from '@gitroom/nestjs-libraries/database/prisma/
 import { ActivationService } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.service';
 import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
+import { ActivityLogRepository } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.repository';
+import { ActivityLogService } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.service';
+import { ApprovalsRepository } from '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.repository';
+import { ApprovalPolicyService } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
+import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.service';
 
 @Global()
 @Module({
@@ -129,6 +134,11 @@ import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-librar
     ActivationRepository,
     ActivationService,
     LoginLockoutService,
+    ActivityLogRepository,
+    ActivityLogService,
+    ApprovalsRepository,
+    ApprovalPolicyService,
+    ApprovalsService,
   ],
   get exports() {
     return this.providers;

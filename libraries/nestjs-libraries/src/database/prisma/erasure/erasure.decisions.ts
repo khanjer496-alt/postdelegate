@@ -168,4 +168,16 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     note: 'deleted (text, displayName, roleCompany)',
   },
   ReviewPrompt: { scope: 'user', note: 'deleted' },
+  ApprovalSettings: {
+    scope: 'org',
+    note: 'deleted; approverIds may name the person, the row goes with the organization',
+  },
+  ApprovalLink: {
+    scope: 'org+user',
+    note: 'deleted with the organization (token hash, post ids); in shared organizations createdById is cleared',
+  },
+  ActivityLog: {
+    scope: 'org+user',
+    note: 'deleted with the organization; in shared organizations the rows the person acted on keep the action but lose actorUserId and actorName. Client names and emails typed on a share link go with the organization',
+  },
 };
