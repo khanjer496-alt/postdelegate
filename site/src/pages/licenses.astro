@@ -1,0 +1,19 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+---
+<Doc title="Licenses and source code — PostDelegate" description="The open-source licenses that cover the PostDelegate application and website, with links to the source code." h1="Open source, with the source to prove it." eyebrow="Licenses" lead="Where to find the source for the PostDelegate application and this website, and the licenses that cover them." cta={false}>
+  <a slot="actions" href={SITE.source} class="button">App source code</a>
+  <a slot="actions" href="/website-source.tar.gz" class="button button-outline">Website source code</a>
+  <h2>The PostDelegate application</h2>
+  <p>The application at <a href={SITE.app}>{SITE.app}</a> is a modified version of <a href={SITE.upstream} target="_blank" rel="noreferrer">Postiz</a> and is licensed under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noreferrer">GNU Affero General Public License v3.0</a> (AGPL-3.0). The complete corresponding source for the version we run is available from the <a href={SITE.source}>app source download</a>, which is also linked inside the app.</p>
+  <h2>This website</h2>
+  <p>The source of postdelegate.com is supplied under the GNU Affero General Public License v3.0. Download it as <a href="/website-source.tar.gz">website-source.tar.gz</a>; the archive includes the full license text in its LICENSE file.</p>
+  <h2>Third-party material</h2>
+  <ul>
+    <li>Plus Jakarta Sans is redistributed under the <a href="/fonts/OFL.txt">SIL Open Font License 1.1</a>.</li>
+    <li>Network glyphs are generated from <a href="https://simpleicons.org" target="_blank" rel="noreferrer">Simple Icons</a> (CC0). Network names and logos identify their respective services and imply no endorsement.</li>
+  </ul>
+  <h2>Questions</h2>
+  <p>Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a> if a download does not work or you need the source for a specific version.</p>
+</Doc>
