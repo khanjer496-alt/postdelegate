@@ -64,7 +64,6 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/agents',
-      requireAi: true,
     },
     {
       name: t('analytics', 'Analytics'),

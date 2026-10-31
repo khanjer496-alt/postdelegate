@@ -158,8 +158,9 @@ pattern for third-party API keys. The mask is computed on read by decrypting and
    dynamic Mastra `model` function resolves the org from `requestContext.get('organization')`, then falls back
    to the async-storage `getAuth()` org (`chat/async.storage.ts`), then throws the "Add your OpenAI key" error.
    Memory `generateTitle` uses the same dynamic model. That's fine.
-3. **Agent page:** no frontend change. It stays hidden and redirects when `!aiAvailable`, as it does today. The
-   Settings → AI tab is the only entry point. Drop the `agent.tsx` row from this design.
+3. **Agent page:** shown in the menu for every workspace (owner's call, 31 Oct 2026). Without a key it shows a
+   "Connect your OpenAI key to start" empty state: admins get a button to Settings → AI, and members are told to ask
+   their workspace admin. With a key it works as before. Every other AI button stays hidden until a key exists.
 4. **Plan feature flags** (`image_generator`, `autoPost`, `clipping_minutes`, `generate_videos`) stay as they
    are. "AI on for every plan" means only the `Sections.AI` / `aiAvailable` gate. Plan features keep their own
    flags.
