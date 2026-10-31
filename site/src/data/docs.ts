@@ -11,6 +11,16 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Team and customers', href: '/docs/team', description: 'Invite team members and group channels by customer.' },
     { title: 'Plans and billing', href: '/docs/billing', description: 'Plan information, the trial and how cancellation works.' },
   ] },
+  { title: 'Plan and review', items: [
+    { title: 'Approvals and client review', href: '/docs/approvals', description: 'Review statuses, client approval links, the Approvals inbox and guardrails for AI agents.' },
+    { title: 'Bulk import from CSV', href: '/docs/bulk-import', description: 'Schedule up to 200 posts at once from a spreadsheet.' },
+    { title: 'Evergreen posts', href: '/docs/evergreen', description: 'Share a post again on a schedule with rotating wordings.' },
+    { title: 'Campaigns and ideas', href: '/docs/campaigns', description: 'Campaigns, content pillars, tags and the ideas board.' },
+  ] },
+  { title: 'Analytics and AI', items: [
+    { title: 'Analytics and reports', href: '/docs/analytics', description: 'Daily history, trends, top posts, insights, reports and the weekly summary email.' },
+    { title: 'AI in PostDelegate', href: '/docs/ai', description: 'Bring your own OpenAI key for AI writing, the Agent and images.' },
+  ] },
   { title: 'Connect channels', items: [
     { title: 'Channels overview', href: '/docs/channels', description: 'What you can connect today and how connections work.' },
     { title: 'YouTube', href: '/docs/channels/youtube', description: 'Connect a YouTube channel with Google sign-in.' },

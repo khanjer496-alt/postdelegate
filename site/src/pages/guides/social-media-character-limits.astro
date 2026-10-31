@@ -1,0 +1,91 @@
+---
+import Guide from '../../layouts/Guide.astro';
+import { NETWORKS } from '../../data/networks';
+// The table is built from NETWORKS, the same data the caption checker uses, so the two never disagree.
+const frontmatter = {
+  title: 'Social media character limits in 2026',
+  metaTitle: 'Social Media Character Limits in 2026 | PostDelegate',
+  description: 'A table of social media character limits for every network, how each one counts characters, and why the platform has the last word on the final post.',
+  date: '2026-11-01',
+};
+const counted: Record<string, string> = {
+  codepoints: 'Unicode characters',
+  utf16: 'UTF-16 units, so some emoji count as 2',
+  utf8_bytes: 'UTF-8 bytes, so non-Latin text uses more',
+  graphemes: 'Graphemes, so an emoji or a flag counts as 1',
+  codepoints_emoji_bytes: 'Characters, with each emoji counted by its UTF-8 byte length',
+  weighted: 'Weighted: most Latin letters 1, many others and emoji 2',
+};
+const assessed = NETWORKS.filter((network) => network.limit > 0);
+const unassessed = NETWORKS.filter((network) => network.limit === 0);
+const notes = (network: typeof NETWORKS[number]) => [network.note, network.urlCost ? `Every link counts as ${network.urlCost}.` : '', network.noMentionDomain ? 'A remote mention counts as just @user.' : ''].filter(Boolean).join(' ');
+const status = (network: typeof NETWORKS[number]) => network.available ? 'Connect today' : 'Coming soon';
+const list = (items: string[]) => items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+---
+<Guide frontmatter={frontmatter}>
+  <p>Every network decides how much text a post can hold, and they disagree. A caption that fits on LinkedIn will be cut off on Bluesky, and a post written for X may be shorter than it needs to be anywhere else. Knowing the numbers up front saves rewrites at the last minute. This page lists the limits PostDelegate uses for planning, explains how each network counts characters and shows how to write once and fit everywhere.</p>
+  <aside class="doc-note"><strong>The platform has the last word.</strong> These are planning estimates, the same ones the <a href="/tools/caption-checker">caption checker</a> uses. Each platform validates the final post, and its rules can change. Confirm the actual post in the composer before it goes out.</aside>
+
+  <h2>Character limits by network</h2>
+  <p>The table lists every network in the PostDelegate directory that has an assessed limit. The last column shows whether you can connect the network today. A network that is coming soon has a limit listed for planning but cannot be connected yet.</p>
+  <table>
+    <thead><tr><th>Network</th><th>Limit</th><th>Counted as</th><th>Notes</th><th>On PostDelegate</th></tr></thead>
+    <tbody>
+      {assessed.map((network) => (
+        <tr>
+          <td><strong>{network.scheduler ? <a href={`/${network.scheduler}`}>{network.name}</a> : network.name}</strong></td>
+          <td>{network.limit.toLocaleString('en-US')}</td>
+          <td>{counted[network.unit] ?? network.unit}</td>
+          <td>{notes(network)}</td>
+          <td>{status(network)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  {unassessed.length > 0 && <p>{list(unassessed.map((network) => network.name))} are in the directory but have no assessed limit yet, so they are left out of the table.</p>}
+
+  <h2>Why the same text counts differently</h2>
+  <p>A character is not one thing. The same sentence can have a different length depending on what the network counts, and emoji and non-Latin scripts are where the gaps show up.</p>
+  <ul>
+    <li><strong>Unicode characters.</strong> The plainest count: one per character. Most networks in the table use it.</li>
+    <li><strong>Graphemes.</strong> What a reader sees as one character. Bluesky counts this way, so an emoji or a flag is 1 even when it is built from several pieces underneath.</li>
+    <li><strong>UTF-16 units.</strong> TikTok counts this way, so some emoji count as 2.</li>
+    <li><strong>UTF-8 bytes.</strong> YouTube and Farcaster count bytes, so accented letters and non-Latin scripts use more than one unit each.</li>
+    <li><strong>Emoji by byte length.</strong> Threads counts an emoji as its UTF-8 byte length, so a post heavy with emoji fills up faster.</li>
+    <li><strong>Weighted.</strong> X weights characters: most Latin letters count 1, many others and emoji count 2, and every link counts as 23.</li>
+    <li><strong>Fixed-cost links.</strong> Mastodon counts every link as 23, however long the address, and a remote mention counts as just the user name.</li>
+  </ul>
+  <p>If you write in a language other than English, or use a lot of emoji, leave extra room. Test the real text, not an estimate from an English sentence.</p>
+
+  <h2>Short-form and long-form networks</h2>
+  <p>The limits fall into two groups, and it helps to plan for each.</p>
+  <h3>Short posts</h3>
+  <p>Networks such as X, Bluesky, Threads, Mastodon, Farcaster, Twitch and Kick sit between 280 and 500 characters in the table. For these, write the shortest version of your idea first. If the idea does not fit, a thread may be a better format. On Bluesky, Kick and Twitch you can add more entries to a post with <strong>Add post in a thread</strong>, which publishes the follow-ups as replies. See <a href="/guides/schedule-bluesky-posts">how to schedule Bluesky posts and threads</a>.</p>
+  <h3>Captions and descriptions</h3>
+  <p>Instagram, TikTok, Google Business Profile, LinkedIn, Discord, Telegram, YouTube, Dribbble and Slack sit between 1,500 and 5,000 characters. The limit is rarely the problem. The practical problem is that most readers see only the first lines, so put the point there.</p>
+  <h3>Articles and newsletters</h3>
+  <p>Article networks such as DEV.to, Medium, Hashnode and WordPress, and email through Listmonk, have limits of 10,000 characters or more. For these, the number in the table is a planning ceiling. The composer in your workspace and the platform enforce the real rule, and each channel has its own required fields, such as a title or a tag. See the <a href="/docs/channels">channel guides</a>, or <a href="/guides/cross-post-blog-articles">cross-post articles with canonical URLs</a>.</p>
+
+  <h2>Write once, fit everywhere</h2>
+  <ol>
+    <li><strong>Write for the tightest network first.</strong> If the same post goes to Bluesky and Instagram, write the Bluesky version, then add detail for Instagram.</li>
+    <li><strong>Put links last.</strong> A link that costs 23 on X or Mastodon is easier to budget when it is the final item.</li>
+    <li><strong>Check the real text.</strong> Paste the finished caption into the <a href="/tools/caption-checker">caption checker</a>. It shows the count for each network at once, and it runs in your browser, so the text is not sent or saved.</li>
+    <li><strong>Adjust per channel.</strong> In the PostDelegate composer you write the content once and then adjust it for each channel. Each channel keeps its own settings, and the composer counts as you type.</li>
+    <li><strong>Read the error if one appears.</strong> A post that is too long is rejected with a readable message, and the API returns the same checks as a <code>400</code> error.</li>
+  </ol>
+
+  <h2>Using an assistant to fit the limits</h2>
+  <p>An AI assistant is useful for trimming. When Claude or ChatGPT is connected to PostDelegate over MCP, it reads each channel's length limit and required settings before it creates a post, so you can ask for one idea in the right length for each channel and get drafts you can review. Ask for drafts, and check each one in the calendar. See <a href="/guides/schedule-social-media-posts-with-claude">scheduling with Claude</a> and <a href="/guides/schedule-social-media-posts-with-chatgpt">scheduling with ChatGPT</a>.</p>
+
+  <h2>What this table is not</h2>
+  <ul>
+    <li>It is not a promise that a post under the limit will be accepted. Networks can also reject a post for content, media or account reasons.</li>
+    <li>It does not cover media limits. File formats and sizes are in the <a href="/docs/media">media guide</a>.</li>
+    <li>It does not mean every listed network is open. Only the ones marked Connect today can be connected.</li>
+  </ul>
+
+  <h2>Next steps</h2>
+  <p>Open the <a href="/tools/caption-checker">caption checker</a> with your next post, then plan it on the calendar. The <a href="/platforms">platform directory</a> shows which networks you can connect today, and the <a href="/docs/posts">scheduling guide</a> covers drafts, scheduling and repeats.</p>
+  <p>Ready to plan your posts? <a href="https://app.postdelegate.com/auth">Start your 7-day free trial</a>. No credit card is required.</p>
+</Guide>
