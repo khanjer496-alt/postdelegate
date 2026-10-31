@@ -1,9 +1,9 @@
 ---
 import Doc from '../../layouts/Doc.astro';
-import { SITE } from '../../data/site';
+import { SITE, CTA_LABEL } from '../../data/site';
 ---
 <Doc title="Built on Postiz — PostDelegate" description="PostDelegate is built on the open-source Postiz publishing platform. Learn how the project and hosted services differ." h1="Built on Postiz. Operated as PostDelegate." eyebrow="Our foundation" lead="The open-source Postiz project provides the publishing foundation for our independently operated service.">
-  <a slot="actions" href={SITE.signup} class="button">Create a workspace</a>
+  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://github.com/gitroomhq/postiz-app" class="button button-outline" target="_blank" rel="noreferrer">Visit the upstream project</a>
   <h2>The shared foundation</h2>
   <p>PostDelegate uses a modified version of Postiz for its calendar, composer, media and publishing workflows. Its open-source architecture gives us a substantial foundation for the service we operate.</p>

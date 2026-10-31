@@ -27,6 +27,9 @@ import useCookie from 'react-use-cookie';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import { DeveloperIconComponent } from '@gitroom/frontend/components/developer/developer.icon.component';
 import { InvoicesComponent } from '@gitroom/frontend/components/layout/invoices.component';
+import { Button } from '@gitroom/react/form/button';
+import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import { useUtmUrl } from '@gitroom/helpers/utils/utm.saver';
 
 const ModeComponent = dynamic(
   () => import('@gitroom/frontend/components/layout/mode.component'),
@@ -44,6 +47,108 @@ const EmbeddedBilling = dynamic(
     ssr: false,
   }
 );
+
+// Starts the free trial without a card, then waits for it on the calendar
+// like a finished checkout does
+export const useStartTrial = () => {
+  const fetch = useFetch();
+  const { mutate } = useSWRConfig();
+  const t = useT();
+  const dub = useDubClickId();
+  const utm = useUtmUrl();
+  const [datafast_visitor_id] = useCookie('datafast_visitor_id', '');
+  const [datafast_session_id] = useCookie('datafast_session_id', '');
+  const [fbc] = useCookie('_fbc', '');
+  const [fbp] = useCookie('_fbp', '');
+
+  return useCallback(
+    async (billing: string, period: string) => {
+      const { id, blocked, trialUsed, subscribed } = await (
+        await fetch('/billing/start-trial', {
+          method: 'POST',
+          body: JSON.stringify({
+            billing,
+            period,
+            ...(utm ? { utm } : {}),
+            ...(datafast_visitor_id && datafast_session_id
+              ? { datafast_visitor_id, datafast_session_id }
+              : {}),
+            ...(dub ? { dub } : {}),
+            ...(fbc ? { fbc } : {}),
+            ...(fbp ? { fbp } : {}),
+          }),
+        })
+      ).json();
+
+      if (id) {
+        window.location.href = `/launches?onboarding=true&trialStart=true&check=${id}${
+          utm ? `&utm_source=${utm}` : ''
+        }`;
+        return;
+      }
+
+      await deleteDialog(
+        blocked
+          ? t(
+              'billing_other_account_subscribed',
+              'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
+            )
+          : trialUsed
+          ? t(
+              'billing_trial_already_used',
+              'This email already had a free trial. Choose a plan to continue.'
+            )
+          : subscribed
+          ? t(
+              'billing_workspace_already_subscribed',
+              'This workspace already has a plan.'
+            )
+          : t('billing_trial_failed', 'We could not start your free trial'),
+        t('ok', 'OK'),
+        t('trial', 'Trial')
+      );
+      mutate('/user/self');
+    },
+    [utm, dub, fbc, fbp, datafast_visitor_id, datafast_session_id]
+  );
+};
+
+const StartTrial: FC<{ tier: string; period: string }> = ({ tier, period }) => {
+  const t = useT();
+  const startTrial = useStartTrial();
+  const [loading, setLoading] = useState(false);
+
+  const start = useCallback(async () => {
+    setLoading(true);
+    try {
+      await startTrial(tier, period);
+    } finally {
+      setLoading(false);
+    }
+  }, [tier, period, startTrial]);
+
+  return (
+    <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor flex flex-col gap-[16px]">
+      <div className="text-[24px] font-[700]">
+        {t('billing_start_free_trial_title', 'Start your 7-day free trial')}
+      </div>
+      <div className="text-[16px] text-textItemBlur">
+        {t(
+          'billing_start_free_trial_description',
+          'Try the {{plan}} plan free for 7 days, no credit card needed. Add a card any time before the trial ends to keep your plan. Without one, your workspace is paused until you choose a plan.',
+          { plan: pricing[tier]?.label || capitalize(tier) }
+        )}
+      </div>
+      <Button
+        loading={loading}
+        onClick={start}
+        className="h-[52px] rounded-[12px] text-[16px] font-[600]"
+      >
+        {t('billing_start_free_trial', 'Start free trial')}
+      </Button>
+    </div>
+  );
+};
 
 export const FirstBillingComponent = () => {
   const { stripeClient } = useVariables();
@@ -85,8 +190,9 @@ export const FirstBillingComponent = () => {
     ).json();
   }, [tier, period]);
 
+  // a trial starts without a card, so no checkout is created for it
   const { data, isLoading } = useSWR(
-    `/billing-${tier}-${period}`,
+    user?.allowTrial ? null : `/billing-${tier}-${period}`,
     loadCheckout,
     {
       revalidateOnFocus: false,
@@ -131,10 +237,7 @@ export const FirstBillingComponent = () => {
                 <CheckIconComponent />
               </div>
               <div>
-                {t(
-                  'billing_pay_nothing_7_days',
-                  'Pay NOTHING for the first 7-days'
-                )}
+                {t('billing_no_credit_card_needed', 'No credit card needed')}
               </div>
             </div>
             <div className="flex gap-[8px]">
@@ -183,7 +286,9 @@ export const FirstBillingComponent = () => {
           <div className="block tablet:hidden">
             <JoinOver />
           </div>
-          {data?.blocked ? (
+          {user?.allowTrial ? (
+            <StartTrial tier={tier} period={period} />
+          ) : data?.blocked ? (
             <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
               {t(
                 'billing_other_account_subscribed',

@@ -88,6 +88,7 @@ export function RegisterAfter({
     genericOauth,
     neynarClientId,
     appleClientId,
+    billingEnabled,
   } = useVariables();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -151,6 +152,14 @@ export function RegisterAfter({
             <h1 className="text-[40px] font-[500] -tracking-[0.8px] text-start cursor-pointer">
               {t('sign_up', 'Sign Up')}
             </h1>
+            {billingEnabled && (
+              <div className="text-[14px] text-textItemBlur mt-[8px]">
+                {t(
+                  'sign_up_free_trial_no_card',
+                  'Start your 7-day free trial. No credit card required.'
+                )}
+              </div>
+            )}
           </div>
           <div className="text-[14px] mt-[32px] mb-[12px]">
             {t('continue_with', 'Continue With')}

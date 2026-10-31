@@ -1,10 +1,10 @@
 ---
 import Doc from '../layouts/Doc.astro';
-import { SITE } from '../data/site';
+import { SITE, CTA_LABEL } from '../data/site';
 ---
 <Doc title="MCP server — PostDelegate" description="Connect your own AI assistant to PostDelegate over MCP. Setup guides for Claude, ChatGPT, Claude Code, Cursor and other clients." h1="Your AI, connected to your content." eyebrow="MCP" lead="MCP gives compatible AI tools a way to work with a publishing workspace. Bring your own assistant, sign in with PostDelegate and keep every post under your review.">
   <a slot="actions" href="/docs/mcp" class="button">Read the MCP docs</a>
-  <a slot="actions" href={SITE.signup} class="button button-outline">Open a workspace</a>
+  <a slot="actions" href={SITE.signup} class="button button-outline">{CTA_LABEL}</a>
   <h2>From a conversation to a draft</h2>
   <p>A compatible client discovers the tools the server offers and uses them to list your channels, read each network's rules, upload media and create drafts. The useful starting point is a single draft that you can inspect in the calendar before anything is scheduled.</p>
   <h2>Set it up</h2>

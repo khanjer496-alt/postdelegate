@@ -5,7 +5,7 @@ export interface DocSection { title: string; items: DocPage[] }
 
 export const DOC_SECTIONS: DocSection[] = [
   { title: 'Get started', items: [
-    { title: 'Getting started', href: '/docs/getting-started', description: 'Create a workspace, connect a channel and schedule your first post.' },
+    { title: 'Getting started', href: '/docs/getting-started', description: 'Start your free trial, connect a channel and schedule your first post.' },
     { title: 'Creating and scheduling posts', href: '/docs/posts', description: 'Drafts, schedules, immediate posts, repeats, previews and the calendar.' },
     { title: 'Media library', href: '/docs/media', description: 'Upload images and video, supported formats and size limits.' },
     { title: 'Team and customers', href: '/docs/team', description: 'Invite team members and group channels by customer.' },

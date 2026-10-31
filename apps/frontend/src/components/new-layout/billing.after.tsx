@@ -62,10 +62,7 @@ export const BillingAfter = () => {
                 </svg>
               </div>
               <div>
-                {t(
-                  'pay_nothing_for_the_first_7_days',
-                  'Pay nothing for the first 7 days'
-                )}
+                {t('no_credit_card_needed', 'No credit card needed')}
               </div>
             </div>
             <div className="flex gap-[5px] items-center">

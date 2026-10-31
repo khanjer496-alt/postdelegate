@@ -12,7 +12,14 @@ import clsx from 'clsx';
 import { capitalize } from 'lodash';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { FAQComponent } from '@gitroom/frontend/components/billing/faq.component';
-import { useBillingFeatures } from '@gitroom/frontend/components/billing/first.billing.component';
+import {
+  useBillingFeatures,
+  useStartTrial,
+} from '@gitroom/frontend/components/billing/first.billing.component';
+import {
+  useAddPaymentMethod,
+  useRenewal,
+} from '@gitroom/frontend/components/billing/trial.banner';
 import { BillingHistory } from '@gitroom/frontend/components/billing/billing.history.component';
 import useSWR, { useSWRConfig } from 'swr';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -105,24 +112,6 @@ const useCredits = (type: (typeof creditTypes)[number]) => {
   );
 };
 
-const useRenewal = () => {
-  const fetch = useFetch();
-  return useSWR<{ renewsAt: number | null; trialing: boolean }>(
-    '/billing/renewal',
-    async () => {
-      const response = await fetch('/billing/renewal');
-      if (!response.ok) {
-        throw new Error('Failed to load renewal date');
-      }
-      return response.json();
-    },
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-    }
-  );
-};
-
 const BillingCycle: FC<{
   tier: string;
   canceled: boolean;
@@ -177,7 +166,12 @@ const BillingCycle: FC<{
         <div className="text-[14px] text-textItemBlur">
           {!canceled && !!renewal?.renewsAt && (
             <>
-              {renewal.trialing
+              {renewal.needsPaymentMethod
+                ? t(
+                    'billing_trial_without_card_ends_on',
+                    'Add a card to keep your plan. Your free trial ends on'
+                  )
+                : renewal.trialing
                 ? t(
                     'billing_trial_ends_on',
                     'Your free trial ends and your first payment is charged on'
@@ -478,6 +472,44 @@ export const MainBillingComponent: FC<{
   const [finishTrial, setFinishTrial] = useState(
     !!queryParams.get('finishTrial')
   );
+  const { data: renewal } = useRenewal();
+  const addPaymentMethod = useAddPaymentMethod();
+  const startTrial = useStartTrial();
+
+  // Features left out of the trial send here to end it, which needs a card
+  useEffect(() => {
+    if (!finishTrial || !renewal?.needsPaymentMethod) {
+      return;
+    }
+    setFinishTrial(false);
+    (async () => {
+      if (
+        await deleteDialog(
+          t(
+            'finish_trial_add_card_first',
+            'This feature is not part of the free trial. Add a card first, then you can end your trial and use it right away.'
+          ),
+          t('add_a_card', 'Add a card'),
+          t('trial', 'Trial')
+        )
+      ) {
+        addPaymentMethod();
+      }
+    })();
+  }, [finishTrial, renewal?.needsPaymentMethod]);
+
+  useEffect(() => {
+    if (queryParams.get('card') === 'added') {
+      router.replace('/billing');
+      toast.show(
+        t(
+          'billing_card_added',
+          'Your card was added. Your plan continues when the trial ends.'
+        )
+      );
+      mutate('/billing/renewal');
+    }
+  }, []);
 
   const finishTrialNow = useCallback(async () => {
     if (
@@ -697,6 +729,14 @@ export const MainBillingComponent: FC<{
           return;
         }
         setLoading(true);
+        if (!subscription && user?.allowTrial) {
+          await startTrial(
+            billing,
+            monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'
+          );
+          setLoading(false);
+          return;
+        }
         const { url, portal, blocked, requiresAction, clientSecret } = await (
           await fetch('/billing/subscribe', {
             method: 'POST',
@@ -778,7 +818,7 @@ export const MainBillingComponent: FC<{
         }
         setLoading(false);
       },
-    [monthlyOrYearly, subscription, user, utm, paymentAction]
+    [monthlyOrYearly, subscription, user, utm, paymentAction, startTrial]
   );
   if (user?.isLifetime) {
     router.replace('/');
@@ -860,7 +900,7 @@ export const MainBillingComponent: FC<{
 
   return (
     <div className="flex flex-col gap-[24px]">
-      {finishTrial && (
+      {finishTrial && renewal?.needsPaymentMethod !== true && (
         <FinishTrial
           close={() => {
             setFinishTrial(false);
@@ -1023,14 +1063,24 @@ export const MainBillingComponent: FC<{
                 )}
               </button>
             )}
-            <button
-              type="button"
-              onClick={updatePayment}
-              className="h-[44px] px-[16px] rounded-[8px] bg-btnSimple text-btnText text-[14px] font-[500] hover:opacity-80 transition-opacity"
-            >
-              {t('billing_update_payment_method', 'Update payment method')}
-            </button>
-            {user?.isTrailing && (
+            {renewal?.needsPaymentMethod ? (
+              <button
+                type="button"
+                onClick={addPaymentMethod}
+                className="h-[44px] px-[16px] rounded-[8px] bg-btnPrimary text-white text-[14px] font-[500] hover:bg-[#5023b8] transition-colors"
+              >
+                {t('add_a_card', 'Add a card')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={updatePayment}
+                className="h-[44px] px-[16px] rounded-[8px] bg-btnSimple text-btnText text-[14px] font-[500] hover:opacity-80 transition-opacity"
+              >
+                {t('billing_update_payment_method', 'Update payment method')}
+              </button>
+            )}
+            {user?.isTrailing && !renewal?.needsPaymentMethod && (
               <button
                 type="button"
                 onClick={finishTrialNow}
