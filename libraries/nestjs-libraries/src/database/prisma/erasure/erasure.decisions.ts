@@ -57,6 +57,14 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
   Credits: { scope: 'org', note: 'deleted' },
   Clipping: { scope: 'org', note: 'deleted' },
   ClippingClip: { scope: 'org', note: 'deleted, clip files are R2 objects' },
+  StudioProject: {
+    scope: 'org',
+    note: 'deleted after its renders; the settings name media ids only',
+  },
+  StudioRender: {
+    scope: 'org',
+    note: 'deleted before the projects; the rendered videos are Media rows and go with the media',
+  },
   Subscription: {
     scope: 'org',
     note: 'row deleted after the Stripe subscription is cancelled; Stripe keeps its own customer and invoice records (tax law), the customer id is listed in the receipt for the operator',
