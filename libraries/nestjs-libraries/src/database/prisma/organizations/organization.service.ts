@@ -200,11 +200,22 @@ export class OrganizationService {
     return { added: true };
   }
 
-  async deleteTeamMember(org: Organization, userId: string) {
+  async deleteTeamMember(
+    org: Organization,
+    userId: string,
+    actingUserId?: string
+  ) {
+    if (actingUserId && actingUserId === userId) {
+      throw new HttpException(
+        "You can't remove yourself from the workspace.",
+        400
+      );
+    }
+
     const userOrgs = await this._organizationRepository.getOrgsByUserId(userId);
     const findOrgToDelete = userOrgs.find((orgUser) => orgUser.id === org.id);
     if (!findOrgToDelete) {
-      throw new Error('User is not part of this organization');
+      throw new HttpException('User is not part of this organization', 404);
     }
 
     // @ts-ignore
@@ -213,8 +224,13 @@ export class OrganizationService {
     const myLevel = myRole === 'USER' ? 0 : myRole === 'ADMIN' ? 1 : 2;
     const userLevel = userRole === 'USER' ? 0 : userRole === 'ADMIN' ? 1 : 2;
 
-    if (myLevel < userLevel) {
-      throw new Error('You do not have permission to delete this user');
+    // only someone above a member can remove them (an admin removes users,
+    // a super admin removes admins and users), like the team page offers
+    if (myLevel <= userLevel) {
+      throw new HttpException(
+        'You do not have permission to remove this member',
+        403
+      );
     }
 
     return this._organizationRepository.deleteTeamMember(org.id, userId);

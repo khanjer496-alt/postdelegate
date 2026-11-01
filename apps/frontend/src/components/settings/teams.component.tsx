@@ -118,6 +118,7 @@ export const TeamsComponent = () => {
   const user = useUser();
   const modals = useModals();
   const t = useT();
+  const toaster = useToaster();
   const myLevel = user?.role === 'USER' ? 0 : user?.role === 'ADMIN' ? 1 : 2;
   const getLevel = useCallback(
     (role: 'USER' | 'ADMIN' | 'SUPERADMIN') =>
@@ -163,9 +164,18 @@ export const TeamsComponent = () => {
         ) {
           return;
         }
-        await fetch(`/settings/team/${toRemove.user.id}`, {
+        const response = await fetch(`/settings/team/${toRemove.user.id}`, {
           method: 'DELETE',
         });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          toaster.show(
+            typeof body?.message === 'string' && body.message
+              ? body.message
+              : t('could_not_remove_member', 'Could not remove this member'),
+            'warning'
+          );
+        }
         await mutate();
       },
     [t]

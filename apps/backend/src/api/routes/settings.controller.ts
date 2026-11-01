@@ -67,9 +67,10 @@ export class SettingsController {
   )
   deleteTeamMember(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Param('id') id: string
   ) {
-    return this._organizationService.deleteTeamMember(org, id);
+    return this._organizationService.deleteTeamMember(org, id, user.id);
   }
 
   @Get('/shortlink')
