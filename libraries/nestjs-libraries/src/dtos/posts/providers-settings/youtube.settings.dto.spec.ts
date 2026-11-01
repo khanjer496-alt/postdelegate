@@ -61,10 +61,45 @@ describe('YoutubeSettingsDto', () => {
       ).toEqual([]);
     });
 
-    it('rejects a value that is not a date', async () => {
-      expect(await errorsOf({ publishAt: 'tomorrow' })).toEqual([
-        'Pick a valid date and time for YouTube to publish the video.',
-      ]);
+    const formatMessage =
+      'Pick a valid date and time for YouTube to publish the video, like 2026-11-05T15:00:00Z.';
+
+    it('rejects values that are not RFC 3339 dates, on every operation', async () => {
+      for (const publishAt of [
+        'tomorrow',
+        // valid ISO 8601 that dayjs reads wrongly or not at all
+        '20261105T150000Z',
+        '2026-W45-1',
+        '2026-309',
+        // no zone, or a date that does not exist
+        '2026-11-05T15:00:00',
+        '2026-02-30T15:00:00Z',
+        '2026-11-05T24:00:00Z',
+      ]) {
+        for (const __validationOperation of ['schedule', 'draft', undefined]) {
+          expect(await errorsOf({ publishAt, __validationOperation })).toEqual([
+            formatMessage,
+          ]);
+        }
+      }
+    });
+
+    it('accepts RFC 3339 with or without seconds, fractions and offsets', async () => {
+      const later = postDate.add(1, 'day');
+      for (const publishAt of [
+        later.format('YYYY-MM-DDTHH:mm[Z]'),
+        later.format('YYYY-MM-DDTHH:mm:ss[Z]'),
+        later.toISOString(),
+        later.utcOffset(120).format('YYYY-MM-DDTHH:mm:ssZ'),
+      ]) {
+        expect(
+          await errorsOf({
+            publishAt,
+            __validationOperation: 'schedule',
+            __validationDate: postDate.format('YYYY-MM-DDTHH:mm:ss'),
+          })
+        ).toEqual([]);
+      }
     });
 
     it('rejects a time in the past', async () => {

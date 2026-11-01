@@ -1,10 +1,10 @@
 import {
   IsArray,
-  IsDateString,
   IsDefined,
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
   registerDecorator,
@@ -62,6 +62,28 @@ export function IsYoutubeTagsLength(validationOptions?: ValidationOptions) {
   };
 }
 
+// RFC 3339, the format YouTube documents for publishAt:
+// YYYY-MM-DDTHH:mm[:ss][.sss] with Z or an ±HH:mm offset
+export const YOUTUBE_PUBLISH_AT_FORMAT =
+  /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,3})?)?(Z|[+-]([01]\d|2[0-3]):[0-5]\d)$/;
+const YOUTUBE_PUBLISH_AT_MESSAGE =
+  'Pick a valid date and time for YouTube to publish the video, like 2026-11-05T15:00:00Z.';
+
+// The publish time when it is a real RFC 3339 date (2026-02-30 is not), the
+// provider uses it too so an unreadable value never changes the visibility
+export const parseYoutubePublishAt = (value?: string) => {
+  const match = YOUTUBE_PUBLISH_AT_FORMAT.exec(value || '');
+  if (!match) {
+    return undefined;
+  }
+  const day = `${match[1]}-${match[2]}-${match[3]}`;
+  if (dayjs.utc(day).format('YYYY-MM-DD') !== day) {
+    return undefined;
+  }
+  const date = dayjs.utc(value);
+  return date.isValid() ? date : undefined;
+};
+
 // The server supplies this ephemeral context while it validates: the operation
 // it will execute and the date the post itself goes out. The time rules only
 // apply while the video is still to be uploaded (schedule / now, or an update
@@ -86,15 +108,20 @@ const getYoutubePublishAtError = (
     !!postDate?.isValid() &&
     postDate.isAfter(dayjs.utc());
 
+  // the format itself is reported by @Matches
   if (
     !settings?.publishAt ||
-    !(['schedule', 'now'].includes(operation) || notUploadedYet)
+    !YOUTUBE_PUBLISH_AT_FORMAT.test(settings.publishAt)
   ) {
     return undefined;
   }
 
-  const publishAt = dayjs.utc(settings.publishAt);
-  if (!publishAt.isValid()) {
+  const publishAt = parseYoutubePublishAt(settings.publishAt);
+  if (!publishAt) {
+    return YOUTUBE_PUBLISH_AT_MESSAGE;
+  }
+
+  if (!(['schedule', 'now'].includes(operation) || notUploadedYet)) {
     return undefined;
   }
 
@@ -138,10 +165,7 @@ export class YoutubeSettingsDto {
   selfDeclaredMadeForKids: 'no' | 'yes';
 
   @IsOptional()
-  @IsDateString(
-    {},
-    { message: 'Pick a valid date and time for YouTube to publish the video.' }
-  )
+  @Matches(YOUTUBE_PUBLISH_AT_FORMAT, { message: YOUTUBE_PUBLISH_AT_MESSAGE })
   @ValidateBy({
     name: 'youtubePublishAt',
     validator: {

@@ -15,7 +15,10 @@ import { Integration } from '@prisma/client';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library/build/src/auth/oauth2client';
-import { YoutubeSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/youtube.settings.dto';
+import {
+  parseYoutubePublishAt,
+  YoutubeSettingsDto,
+} from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/youtube.settings.dto';
 import {
   BadBody,
   PublishedWithError,
@@ -820,12 +823,13 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     // makes it public at publishAt (it only accepts publishAt on a private
     // video). A time that passed meanwhile (the post went out late or was
     // moved after it) publishes the video now, like YouTube does for a past
-    // publishAt.
-    const publishAt =
-      settings?.publishAt && dayjs.utc(settings.publishAt).isAfter(dayjs())
-        ? dayjs.utc(settings.publishAt).toISOString()
-        : undefined;
-    const privacyStatus = settings?.publishAt
+    // publishAt. Drafts and status changes skip the settings validation, so a
+    // value that isn't a real date keeps the type, as if it wasn't set.
+    const publishAtDate = parseYoutubePublishAt(settings?.publishAt);
+    const publishAt = publishAtDate?.isAfter(dayjs())
+      ? publishAtDate.toISOString()
+      : undefined;
+    const privacyStatus = publishAtDate
       ? publishAt
         ? 'private'
         : 'public'

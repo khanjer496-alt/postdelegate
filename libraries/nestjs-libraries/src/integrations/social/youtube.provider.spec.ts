@@ -84,4 +84,13 @@ describe('YoutubeProvider upload metadata', () => {
       selfDeclaredMadeForKids: false,
     });
   });
+
+  it('keeps the type when publishAt is not a real date (drafts skip validation)', async () => {
+    for (const publishAt of ['2026-309', '20261105T150000Z', '2026-W45-1']) {
+      expect(await startUpload({ type: 'unlisted', publishAt })).toEqual({
+        privacyStatus: 'unlisted',
+        selfDeclaredMadeForKids: false,
+      });
+    }
+  });
 });
