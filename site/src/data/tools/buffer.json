@@ -1,0 +1,72 @@
+{
+  "name": "Buffer",
+  "slug": "buffer",
+  "site": "https://buffer.com",
+  "pricingUrl": "https://buffer.com/pricing",
+  "checked": "2026-11-02",
+  "kind": {
+    "value": "Hosted scheduler",
+    "src": "https://buffer.com/pricing"
+  },
+  "hosting": {
+    "value": "Hosted service",
+    "src": "https://buffer.com/pricing"
+  },
+  "pricingModel": {
+    "value": "Per channel per month; channels above 10 cost less each",
+    "src": "https://buffer.com/pricing"
+  },
+  "freeOption": {
+    "value": "Free plan: 3 channels, 10 scheduled posts per channel, 1 user",
+    "src": "https://buffer.com/pricing"
+  },
+  "trial": {
+    "value": "14-day trial of Essentials and Team",
+    "src": "https://buffer.com/pricing"
+  },
+  "entryPaid": {
+    "value": "Essentials, $6 per channel/month on monthly billing ($5 on yearly)",
+    "src": "https://buffer.com/pricing"
+  },
+  "plans": {
+    "value": "Essentials $6 and Team $12 per channel/month for channels 1 to 10; $4 each for channels 11 to 25 and $3 each for 26 to 50",
+    "src": "https://buffer.com/pricing"
+  },
+  "cost": {
+    "3": {
+      "value": "$0 / $18",
+      "note": "Free plan (10 scheduled posts per channel), or Essentials at 3 × $6",
+      "src": "https://buffer.com/pricing"
+    },
+    "10": {
+      "value": "$60",
+      "note": "Essentials, 10 × $6 (Team: $120)",
+      "src": "https://buffer.com/pricing"
+    },
+    "30": {
+      "value": "$135",
+      "note": "Essentials: 10 × $6 + 15 × $4 + 5 × $3 (Team: $195)",
+      "src": "https://buffer.com/pricing"
+    }
+  },
+  "networks": {
+    "value": "12 listed: Instagram, Facebook, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Google Business Profile, Bluesky, Mastodon and Substack",
+    "src": "https://buffer.com/pricing"
+  },
+  "api": {
+    "value": "API keys on every plan, with monthly request limits per channel",
+    "src": "https://buffer.com/pricing"
+  },
+  "mcp": {
+    "value": "MCP server on every plan, including Free",
+    "src": "https://buffer.com/mcp"
+  },
+  "ai": {
+    "value": "AI Assistant included on every plan",
+    "src": "https://buffer.com/pricing"
+  },
+  "teams": {
+    "value": "Unlimited team members and approval workflows on Team; Free and Essentials have 1 user",
+    "src": "https://buffer.com/pricing"
+  }
+}

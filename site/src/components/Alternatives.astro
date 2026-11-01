@@ -1,0 +1,73 @@
+---
+// Template for /alternatives/{tool}: the tool and its alternatives in one table, facts from
+// src/data/tools/*.json. The page file supplies the words; PostDelegate gets its own box.
+import Doc from '../layouts/Doc.astro';
+import Faq from './Faq.astro';
+import FactCell from './compare/FactCell.astro';
+import PostDelegateFit from './compare/PostDelegateFit.astro';
+import CompareNotes from './compare/CompareNotes.astro';
+import { tool, checkedOn, comparisonJsonLd, type Tool } from '../data/tools';
+interface Props {
+  subject: string; alternatives: string[]; title: string; description: string; h1: string; shortAnswer: string;
+  fitIntro: string; faq: { q: string; a: string }[]; links: { href: string; label: string }[]; published: string;
+}
+const { subject, alternatives, title, description, h1, shortAnswer, fitIntro, faq, links, published } = Astro.props;
+const tools = [subject, ...alternatives].map(tool);
+const checked = checkedOn(tools);
+const modified = [published, checked].sort().at(-1)!;
+const path = `/alternatives/${subject}`;
+const namesPostiz = tools.some((t) => t.slug === 'postiz');
+const columns: { label: string; key: keyof Tool }[] = [
+  { label: 'Hosting', key: 'hosting' },
+  { label: 'Free option', key: 'freeOption' },
+  { label: 'Entry price', key: 'entryPaid' },
+  { label: 'Priced by', key: 'pricingModel' },
+  { label: 'Networks', key: 'networks' },
+  { label: 'API', key: 'api' },
+  { label: 'MCP', key: 'mcp' },
+  { label: 'License', key: 'license' },
+];
+const jsonLd = comparisonJsonLd({ path, title: h1, description, section: { name: 'Alternatives', path: '/alternatives' }, faq, published, modified });
+---
+<Doc title={title} description={description} h1={h1} eyebrow="Alternatives" jsonLd={jsonLd}>
+  <a slot="actions" href="#comparison-table" class="button button-outline">Jump to the table</a>
+  <h2>Short answer</h2>
+  <p class="short-answer">{shortAnswer}</p>
+  <CompareNotes tools={tools} checked={checked} namesPostiz={namesPostiz} />
+
+  <slot name="before-table" />
+
+  <h2 id="comparison-table">Comparison table</h2>
+  <div class="alt-scroll">
+    <table class="alt-table">
+      <caption class="sr-only">{tools[0].name} and its alternatives compared</caption>
+      <thead><tr><th scope="col">Tool</th>{columns.map((c) => <th scope="col">{c.label}</th>)}</tr></thead>
+      <tbody>{tools.map((t) => <tr><th scope="row"><a href={t.site} target="_blank" rel="noopener">{t.name}</a></th>{columns.map((c) => <td><FactCell fact={t[c.key] as never} vendor={t.name} /></td>)}</tr>)}</tbody>
+    </table>
+  </div>
+  <p class="alt-small">Scroll sideways on small screens. "Not listed" means the vendor's pages we checked do not say, so we left it out rather than guess.</p>
+
+  <slot />
+
+  <PostDelegateFit intro={fitIntro} />
+
+  <h2>FAQ</h2>
+  <Faq items={faq} />
+
+  <h2>Related</h2>
+  <ul class="alt-links">{links.map((link) => <li><a href={link.href}>{link.label}</a></li>)}</ul>
+  <p class="alt-small">Product names are trademarks of their owners. PostDelegate is not affiliated with or endorsed by any of them. Last updated <time datetime={modified}>{modified}</time>.</p>
+</Doc>
+<style>
+  .short-answer { padding: 20px 24px; border-left: 3px solid #c8ff4d; border-radius: 0 14px 14px 0; background: #171717; color: #e6e6e6; font-size: 17px; line-height: 1.75; }
+  .alt-scroll { margin: 22px 0; overflow-x: auto; border: 1px solid #303030; border-radius: 18px; background: #171717; }
+  .alt-table { width: 100%; min-width: 72rem; border-collapse: collapse; font-size: 13.5px; line-height: 1.6; }
+  .alt-table thead th { background: #222; color: #fff; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+  .alt-table th, .alt-table td { padding: 12px 14px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+  .alt-table tbody tr:last-child > * { border-bottom: 0; }
+  .alt-table tbody th { color: #fff; font-weight: 700; white-space: nowrap; }
+  .alt-table td { color: #c4c4c4; }
+  .alt-small { color: #9a9a9a; font-size: 13px !important; }
+  .alt-links { columns: 2; column-gap: 32px; }
+  @media (max-width: 600px) { .alt-links { columns: 1; } .short-answer { font-size: 16px; padding: 16px 18px; } }
+</style>

@@ -1,0 +1,15 @@
+---
+// One fact from src/data/tools/*.json with a link to each page it was read from.
+import { sources, type Fact } from '../../data/tools';
+interface Props { fact?: Fact; vendor: string }
+const { fact, vendor } = Astro.props;
+const links = sources(fact);
+---
+{fact ? (
+  <>{fact.value}{fact.note && <span class="fact-note"> ({fact.note})</span>}{links.map((href, i) => <a class="fact-src" href={href} target="_blank" rel="noopener" aria-label={`Source for ${vendor}${links.length > 1 ? ` (${i + 1})` : ''}: ${new URL(href).hostname}`}>source{links.length > 1 ? ` ${i + 1}` : ''}</a>)}</>
+) : <span class="fact-missing">Not listed</span>}
+<style>
+  .fact-note { color: #9a9a9a; }
+  .fact-src { display: inline-block; margin-left: 6px; color: #b39aff !important; font-size: 11px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+  .fact-missing { color: #808080; }
+</style>
