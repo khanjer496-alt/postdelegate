@@ -223,6 +223,8 @@
   "add_subreddit": "Add Subreddit",
   "please_add_at_least_one_subreddit": "Please add at least one Subreddit",
   "add_community": "Add Community",
+  "are_you_sure_you_want_to_delete_this_community": "Are you sure you want to delete this Community?",
+  "please_add_at_least_one_community": "Please add at least one Community",
   "select_post_type": "Select Post Type...",
   "we_couldn_t_find_any_business_connected_to_your_linkedin_page": "We couldn't find any business connected to your LinkedIn Page.",
   "please_close_this_dialog_create_a_new_page_and_add_a_new_channel_again": "Please close this dialog, create a new page, and add a new channel again.",
