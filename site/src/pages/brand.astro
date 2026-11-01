@@ -1,0 +1,49 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+// Colours are the ones in /mark.svg and the site theme (src/styles/global.css).
+const files = [
+  { name: 'Logo mark (SVG)', href: '/mark.svg', size: '64 × 64, scalable' },
+  { name: 'Favicon mark (SVG)', href: '/postdelegate.svg', size: '64 × 64, scalable' },
+  { name: 'App icon (PNG)', href: '/postdelegate-icon-512.png', size: '512 × 512' },
+  { name: 'App icon (PNG)', href: '/postdelegate-icon-192.png', size: '192 × 192' },
+  { name: 'Apple touch icon (PNG)', href: '/postdelegate-apple-touch-icon.png', size: '180 × 180' },
+  { name: 'Social card (PNG)', href: '/og.png', size: '1200 × 630' },
+];
+const colours = [
+  { name: 'Night', hex: '#080A0F', use: 'Logo background' },
+  { name: 'Paper', hex: '#F7F7F2', use: 'Logo calendar outline' },
+  { name: 'Lime', hex: '#C8FF4D', use: 'Accent, the scheduled dot' },
+  { name: 'Violet', hex: '#7357FF', use: 'Accent, the orbit' },
+  { name: 'Page', hex: '#0D0D0D', use: 'Website background' },
+];
+---
+<Doc title="Brand and logo files — PostDelegate" description="PostDelegate logo files, app icons, brand colours and how to write the product name, for press, directories and partners writing about PostDelegate." h1="Brand." eyebrow="Press kit" lead="Logo files, colours and the product name, for anyone writing about PostDelegate.">
+  <h2>The name</h2>
+  <p>Write <strong>PostDelegate</strong>: one word, with a capital P and a capital D. PostDelegate is operated by {SITE.operator}.</p>
+  <h2>Logo files</h2>
+  <div class="brand-mark"><img src="/mark.svg" width="96" height="96" alt="PostDelegate logo mark" /><img src="/postdelegate-icon-512.png" width="96" height="96" alt="PostDelegate app icon" loading="lazy" /></div>
+  <table>
+    <thead><tr><th>File</th><th>Size</th></tr></thead>
+    <tbody>{files.map((f) => <tr><td><a href={f.href}>{f.name}</a></td><td>{f.size}</td></tr>)}</tbody>
+  </table>
+  <h2>Colours</h2>
+  <ul class="swatches">{colours.map((c) => <li><span style={`background:${c.hex}`} aria-hidden="true"></span><div><strong>{c.name}</strong><code>{c.hex}</code><small>{c.use}</small></div></li>)}</ul>
+  <p>The website uses Plus Jakarta Sans.</p>
+  <h2>Using the logo</h2>
+  <ul>
+    <li>Use the files as they are: don't recolour, stretch or add effects to the mark.</li>
+    <li>Leave space around the mark, at least a quarter of its width.</li>
+    <li>Don't use the logo in a way that suggests PostDelegate endorses your product.</li>
+  </ul>
+  <p>Need something else? Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
+</Doc>
+<style>
+  .brand-mark { display: flex; flex-wrap: wrap; gap: 18px; margin: 20px 0; }
+  .brand-mark img { border-radius: 22px; border: 1px solid #333; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0 !important; list-style: none !important; }
+  .swatches li { display: flex; align-items: center; gap: 12px; margin: 0 !important; padding: 12px !important; border: 1px solid #303030; border-radius: 14px; background: #151515; }
+  .swatches span { flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid #ffffff26; }
+  .swatches div { display: grid; gap: 2px; line-height: 1.4; }
+  .swatches small { color: #9a9a9a; font-size: 12px; }
+</style>

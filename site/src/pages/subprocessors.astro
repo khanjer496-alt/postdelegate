@@ -1,0 +1,23 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { SITE } from '../data/site';
+// From section 9 ("Hosting and other recipients") and section 15 of the privacy policy,
+// deploy/postdelegate/legal-public/privacy.html. The privacy policy is the authoritative list.
+const providers = [
+  { name: 'OVHcloud', purpose: 'Hosts the application server, its databases and the Temporal scheduling service.', where: 'United Kingdom' },
+  { name: 'Cloudflare', purpose: 'DNS, proxy, CDN and security services; R2 stores uploaded media (media.postdelegate.com) and encrypted off-site backups.', where: 'United States and other countries' },
+  { name: 'Stripe', purpose: 'Processes subscription payments and card data, and holds your Stripe customer record.', where: 'United States and other countries' },
+  { name: 'Resend', purpose: 'Delivers transactional email: activation, password reset, invitations, notifications and digests.', where: 'United States and other countries' },
+  { name: 'OpenAI', purpose: 'Only if your workspace adds its own OpenAI API key: receives, under your key, what the AI feature you use needs. OpenAI bills you directly.', where: 'United States and other countries' },
+  { name: 'PayPal', purpose: 'Receives the payout email and amount when we pay an affiliate commission.', where: 'See PayPal’s privacy policy' },
+];
+---
+<Doc title="Subprocessors — PostDelegate" description="The providers PostDelegate uses to host the app, store media, take payments and send email, what each handles and where, taken from our privacy policy." h1="Subprocessors." eyebrow="Trust" lead={`The providers ${SITE.operator} uses to run PostDelegate, and what each one handles.`}>
+  <a slot="actions" href={SITE.legal.privacy} class="button button-outline">Read the privacy policy</a>
+  <table>
+    <thead><tr><th>Provider</th><th>What it handles</th><th>Where</th></tr></thead>
+    <tbody>{providers.map((p) => <tr><td><strong>{p.name}</strong></td><td>{p.purpose}</td><td>{p.where}</td></tr>)}</tbody>
+  </table>
+  <p>The social networks you connect, such as YouTube, Discord or Telegram, receive the content and requests you tell us to send and process them under their own terms. Workspace members see data according to their permissions.</p>
+  <p>We do not use a third-party advertising, analytics or session-recording provider. This page summarises the <a href={SITE.legal.privacy}>privacy policy</a>; if the two ever differ, the privacy policy applies. Questions: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
+</Doc>
