@@ -4,7 +4,7 @@ export const SITE = {
  email:'support@postdelegate.com',source:'https://app.postdelegate.com/source',
  tagline:'Your social media. All in one clear calendar.',
  legal:{terms:'https://app.postdelegate.com/legal/terms/',privacy:'https://app.postdelegate.com/legal/privacy/',
- dataDeletion:'/support#data-requests',licenses:'/licenses',
+ dataDeletion:'https://app.postdelegate.com/legal/data-deletion',licenses:'/licenses',
  subprocessors:'https://app.postdelegate.com/legal/privacy/',security:'/about#security'},operator:'Nasida Apps LLC',
 } as const;
 // Sign-up calls to action. Every plan starts with a 7-day free trial that needs no card.

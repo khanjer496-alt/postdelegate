@@ -2,8 +2,8 @@
 /privacy/ https://app.postdelegate.com/legal/privacy/ 301
 /terms https://app.postdelegate.com/legal/terms/ 301
 /terms/ https://app.postdelegate.com/legal/terms/ 301
-/data-deletion /support#data-requests 302
-/data-deletion/ /support#data-requests 302
+/data-deletion https://app.postdelegate.com/legal/data-deletion 302
+/data-deletion/ https://app.postdelegate.com/legal/data-deletion 302
 /postdelegate-workspace-preview.png /images/postdelegate-workspace.jpg 301
 /postdelegate-composer-preview.png /images/postdelegate-workspace.jpg 301
 /sitemap.xml /sitemap-0.xml 200
