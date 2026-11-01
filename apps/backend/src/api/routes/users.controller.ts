@@ -343,6 +343,10 @@ export class UsersController {
       );
     }
 
+    // a workspace other people use stays with them, refused before any
+    // subscription is cancelled
+    await this._userService.assertCanDeleteAccount(user.id);
+
     // Cancel billing before scrubbing the account — once the account is
     // deleted there is no way to retry a failed cancellation
     const ownedOrgs = await this._userService.getOrgsToDeleteForAccount(

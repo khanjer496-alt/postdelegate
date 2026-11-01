@@ -624,6 +624,7 @@ export class OrganizationRepository {
         users: {
           select: {
             role: true,
+            disabled: true,
             user: {
               select: {
                 email: true,
@@ -635,6 +636,56 @@ export class OrganizationRepository {
             },
           },
         },
+      },
+    });
+  }
+
+  // a member of the workspace, with what decides whether they can own it
+  getTeamMember(orgId: string, userId: string) {
+    return this._userOrg.model.userOrganization.findFirst({
+      where: {
+        organizationId: orgId,
+        userId,
+      },
+      select: {
+        role: true,
+        disabled: true,
+        user: {
+          select: {
+            deletedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  // the active Super Admins, a workspace always keeps at least one
+  countSuperAdmins(orgId: string) {
+    return this._userOrg.model.userOrganization.count({
+      where: {
+        organizationId: orgId,
+        role: Role.SUPERADMIN,
+        disabled: false,
+        user: {
+          deletedAt: null,
+        },
+      },
+    });
+  }
+
+  changeTeamMemberRole(orgId: string, userId: string, role: Role) {
+    return this._userOrg.model.userOrganization.update({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId: orgId,
+        },
+      },
+      data: {
+        role,
+      },
+      select: {
+        role: true,
       },
     });
   }

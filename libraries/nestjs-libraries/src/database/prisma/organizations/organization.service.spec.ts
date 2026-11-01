@@ -52,3 +52,78 @@ describe('OrganizationService.deleteTeamMember', () => {
     expect(repository.deleteTeamMember).not.toHaveBeenCalled();
   });
 });
+
+describe('OrganizationService.changeTeamMemberRole', () => {
+  const makeTransfer = (
+    myRole: Role,
+    member: { role: Role; disabled?: boolean; deletedAt?: Date } | null,
+    superAdmins = 1
+  ) => {
+    const repository = {
+      getTeamMember: jest.fn(async () =>
+        member
+          ? {
+              role: member.role,
+              disabled: !!member.disabled,
+              user: { deletedAt: member.deletedAt || null },
+            }
+          : null
+      ),
+      countSuperAdmins: jest.fn(async () => superAdmins),
+      changeTeamMemberRole: jest.fn(async (_o: string, _u: string, role: Role) => ({ role })),
+    };
+    const service = new OrganizationService(repository as any, {} as any);
+    const org = { id: 'org-A', users: [{ role: myRole }] } as any;
+    return { service, repository, org };
+  };
+
+  it('lets a Super Admin make an active member a Super Admin', async () => {
+    const { service, repository, org } = makeTransfer('SUPERADMIN', { role: 'ADMIN' });
+    await expect(
+      service.changeTeamMemberRole(org, 'member', { role: 'SUPERADMIN' })
+    ).resolves.toEqual({ role: 'SUPERADMIN' });
+    // scoped to the workspace of the request
+    expect(repository.getTeamMember).toHaveBeenCalledWith('org-A', 'member');
+    expect(repository.changeTeamMemberRole).toHaveBeenCalledWith('org-A', 'member', 'SUPERADMIN');
+  });
+
+  it.each(['ADMIN', 'USER'] as const)('refuses a %s', async (role) => {
+    const { service, repository, org } = makeTransfer(role, { role: 'USER' });
+    await expect(
+      service.changeTeamMemberRole(org, 'member', { role: 'SUPERADMIN' })
+    ).rejects.toMatchObject({ status: 403 });
+    expect(repository.changeTeamMemberRole).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not in this workspace', null],
+    ['disabled', { role: 'USER' as Role, disabled: true }],
+    ['deleted', { role: 'USER' as Role, deletedAt: new Date() }],
+  ])('refuses a member that is %s', async (_, member) => {
+    const { service, repository, org } = makeTransfer('SUPERADMIN', member);
+    await expect(
+      service.changeTeamMemberRole(org, 'member', { role: 'SUPERADMIN' })
+    ).rejects.toMatchObject({ status: 404 });
+    expect(repository.changeTeamMemberRole).not.toHaveBeenCalled();
+  });
+
+  it('never demotes the last Super Admin', async () => {
+    const { service, repository, org } = makeTransfer('SUPERADMIN', { role: 'SUPERADMIN' }, 1);
+    await expect(
+      service.changeTeamMemberRole(org, 'me', { role: 'ADMIN' })
+    ).rejects.toThrow('at least one Super Admin');
+    expect(repository.changeTeamMemberRole).not.toHaveBeenCalled();
+  });
+
+  it('lets the old owner step down once another Super Admin exists', async () => {
+    const { service, repository, org } = makeTransfer('SUPERADMIN', { role: 'SUPERADMIN' }, 2);
+    await service.changeTeamMemberRole(org, 'me', { role: 'ADMIN' });
+    expect(repository.changeTeamMemberRole).toHaveBeenCalledWith('org-A', 'me', 'ADMIN');
+  });
+
+  it('never removes the last Super Admin (nobody removes themselves)', async () => {
+    const { result, repository } = await removeAs('SUPERADMIN', 'SUPERADMIN', true);
+    await expect(result).rejects.toMatchObject({ status: 400 });
+    expect(repository.deleteTeamMember).not.toHaveBeenCalled();
+  });
+});
