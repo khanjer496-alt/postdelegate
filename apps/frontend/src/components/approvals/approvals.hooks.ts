@@ -170,3 +170,55 @@ export const readError = async (response: Response, fallback: string) => {
     : body?.message || body?.msg;
   return typeof message === 'string' && message ? message : fallback;
 };
+
+// The root post of one channel, as the editor holds it
+export interface ChannelPost {
+  id: string;
+  state?: string;
+  approvalStatus?: ApprovalStatus | string | null;
+  publishDate?: string | Date | null;
+}
+
+export type ReviewAction =
+  | 'approve'
+  | 'request_changes'
+  | 'reject'
+  | 'submit'
+  | 'share';
+
+// A post made for several channels is one post per channel. An action on the
+// channel in view also covers the other channels that are at the same review
+// step, never one that went out or is going out now
+export const channelsToActOn = (
+  siblings: ChannelPost[],
+  action: ReviewAction,
+  now: Date = new Date()
+) =>
+  siblings.filter((post) => {
+    const status = post.approvalStatus || 'NONE';
+    if (post.state === 'PUBLISHED' || post.state === 'ERROR') {
+      return false;
+    }
+    if (
+      post.state === 'QUEUE' &&
+      !!post.publishDate &&
+      new Date(post.publishDate) < now
+    ) {
+      return false;
+    }
+    switch (action) {
+      case 'approve':
+      case 'reject':
+        return status === 'IN_REVIEW' || status === 'CHANGES_REQUESTED';
+      case 'request_changes':
+        return status === 'IN_REVIEW';
+      case 'submit':
+        return (
+          status === 'CHANGES_REQUESTED' ||
+          status === 'REJECTED' ||
+          (status === 'NONE' && post.state === 'DRAFT')
+        );
+      case 'share':
+        return true;
+    }
+  });

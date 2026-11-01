@@ -138,10 +138,27 @@ export const useApprovalActions = () => {
     [fetch, toaster, mutate]
   );
 
+  // the other channels of the post get the same decision, each one that
+  // fails says so on its own
+  const callOthers = useCallback(
+    async (
+      others: PostRef[],
+      action: string,
+      body: Record<string, any>,
+      fallback: string
+    ) => {
+      for (const other of others) {
+        await call(`/approvals/posts/${other.id}/${action}`, body, fallback);
+      }
+    },
+    [call]
+  );
+
   const approve = useCallback(
-    async (post: PostRef, silent = false) => {
-      const passed =
-        !!post.publishDate && dayjs(post.publishDate).isBefore(dayjs());
+    async (post: PostRef, silent = false, others: PostRef[] = []) => {
+      const passed = [post, ...others].some(
+        (p) => !!p.publishDate && dayjs(p.publishDate).isBefore(dayjs())
+      );
       if (
         passed &&
         !silent &&
@@ -165,6 +182,12 @@ export const useApprovalActions = () => {
       if (!result) {
         return false;
       }
+      await callOthers(
+        others,
+        'approve',
+        {},
+        t('approval_approve_failed', 'Could not approve the post')
+      );
       if (!silent) {
         toaster.show(
           result.publishedNow
@@ -175,7 +198,7 @@ export const useApprovalActions = () => {
       }
       return true;
     },
-    [call, t, toaster]
+    [call, callOthers, t, toaster]
   );
 
   const askComment = useCallback(
@@ -219,7 +242,7 @@ export const useApprovalActions = () => {
   );
 
   const requestChanges = useCallback(
-    (post: PostRef) =>
+    (post: PostRef, others: PostRef[] = []) =>
       askComment({
         title: t('approval_request_changes', 'Request changes'),
         label: t('approval_what_to_change', 'What should change?'),
@@ -236,19 +259,28 @@ export const useApprovalActions = () => {
             t('approval_request_failed', 'Could not send the feedback')
           );
           if (result) {
+            await callOthers(
+              others,
+              'request-changes',
+              { comment },
+              t('approval_request_failed', 'Could not send the feedback')
+            );
             toaster.show(
-              t('approval_changes_requested_toast', 'Feedback sent to the author'),
+              t(
+                'approval_changes_requested_toast',
+                'Feedback sent to the author'
+              ),
               'success'
             );
           }
           return !!result;
         },
       }),
-    [askComment, call, t, toaster]
+    [askComment, call, callOthers, t, toaster]
   );
 
   const reject = useCallback(
-    (post: PostRef) =>
+    (post: PostRef, others: PostRef[] = []) =>
       askComment({
         title: t('approval_reject', 'Reject'),
         label: t('approval_reject_reason', 'Reason'),
@@ -265,27 +297,45 @@ export const useApprovalActions = () => {
             t('approval_reject_failed', 'Could not reject the post')
           );
           if (result) {
-            toaster.show(t('approval_rejected_toast', 'Post rejected'), 'success');
+            await callOthers(
+              others,
+              'reject',
+              comment ? { comment } : {},
+              t('approval_reject_failed', 'Could not reject the post')
+            );
+            toaster.show(
+              t('approval_rejected_toast', 'Post rejected'),
+              'success'
+            );
           }
           return !!result;
         },
       }),
-    [askComment, call, t, toaster]
+    [askComment, call, callOthers, t, toaster]
   );
 
   const submit = useCallback(
-    async (post: PostRef) => {
+    async (post: PostRef, others: PostRef[] = []) => {
       const result = await call(
         `/approvals/posts/${post.id}/submit`,
         {},
         t('approval_submit_failed', 'Could not send the post for review')
       );
       if (result) {
-        toaster.show(t('approval_sent_for_review', 'Sent for review'), 'success');
+        await callOthers(
+          others,
+          'submit',
+          {},
+          t('approval_submit_failed', 'Could not send the post for review')
+        );
+        toaster.show(
+          t('approval_sent_for_review', 'Sent for review'),
+          'success'
+        );
       }
       return !!result;
     },
-    [call, t, toaster]
+    [call, callOthers, t, toaster]
   );
 
   return { approve, requestChanges, reject, submit };

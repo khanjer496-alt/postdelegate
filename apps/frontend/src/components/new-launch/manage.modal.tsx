@@ -1352,6 +1352,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     state={existingData.posts[0].state}
                     approvalStatus={existingApproval}
                     publishDate={existingData.posts[0].publishDate}
+                    siblings={(existingData.siblings || [])
+                      .map((sibling) => sibling.posts?.[0])
+                      .filter((post) => !!post?.id)}
                     mutate={mutate}
                   />
                 )}
