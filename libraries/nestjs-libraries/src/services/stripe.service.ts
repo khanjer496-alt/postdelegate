@@ -670,7 +670,15 @@ export class StripeService extends PaymentProviderAbstract {
         }
       );
 
-      if (!(await this.needsPaymentMethod(subscription))) {
+      const needsCard = await this.needsPaymentMethod(subscription);
+      // a trial with a card is charged when it ends, the admins are told when
+      // and where to change or cancel first (not when it is already canceled)
+      const charges =
+        !needsCard &&
+        subscription.status === 'trialing' &&
+        !subscription.cancel_at_period_end &&
+        !subscription.cancel_at;
+      if (!needsCard && !charges) {
         return { ok: true };
       }
 
@@ -678,6 +686,23 @@ export class StripeService extends PaymentProviderAbstract {
         subscription.customer as string
       );
       if (!org) {
+        return { ok: true };
+      }
+
+      if (charges) {
+        const plan = pricing[subscription.metadata?.billing || '']?.label;
+        await this.notifyBilling(
+          org.id,
+          'Your free trial ends soon',
+          `Your PostDelegate free trial ends on ${dayjs
+            .unix(subscription.trial_end!)
+            .format('MMMM D, YYYY')}, and the card on file will then be charged for your ${
+            plan ? `${escape(plan)} ` : ''
+          }plan. Billing shows the amount. To change or cancel your plan before then, open Settings > Billing (${
+            process.env.FRONTEND_URL
+          }/billing).`,
+          'Manage billing'
+        );
         return { ok: true };
       }
 
