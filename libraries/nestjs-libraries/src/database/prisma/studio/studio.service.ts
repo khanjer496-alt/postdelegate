@@ -294,6 +294,14 @@ export class StudioService {
     if (body.script) {
       words = wordsFromScript(body.script, trim.start, trim.end);
     } else {
+      // Whisper is a Studio feature like rendering: it needs an active plan
+      if (!(await this.billing(org)).subscribed) {
+        throw new HttpException(
+          'Studio needs an active plan. Pick one in Billing to make captions.',
+          406
+        );
+      }
+
       // one transcription at a time per workspace: each runs ffmpeg here
       // and spends the workspace's own OpenAI credit
       const lock = `studioTranscribe:${org}`;
@@ -341,11 +349,19 @@ export class StudioService {
       throw new BadRequestException('This video is not in the media library');
     }
 
-    // a server-wide cap: every transcription runs ffmpeg in the API process
-    const slot = await ioRedis.incr('studioTranscribeRunning');
-    await ioRedis.expire('studioTranscribeRunning', 120);
-    if (slot > MAX_TRANSCRIPTIONS) {
-      await ioRedis.decr('studioTranscribeRunning');
+    // A server-wide cap: every transcription runs ffmpeg in the API process.
+    // Each one holds a slot key that expires by itself after the budget, so a
+    // crashed request never keeps a slot
+    const token = randomBytes(16).toString('hex');
+    let slot: string | undefined;
+    for (let i = 0; i < MAX_TRANSCRIPTIONS && !slot; i++) {
+      if (
+        await ioRedis.set(`studioTranscribeSlot:${i}`, token, 'EX', 60, 'NX')
+      ) {
+        slot = `studioTranscribeSlot:${i}`;
+      }
+    }
+    if (!slot) {
       throw new HttpException(
         'Studio is busy right now, try again in a minute',
         429
@@ -356,8 +372,8 @@ export class StudioService {
       this.tmpRoot(),
       `transcribe-${source.media.id}-${Date.now()}`
     );
-    await mkdir(dir, { recursive: true });
     try {
+      await mkdir(dir, { recursive: true });
       // mono 16 kHz at 32 kbps: 180 seconds stay far below Whisper's 25 MB
       await this.run(
         'ffmpeg',
@@ -399,12 +415,12 @@ export class StudioService {
             timestamp_granularities: ['word'],
           },
           {
-            // what is left of the 55 seconds the request may take
-            timeout: Math.max(
-              5000,
-              TRANSCRIBE_BUDGET - (Date.now() - startedAt)
+            // what is left of the 55 seconds the request may take, for the
+            // whole call: no retry, a retry would start a fresh timeout
+            maxRetries: 0,
+            signal: AbortSignal.timeout(
+              Math.max(1000, TRANSCRIBE_BUDGET - (Date.now() - startedAt))
             ),
-            maxRetries: 1,
           }
         );
       } catch (err) {
@@ -441,7 +457,9 @@ export class StudioService {
       );
       throw new HttpException('The sound of this clip could not be read', 400);
     } finally {
-      await ioRedis.decr('studioTranscribeRunning');
+      if ((await ioRedis.get(slot)) === token) {
+        await ioRedis.del(slot);
+      }
       await rm(dir, { recursive: true, force: true });
     }
   }

@@ -193,8 +193,6 @@ export class StudioRepository {
     });
   }
 
-  // Renders of a workspace that are queued or running, oldest first: the
-  // oldest is the one whose turn it is
   // Whether the render may still save its video: not cancelled, failed or
   // saved, and its project not deleted
   async isRenderLive(id: string) {
@@ -266,6 +264,8 @@ export class StudioRepository {
     }
   }
 
+  // Renders of a workspace that are queued or running, oldest first: the
+  // oldest is the one whose turn it is
   getActiveRenders(org: string) {
     return this._studioRender.model.studioRender.findMany({
       where: {

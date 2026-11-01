@@ -15,9 +15,6 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
     set: (...args: unknown[]) => redisSet(...args),
     del: (...args: unknown[]) => redisDel(...args),
     get: (...args: unknown[]) => redisGet(...args),
-    incr: jest.fn().mockResolvedValue(1),
-    decr: jest.fn(),
-    expire: jest.fn(),
   },
 }));
 jest.mock(
@@ -570,6 +567,33 @@ describe('StudioService transcribe', () => {
       429
     );
     expect(aiCredentialService.hasCredential).not.toHaveBeenCalled();
+  });
+
+  it('needs an active plan for Whisper but not for a typed script', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    const organizationService = {
+      getOrgByIdWithSubscription: jest
+        .fn()
+        .mockResolvedValue({
+          id: 'org-1',
+          isTrailing: false,
+          subscription: null,
+        }),
+    };
+    (service as any)._organizationService = organizationService;
+    try {
+      expect(
+        await service
+          .transcribe('org-1', 'project-1', {})
+          .catch((err: HttpException) => err.getStatus())
+      ).toBe(406);
+      expect(aiCredentialService.hasCredential).not.toHaveBeenCalled();
+      await expect(
+        service.transcribe('org-1', 'project-1', { script: 'one two' })
+      ).resolves.toBeTruthy();
+    } finally {
+      delete process.env.STRIPE_PUBLISHABLE_KEY;
+    }
   });
 
   it('releases only its own transcription lock', async () => {
