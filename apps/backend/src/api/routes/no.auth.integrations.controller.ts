@@ -235,9 +235,13 @@ export class NoAuthIntegrationsController {
       )) &&
       !(await this._permissionsService.canAddChannel(org.id, org.createdAt))
     ) {
+      const message = await this._permissionsService
+        .channelLimitMessage(org.id)
+        .catch((): undefined => undefined);
       throw new SubscriptionException({
         section: Sections.CHANNEL,
         action: AuthorizationActions.Create,
+        ...(message ? { message } : {}),
       });
     }
 

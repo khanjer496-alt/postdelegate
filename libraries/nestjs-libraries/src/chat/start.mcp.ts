@@ -15,8 +15,7 @@ import { CLIPPING_WIDGET_URI, clippingWidgetHtml } from '@gitroom/nestjs-librari
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { McpRelayService } from '@gitroom/nestjs-libraries/chat/mcp.relay.service';
 import {
-  SUBSCRIPTION_ENDED_MESSAGE,
-  subscriptionEnded,
+  subscriptionProblem,
 } from '@gitroom/nestjs-libraries/chat/auth.context';
 const fixAcceptHeader = (req: Request) => {
   const value = 'application/json, text/event-stream';
@@ -397,8 +396,9 @@ export const startMcp = async (app: INestApplication) => {
 
     // 403, not 401: the token is fine, a 401 would send the client back
     // through OAuth for nothing
-    if (subscriptionEnded(auth)) {
-      res.status(403).json({ error: 'subscription_required', error_description: SUBSCRIPTION_ENDED_MESSAGE });
+    const problem = subscriptionProblem(auth);
+    if (problem) {
+      res.status(403).json({ error: 'subscription_required', error_description: problem });
       return;
     }
 
@@ -451,8 +451,9 @@ export const startMcp = async (app: INestApplication) => {
     }
 
     // @ts-ignore
-    if (subscriptionEnded(req.auth)) {
-      res.status(403).send(SUBSCRIPTION_ENDED_MESSAGE);
+    const problem = subscriptionProblem(req.auth);
+    if (problem) {
+      res.status(403).send(problem);
       return;
     }
 
@@ -495,8 +496,9 @@ export const startMcp = async (app: INestApplication) => {
     }
 
     // @ts-ignore
-    if (subscriptionEnded(req.auth)) {
-      res.status(403).send(SUBSCRIPTION_ENDED_MESSAGE);
+    const problem = subscriptionProblem(req.auth);
+    if (problem) {
+      res.status(403).send(problem);
       return;
     }
 
@@ -545,8 +547,9 @@ export const startMcp = async (app: INestApplication) => {
     }
 
     // @ts-ignore
-    if (subscriptionEnded(req.auth)) {
-      res.status(403).send(SUBSCRIPTION_ENDED_MESSAGE);
+    const problem = subscriptionProblem(req.auth);
+    if (problem) {
+      res.status(403).send(problem);
       return;
     }
 

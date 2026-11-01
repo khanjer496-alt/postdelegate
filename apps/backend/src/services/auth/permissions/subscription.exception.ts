@@ -48,13 +48,17 @@ export class SubscriptionExceptionFilter implements ExceptionFilter {
     // a full plan that sells extra channels adds them instead of upgrading,
     // priced for the subscription's billing period
     const offer = error.extraChannels;
-    const message = offer
-      ? `You have used all ${offer.totalChannels} channels of your ${
-          offer.plan
-        } plan. Add extra channels for $${offer.price.toFixed(
-          offer.price % 1 ? 2 : 0
-        )} a ${offer.period === 'YEARLY' ? 'year' : 'month'} each.`
-      : getErrorMessage(error, isMember);
+    // a channel limit filled by channels to reconnect says that first
+    const message =
+      error.section === Sections.CHANNEL && error.message
+        ? error.message
+        : offer
+        ? `You have used all ${offer.totalChannels} channels of your ${
+            offer.plan
+          } plan. Add extra channels for $${offer.price.toFixed(
+            offer.price % 1 ? 2 : 0
+          )} a ${offer.period === 'YEARLY' ? 'year' : 'month'} each.`
+        : getErrorMessage(error, isMember);
 
     // AI is denied only when the workspace has no OpenAI key of its own, which
     // is fixed in Settings → AI, not by paying. A member gets no link, as the

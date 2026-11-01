@@ -162,12 +162,18 @@ export class AuthService {
   // A provider sign-up for an email that already has a password account
   // would make a second, empty account
   private async assertNoPasswordAccount(email?: string) {
-    if (email && (await this._userService.getUserByEmail(email))) {
-      throw new HttpException(
-        'This email already has a PostDelegate account. Sign in with your email and password instead.',
-        400
-      );
+    const existing = email
+      ? await this._userService.getUserByEmail(email)
+      : null;
+    if (!existing) {
+      return;
     }
+    throw new HttpException(
+      existing.activated
+        ? 'This email already has a PostDelegate account. Sign in with your email and password instead.'
+        : 'This email already has a PostDelegate account that is not activated yet. Activate it from the email we sent you (you can resend it from the sign in page), then sign in with your email and password.',
+      400
+    );
   }
 
   public getOrgFromCookie(cookie?: string) {

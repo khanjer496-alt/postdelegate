@@ -212,3 +212,27 @@ describe('PermissionsService AutoPost', () => {
     expect(await canDo('USER', Sections.AUTO_POST)).toBe(true);
   });
 });
+
+describe('PermissionsService channel limit wording', () => {
+  const serviceWith = (channels: object[]) =>
+    new PermissionsService(
+      {} as any,
+      {} as any,
+      { getIntegrationsList: jest.fn().mockResolvedValue(channels) } as any,
+      {} as any,
+      {} as any
+    );
+
+  it('says to reconnect or remove first when such channels fill the slots', async () => {
+    expect(
+      await serviceWith([
+        { id: 'a', refreshNeeded: true },
+        { id: 'b' },
+      ]).channelLimitMessage('org')
+    ).toContain('1 of them needs a reconnect or is turned off. Reconnect or remove a channel first');
+  });
+
+  it('keeps the usual wording when every channel works', async () => {
+    expect(await serviceWith([{ id: 'a' }]).channelLimitMessage('org')).toBeUndefined();
+  });
+});

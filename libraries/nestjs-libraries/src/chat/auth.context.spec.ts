@@ -1,9 +1,10 @@
 import {
+  PLAN_NEEDED_MESSAGE,
   SUBSCRIPTION_ENDED_MESSAGE,
-  subscriptionEnded,
+  subscriptionProblem,
 } from '@gitroom/nestjs-libraries/chat/auth.context';
 
-describe('subscriptionEnded (MCP auth)', () => {
+describe('subscriptionProblem (MCP auth)', () => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   afterEach(() => {
     if (stripeKey === undefined) {
@@ -13,31 +14,38 @@ describe('subscriptionEnded (MCP auth)', () => {
     }
   });
 
-  it('blocks an organization without a subscription when billing is on', () => {
+  it('says the subscription ended for a workspace that had one', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
-    expect(subscriptionEnded({ subscription: null })).toBe(true);
+    expect(subscriptionProblem({ subscription: null, paymentId: 'cus_1' })).toBe(
+      SUBSCRIPTION_ENDED_MESSAGE
+    );
+    expect(SUBSCRIPTION_ENDED_MESSAGE).toContain(
+      'Your PostDelegate subscription has ended'
+    );
+  });
+
+  it('says an active plan is needed for a workspace that never subscribed', () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    expect(subscriptionProblem({ subscription: null, paymentId: null })).toBe(
+      PLAN_NEEDED_MESSAGE
+    );
+    expect(PLAN_NEEDED_MESSAGE).toContain('needs an active plan');
   });
 
   it('lets a subscribed organization through', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
     expect(
-      subscriptionEnded({ subscription: { subscriptionTier: 'PRO' } })
-    ).toBe(false);
+      subscriptionProblem({ subscription: { subscriptionTier: 'PRO' } })
+    ).toBeNull();
   });
 
   it('never blocks when billing is off (self-hosted)', () => {
     delete process.env.STRIPE_SECRET_KEY;
-    expect(subscriptionEnded({ subscription: null })).toBe(false);
+    expect(subscriptionProblem({ subscription: null })).toBeNull();
   });
 
   it('leaves a missing organization to the invalid token answer', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
-    expect(subscriptionEnded(undefined)).toBe(false);
-  });
-
-  it('says the subscription has ended in plain words', () => {
-    expect(SUBSCRIPTION_ENDED_MESSAGE).toContain(
-      'Your PostDelegate subscription has ended'
-    );
+    expect(subscriptionProblem(undefined)).toBeNull();
   });
 });

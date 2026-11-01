@@ -516,4 +516,11 @@ describe('AuthService invites and provider accounts', () => {
     ).rejects.toThrow('Sign in with your email and password instead');
     expect(organizations.createOrgAndUser).not.toHaveBeenCalled();
   });
+
+  it('tells an unactivated password account to activate before signing in', async () => {
+    const { service } = setupInvites({ localUser: localUser({ activated: false }) });
+    await expect(service.checkExists('GOOGLE', 'code', undefined, 's', 's')).rejects.toThrow(
+      'not activated yet. Activate it from the email we sent you'
+    );
+  });
 });

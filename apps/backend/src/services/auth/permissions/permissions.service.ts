@@ -121,6 +121,22 @@ export class PermissionsService {
     return this.allows(orgId, created_at, Sections.CHANNEL);
   }
 
+  // When channels that need a reconnect or are turned off fill the plan's
+  // slots, fixing or removing one of those comes before upgrading
+  async channelLimitMessage(orgId: string) {
+    const stuck = (
+      await this._integrationService.getIntegrationsList(orgId)
+    ).filter((channel) => channel.refreshNeeded || channel.disabled).length;
+    if (!stuck) {
+      return undefined;
+    }
+    return `All the channels of your plan are in use, and ${stuck} of them ${
+      stuck === 1 ? 'needs' : 'need'
+    } a reconnect or ${
+      stuck === 1 ? 'is' : 'are'
+    } turned off. Reconnect or remove a channel first, or upgrade your plan to add more channels.`;
+  }
+
   async check(
     orgId: string,
     created_at: Date,

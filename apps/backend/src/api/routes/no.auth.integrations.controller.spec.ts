@@ -30,6 +30,7 @@ const make = (
   const org = { id: 'org-1', apiKey: 'api', isTrailing: false };
   const permissions = {
     canAddChannel: jest.fn(async () => limits.canAdd ?? true),
+    channelLimitMessage: jest.fn(async (): Promise<string | undefined> => undefined),
   };
   const integrationService = {
     getIntegrationByInternalId: jest.fn(async () => limits.existing ?? null),
