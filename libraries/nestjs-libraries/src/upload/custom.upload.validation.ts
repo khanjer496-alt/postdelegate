@@ -17,20 +17,13 @@ export const UPLOAD_ALLOWED_MIME = new Set<string>([
   'video/mp4',
 ]);
 
-// What Studio takes as music (POST /studio/assets): mp3, m4a (some apps
-// write it with an mp4 brand) and wav, kept out of the media library
-export const STUDIO_AUDIO_MIME = new Set<string>([
-  'audio/mpeg',
-  'audio/x-m4a',
-  'audio/mp4',
-  'video/mp4',
-  'audio/wav',
-]);
-
-// The types an upload route accepts and the size cap of each
+// The types an upload route accepts and the size cap of each; the media
+// library's when a route gives none
 export interface UploadRules {
   allowed: Set<string>;
   maxSize: (mimeType: string) => number;
+  // the largest file of any allowed type
+  fileSize: number;
 }
 
 export function getMaxSize(mimeType: string): number {
@@ -68,7 +61,10 @@ export async function uploadStreamToStorage(
   storage: IUploadProvider,
   webStream: ReadableStream,
   declaredSize = 0,
-  rules: UploadRules = { allowed: UPLOAD_ALLOWED_MIME, maxSize: getMaxSize }
+  rules: Omit<UploadRules, 'fileSize'> = {
+    allowed: UPLOAD_ALLOWED_MIME,
+    maxSize: getMaxSize,
+  }
 ) {
   let sniffed: ReadableStream & { fileType?: { mime: string; ext: string } };
   try {

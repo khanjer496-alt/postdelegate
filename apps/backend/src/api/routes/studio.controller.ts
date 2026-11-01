@@ -26,7 +26,8 @@ import {
   UpdateStudioProjectDto,
 } from '@gitroom/nestjs-libraries/dtos/studio/studio.project.dto';
 import { StudioScheduleRendersDto } from '@gitroom/nestjs-libraries/dtos/studio/studio.schedule.dto';
-import { studioAudioUploadOptions } from '@gitroom/nestjs-libraries/upload/multer.stream.engine';
+import { streamUploadOptions } from '@gitroom/nestjs-libraries/upload/multer.stream.engine';
+import { STUDIO_MUSIC_UPLOAD } from '@gitroom/nestjs-libraries/dtos/studio/studio.music.dto';
 import { userActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
 import {
   AuthorizationActions,
@@ -108,7 +109,7 @@ export class StudioController {
   @UseGuards(ThrottlerRealIpGuard)
   @Throttle({ default: { limit: 60, ttl: HOUR } })
   @Post('/assets')
-  @UseInterceptors(FileInterceptor('file', studioAudioUploadOptions()))
+  @UseInterceptors(FileInterceptor('file', streamUploadOptions(STUDIO_MUSIC_UPLOAD)))
   uploadAsset(
     @GetOrgFromRequest() org: Organization,
     @UploadedFile() file: Express.Multer.File
@@ -130,24 +131,30 @@ export class StudioController {
   }
 
   // Finished videos scheduled at once, with every check of the bulk video
-  // upload: the plan check of POST /posts, then the posts left this month
+  // upload: the plan check of POST /posts for a request never sent before
+  // (sending one again gets its result), then the posts left this month
   @Post('/renders/schedule')
   async scheduleRenders(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Body() body: StudioScheduleRendersDto
   ) {
-    const ability = await this._permissionsService.check(
-      org.id,
-      org.createdAt,
-      (org as any).users[0].role,
-      [[AuthorizationActions.Create, Sections.POSTS_PER_MONTH]]
-    );
-    if (!ability.can(AuthorizationActions.Create, Sections.POSTS_PER_MONTH)) {
-      throw new SubscriptionException({
-        action: AuthorizationActions.Create,
-        section: Sections.POSTS_PER_MONTH,
-      });
+    if (
+      (await this._studioScheduleService.status(org.id, body)).status ===
+      'none'
+    ) {
+      const ability = await this._permissionsService.check(
+        org.id,
+        org.createdAt,
+        (org as any).users[0].role,
+        [[AuthorizationActions.Create, Sections.POSTS_PER_MONTH]]
+      );
+      if (!ability.can(AuthorizationActions.Create, Sections.POSTS_PER_MONTH)) {
+        throw new SubscriptionException({
+          action: AuthorizationActions.Create,
+          section: Sections.POSTS_PER_MONTH,
+        });
+      }
     }
     const remaining = await this._permissionsService.remainingPostsThisMonth(
       org.id,

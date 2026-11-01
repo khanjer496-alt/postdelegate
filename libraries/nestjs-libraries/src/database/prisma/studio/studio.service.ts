@@ -245,14 +245,26 @@ export class StudioService {
       throw new BadRequestException('The project is too large');
     }
 
-    if (spec) {
-      await this.useMusic(org, id, project.spec?.music, body.spec?.music);
+    // most saves keep the music as it was and skip this
+    const music = this.musicChange(project.spec?.music, body.spec?.music);
+    if (spec && music.changed && music.assetId) {
+      const asset = await this._studioRepository.getAsset(org, music.assetId);
+      if (!asset || (asset.projectId && asset.projectId !== id)) {
+        throw new BadRequestException(
+          'This music is not available anymore, add it again'
+        );
+      }
     }
 
     await this._studioRepository.updateProject(org, id, {
       ...(body.name ? { name: body.name } : {}),
       ...(spec ? { spec } : {}),
     });
+
+    // only once the settings that name it are saved
+    if (spec && music.changed) {
+      await this.useMusic(org, id, music.assetId);
+    }
     return this.getProject(org, id);
   }
 
@@ -356,36 +368,32 @@ export class StudioService {
     };
   }
 
+  // The music asset the new settings name, and whether it is another one
+  // than the saved settings named
+  private musicChange(before: unknown, after: unknown) {
+    const idOf = (value: unknown) => {
+      const id =
+        value && typeof value === 'object'
+          ? (value as { assetId?: unknown }).assetId
+          : undefined;
+      return typeof id === 'string' ? id : undefined;
+    };
+    const assetId = idOf(after);
+    return { assetId, changed: assetId !== idOf(before) };
+  }
+
   // The project keeps the music its settings name and lets go of any other:
-  // one it lets go of is removed after a week. Music of another workspace or
-  // project can't be taken
+  // one it lets go of is removed after a week. Music another project took
+  // in the meantime stays with it
   private async useMusic(
     org: string,
     projectId: string,
-    before: unknown,
-    music: unknown
+    assetId: string | undefined
   ) {
-    const idOf = (value: unknown) =>
-      value && typeof value === 'object'
-        ? (value as { assetId?: unknown }).assetId
-        : undefined;
-    const assetId = idOf(music);
-    // most saves keep the music as it was
-    if (assetId === idOf(before)) {
-      return;
+    if (assetId) {
+      await this._studioRepository.attachAsset(org, assetId, projectId);
     }
-    if (typeof assetId === 'string') {
-      if (!(await this._studioRepository.attachAsset(org, assetId, projectId))) {
-        throw new BadRequestException(
-          'This music is not available anymore, add it again'
-        );
-      }
-    }
-    await this._studioRepository.detachAssets(
-      org,
-      projectId,
-      typeof assetId === 'string' ? assetId : undefined
-    );
+    await this._studioRepository.detachAssets(org, projectId, assetId);
   }
 
   private async removeAsset(asset: { id: string; path: string }) {
@@ -1159,6 +1167,9 @@ export class StudioService {
         const image = IMAGE_EXTENSIONS.includes(ext);
         if (image && !template.instance.allowsImage(spec, index)) {
           throw new StudioStop('This template needs a video, not a picture.');
+        }
+        if (!image && !template.instance.allowsVideo(spec, index)) {
+          throw new StudioStop('This template takes pictures, not videos.');
         }
 
         const file = `source-${index}${ext}`;

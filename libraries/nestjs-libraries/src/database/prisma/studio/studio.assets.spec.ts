@@ -72,7 +72,6 @@ describe('StudioService music, pictures and cleanup', () => {
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
     dir = mkdtempSync(join(tmpdir(), 'studio-assets-'));
     process.env.STUDIO_TMP_DIR = dir;
-    process.env.STUDIO_MIN_FREE_GB = '0';
     organizationService = {
       getOrgByIdWithSubscription: jest.fn().mockResolvedValue({
         id: 'org-1',
@@ -144,7 +143,6 @@ describe('StudioService music, pictures and cleanup', () => {
     rmSync(dir, { recursive: true, force: true });
     delete process.env.STRIPE_PUBLISHABLE_KEY;
     delete process.env.STUDIO_TMP_DIR;
-    delete process.env.STUDIO_MIN_FREE_GB;
   });
 
   describe('uploads', () => {
@@ -203,13 +201,33 @@ describe('StudioService music, pictures and cleanup', () => {
     });
 
     it('refuses music of another workspace or project', async () => {
-      repository.attachAsset.mockResolvedValue(false);
+      repository.getAsset.mockResolvedValueOnce(null);
+      expect(
+        await status(
+          service.updateProject('org-1', 'project-1', { spec: slideshow(true) })
+        )
+      ).toBe(400);
+      repository.getAsset.mockResolvedValueOnce({
+        id: assetId,
+        name: 'abc.mp3',
+        path: 'https://media.example/abc.mp3',
+        projectId: 'project-2',
+      });
       expect(
         await status(
           service.updateProject('org-1', 'project-1', { spec: slideshow(true) })
         )
       ).toBe(400);
       expect(repository.updateProject).not.toHaveBeenCalled();
+      expect(repository.attachAsset).not.toHaveBeenCalled();
+    });
+
+    it('takes the music only once the settings are saved', async () => {
+      repository.updateProject.mockRejectedValueOnce(new Error('db down'));
+      await expect(
+        service.updateProject('org-1', 'project-1', { spec: slideshow(true) })
+      ).rejects.toThrow('db down');
+      expect(repository.attachAsset).not.toHaveBeenCalled();
     });
 
     it('lets go of the music when it is taken out', async () => {
@@ -302,6 +320,10 @@ describe('StudioService music, pictures and cleanup', () => {
     let plan: jest.SpyInstance;
 
     beforeEach(() => {
+      // the free space of the machine running the tests is not the point
+      jest
+        .spyOn(service as any, 'checkFreeDisk')
+        .mockResolvedValue(undefined);
       download = jest
         .spyOn(service as any, 'download')
         .mockResolvedValue(undefined);
@@ -360,7 +382,7 @@ describe('StudioService music, pictures and cleanup', () => {
       expect(download).not.toHaveBeenCalled();
     });
 
-    it('refuses a video in a slideshow after probing it', async () => {
+    it('refuses a video in a slideshow before downloading it', async () => {
       mediaService.getOrgMediaById.mockResolvedValue({
         id: mediaId,
         name: 'abc.mp4',
@@ -371,8 +393,9 @@ describe('StudioService music, pictures and cleanup', () => {
       renderOf('image-slideshow', slideshow());
       await expect(service.render('render-1')).rejects.toMatchObject({
         type: 'studio_stop',
-        message: expect.stringContaining('made of pictures'),
+        message: 'This template takes pictures, not videos.',
       });
+      expect(download).not.toHaveBeenCalled();
     });
 
     it('refuses music of another workspace', async () => {

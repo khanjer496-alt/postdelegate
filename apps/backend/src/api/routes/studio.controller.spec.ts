@@ -14,7 +14,7 @@ jest.mock('@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.s
   userActor: (user: any) => ({ type: 'user', userId: user.id }),
 }));
 jest.mock('@gitroom/nestjs-libraries/upload/multer.stream.engine', () => ({
-  studioAudioUploadOptions: () => ({}),
+  streamUploadOptions: () => ({}),
 }));
 
 import { BadRequestException } from '@nestjs/common';
@@ -30,11 +30,16 @@ describe('StudioController', () => {
     content: 'New video',
   };
 
-  const make = (allowed: boolean, remaining: number | null = 4) => {
+  const make = (
+    allowed: boolean,
+    remaining: number | null = 4,
+    status: 'none' | 'running' | 'done' = 'none'
+  ) => {
     const studio = {
       saveAsset: jest.fn().mockResolvedValue({ id: 'asset-1' }),
     };
     const schedule = {
+      status: jest.fn().mockResolvedValue({ key: 'k', status }),
       scheduleRenders: jest.fn().mockResolvedValue({ created: 1 }),
     };
     const permissions = {
@@ -73,6 +78,15 @@ describe('StudioController', () => {
       type: 'user',
       userId: 'u-1',
     });
+  });
+
+  it('lets a request sent before through without the plan check, for its result', async () => {
+    const { controller, schedule, permissions } = make(false, 0, 'done');
+    expect(await controller.scheduleRenders(org, user, body)).toEqual({
+      created: 1,
+    });
+    expect(permissions.check).not.toHaveBeenCalled();
+    expect(schedule.scheduleRenders).toHaveBeenCalled();
   });
 
   it('saves an uploaded music file for the request workspace', async () => {

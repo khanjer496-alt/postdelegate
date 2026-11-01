@@ -17,7 +17,7 @@ const renderB = '9b2f4c1d-3e5a-4b6c-8d7e-0f1a2b3c4d5e';
 
 describe('StudioScheduleService', () => {
   let repository: { getRendersToSchedule: jest.Mock };
-  let bulk: { preview: jest.Mock; create: jest.Mock };
+  let bulk: { status: jest.Mock; preview: jest.Mock; create: jest.Mock };
   let service: StudioScheduleService;
   const body = {
     renderIds: [renderB, renderA, renderB],
@@ -33,6 +33,7 @@ describe('StudioScheduleService', () => {
       ]),
     };
     bulk = {
+      status: jest.fn().mockResolvedValue({ key: 'k', status: 'none' }),
       preview: jest
         .fn()
         .mockResolvedValue({ invalid: 0, posts: [], total: 2, valid: 2 }),
@@ -83,6 +84,22 @@ describe('StudioScheduleService', () => {
     await service.scheduleRenders('org-1', body, null);
     await service.scheduleRenders('org-1', body, null);
     expect(bulk.create.mock.calls[0][1]).toEqual(bulk.create.mock.calls[1][1]);
+  });
+
+  it('returns the result of a request sent before without checking it again', async () => {
+    bulk.status.mockResolvedValue({ key: 'k', status: 'done' });
+    bulk.create.mockResolvedValue({ created: 2, alreadyCreated: true });
+    expect(await service.scheduleRenders('org-1', body, 0)).toEqual({
+      created: 2,
+      alreadyCreated: true,
+    });
+    expect(bulk.preview).not.toHaveBeenCalled();
+  });
+
+  it('reads where a request stands by the same request', async () => {
+    await service.status('org-1', body);
+    await service.scheduleRenders('org-1', body, null);
+    expect(bulk.status.mock.calls[0][1]).toEqual(bulk.create.mock.calls[0][1]);
   });
 
   it('adds drafts when asked', async () => {

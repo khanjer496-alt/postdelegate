@@ -43,6 +43,10 @@ export class ImageSlideshowTemplate extends StudioTemplateAbstract<ImageSlidesho
     return true;
   }
 
+  allowsVideo() {
+    return false;
+  }
+
   check(spec: ImageSlideshowDto) {
     return spec.slides.length < STUDIO_MIN_SLIDES
       ? `Add at least ${STUDIO_MIN_SLIDES} pictures`

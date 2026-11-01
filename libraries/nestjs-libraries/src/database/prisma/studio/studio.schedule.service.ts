@@ -16,17 +16,13 @@ export class StudioScheduleService {
     private _postsBulkVideosService: PostsBulkVideosService
   ) {}
 
-  // One post a video on every channel, each in the next free time slot of
-  // the channel, through every check of POST /posts. "remaining" is what the
-  // plan still allows this month (null for no limit), "actor" the member
-  // scheduling (approvals apply). Sending the same renders, channels and
-  // text again the same day returns the first result instead of posting twice
-  async scheduleRenders(
+  // The bulk video request of the renders: one video each, in the order they
+  // were picked, in the free time slots of every channel from today. The
+  // same renders, channels and text make the same request all day long
+  private async request(
     org: string,
-    body: StudioScheduleRendersDto,
-    remaining: number | null,
-    actor?: ApprovalActor
-  ) {
+    body: StudioScheduleRendersDto
+  ): Promise<BulkVideoPostsDto> {
     const ids = uniq(body.renderIds);
     const renders = await this._studioRepository.getRendersToSchedule(
       org,
@@ -39,7 +35,7 @@ export class StudioScheduleService {
     }
 
     const byId = new Map(renders.map((render) => [render.id, render]));
-    const request: BulkVideoPostsDto = {
+    return {
       type: body.type || 'schedule',
       schedule: {
         mode: 'slots',
@@ -49,6 +45,40 @@ export class StudioScheduleService {
       channels: body.integrations,
       videos: ids.map((id) => ({ mediaId: byId.get(id)!.mediaId! })),
     };
+  }
+
+  // Where the same request stands: never sent, running, or done
+  async status(org: string, body: StudioScheduleRendersDto) {
+    return this._postsBulkVideosService.status(
+      org,
+      await this.request(org, body)
+    );
+  }
+
+  // One post a video on every channel, each in the next free time slot of
+  // the channel, through every check of POST /posts. "remaining" is what the
+  // plan still allows this month (null for no limit), "actor" the member
+  // scheduling (approvals apply). Sending the same renders, channels and
+  // text again the same day returns the first result instead of posting twice
+  async scheduleRenders(
+    org: string,
+    body: StudioScheduleRendersDto,
+    remaining: number | null,
+    actor?: ApprovalActor
+  ) {
+    const request = await this.request(org, body);
+    // a request sent before gets its result (or its 409 while it runs)
+    if (
+      (await this._postsBulkVideosService.status(org, request)).status !==
+      'none'
+    ) {
+      return this._postsBulkVideosService.create(
+        org,
+        request,
+        remaining,
+        actor
+      );
+    }
 
     // the problems of every video in one message, before anything is created
     const preview = await this._postsBulkVideosService.preview(

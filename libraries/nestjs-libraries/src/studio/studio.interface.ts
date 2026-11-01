@@ -193,6 +193,11 @@ export abstract class StudioTemplateAbstract<
     return false;
   }
 
+  // Whether it may be a video, checked before anything is downloaded
+  allowsVideo(spec: T, index: number) {
+    return true;
+  }
+
   // The music asset of the workspace the spec picked
   musicAssetId(spec: T): string | undefined {
     return (spec as { music?: StudioMusicDto }).music?.assetId;

@@ -10,6 +10,11 @@ import {
   Avatar,
   StatusChip,
 } from '@gitroom/frontend/components/launches/import/import.posts.modal';
+import {
+  SettingInput,
+  cleanSettings,
+  initialSettings,
+} from '@gitroom/frontend/components/launches/import/bulk.videos.modal';
 import { Segmented } from '@gitroom/frontend/components/studio/studio.settings';
 import {
   StudioFinishedRender,
@@ -32,72 +37,27 @@ type ScheduleResult = {
   posts: { index: number; status: string; error?: string }[];
 };
 
-// The settings a network needs, as the bulk video upload asks for them
+// The settings a network needs, with the same inputs and defaults as the
+// bulk video upload
 const ChannelSettings: FC<{
   channel: StudioScheduleChannel;
   values: Record<string, any>;
   onChange: (values: Record<string, any>) => void;
 }> = ({ channel, values, onChange }) => {
-  const id = useId();
   const fields = channel.settings.filter((field) => field.required);
   if (!fields.length) {
     return null;
   }
   return (
     <div className="flex flex-col gap-[8px] ps-[32px]">
-      {fields.map((field) => {
-        const key = `${id}-${field.key}`;
-        const value = values[field.key] ?? field.defaultValue ?? '';
-        return (
-          <label key={field.key} htmlFor={key} className="flex flex-col gap-[4px] text-[13px]">
-            <span className="text-textItemBlur capitalize">
-              {field.key.replace(/_/g, ' ')}
-            </span>
-            {field.type === 'select' ? (
-              <select
-                id={key}
-                value={value}
-                onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
-                className="bg-newBgColorInner h-[36px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] text-textColor outline-none"
-              >
-                <option value="">—</option>
-                {(field.options || []).map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            ) : field.type === 'boolean' ? (
-              <input
-                id={key}
-                type="checkbox"
-                checked={!!values[field.key]}
-                onChange={(e) =>
-                  onChange({ ...values, [field.key]: e.target.checked })
-                }
-                className="w-[16px] h-[16px] accent-btnPrimary"
-              />
-            ) : (
-              <input
-                id={key}
-                type={field.type === 'number' ? 'number' : 'text'}
-                value={value}
-                maxLength={field.maxLength}
-                onChange={(e) =>
-                  onChange({
-                    ...values,
-                    [field.key]:
-                      field.type === 'number'
-                        ? Number(e.target.value)
-                        : e.target.value,
-                  })
-                }
-                className="bg-newBgColorInner h-[36px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] text-textColor outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
-              />
-            )}
-          </label>
-        );
-      })}
+      {fields.map((field) => (
+        <SettingInput
+          key={field.key}
+          field={field}
+          value={values[field.key]}
+          onChange={(value) => onChange({ ...values, [field.key]: value })}
+        />
+      ))}
     </div>
   );
 };
@@ -136,7 +96,7 @@ const ScheduleRenders: FC<{
           renderIds: renders.map((render) => render.id),
           integrations: pickedIds.map((id) => ({
             id,
-            settings: picked[id],
+            settings: cleanSettings(picked[id]),
           })),
           content,
           type,
@@ -263,7 +223,7 @@ const ScheduleRenders: FC<{
                         setPicked((current) => {
                           const next = { ...current };
                           if (e.target.checked) {
-                            next[channel.id] = {};
+                            next[channel.id] = initialSettings(channel.settings);
                           } else {
                             delete next[channel.id];
                           }

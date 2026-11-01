@@ -9,12 +9,21 @@ import {
   Min,
 } from 'class-validator';
 import { STUDIO_MAX_SOURCE_SECONDS } from '@gitroom/nestjs-libraries/dtos/studio/studio.clip.dto';
+import type { UploadRules } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 
 // Music the workspace uploaded with POST /studio/assets. Only the id is read
 // by the render, which finds the file of the asset in our own storage
 export const STUDIO_MUSIC_MAX_BYTES = 30 * 1024 * 1024;
 // how loud the music sits under the sound of the clip when nothing is picked
 export const STUDIO_MUSIC_VOLUME = 0.25;
+
+// What POST /studio/assets takes, sniffed from the first bytes: mp3, m4a and
+// wav, 30 MB at most. A video is never taken, even in an mp4
+export const STUDIO_MUSIC_UPLOAD: UploadRules = {
+  allowed: new Set(['audio/mpeg', 'audio/x-m4a', 'audio/mp4', 'audio/wav']),
+  maxSize: () => STUDIO_MUSIC_MAX_BYTES,
+  fileSize: STUDIO_MUSIC_MAX_BYTES,
+};
 
 export class StudioMusicDto {
   @IsDefined()
