@@ -1261,6 +1261,8 @@ export class PostsService {
           emptyContent,
           tooLong,
           maximumCharacters,
+          // a turned off channel never publishes, API and MCP refuse it
+          disabled: !!integration.disabled,
         };
       })
     );

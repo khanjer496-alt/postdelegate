@@ -1092,7 +1092,7 @@ describe('PostsService.validatePosts post date context', () => {
       {} as any,
       {} as any
     );
-    return { service };
+    return { service, integrationService };
   };
 
   const postDate = dayjs.utc().add(2, 'day');
@@ -1160,5 +1160,22 @@ describe('PostsService.validatePosts post date context', () => {
       postDate.format('YYYY-MM-DDTHH:mm:ss')
     );
     expect(results.map((r) => r.valid)).toEqual([true, true]);
+  });
+
+  it('flags a turned off channel so API and MCP can refuse it', async () => {
+    const { service, integrationService } = makeValidationService();
+    integrationService.getIntegrationById.mockResolvedValue({
+      id: 'yt-1',
+      name: 'Channel',
+      providerIdentifier: 'youtube',
+      additionalSettings: '[]',
+      disabled: true,
+    });
+    const [result] = await service.validatePosts(
+      'org-1',
+      [youtubePost({})],
+      'draft'
+    );
+    expect(result.disabled).toBe(true);
   });
 });
