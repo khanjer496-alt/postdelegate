@@ -197,3 +197,24 @@ describe('IntegrationService.topViewedPosts', () => {
     expect(redis.set).not.toHaveBeenCalled();
   });
 });
+
+describe('IntegrationService.checkAnalytics on a channel without analytics', () => {
+  beforeEach(() => {
+    redis.get.mockReset().mockResolvedValue(undefined);
+  });
+
+  // the analytics page used to call .map on the error it got back
+  it.each([
+    ['disabled', channel({ disabled: true })],
+    ['half-connected', channel({ inBetweenSteps: true })],
+    ['deleted', channel({ deletedAt: new Date() })],
+    ['missing', null],
+  ])('answers [] for a %s channel, as the API documents', async (_, row) => {
+    const analytics = jest.fn();
+    const { service } = makeService({ analytics }, row as any);
+    await expect(service.checkAnalytics(org, 'int-1', '7')).resolves.toEqual(
+      []
+    );
+    expect(analytics).not.toHaveBeenCalled();
+  });
+});

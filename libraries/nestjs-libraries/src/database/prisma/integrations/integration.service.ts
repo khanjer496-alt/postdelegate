@@ -532,8 +532,10 @@ export class IntegrationService {
     const days = Number(date) > 0 ? Number(date) : 7;
     const getIntegration = await this.getIntegrationById(org.id, integration);
 
+    // a disabled, removed or half-connected channel has no analytics: `[]`,
+    // as the API documents, instead of an error the analytics page can't read
     if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
-      throw new Error('Invalid integration');
+      return [];
     }
 
     if (getIntegration.type !== 'social') {
