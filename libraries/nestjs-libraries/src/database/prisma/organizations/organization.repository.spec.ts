@@ -20,7 +20,7 @@ const makeRepo = () => {
     { model: { user } } as any,
     { model: { $transaction } } as any
   );
-  return { repo, user, userOrganization, $transaction };
+  return { repo, user, userOrganization, organization, $transaction };
 };
 
 describe('OrganizationRepository.addUserToOrg invites', () => {
@@ -47,7 +47,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'other@example.com')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'wrong_email' });
 
     expect(userOrganization.create).not.toHaveBeenCalled();
     expect($transaction).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', '')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'wrong_email' });
     expect($transaction).not.toHaveBeenCalled();
   });
 
@@ -68,7 +68,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'already_used' });
     expect($transaction).not.toHaveBeenCalled();
   });
 
@@ -78,8 +78,19 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'already_member' });
     expect($transaction).not.toHaveBeenCalled();
+  });
+
+  it('tells a member who already accepted the invite nothing went wrong', async () => {
+    const { repo, user, userOrganization } = makeRepo();
+    // the invite was used, by this very member
+    user.findFirst.mockResolvedValue({ id: 'user-1' });
+    userOrganization.findFirst.mockResolvedValue({ id: 'm-1' });
+
+    await expect(
+      repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+    ).resolves.toEqual({ failed: 'already_member' });
   });
 
   it('keeps admin-initiated adds (no invite email) working', async () => {
@@ -89,5 +100,102 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     expect(user.findUnique).not.toHaveBeenCalled();
     expect($transaction).toHaveBeenCalledTimes(1);
+  });
+
+  describe('with billing on', () => {
+    const key = process.env.STRIPE_PUBLISHABLE_KEY;
+    beforeEach(() => {
+      process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    });
+    afterEach(() => {
+      if (key === undefined) {
+        delete process.env.STRIPE_PUBLISHABLE_KEY;
+      } else {
+        process.env.STRIPE_PUBLISHABLE_KEY = key;
+      }
+    });
+
+    it.each([
+      ['a FREE or lapsed workspace', null],
+      ['a plan without team members', { subscriptionTier: 'STANDARD' }],
+    ])('does not add a member to %s', async (_, subscription) => {
+      const { repo, organization, $transaction } = makeRepo();
+      organization.findFirst.mockResolvedValue({ subscription });
+
+      await expect(
+        repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+      ).resolves.toEqual({ failed: 'plan' });
+      expect($transaction).not.toHaveBeenCalled();
+    });
+
+    it('adds a member to a plan with team members', async () => {
+      const { repo, organization, $transaction } = makeRepo();
+      organization.findFirst.mockResolvedValue({
+        subscription: { subscriptionTier: 'TEAM' },
+      });
+
+      await expect(
+        repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+      ).resolves.toEqual({ id: 'membership' });
+    });
+  });
+});
+
+describe('OrganizationRepository member emails', () => {
+  const makeEmailRepo = () => {
+    const organization = { findUnique: jest.fn().mockResolvedValue({ users: [] }) };
+    const repo = new OrganizationRepository(
+      { model: { organization } } as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { repo, organization };
+  };
+
+  it.each(['getAllUsersOrgs', 'getActiveTeam'] as const)(
+    '%s leaves out disabled members and deleted accounts',
+    async (method) => {
+      const { repo, organization } = makeEmailRepo();
+      await repo[method]('org-A');
+      expect(organization.findUnique.mock.calls[0][0].select.users.where).toEqual({
+        disabled: false,
+        user: { deletedAt: null },
+      });
+    }
+  );
+});
+
+describe('OrganizationRepository.changeTeamMemberRole', () => {
+  const makeRoleRepo = (role: string, owners: number) => {
+    const tx = {
+      userOrganization: {
+        findFirst: jest.fn(async () => ({ role })),
+        count: jest.fn(async () => owners),
+        update: jest.fn(async (args: any) => ({ role: args.data.role })),
+      },
+    };
+    const $transaction = jest.fn(async (fn: any, options: any) => fn(tx));
+    const repo = new OrganizationRepository(
+      {} as any,
+      {} as any,
+      {} as any,
+      { model: { $transaction } } as any
+    );
+    return { repo, tx, $transaction };
+  };
+
+  it('counts and updates in one serializable transaction', async () => {
+    const { repo, $transaction } = makeRoleRepo('SUPERADMIN', 2);
+    await expect(repo.changeTeamMemberRole('org-A', 'me', 'ADMIN' as any)).resolves.toEqual({
+      role: 'ADMIN',
+    });
+    expect($transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' });
+  });
+
+  it('never leaves a workspace without a Super Admin', async () => {
+    const { repo, tx } = makeRoleRepo('SUPERADMIN', 1);
+    await expect(repo.changeTeamMemberRole('org-A', 'me', 'ADMIN' as any)).resolves.toBeNull();
+    expect(tx.userOrganization.update).not.toHaveBeenCalled();
   });
 });

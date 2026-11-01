@@ -20,10 +20,12 @@ import { NotEnoughScopes } from '@gitroom/nestjs-libraries/integrations/social.a
 import {
   AuthorizationActions,
   Sections,
+  SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -32,7 +34,8 @@ export class NoAuthIntegrationsController {
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _organizationService: OrganizationService
+    private _organizationService: OrganizationService,
+    private _permissionsService: PermissionsService
   ) {}
 
   @Get('/')
@@ -221,6 +224,26 @@ export class NoAuthIntegrationsController {
       String(id),
       integration
     );
+
+    // This route runs without a session, so the guard never checked the plan's
+    // channel limit. A channel the workspace already has (a reconnect) never
+    // counts as a new one
+    if (
+      !(await this._integrationService.getIntegrationByInternalId(
+        org.id,
+        refresh || String(id)
+      )) &&
+      !(await this._permissionsService.canAddChannel(org.id, org.createdAt))
+    ) {
+      const message = await this._permissionsService
+        .channelLimitMessage(org.id)
+        .catch((): undefined => undefined);
+      throw new SubscriptionException({
+        section: Sections.CHANNEL,
+        action: AuthorizationActions.Create,
+        ...(message ? { message } : {}),
+      });
+    }
 
     if (refresh && String(id) !== String(refresh)) {
       // A reconnect that returns a different id is either the wrong account or

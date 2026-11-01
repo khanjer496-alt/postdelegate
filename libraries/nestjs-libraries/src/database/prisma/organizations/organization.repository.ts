@@ -1,10 +1,18 @@
 import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Role, ShortLinkPreference, SubscriptionTier } from '@prisma/client';
+import { Prisma, Role, ShortLinkPreference } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+
+// Why an invite could not be accepted, so the person can be told
+export type InviteFailure =
+  | 'wrong_email'
+  | 'already_used'
+  | 'already_member'
+  | 'plan';
 
 @Injectable()
 export class OrganizationRepository {
@@ -417,6 +425,22 @@ export class OrganizationRepository {
     // invited person can accept (admin-initiated adds have no invite email)
     invitedEmail?: string
   ) {
+    // first: someone who already joined (with this very invite or another
+    // way) is not told the invite failed
+    const alreadyMember = await this._userOrg.model.userOrganization.findFirst({
+      where: {
+        userId,
+        organizationId: orgId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (alreadyMember) {
+      return { failed: 'already_member' as InviteFailure };
+    }
+
     if (invitedEmail !== undefined) {
       const accepting = await this._user.model.user.findUnique({
         where: {
@@ -433,7 +457,7 @@ export class OrganizationRepository {
         accepting.email.trim().toLowerCase() !==
           invitedEmail.trim().toLowerCase()
       ) {
-        return false;
+        return { failed: 'wrong_email' as InviteFailure };
       }
     }
 
@@ -444,21 +468,7 @@ export class OrganizationRepository {
     });
 
     if (checkIfInviteExists) {
-      return false;
-    }
-
-    const alreadyMember = await this._userOrg.model.userOrganization.findFirst({
-      where: {
-        userId,
-        organizationId: orgId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (alreadyMember) {
-      return false;
+      return { failed: 'already_used' as InviteFailure };
     }
 
     const checkForSubscription =
@@ -471,12 +481,14 @@ export class OrganizationRepository {
         },
       });
 
+    // with billing on, only a live plan that includes team members takes
+    // new members (FREE and lapsed workspaces have no subscription)
+    const tier = checkForSubscription?.subscription?.subscriptionTier;
     if (
       process.env.STRIPE_PUBLISHABLE_KEY &&
-      checkForSubscription?.subscription?.subscriptionTier ===
-        SubscriptionTier.STANDARD
+      (!tier || !pricing[tier]?.team_members)
     ) {
-      return false;
+      return { failed: 'plan' as InviteFailure };
     }
 
     // joining and burning the invite id happen together, so a half applied
@@ -614,6 +626,106 @@ export class OrganizationRepository {
         users: {
           select: {
             role: true,
+            disabled: true,
+            user: {
+              select: {
+                email: true,
+                id: true,
+                sendSuccessEmails: true,
+                sendFailureEmails: true,
+                sendStreakEmails: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // a member of the workspace, with what decides whether they can own it
+  getTeamMember(orgId: string, userId: string) {
+    return this._userOrg.model.userOrganization.findFirst({
+      where: {
+        organizationId: orgId,
+        userId,
+      },
+      select: {
+        role: true,
+        disabled: true,
+        user: {
+          select: {
+            deletedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Changes a member's role, but never leaves the workspace without an active
+  // Super Admin (null then). The count and the update run in one serializable
+  // transaction, so two owners demoting each other at once can't both pass:
+  // one of them fails with a serialization error instead
+  changeTeamMemberRole(orgId: string, userId: string, role: Role) {
+    return this._transaction.model.$transaction(
+      async (tx) => {
+        const member = await tx.userOrganization.findFirst({
+          where: { organizationId: orgId, userId },
+          select: { role: true },
+        });
+        if (!member) {
+          return null;
+        }
+        if (member.role === Role.SUPERADMIN && role !== Role.SUPERADMIN) {
+          const owners = await tx.userOrganization.count({
+            where: {
+              organizationId: orgId,
+              role: Role.SUPERADMIN,
+              disabled: false,
+              user: {
+                deletedAt: null,
+              },
+            },
+          });
+          if (owners <= 1) {
+            return null;
+          }
+        }
+        return tx.userOrganization.update({
+          where: {
+            userId_organizationId: {
+              userId,
+              organizationId: orgId,
+            },
+          },
+          data: {
+            role,
+          },
+          select: {
+            role: true,
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+  }
+
+  // the members who still get the workspace's emails (digest, streak):
+  // not disabled, not deleted
+  getActiveTeam(orgId: string) {
+    return this._organization.model.organization.findUnique({
+      where: {
+        id: orgId,
+      },
+      select: {
+        users: {
+          where: {
+            disabled: false,
+            user: {
+              deletedAt: null,
+            },
+          },
+          select: {
+            role: true,
             user: {
               select: {
                 email: true,
@@ -658,6 +770,13 @@ export class OrganizationRepository {
       },
       select: {
         users: {
+          // a disabled member or a deleted account gets no post emails
+          where: {
+            disabled: false,
+            user: {
+              deletedAt: null,
+            },
+          },
           select: {
             user: {
               select: {

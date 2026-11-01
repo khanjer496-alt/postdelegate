@@ -14,6 +14,9 @@ import { UPLOAD_WIDGET_URI, uploadWidgetHtml } from '@gitroom/nestjs-libraries/c
 import { CLIPPING_WIDGET_URI, clippingWidgetHtml } from '@gitroom/nestjs-libraries/chat/ui/clipping.widget';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { McpRelayService } from '@gitroom/nestjs-libraries/chat/mcp.relay.service';
+import {
+  subscriptionProblem,
+} from '@gitroom/nestjs-libraries/chat/auth.context';
 const fixAcceptHeader = (req: Request) => {
   const value = 'application/json, text/event-stream';
   req.headers.accept = value;
@@ -391,6 +394,14 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
+    // 403, not 401: the token is fine, a 401 would send the client back
+    // through OAuth for nothing
+    const problem = subscriptionProblem(auth);
+    if (problem) {
+      res.status(403).json({ error: 'subscription_required', error_description: problem });
+      return;
+    }
+
     endListenStream(req, res);
     fixAcceptHeader(req);
     await runWithContext({ requestId: token!, auth, relay: relay || undefined, source }, async () => {
@@ -439,6 +450,13 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
+    // @ts-ignore
+    const problem = subscriptionProblem(req.auth);
+    if (problem) {
+      res.status(403).send(problem);
+      return;
+    }
+
     const url = new URL('/mcp', process.env.NEXT_PUBLIC_BACKEND_URL);
 
     endListenStream(req, res);
@@ -474,6 +492,13 @@ export const startMcp = async (app: INestApplication) => {
     // @ts-ignore
     if (!req.auth) {
       res.status(400).send('Invalid API Key');
+      return;
+    }
+
+    // @ts-ignore
+    const problem = subscriptionProblem(req.auth);
+    if (problem) {
+      res.status(403).send(problem);
       return;
     }
 
@@ -518,6 +543,13 @@ export const startMcp = async (app: INestApplication) => {
     // @ts-ignore
     if (!req.auth) {
       res.status(400).send('Invalid API Key');
+      return;
+    }
+
+    // @ts-ignore
+    const problem = subscriptionProblem(req.auth);
+    if (problem) {
+      res.status(403).send(problem);
       return;
     }
 

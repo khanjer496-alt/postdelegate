@@ -157,9 +157,16 @@ export class PublicIntegrationsController {
     @Body() rawBody: any
   ) {
     Sentry.metrics.count('public_api-request', 1);
+    // only the known types, anything else schedules like a missing type did
+    const type = ['draft', 'schedule', 'now', 'update'].includes(rawBody?.type)
+      ? rawBody.type
+      : 'schedule';
+    // a draft is validated as a draft (its settings can still be incomplete),
+    // like the dashboard and MCP do
     const body = await this._postsService.mapTypeToPost(
       {
         ...rawBody,
+        type,
         // a date per channel is a dashboard feature, the public API keeps one
         // date for the whole request
         posts: Array.isArray(rawBody?.posts)
@@ -167,13 +174,9 @@ export class PublicIntegrationsController {
           : rawBody?.posts,
       },
       org.id,
-      rawBody?.type === 'draft' || true,
-      rawBody?.type
+      false,
+      type
     );
-    // only the known types, anything else schedules like a missing type did
-    body.type = ['draft', 'schedule', 'now', 'update'].includes(rawBody?.type)
-      ? rawBody.type
-      : 'schedule';
 
     if (
       process.env.RESTRICT_UPLOAD_DOMAINS &&
@@ -216,6 +219,14 @@ export class PublicIntegrationsController {
         fail(
           item,
           'Your post should have at least one character or one image.'
+        );
+      }
+      // a turned off channel would only fail at publish; a draft or an
+      // update never publishes from here
+      if (item.disabled && body.type !== 'update' && body.type !== 'draft') {
+        fail(
+          item,
+          `${item.name} is turned off. Turn it on from the channel menu in the calendar, or pick another channel.`
         );
       }
     }

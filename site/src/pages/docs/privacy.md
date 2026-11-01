@@ -24,6 +24,8 @@ You can also revoke access from the network's side, for example by deleting an a
 
 ## Deleting your account and data
 
+Workspaces shared with other people stay with their members. If you are the only owner of a workspace others use, make another member the owner first. See [Transfer ownership](/docs/team#transfer-ownership).
+
 To delete your account or ask what we hold about you, follow the instructions on the [data deletion page](https://app.postdelegate.com/legal/data-deletion), or email [support@postdelegate.com](mailto:support@postdelegate.com) from the address on your account. We may need to confirm that you own the account before acting. Never send passwords, API keys or tokens by email.
 
 ## Credentials and keys

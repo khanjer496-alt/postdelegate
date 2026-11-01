@@ -22,7 +22,21 @@ Team members share your workspace so they can create, review and schedule posts 
 | **Admin** | Manage the workspace, including inviting and removing team members, within the limits of your plan. |
 | **User** | Work on posts and channels. The **Teams** tab is not shown to this role. |
 
-You can only manage members at a lower level than your own. To remove a team member, use **Remove** next to their name in **Settings > Teams**. The workspace owner appears as **Super Admin**.
+You can only manage members at a lower level than your own. To remove a team member, use **Remove** next to their name in **Settings > Teams**. You can't remove yourself. The workspace owner appears as **Super Admin**.
+
+### Transfer ownership
+
+A Super Admin can hand the workspace to someone else:
+
+1. Open **Settings > Teams**.
+2. Choose **Make owner** next to an active member. They become a Super Admin.
+3. If you no longer want to own the workspace, choose **Step down to Admin** next to your own name.
+
+A workspace always keeps at least one Super Admin, so you can only step down once someone else owns it. Billing stays with the workspace, not the person. The new owner can update the card in **Billing**.
+
+### Deleting your account when others use your workspace
+
+Workspaces shared with other people stay with their members. If you are the only Super Admin of a workspace that other active members use, PostDelegate won't delete your account until you either make another member the owner or remove the other members. A workspace you use alone is deleted along with your account. If a workspace has another Super Admin, deleting your account only removes you from it.
 
 ## Customers
 
