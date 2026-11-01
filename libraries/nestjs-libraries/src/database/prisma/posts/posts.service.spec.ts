@@ -391,6 +391,8 @@ describe('PostsService monthly cap on one network', () => {
         .fn()
         .mockResolvedValue(limits ? { plan: 'Starter', limits, anchor } : null),
     };
+    // the live trial status, asked only when the trial cap alone refuses
+    const paymentService = { isTrialing: jest.fn().mockResolvedValue(false) };
     const integrationService = {
       getIntegrationsList: jest.fn().mockResolvedValue([
         { id: 'i-x', providerIdentifier: 'x' },
@@ -419,10 +421,11 @@ describe('PostsService monthly cap on one network', () => {
       {} as any,
       {} as any,
       {} as any,
-      subscriptionService as any
+      subscriptionService as any,
+      paymentService as any
     );
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
-    return { service, postRepository, subscriptionService };
+    return { service, postRepository, subscriptionService, paymentService };
   };
 
   const post = (integration: string, values: number, ids = false) => ({
@@ -906,6 +909,102 @@ describe('PostsService monthly cap on one network', () => {
     });
   });
 
+  // An Ultimate subscription marked isTrailing: a real trial, or a paid one
+  // whose renewal Stripe is retrying (past_due), which keeps the plan's cap
+  describe('a trial', () => {
+    const trialPlan = (service: any, subscriptionService: any) => {
+      subscriptionService.getProviderPostsLimits.mockResolvedValue({
+        plan: 'Ultimate',
+        limits: { x: 1000 },
+        trialLimits: { x: 30 },
+        anchor,
+      });
+      jest
+        .spyOn(service, 'getPostsRecursively')
+        .mockResolvedValue([{ id: 'p-1' }] as any);
+    };
+    const trialMessage =
+      'A free trial posts here as much as the Starter plan. Add a card, then end your trial on the Billing page to get your plan\'s full limit.';
+
+    it('holds a trialing subscription to the Starter cap when scheduling', async () => {
+      const { service, subscriptionService, paymentService } =
+        makeLimitService({ x: 1000 }, 30, 0);
+      trialPlan(service, subscriptionService);
+      paymentService.isTrialing.mockResolvedValue(true);
+      await expect(
+        service.checkProviderPostsLimit('org-1', {
+          type: 'schedule',
+          posts: [post('i-x', 1)],
+        })
+      ).rejects.toMatchObject({
+        status: 402,
+        message: `You've used your 30 X posts for this month on the Ultimate trial. ${trialMessage}`,
+      });
+      expect(paymentService.isTrialing).toHaveBeenCalledWith('org-1');
+    });
+
+    it('holds a trialing subscription to the Starter cap when publishing', async () => {
+      const { service, subscriptionService, paymentService } =
+        makeLimitService({ x: 1000 }, 30);
+      trialPlan(service, subscriptionService);
+      paymentService.isTrialing.mockResolvedValue(true);
+      expect(
+        await service.providerPublishProblem('org-1', 'x', [
+          { id: 'p-1', parentPostId: null },
+        ])
+      ).toBe(
+        `Monthly X post limit reached on the Ultimate trial (30). ${trialMessage}`
+      );
+    });
+
+    it.each([
+      ['past_due, its renewal being retried', false],
+      ['active', false],
+    ])(
+      'keeps the plan cap of a subscription that is %s',
+      async (_, trialing) => {
+        const { service, subscriptionService, paymentService } =
+          makeLimitService({ x: 1000 }, 30, 0);
+        trialPlan(service, subscriptionService);
+        paymentService.isTrialing.mockResolvedValue(trialing);
+        await expect(
+          service.checkProviderPostsLimit('org-1', {
+            type: 'schedule',
+            posts: [post('i-x', 1)],
+          })
+        ).resolves.toEqual(new Set(['i-x']));
+        expect(
+          await service.providerPublishProblem('org-1', 'x', [
+            { id: 'p-1', parentPostId: null },
+          ])
+        ).toBeNull();
+      }
+    );
+
+    it('never asks Stripe while the trial cap has room or the plan cap refuses anyway', async () => {
+      const { service, subscriptionService, paymentService } =
+        makeLimitService({ x: 1000 }, 10);
+      trialPlan(service, subscriptionService);
+      expect(
+        await service.providerPublishProblem('org-1', 'x', [
+          { id: 'p-1', parentPostId: null },
+        ])
+      ).toBeNull();
+
+      const full = makeLimitService({ x: 1000 }, 1000);
+      trialPlan(full.service, full.subscriptionService);
+      expect(
+        await full.service.providerPublishProblem('org-1', 'x', [
+          { id: 'p-1', parentPostId: null },
+        ])
+      ).toBe(
+        'Monthly X post limit reached on the Ultimate plan (1000). Or bring your own key.'
+      );
+      expect(paymentService.isTrialing).not.toHaveBeenCalled();
+      expect(full.paymentService.isTrialing).not.toHaveBeenCalled();
+    });
+  });
+
   describe('when a post goes out', () => {
     it('lets it publish while the month has room for its thread', async () => {
       const { service, postRepository } = makeLimitService({ x: 30 }, 28);
@@ -936,26 +1035,6 @@ describe('PostsService monthly cap on one network', () => {
         ])
       ).toBe(
         'Monthly X post limit reached on the Starter plan (30). Or bring your own key.'
-      );
-    });
-
-    it('tells a trial that finishing it is what raises the cap', async () => {
-      const { service, subscriptionService } = makeLimitService({ x: 30 }, 30);
-      subscriptionService.getProviderPostsLimits.mockResolvedValue({
-        plan: 'Ultimate trial',
-        limits: { x: 30 },
-        trial: true,
-        anchor,
-      });
-      jest
-        .spyOn(service, 'getPostsRecursively')
-        .mockResolvedValue([{ id: 'p-1' }] as any);
-      expect(
-        await service.providerPublishProblem('org-1', 'x', [
-          { id: 'p-1', parentPostId: null },
-        ])
-      ).toBe(
-        "Monthly X post limit reached on the Ultimate trial plan (30). A free trial posts here as much as the Starter plan. Finish your trial on the Billing page to get your plan's full limit. Or bring your own key."
       );
     });
 

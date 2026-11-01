@@ -414,8 +414,14 @@ export const studioTemplateSettings: Record<
         style: { font: 'bold', position: 'bottom', maxWords: 3 },
       },
     },
-    ready: (spec) => !!spec.captions?.words?.length,
-    missing: (t) => t('studio_captions_missing', 'Make the captions first'),
+    // the render burns in the words, from the AI or a timed script: a script
+    // typed but not timed yet, or words all emptied, would render none
+    ready: (spec) => !!spec.captions?.words?.some((word) => word.text.trim()),
+    missing: (t) =>
+      t(
+        'studio_captions_missing',
+        'Make the captions with your AI, or type a script and click "Use this script"'
+      ),
     Settings: CaptionSettings,
   },
 };

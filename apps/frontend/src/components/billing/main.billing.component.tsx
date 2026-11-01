@@ -55,33 +55,62 @@ export const Prorate: FC<{
   const { period, pack } = props;
   const t = useT();
   const fetch = useFetch();
-  const [price, setPrice] = useState<number | false>(false);
+  const [preview, setPreview] = useState<
+    | { price?: number; needsPaymentMethod?: boolean; trialEndPrice?: number }
+    | false
+  >(false);
   const calculatePrice = useDebouncedCallback(async () => {
-    setPrice(
-      (
-        await (
-          await fetch('/billing/prorate', {
-            method: 'POST',
-            body: JSON.stringify({
-              period,
-              billing: pack,
-            }),
-          })
-        ).json()
-      ).price
+    setPreview(
+      await (
+        await fetch('/billing/prorate', {
+          method: 'POST',
+          body: JSON.stringify({
+            period,
+            billing: pack,
+          }),
+        })
+      ).json()
     );
   }, 500);
   useEffect(() => {
-    setPrice(false);
+    setPreview(false);
     calculatePrice();
   }, [period, pack]);
+  if (!preview) {
+    return null;
+  }
+  // a trial without a card has nothing to pay today: a bigger plan needs a
+  // card first, a smaller one is charged when the trial ends
+  if (preview.needsPaymentMethod) {
+    return (
+      <div className="animate-fadeIn">
+        {t(
+          'billing_trial_add_card_to_switch',
+          'Add a card to switch during your trial'
+        )}
+      </div>
+    );
+  }
+  if (typeof preview.trialEndPrice === 'number') {
+    return (
+      <div className="animate-fadeIn">
+        {t(
+          'billing_trial_then_price',
+          '$0 today, ${{price}} when the trial ends',
+          {
+            price: preview.trialEndPrice,
+          }
+        )}
+      </div>
+    );
+  }
   // nothing is shown while the preview loads, the price is missing when it fails
-  if (typeof price !== 'number') {
+  if (typeof preview.price !== 'number') {
     return null;
   }
   return (
     <div className="animate-fadeIn">
-      {t('pay_today', 'Pay Today')} ${Math.max(price, 0).toFixed(2)}
+      {t('pay_today', 'Pay Today')} ${Math.max(preview.price, 0).toFixed(2)}
     </div>
   );
 };

@@ -428,9 +428,10 @@ export class SubscriptionService {
 
   // The plan's monthly caps on single networks (provider_posts_per_month) and
   // the anchor of its months (planMonth), the subscription's start like
-  // posts_per_month. A trial is held to the trial cap whatever plan it tries,
-  // like Studio and clipping it is told by isTrailing. Without billing there
-  // are no plans to cap
+  // posts_per_month. A workspace marked isTrailing also gets the trial caps:
+  // they only apply once the payment provider confirms a real trial (the flag
+  // is also set for a paid renewal being retried). Without billing there are
+  // no plans to cap
   async getProviderPostsLimits(organizationId: string) {
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
       return null;
@@ -443,12 +444,12 @@ export class SubscriptionService {
       this._organizationService.getOrgById(organizationId),
     ]);
     const tier = subscription?.subscriptionTier || 'FREE';
-    const trial = !!subscription && !!organization?.isTrailing;
+    const maybeTrial = !!subscription && !!organization?.isTrailing;
 
     return {
-      plan: `${pricing[tier].label || tier}${trial ? ' trial' : ''}`,
-      limits: providerPostsLimitsOf(tier, trial),
-      trial,
+      plan: pricing[tier].label || tier,
+      limits: providerPostsLimitsOf(tier),
+      ...(maybeTrial ? { trialLimits: providerPostsLimitsOf(tier, true) } : {}),
       // without a subscription every cap is 0, the month doesn't matter
       anchor: subscription?.createdAt || new Date(),
     };

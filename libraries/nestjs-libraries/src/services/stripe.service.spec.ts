@@ -1115,6 +1115,51 @@ describe('StripeService cardless trial', () => {
   });
 });
 
+describe('isTrialing', () => {
+  const organizationService = { getOrgById: jest.fn() };
+  const service = new StripeService(
+    {} as any,
+    organizationService as any,
+    {} as any,
+    {} as any
+  );
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    organizationService.getOrgById.mockResolvedValue({
+      id: 'org_1',
+      paymentId: 'cus_1',
+    });
+  });
+
+  const live = (...statuses: string[]) =>
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: statuses.map((status, i) => ({ id: `sub_${i}`, status })),
+    });
+
+  it('is a trial only while Stripe has the subscription trialing', async () => {
+    live('trialing');
+    expect(await service.isTrialing('org_1')).toBe(true);
+  });
+
+  it.each([['past_due'], ['active'], ['unpaid']])(
+    'is not a trial when the subscription is %s',
+    async (status) => {
+      live(status);
+      expect(await service.isTrialing('org_1')).toBe(false);
+    }
+  );
+
+  it('is not a trial without a Stripe customer', async () => {
+    organizationService.getOrgById.mockResolvedValue({
+      id: 'org_1',
+      paymentId: 'user_1',
+    });
+    expect(await service.isTrialing('org_1')).toBe(false);
+    expect(mockStripe.subscriptions.list).not.toHaveBeenCalled();
+  });
+});
+
 describe('trialEndsSoonDetails', () => {
   it('shows the plan of the trial and every paid plan from the pricing', () => {
     const html = trialEndsSoonDetails(
@@ -2243,6 +2288,52 @@ describe('extra channels', () => {
         expect(mockStripe.subscriptions.update.mock.calls[0][1].items).toEqual([
           { id: 'si_plan', price: 'price_starter_month', quantity: 1 },
         ]);
+      });
+
+      describe('price preview', () => {
+        const prorate = (billing: string, period = 'MONTHLY') =>
+          service.prorate('org_1', { billing, period } as any);
+
+        // Stripe answers invoice-upcoming-none: the trial cancels at its end
+        it('asks a trial without a card for one before a bigger plan, without an upcoming invoice', async () => {
+          live(trial('STANDARD', cardless));
+          noCard();
+          ultimatePrice();
+
+          expect(await prorate('ULTIMATE')).toEqual({
+            price: 0,
+            needsPaymentMethod: true,
+          });
+          expect(mockStripe.invoices.createPreview).not.toHaveBeenCalled();
+        });
+
+        it('shows the price at the end of the trial for a smaller plan', async () => {
+          live(trial('ULTIMATE', cardless));
+          noCard();
+          mockStripe.prices.list.mockResolvedValueOnce({
+            data: [{ id: 'price_starter_year', unit_amount: 18000 }],
+          });
+
+          expect(await prorate('STANDARD', 'YEARLY')).toEqual({
+            price: 0,
+            trialEndPrice: 180,
+          });
+          expect(mockStripe.invoices.createPreview).not.toHaveBeenCalled();
+        });
+
+        it('previews the invoice of a trial with a card', async () => {
+          live(trial('STANDARD', cardless));
+          mockStripe.customers.retrieve.mockResolvedValue({
+            invoice_settings: { default_payment_method: 'pm_1' },
+          });
+          ultimatePrice();
+          mockStripe.invoices.createPreview.mockResolvedValue({
+            amount_due: 0,
+          });
+
+          expect(await prorate('ULTIMATE')).toEqual({ price: 0 });
+          expect(mockStripe.invoices.createPreview).toHaveBeenCalled();
+        });
       });
 
       it('lets a trial that came with a card from checkout move up', async () => {

@@ -896,6 +896,32 @@ export class StripeService extends PaymentProviderAbstract {
       ).data.filter((f) => f.status === 'active' || f.status === 'trialing'),
     };
 
+    // Stripe has no upcoming invoice for a trial without a card, it cancels
+    // at the end instead (invoice-upcoming-none): nothing is charged today. A
+    // bigger plan needs the card first (subscribe), a smaller one is charged
+    // its price when the trial ends
+    const trialing = currentUserSubscription.data[0];
+    if (
+      trialing &&
+      isCardlessTrial(trialing) &&
+      !(await this.hasPaymentMethod(trialing))
+    ) {
+      return isBiggerPlan(
+        trialing.metadata?.billing ||
+          (await this._subscriptionService.getSubscription(organizationId))
+            ?.subscriptionTier,
+        body.billing
+      )
+        ? { price: 0, needsPaymentMethod: true }
+        : {
+            price: 0,
+            trialEndPrice:
+              pricing[body.billing][
+                body.period === 'YEARLY' ? 'year_price' : 'month_price'
+              ],
+          };
+    }
+
     const extraChannelItems = await this.extraChannelItemsForPlan(
       currentUserSubscription?.data?.[0],
       body
@@ -1060,6 +1086,18 @@ export class StripeService extends PaymentProviderAbstract {
     await this._subscriptionService.deleteSubscription(
       org.paymentId,
       STRIPE_PROVIDER
+    );
+  }
+
+  // A subscription Stripe still has in its trial, not a past_due one: the
+  // stored isTrailing is set for both
+  override async isTrialing(organizationId: string) {
+    const live = await this.getLiveSubscriptions(
+      await this.getCustomerByOrganizationId(organizationId)
+    );
+    return (
+      live.some((f) => f.status === 'trialing') &&
+      !live.some((f) => f.status === 'active')
     );
   }
 

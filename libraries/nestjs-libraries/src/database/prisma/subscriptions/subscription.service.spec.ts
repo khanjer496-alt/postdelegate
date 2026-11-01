@@ -79,20 +79,21 @@ describe('getProviderPostsLimits', () => {
     return service.getProviderPostsLimits('org_1');
   };
 
-  it('holds an Ultimate trial to the Starter cap on X', async () => {
+  // isTrailing is also set for a paid renewal being retried, so the trial
+  // caps come next to the plan's and the posts check confirms the trial
+  it('adds the Starter X cap as the trial cap of a workspace marked trialing', async () => {
     expect(await limits('ULTIMATE', true)).toEqual({
-      plan: 'Ultimate trial',
-      limits: { x: 30 },
-      trial: true,
+      plan: 'Ultimate',
+      limits: { x: 1000 },
+      trialLimits: { x: 30 },
       anchor,
     });
   });
 
-  it('gives the paid plan its own cap', async () => {
+  it('gives the paid plan its own cap and no trial cap', async () => {
     expect(await limits('ULTIMATE', false)).toEqual({
       plan: 'Ultimate',
       limits: { x: 1000 },
-      trial: false,
       anchor,
     });
   });

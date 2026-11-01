@@ -77,6 +77,9 @@ export const allProviders = (setEmpty?: any) => {
     { value: TikTokDto, name: 'tiktok-business' },
     { value: DiscordDto, name: 'discord' },
     { value: SlackDto, name: 'slack' },
+    // no settings: a class without validation rules is refused as "an
+    // unknown value", so Kick is validated like the others without any
+    { value: setEmpty, name: 'kick' },
     { value: TwitchDto, name: 'twitch' },
     { value: XDto, name: 'x' },
     { value: XDto, name: 'x-own-key' },
@@ -98,9 +101,6 @@ export const allProviders = (setEmpty?: any) => {
     { value: setEmpty, name: 'telegram' },
     { value: setEmpty, name: 'nostr' },
     { value: setEmpty, name: 'vk' },
-    // Kick has no settings: a class without validation rules is refused as
-    // "an unknown value", so it is validated like the others without any
-    { value: setEmpty, name: 'kick' },
     { value: MoltbookDto, name: 'moltbook' },
     { value: SkoolDto, name: 'skool' },
     { value: WhopDto, name: 'whop' },
