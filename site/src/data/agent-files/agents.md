@@ -27,7 +27,7 @@ curl {{rest_base}}/integrations \
 | Cursor | `.cursor/mcp.json`: `{ "mcpServers": { "postdelegate": { "url": "{{mcp_oauth}}" } } }` |
 | Other clients | {{site}}/docs/mcp/clients |
 
-MCP tool names: `integrationList`, `groupList`, `integrationSchema`, `triggerTool`, `integrationSchedulePostTool`, `postsListTool`, `postSettingsTool`, `deletePostTool`, `uploadFromUrlTool`, `mediaListTool`, `mediaStatusTool`, `uploadWidgetTool`, `uploadWidgetStatusTool`. The tools that change data are `integrationSchedulePostTool`, `postSettingsTool`, `deletePostTool`, `triggerTool` (may refresh a channel's login) and the upload tools. Reference: {{site}}/docs/mcp/tools.
+MCP tool names: `integrationList`, `groupList`, `integrationSchema`, `triggerTool`, `integrationSchedulePostTool`, `postsListTool`, `postSettingsTool`, `deletePostTool`, `uploadFromUrlTool`, `mediaListTool`, `mediaStatusTool`, `uploadWidgetTool`, `uploadWidgetStatusTool`. The tools that change data are `integrationSchedulePostTool`, `postSettingsTool`, `deletePostTool`, `triggerTool` (may refresh a channel's login; a failed refresh disconnects the channel; pass `dataSchema: []` when the helper takes no input) and the upload tools. Reference: {{site}}/docs/mcp/tools.
 
 ## REST endpoints
 
@@ -44,7 +44,7 @@ All paths are relative to `{{rest_base}}`.
 
 ## Creating a post
 
-1. `GET /integrations`. Use a channel's `id` and `identifier`. Skip `disabled: true`.
+1. `GET /integrations`. Use a channel's `id` and `identifier`. Skip channels with `disabled: true`, which are paused.
 2. `GET /integration-settings/:id` returns `rules`, `maxLength`, a JSON schema of `settings` and helper `tools`. For ids, call `POST /integration-trigger/:id` with `{ "methodName": "...", "data": {} }`.
 3. Upload media first and keep `id` and `path`. With `adjust`, poll `GET /media/:id/status` until `ready`.
 4. `POST /posts`:
@@ -71,9 +71,9 @@ All paths are relative to `{{rest_base}}`.
 - `date` is UTC ISO 8601 and applies to every channel in the request. Channels that share a date belong in one request. Different dates need separate requests.
 - `settings` is an object of network fields. Use `{}` for networks without settings. Do not send `__type`.
 - `value[0]` is the post and later entries are follow-ups. `content` is a small HTML subset: `p`, `br`, `strong`, `u`, `a`, `ul`, `li`, `h1`, `h2`, `h3`, `span`, `img`. Wrap lines in `<p>`.
-- The response is `[{ "postId", "integration" }]`. Preview: `https://app.postdelegate.com/p/POST_ID?share=true`.
-- Drafts are only checked for empty content. `schedule` and `now` get the app's full checks.
-- If the workspace requires approval for API posts, the post waits in Approvals until a teammate approves it. Do not resubmit.
+- The response is `[{ "postId", "integration" }]`, plus `"approvalStatus": "IN_REVIEW"` on items held for approval. Preview: `https://app.postdelegate.com/p/POST_ID?share=true`.
+- Every type, drafts included, must have valid network `settings` for the channel. Drafts skip only the media rules and length checks. `schedule` and `now` get the app's full checks.
+- If the workspace requires approval for API posts, the response item includes `"approvalStatus": "IN_REVIEW"` and the post waits in the Review inbox (approvals) until a teammate approves it. Do not resubmit.
 
 ## Networks you can connect today
 

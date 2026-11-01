@@ -19,10 +19,10 @@ Tool names are exactly as the server reports them.
 
 | Tool | Use it to | Changes data? |
 | --- | --- | --- |
-| `integrationList` | List connected channels: `id`, `name`, `platform`, `disabled`, `customer`. Optional `group` filters by customer. | No |
+| `integrationList` | List connected channels: `id`, `name`, `platform`, `picture`. Optional `group` filters by customer. | No |
 | `groupList` | List customers (groups) for agencies. | No |
 | `integrationSchema` | Get a network's `rules`, `maxLength`, `settings` schema and helper `tools`. Input: `platform` (the channel's `platform`), `isPremium` (`false`). | No |
-| `triggerTool` | Run a helper from `integrationSchema` `tools` to fetch ids (channels, lists, categories, tags). Input: `integrationId`, `methodName`, `dataSchema: [{key, value}]`. May refresh the channel's saved login. | Can refresh credentials |
+| `triggerTool` | Run a helper from `integrationSchema` `tools` to fetch ids (channels, lists, categories, tags). Input: `integrationId`, `methodName`, `dataSchema: [{key, value}]` (required, `[]` when the helper takes no input). May refresh the channel's saved login, and a failed refresh disconnects the channel. | Can refresh credentials |
 | `integrationSchedulePostTool` | Create a draft, scheduled or immediate post on one or more channels. | **Yes** |
 | `postsListTool` | List posts between `startDate` and `endDate` (UTC), optional `customer`. Returns `id`, `publishDate`, `state`, `error`, `content`, `settings`, `platform`. | No |
 | `postSettingsTool` | Merge new network settings into an unpublished post. Input: `id`, `settings: [{key, value}]`. Content and date stay. | **Yes** |
@@ -37,12 +37,12 @@ Tool names are exactly as the server reports them.
 
 ## Workflow
 
-1. **Find the channel.** Call `integrationList`. Match the user's words to a channel `name` and `platform`. Skip channels with `disabled: true`, which are paused. For agencies, call `groupList` and filter by `group`. If more than one channel fits, ask which one.
+1. **Find the channel.** Call `integrationList`. Match the user's words to a channel `name` and `platform`. For agencies, call `groupList` and filter by `group`. If more than one channel fits, ask which one.
 2. **Read the channel's rules.** Call `integrationSchema` with the channel's `platform` and `isPremium: false`. Keep `rules`, `maxLength`, the `settings` schema and the helper `tools`. Do this before every new post, and again if the channel changes.
-3. **Fill settings that need ids.** If a setting needs an id (a Discord channel, a WordPress category, a Listmonk list), call `triggerTool` with the channel `id`, the helper's `methodName` and any `dataSchema` values. Pass ids, never display labels.
+3. **Fill settings that need ids.** If a setting needs an id (a Discord channel, a WordPress category, a Listmonk list), call `triggerTool` with the channel `id`, the helper's `methodName` and `dataSchema` (always an array: `[]` when the helper takes no input, otherwise `[{ "key", "value" }]` such as `[{ "key": "word", "value": "rust" }]`). Pass ids, never display labels. If the channel's login has expired, `triggerTool` tries to refresh it. If that fails the channel is disconnected and the user must reconnect it in PostDelegate.
 4. **Prepare media.**
    - Already uploaded: `mediaListTool` (search by file name) and use its `path`.
-   - Public URL: `uploadFromUrlTool`. Use only the returned `path`. Attachments must be on PostDelegate's media domain.
+   - Upload media first with `uploadFromUrlTool` (public URL) or the upload widget, then attach only the returned `path`. Links to other sites are rejected as attachments.
    - With `adjust: true`, poll `mediaStatusTool` about every 10 seconds until `ready` before scheduling.
    - A file on the user's device: `uploadWidgetTool` if the host shows widgets, otherwise ask the user to upload it in the app (**Media**) or through `POST /upload`. You cannot read local files.
    - Posts accept `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` and `.mp4`. Images up to 10 MB, MP4 video up to 1 GB.
@@ -80,7 +80,7 @@ Tool names are exactly as the server reports them.
 - `content` is HTML. Wrap each line or paragraph in `<p>`. Allowed tags: `p`, `strong`, `u`, `ul`, `li`, `h1`, `h2`, `h3`. Do not combine `u` and `strong`. Use `<img src="...">` only when the channel's rules say pictures go inside the content. Use `span` only for a mention in the exact format a mention helper returns. PostDelegate converts the HTML to Markdown or plain text for networks that need it.
 - Stay within `maxLength` from `integrationSchema`. The limits below are guides. The schema and the server's checks have the final say.
 - Dates are UTC. Ask for the user's time zone if it is unclear, and show times back to the user in their own time zone.
-- To turn an existing draft into a scheduled post, ask the user to schedule it in the app (or use REST `PUT /posts/:id/status`). Do not create a second copy.
+- To turn an existing draft into a scheduled post, ask the user to schedule it in the app (or use REST `PUT /posts/:id/status` with `{ "status": "schedule" }`, or `{ "status": "draft" }` to move it back). Do not create a second copy.
 
 ## Networks you can connect today
 
@@ -95,7 +95,7 @@ Only these networks can be connected today. Others in PostDelegate's directory a
 ## Changing or deleting posts
 
 - **Find first.** Call `postsListTool` with a UTC window. For "all upcoming", use now to a year ahead. `state` is `QUEUE` (scheduled), `DRAFT`, `PUBLISHED` or `ERROR`. Errored posts carry a readable `error`.
-- **Settings only.** `postSettingsTool` changes network settings of a scheduled or draft post that has not published. Only the keys you pass change. You cannot change content or date with it, so for those send the user to the app.
+- **Settings only.** `postSettingsTool` changes network settings of a scheduled or draft post that has not published. Only the keys you pass change. You cannot change content or date with it, so for those send the user to the app. Follow the "Confirm settings changes" safety rule first.
 - **Delete.** `deletePostTool` removes the post on that one channel. A post made for several channels has a separate id on each, so ask which channels. A repeating post is listed once per repetition with the same id, and deleting it deletes every repetition.
 - Never use `integrationSchedulePostTool` to edit an existing post. It always creates a new one.
 

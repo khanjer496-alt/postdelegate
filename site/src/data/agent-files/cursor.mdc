@@ -20,7 +20,7 @@ Cursor MCP config (`.cursor/mcp.json`):
 
 ## Workflow
 
-1. List channels: MCP `integrationList` / REST `GET /integrations`. Skip `disabled: true`.
+1. List channels: MCP `integrationList` / REST `GET /integrations` (REST also returns `disabled`; skip channels with `disabled: true`, they are paused).
 2. Read the network's rules and settings: MCP `integrationSchema` (`platform`, `isPremium: false`) / REST `GET /integration-settings/:id`. Look up ids with MCP `triggerTool` / REST `POST /integration-trigger/:id`.
 3. Upload media first: MCP `uploadFromUrlTool` / REST `POST /upload` or `POST /upload-from-url`. With `adjust`, wait for `ready` (MCP `mediaStatusTool` / REST `GET /media/:id/status`).
 4. Create a **draft**: MCP `integrationSchedulePostTool` (`settings` is a `[{key, value}]` list) / REST `POST /posts` (`settings` is an object, `{}` when none; `shortLink` and `tags` required; one `date` per request).
