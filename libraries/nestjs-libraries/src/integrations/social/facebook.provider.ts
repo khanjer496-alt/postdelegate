@@ -46,11 +46,13 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 500; // Facebook has reasonable rate limits
   editor = 'normal' as const;
 
-  // analytics() reports the page's media views per day. Per post: videos
-  // report views, reels plays, and feed posts their unique media views
+  // analytics() reports the page's media views per day, each dated by its
+  // end_time, which is midnight Pacific at the end of that day. Per post:
+  // videos report views, reels plays, and feed posts their unique media views
   // (labelled Impressions)
   viewsMetric: ViewsMetric = {
     channel: 'Media views',
+    channelDateOffset: -1,
     post: ['Views', 'Plays', 'Impressions'],
   };
   maxLength() {

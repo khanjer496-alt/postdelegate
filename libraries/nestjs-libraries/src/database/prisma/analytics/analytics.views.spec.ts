@@ -6,6 +6,21 @@ jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service',
   () => ({ IntegrationService: class {} })
 );
+// a small read limit, so the cut-off history can be tested
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository',
+  () => ({ AnalyticsRepository: class {}, HISTORY_READ_LIMIT: 7 })
+);
+const store = new Map<string, string>();
+jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
+  ioRedis: {
+    get: jest.fn(async (key: string) => store.get(key)),
+    set: jest.fn(async (key: string, value: string) => {
+      store.set(key, value);
+      return 'OK';
+    }),
+  },
+}));
 
 import {
   AnalyticsService,
@@ -63,9 +78,29 @@ describe('dailyGains', () => {
       )
     ).toEqual({
       '2026-10-02': 0,
-      // gains again only above the highest count read so far
+      // the lower count held a second reading: a lasting recount, gains
+      // count from it again
+      '2026-10-03': 30,
+      '2026-10-04': 80,
+    });
+  });
+
+  it('does not freeze after a lasting downward recount', () => {
+    expect(
+      asObject(
+        dailyGains([
+          { date: '2026-10-01', value: 10000 },
+          { date: '2026-10-02', value: 6000 },
+          { date: '2026-10-03', value: 6000 },
+          { date: '2026-10-04', value: 6100 },
+          { date: '2026-10-05', value: 6250 },
+        ])
+      )
+    ).toEqual({
+      '2026-10-02': 0,
       '2026-10-03': 0,
-      '2026-10-04': 30,
+      '2026-10-04': 100,
+      '2026-10-05': 150,
     });
   });
 
@@ -193,6 +228,11 @@ const providers: Record<string, any> = {
     postAnalytics: jest.fn(),
     accountStats: jest.fn(),
   },
+  // daily series dated by the end of each day
+  'offset-network': {
+    viewsMetric: { channel: 'Media views', channelDateOffset: -1 },
+    analytics: jest.fn(),
+  },
   // shares analytics, but does not say which metric counts views
   'silent-network': { analytics: jest.fn(), postAnalytics: jest.fn() },
 };
@@ -201,6 +241,7 @@ const org = { id: 'org-A' } as any;
 const NOW = new Date('2026-10-07T15:00:00Z');
 
 const makeService = () => {
+  store.clear();
   const repository = {
     getOverviewChannels: jest.fn().mockResolvedValue([]),
     getPostViewSnapshots: jest.fn().mockResolvedValue([]),
@@ -269,10 +310,14 @@ describe('AnalyticsService.getViewGains', () => {
     );
     expect(repository.getAnalyticsPostsOf.mock.calls[0][0]).toBe('org-A');
     expect(integrationService.checkAnalytics).toHaveBeenCalledTimes(1);
+    // a soft refresh and the short cache, so the page never flags a channel
     expect(integrationService.checkAnalytics).toHaveBeenCalledWith(
       org,
       'l1',
-      '7'
+      '7',
+      false,
+      'soft',
+      600
     );
   });
 
@@ -394,7 +439,8 @@ describe('AnalyticsService.getViewGainPosts', () => {
       org,
       'l1',
       30,
-      10
+      10,
+      600
     );
   });
 
@@ -410,12 +456,7 @@ describe('AnalyticsService.getViewGainPosts', () => {
     );
 
     expect(result.posts).toEqual([]);
-    expect(repository.getPostViewSnapshots).toHaveBeenCalledWith(
-      'org-A',
-      [],
-      expect.any(Date),
-      NOW
-    );
+    expect(repository.getPostViewSnapshots.mock.calls[0][0]).toBe('org-A');
     expect(integrationService.topViewedPosts).not.toHaveBeenCalled();
   });
 
@@ -509,5 +550,71 @@ describe('AnalyticsService.getViewGainPosts', () => {
     const result = await service.getViewGainPosts(org, 7, { limit: 2 }, NOW);
 
     expect(result.posts.map((post) => post.externalId)).toEqual(['b', 'c']);
+  });
+});
+
+describe('AnalyticsService view gains, history sharing and limits', () => {
+  it('reads the history once for both Views calls of a page', async () => {
+    const { service, repository } = makeService();
+    repository.getOverviewChannels.mockResolvedValue([channel('h1')]);
+    repository.getPostViewSnapshots.mockResolvedValue([
+      reading('h1', 'p1', '2026-10-05', 10),
+      reading('h1', 'p1', '2026-10-06', 25),
+    ]);
+
+    const gains = await service.getViewGains(org, 7, NOW);
+    const posts = await service.getViewGainPosts(org, 7, {}, NOW);
+
+    expect(repository.getPostViewSnapshots).toHaveBeenCalledTimes(1);
+    expect(gains.channels[0]).toMatchObject({ id: 'h1', total: 15 });
+    expect(posts.posts.map((post) => post.gained)).toEqual([15]);
+  });
+
+  it('leaves out the oldest day when the read limit cuts it, and says so', async () => {
+    const { service, repository } = makeService();
+    repository.getOverviewChannels.mockResolvedValue([channel('h1')]);
+    // newest first, as the repository reads them; 7 rows hit the limit
+    repository.getPostViewSnapshots.mockResolvedValue([
+      reading('h1', 'p1', '2026-10-07', 40),
+      reading('h1', 'p2', '2026-10-07', 9),
+      reading('h1', 'p1', '2026-10-06', 30),
+      reading('h1', 'p2', '2026-10-06', 4),
+      // the oldest day read, maybe without all its posts
+      reading('h1', 'p1', '2026-10-05', 0),
+      reading('h1', 'p3', '2026-10-05', 99),
+      reading('h1', 'p2', '2026-10-05', 1),
+    ]);
+
+    const result = await service.getViewGains(org, 7, NOW);
+
+    expect(result.partial).toBe(true);
+    // the 5th is a base no more: gains start on the 7th
+    expect(result.channels[0].points.slice(4)).toEqual([null, null, 15]);
+  });
+
+  it('is not partial under the limit', async () => {
+    const { service, repository } = makeService();
+    repository.getOverviewChannels.mockResolvedValue([channel('h1')]);
+    expect((await service.getViewGains(org, 7, NOW)).partial).toBe(false);
+  });
+
+  it('moves a daily series dated by the end of each day back one day', async () => {
+    const { service, repository, integrationService } = makeService();
+    repository.getOverviewChannels.mockResolvedValue([
+      channel('o1', { providerIdentifier: 'offset-network' }),
+    ]);
+    integrationService.checkAnalytics.mockResolvedValue([
+      {
+        label: 'Media views',
+        data: [
+          { total: 35, date: '2026-10-02' },
+          { total: 12, date: '2026-10-03' },
+        ],
+      },
+    ]);
+
+    const result = await service.getViewGains(org, 7, NOW);
+
+    expect(result.channels[0].points.slice(0, 3)).toEqual([35, 12, null]);
   });
 });

@@ -5,7 +5,12 @@ import utc from 'dayjs/plugin/utc';
 import pLimit from 'p-limit';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
-import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { createHash } from 'crypto';
+import {
+  AnalyticsRepository,
+  HISTORY_READ_LIMIT,
+} from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
@@ -227,6 +232,8 @@ export interface ViewGainsResponse {
   totalViews: number | null;
   bestDay: ViewGainDay | null;
   channels: ViewGainsChannel[];
+  // the daily history hit its read limit, so its oldest days are left out
+  partial: boolean;
 }
 
 export interface ViewGainPost {
@@ -249,6 +256,17 @@ export interface ViewGainPostsResponse {
   posts: ViewGainPost[];
   // channels asked for their posts that did not answer
   unavailable: number;
+  // see ViewGainsResponse.partial
+  partial: boolean;
+}
+
+// the daily history part of the view gains, kept briefly so the two Views
+// calls of a page compute it once
+interface HistoryViewGains {
+  // views gained per channel id and day
+  channels: Record<string, Record<string, number>>;
+  posts: Array<Omit<ViewGainPost, 'channel'> & { integrationId: string }>;
+  partial: boolean;
 }
 
 type PostViewReadingRow = Awaited<
@@ -262,6 +280,11 @@ const VIEW_GAINS_LOOKBACK_DAYS = 7;
 // a post first read within this many days of going out had no views before
 const NEW_POST_DAYS = 2;
 const VIEW_GAIN_POSTS_LIMIT = 10;
+// a count read this many times in a row below the highest one is a lasting
+// recount, not a glitch
+const RECOUNT_READINGS = 2;
+// how long the Views section keeps live network data and the history part
+const VIEWS_CACHE_SECONDS = 600;
 
 export interface AnalyticsInsightsResponse {
   // PostDelegate posts with metrics in the range
@@ -298,12 +321,12 @@ const isoDay = (date: Date) => dayjs(date).utc().format('YYYY-MM-DD');
 
 // Daily gains of a running count (a post's lifetime views) from its daily
 // readings: each reading minus the highest count read before it, never below
-// 0. A count that drops (a glitch, a platform recount) is no gain, and it
-// gains again only above that highest count, so a reading that dips and
-// comes back is never counted twice. Days missed between two readings share
-// the gain evenly. The first reading is the base, unless the post went out at
-// most NEW_POST_DAYS before it: then it had no views before and its count is
-// spread from the day it was published.
+// 0. A count that drops is no gain, so a reading that dips once and comes back
+// (a glitch) is never counted twice. A drop that holds for RECOUNT_READINGS
+// readings is a lasting recount: the count then gains from its new level. Days
+// missed between two readings share the gain evenly. The first reading is the
+// base, unless the post went out at most NEW_POST_DAYS before it: then it had
+// no views before and its count is spread from the day it was published.
 export const dailyGains = (
   readings: Array<{ date: string; value: number }>,
   publishedDay?: string
@@ -325,11 +348,17 @@ export const dailyGains = (
   const sorted = [...readings].sort((a, b) => a.date.localeCompare(b.date));
   let previous: { date: string; value: number } | undefined;
   let highest = 0;
+  let lower = 0;
   for (const reading of sorted) {
     if (previous && previous.date === reading.date) {
       continue;
     }
     if (previous) {
+      lower = reading.value < highest ? lower + 1 : 0;
+      if (lower >= RECOUNT_READINGS) {
+        // the recount held: gains count from the reading before this one
+        highest = previous.value;
+      }
       spread(previous.date, reading.date, Math.max(0, reading.value - highest));
     } else if (publishedDay) {
       const age = dayjs.utc(reading.date).diff(dayjs.utc(publishedDay), 'day');
@@ -343,7 +372,10 @@ export const dailyGains = (
       }
     }
     previous = reading;
-    highest = Math.max(highest, reading.value);
+    highest = lower >= RECOUNT_READINGS ? reading.value : Math.max(highest, reading.value);
+    if (lower >= RECOUNT_READINGS) {
+      lower = 0;
+    }
   }
   return gains;
 };
@@ -996,22 +1028,26 @@ export class AnalyticsService {
     if (kind === 'posts' && provider.topViewedPosts) {
       return 'live';
     }
-    return metric.post?.length &&
-      process.env.ANALYTICS_HISTORY_DISABLED !== 'true' &&
-      isHistoryProvider(provider)
-      ? 'history'
-      : null;
+    return this.keepsViewHistory(providerIdentifier) ? 'history' : null;
   }
 
-  // the live social channels of the organization, optionally only `only`
-  private async viewGainChannels(orgId: string, only?: string[]) {
-    const filter = only?.length ? new Set(only) : null;
+  // the provider's post views are kept in the daily history
+  private keepsViewHistory(providerIdentifier: string) {
+    const provider = this._integrationManager.getSocialIntegration(
+      providerIdentifier
+    );
+    return (
+      !!provider?.viewsMetric?.post?.length &&
+      process.env.ANALYTICS_HISTORY_DISABLED !== 'true' &&
+      isHistoryProvider(provider)
+    );
+  }
+
+  // the live social channels of the organization
+  private async viewGainChannels(orgId: string) {
     return (await this._analyticsRepository.getOverviewChannels(orgId)).filter(
       (channel) =>
-        channel.type === 'social' &&
-        !channel.disabled &&
-        !channel.inBetweenSteps &&
-        (!filter || filter.has(channel.id))
+        channel.type === 'social' && !channel.disabled && !channel.inBetweenSteps
     );
   }
 
@@ -1025,18 +1061,11 @@ export class AnalyticsService {
     const sources = channels.map((channel) =>
       this.viewsSourceOf(channel.providerIdentifier, 'channel')
     );
+    const history = await this.historyViewGains(org.id, channels, days, from, to);
 
-    const history = await this.historyViewGains(
-      org.id,
-      channels
-        .filter((_, index) => sources[index] === 'history')
-        .map((channel) => channel.id),
-      from,
-      to
-    );
-
-    // the same path as the channel analytics view: an expired token is
-    // refreshed, a few channels at a time, a slow one is left out
+    // a few channels at a time, a slow one is left out. An expired token is
+    // refreshed softly: a failed refresh leaves the channel unavailable here,
+    // it is never flagged for reconnect by this page
     const limit = pLimit(ENGAGEMENT_CONCURRENCY);
     const live = await Promise.all(
       channels.map((channel, index) =>
@@ -1047,7 +1076,10 @@ export class AnalyticsService {
                 this._integrationService.checkAnalytics(
                   org,
                   channel.id,
-                  String(days)
+                  String(days),
+                  false,
+                  'soft',
+                  VIEWS_CACHE_SECONDS
                 ),
                 ENGAGEMENT_TIMEOUT_MS
               )
@@ -1057,15 +1089,18 @@ export class AnalyticsService {
       )
     );
 
-    return this.aggregateViewGains({
-      days,
-      from,
-      to,
-      channels,
-      sources,
-      live,
-      history: history.channels,
-    });
+    return {
+      ...this.aggregateViewGains({
+        days,
+        from,
+        to,
+        channels,
+        sources,
+        live,
+        history: history.channels,
+      }),
+      partial: history.partial,
+    };
   }
 
   aggregateViewGains({
@@ -1083,8 +1118,8 @@ export class AnalyticsService {
     channels: OverviewChannelRow[];
     sources: ViewsSource[];
     live: Array<ProviderMetric[] | null>;
-    history: Map<string, Map<string, number>>;
-  }): ViewGainsResponse {
+    history: Record<string, Record<string, number>>;
+  }): Omit<ViewGainsResponse, 'partial'> {
     const dates = this.daysBetween(from, to);
 
     const rows = channels.map((channel, index): ViewGainsChannel => {
@@ -1096,27 +1131,28 @@ export class AnalyticsService {
         return { ...base, status: 'unsupported', ...empty };
       }
 
-      let byDay: Map<string, number> | undefined;
+      let byDay: Record<string, number> | undefined;
       if (source === 'history') {
-        byDay = history.get(channel.id);
+        byDay = history[channel.id];
       } else {
-        const label = this._integrationManager
-          .getSocialIntegration(channel.providerIdentifier)
-          ?.viewsMetric?.channel?.trim()
-          .toLowerCase();
+        const metric = this._integrationManager.getSocialIntegration(
+          channel.providerIdentifier
+        )?.viewsMetric;
+        const label = metric?.channel?.trim().toLowerCase();
+        const offset = metric?.channelDateOffset || 0;
         const series = (live[index] || []).find(
-          (metric) => metric?.label?.trim().toLowerCase() === label
+          (item) => item?.label?.trim().toLowerCase() === label
         );
         if (series) {
-          byDay = new Map();
+          byDay = {};
           for (const point of series.data || []) {
             const value = Number(point?.total);
             const date = point?.date ? dayjs.utc(point.date) : null;
             if (!Number.isFinite(value) || !date?.isValid()) {
               continue;
             }
-            const key = date.format('YYYY-MM-DD');
-            byDay.set(key, (byDay.get(key) || 0) + Math.max(0, Math.round(value)));
+            const key = date.add(offset, 'day').format('YYYY-MM-DD');
+            byDay[key] = (byDay[key] || 0) + Math.max(0, Math.round(value));
           }
         }
       }
@@ -1129,7 +1165,7 @@ export class AnalyticsService {
         };
       }
 
-      const points = dates.map((date) => byDay!.get(date) ?? null);
+      const points = dates.map((date) => byDay![date] ?? null);
       if (source === 'history' && points.every((point) => point === null)) {
         return { ...base, status: 'collecting', ...empty };
       }
@@ -1171,27 +1207,27 @@ export class AnalyticsService {
   ): Promise<ViewGainPostsResponse> {
     const { from, to } = this.historyRange(days, now);
     const limit = Math.min(50, Math.max(1, options.limit || VIEW_GAIN_POSTS_LIMIT));
-    const channels = await this.viewGainChannels(org.id, options.integrations);
+    const all = await this.viewGainChannels(org.id);
+    // the same history as the channel gains (and its cache), narrowed after
+    const history = await this.historyViewGains(org.id, all, days, from, to);
+
+    const only = options.integrations?.length ? new Set(options.integrations) : null;
+    const channels = all.filter((channel) => !only || only.has(channel.id));
     const sources = channels.map((channel) =>
       this.viewsSourceOf(channel.providerIdentifier, 'posts')
     );
-    const byId = new Map(channels.map((channel) => [channel.id, channel]));
-
-    const history = await this.historyViewGains(
-      org.id,
+    const byId = new Map(
       channels
         .filter((_, index) => sources[index] === 'history')
-        .map((channel) => channel.id),
-      from,
-      to
+        .map((channel) => [channel.id, channel])
     );
 
-    const posts: ViewGainPost[] = history.posts.map(
-      ({ integrationId, ...post }) => ({
+    const posts: ViewGainPost[] = history.posts
+      .filter((post) => byId.has(post.integrationId))
+      .map(({ integrationId, ...post }) => ({
         ...post,
         channel: this.historyChannel(byId.get(integrationId)!),
-      })
-    );
+      }));
 
     // read-only, see IntegrationService.topViewedPosts
     let unavailable = 0;
@@ -1201,7 +1237,13 @@ export class AnalyticsService {
       live.map((channel) =>
         queue(() =>
           this.withTimeout(
-            this._integrationService.topViewedPosts(org, channel.id, days, limit),
+            this._integrationService.topViewedPosts(
+              org,
+              channel.id,
+              days,
+              limit,
+              VIEWS_CACHE_SECONDS
+            ),
             ENGAGEMENT_TIMEOUT_MS
           ).catch((): null => null)
         )
@@ -1235,18 +1277,38 @@ export class AnalyticsService {
         .sort((a, b) => b.gained - a.gained || a.id.localeCompare(b.id))
         .slice(0, limit),
       unavailable,
+      partial: history.partial && byId.size > 0,
     };
   }
 
-  // The daily view gains of the channels' tracked posts, from the daily view
-  // counts of the history: per channel and day, and per post over the range
+  // The daily view gains of the tracked posts of every channel whose post
+  // views are kept, per channel and day and per post over the range. Kept
+  // for a few minutes, so the two Views calls of a page read the history once
   private async historyViewGains(
     orgId: string,
-    integrationIds: string[],
+    channels: OverviewChannelRow[],
+    days: number,
     from: Date,
     to: Date
-  ) {
-    const readings = await this._analyticsRepository.getPostViewSnapshots(
+  ): Promise<HistoryViewGains> {
+    const integrationIds = channels
+      .filter((channel) => this.keepsViewHistory(channel.providerIdentifier))
+      .map((channel) => channel.id)
+      .sort();
+    if (!integrationIds.length) {
+      return { channels: {}, posts: [], partial: false };
+    }
+
+    // under the integration:{org}:* pattern the organization erasure clears
+    const cacheKey = `integration:${orgId}:views-history:${days}:${isoDay(
+      to
+    )}:${createHash('sha1').update(integrationIds.join(',')).digest('hex')}`;
+    const cached = await ioRedis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
+    let readings = await this._analyticsRepository.getPostViewSnapshots(
       orgId,
       integrationIds,
       dayjs(from)
@@ -1256,12 +1318,27 @@ export class AnalyticsService {
         .toDate(),
       to
     );
+    // past the read limit the oldest day read may be cut off: leave it out
+    const partial = readings.length >= HISTORY_READ_LIMIT;
+    if (partial) {
+      const oldest = readings.reduce(
+        (min, reading) => (isoDay(reading.date) < min ? isoDay(reading.date) : min),
+        isoDay(readings[0].date)
+      );
+      readings = readings.filter((reading) => isoDay(reading.date) !== oldest);
+    }
+
     const posts = await this._analyticsRepository.getAnalyticsPostsOf(
       orgId,
       integrationIds,
       [...new Set(readings.map((reading) => reading.externalId))]
     );
-    return this.aggregateHistoryViewGains(from, to, readings, posts);
+    const result = {
+      ...this.aggregateHistoryViewGains(from, to, readings, posts),
+      partial,
+    };
+    await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', VIEWS_CACHE_SECONDS);
+    return result;
   }
 
   aggregateHistoryViewGains(
@@ -1269,7 +1346,7 @@ export class AnalyticsService {
     to: Date,
     readings: PostViewReadingRow[],
     posts: AnalyticsPostRow[]
-  ) {
+  ): Omit<HistoryViewGains, 'partial'> {
     const first = isoDay(from);
     const last = isoDay(to);
     const key = (integrationId: string, externalId: string) =>
@@ -1300,25 +1377,25 @@ export class AnalyticsService {
       byPost.set(id, entry);
     }
 
-    const channels = new Map<string, Map<string, number>>();
-    const rows: Array<Omit<ViewGainPost, 'channel'> & { integrationId: string }> =
-      [];
+    const channels: Record<string, Record<string, number>> = {};
+    const rows: HistoryViewGains['posts'] = [];
     for (const [id, entry] of byPost) {
       const post = meta.get(id);
       const gains = dailyGains(
         entry.readings,
         post ? isoDay(post.publishedAt) : undefined
       );
-      const channel = channels.get(entry.integrationId) || new Map();
       let gained = 0;
       for (const [date, value] of gains) {
         if (date < first || date > last) {
           continue;
         }
-        channel.set(date, (channel.get(date) || 0) + value);
+        // a channel with readings but no day to compare yet has no entry
+        const channel = (channels[entry.integrationId] =
+          channels[entry.integrationId] || {});
+        channel[date] = (channel[date] || 0) + value;
         gained += value;
       }
-      channels.set(entry.integrationId, channel);
 
       const latest = entry.readings.reduce((a, b) => (b.date > a.date ? b : a));
       rows.push({
@@ -1332,13 +1409,6 @@ export class AnalyticsService {
         gained,
         views: latest.value,
       });
-    }
-
-    // a channel with readings but no day to compare yet has no entry
-    for (const [id, days] of channels) {
-      if (!days.size) {
-        channels.delete(id);
-      }
     }
 
     return { channels, posts: rows };

@@ -5,7 +5,7 @@ import { AccountStats, PostStats } from '@gitroom/nestjs-libraries/integrations/
 
 // the most rows one history read returns, newest first: a 90-day comparison
 // window of 100 channels is under 20,000 snapshot rows
-const HISTORY_READ_LIMIT = 50000;
+export const HISTORY_READ_LIMIT = 50000;
 // deleted channels per batch when their history is purged
 const PURGE_BATCH = 500;
 

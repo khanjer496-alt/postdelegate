@@ -523,8 +523,13 @@ export class IntegrationService {
     integration: string,
     date: string,
     forceRefresh = false,
-    // read-only callers (the analytics overview) never refresh or disconnect
-    allowRefresh = true
+    // read-only callers (the analytics overview) never refresh or disconnect.
+    // 'soft' (Analytics > Views) tries the refresh, but a failure only leaves
+    // this call empty: the channel is not flagged, notified or disconnected
+    allowRefresh: boolean | 'soft' = true,
+    // seconds to keep the result even for a provider that bypasses the hourly
+    // cache, so a page that asks again soon does not call the network again
+    shortCacheSeconds?: number
   ): Promise<AnalyticsData[]> {
     // Days to load, missing or invalid on some public API calls (same default as the app)
     const days = Number(date) > 0 ? Number(date) : 7;
@@ -549,8 +554,11 @@ export class IntegrationService {
       if (!allowRefresh) {
         return [];
       }
+      const soft = allowRefresh === 'soft';
       const data = await this._refreshIntegrationService.refresh(
-        getIntegration
+        getIntegration,
+        '',
+        soft
       );
       if (!data) {
         return [];
@@ -565,13 +573,21 @@ export class IntegrationService {
           await timer(10000);
         }
       } else {
-        await this.disconnectChannel(org.id, getIntegration);
+        if (!soft) {
+          await this.disconnectChannel(org.id, getIntegration);
+        }
         return [];
       }
     }
 
     const bypassCache = integrationProvider.authorizationPolicy?.bypassAnalyticsCache;
-    const getIntegrationData = bypassCache ? undefined : await ioRedis.get(`integration:${org.id}:${integration}:${days}`);
+    // the short cache has its own key, under the same purged pattern
+    const shortCache = bypassCache && !!shortCacheSeconds;
+    const cacheKey = shortCache
+      ? `integration:${org.id}:${integration}:${days}:short`
+      : `integration:${org.id}:${integration}:${days}`;
+    const getIntegrationData =
+      bypassCache && !shortCache ? undefined : await ioRedis.get(cacheKey);
     if (getIntegrationData) {
       return JSON.parse(getIntegrationData);
     }
@@ -586,16 +602,27 @@ export class IntegrationService {
         if (bypassCache) {
           const current = await this.getActiveIntegrationById(org.id, integration);
           if (!current || current.token !== getIntegration.token) return [];
-        } else await ioRedis.set(
-          `integration:${org.id}:${integration}:${days}`,
-          JSON.stringify(loadAnalytics),
-          'EX',
-          !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
-            ? 1
-            : 3600
-        );
+        }
+        if (!bypassCache || shortCache) {
+          await ioRedis.set(
+            cacheKey,
+            JSON.stringify(loadAnalytics),
+            'EX',
+            !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+              ? 1
+              : shortCache
+              ? shortCacheSeconds!
+              : 3600
+          );
+        }
         return loadAnalytics;
       } catch (e) {
+        if (e instanceof RefreshToken && allowRefresh === 'soft') {
+          // one retry with a fresh token, never a loop
+          return forceRefresh
+            ? []
+            : this.checkAnalytics(org, integration, date, true, 'soft', shortCacheSeconds);
+        }
         if (e instanceof RefreshToken && allowRefresh) {
           return this.checkAnalytics(org, integration, date, true);
         }
@@ -715,7 +742,9 @@ export class IntegrationService {
     org: Organization,
     integration: string,
     days: number,
-    limit: number
+    limit: number,
+    // how long to keep the list of a provider that bypasses the hourly cache
+    shortCacheSeconds = 600
   ): Promise<TopViewedPostsResponse> {
     const getIntegration = await this.getIntegrationById(org.id, integration);
 
@@ -747,9 +776,10 @@ export class IntegrationService {
       return unavailable;
     }
 
+    // a provider that bypasses the hourly cache is kept for a few minutes only
     const cacheKey = `integration:${org.id}:${integration}:top-viewed:${days}:${limit}`;
     const bypassCache = integrationProvider.authorizationPolicy?.bypassAnalyticsCache;
-    const cached = bypassCache ? undefined : await ioRedis.get(cacheKey);
+    const cached = await ioRedis.get(cacheKey);
     if (cached) {
       return { supported: true, posts: JSON.parse(cached) };
     }
@@ -764,12 +794,15 @@ export class IntegrationService {
       if (bypassCache) {
         const current = await this.getActiveIntegrationById(org.id, integration);
         if (!current || current.token !== getIntegration.token) return unavailable;
-      } else await ioRedis.set(
+      }
+      await ioRedis.set(
         cacheKey,
         JSON.stringify(posts),
         'EX',
         !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
           ? 1
+          : bypassCache
+          ? shortCacheSeconds
           : 3600
       );
       return { supported: true, posts };

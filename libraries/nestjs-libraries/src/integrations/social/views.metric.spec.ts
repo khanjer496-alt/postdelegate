@@ -220,9 +220,11 @@ describe('Facebook viewsMetric', () => {
 
     const data = await provider.analytics('page', 'token', 7);
 
-    expect(
-      metricOf(data, provider.viewsMetric.channel)?.data.map((p) => p.total)
-    ).toEqual([35, 12]);
+    const series = metricOf(data, provider.viewsMetric.channel)?.data;
+    expect(series?.map((p) => p.total)).toEqual([35, 12]);
+    // dated by end_time, the end of each day: the view gains move them back
+    expect(series?.[0].date).toBe('2026-10-02');
+    expect(provider.viewsMetric.channelDateOffset).toBe(-1);
   });
 
   it('names the views labels of feed, video and reel posts', async () => {

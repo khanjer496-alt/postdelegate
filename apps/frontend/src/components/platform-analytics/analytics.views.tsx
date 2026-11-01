@@ -1,6 +1,13 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, {
+  FC,
+  KeyboardEvent,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import useSWR from 'swr';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
@@ -44,6 +51,7 @@ interface ViewGainsData {
   totalViews: number | null;
   bestDay: ViewGainDay | null;
   channels: ViewGainsChannel[];
+  partial: boolean;
 }
 
 interface ViewGainPost {
@@ -62,9 +70,21 @@ interface ViewGainPostsData {
   days: number;
   posts: ViewGainPost[];
   unavailable: number;
+  partial: boolean;
 }
 
 const TOP_POSTS = 10;
+// the top posts of every channel are loaded once and narrowed to the
+// selected channels here, so toggling a channel calls nothing
+const TOP_POSTS_LOADED = 50;
+
+// live network data is costly: what was loaded is reused instead of asked
+// for again on every mount
+const viewsSwrOptions = {
+  ...swrOptions,
+  revalidateIfStale: false,
+  dedupingInterval: 60000,
+};
 
 const useViewGains = (days: Range) => {
   const fetch = useFetch();
@@ -75,16 +95,12 @@ const useViewGains = (days: Range) => {
     }
     return (await response.json()) as ViewGainsData;
   }, []);
-  return useSWR(`/analytics/views?days=${days}`, load, swrOptions);
+  return useSWR(`/analytics/views?days=${days}`, load, viewsSwrOptions);
 };
 
 // loaded once the view gains are in: those refresh an expired token, this
 // read-only call then uses it
-const useViewGainPosts = (
-  days: Range,
-  integrations: string[],
-  ready: boolean
-) => {
+const useViewGainPosts = (days: Range, ready: boolean) => {
   const fetch = useFetch();
   const load = useCallback(async (path: string) => {
     const response = await fetch(path);
@@ -94,15 +110,9 @@ const useViewGainPosts = (
     return (await response.json()) as ViewGainPostsData;
   }, []);
   return useSWR(
-    ready
-      ? `/analytics/views/posts?days=${days}&limit=${TOP_POSTS}${
-          integrations.length
-            ? `&integrations=${encodeURIComponent(integrations.join(','))}`
-            : ''
-        }`
-      : null,
+    ready ? `/analytics/views/posts?days=${days}&limit=${TOP_POSTS_LOADED}` : null,
     load,
-    swrOptions
+    viewsSwrOptions
   );
 };
 
@@ -134,8 +144,9 @@ const sumPoints = (dates: string[], channels: ViewGainsChannel[]) => {
 };
 
 // A native SVG bar chart of daily values: an empty slot where a day has no
-// value, the hovered or tapped day read out below, and a hidden table with
-// every value for screen readers
+// value, and the hovered, tapped or focused day read out below. The days are
+// one tab stop, arrow keys move between them. Compact charts are decoration
+// next to a written total, hidden from screen readers.
 const BarChart: FC<{
   dates: string[];
   values: Array<number | null>;
@@ -145,6 +156,7 @@ const BarChart: FC<{
 }> = ({ dates, values, label, height = 180, compact = false }) => {
   const t = useT();
   const [active, setActive] = useState<number | null>(null);
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const width = 600;
   const present = values.filter((v): v is number => v !== null);
   const max = Math.max(1, ...present);
@@ -153,75 +165,115 @@ const BarChart: FC<{
   const top = compact ? 0 : 6;
   const barHeight = (value: number) =>
     value > 0 ? Math.max(2, (value / max) * (height - top)) : 1;
+  // the day that takes the tab stop: the active one, else the last
+  const focusable = active ?? dates.length - 1;
 
-  const summary = present.length
-    ? t('analytics_views_chart_summary', '{{label}}: {{total}} views over {{days}} days, at most {{max}} in a day', {
-        label,
-        total: formatNumber(present.reduce((a, b) => a + b, 0)),
-        days: dates.length,
-        max: formatNumber(Math.max(...present)),
-      })
-    : t('analytics_chart_no_data', 'No data yet');
+  const dayText = (index: number) =>
+    values[index] === null
+      ? t('analytics_views_day_no_data', '{{date}}: no data', {
+          date: dateLabel(dates[index]),
+        })
+      : t('analytics_views_day_value', '{{date}}: {{views}} views', {
+          date: dateLabel(dates[index]),
+          views: formatNumber(values[index]!),
+        });
+
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>) => {
+      // left and right follow the reading direction
+      const forward = document.dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
+      const backward = document.dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
+      const current = active ?? dates.length - 1;
+      const next =
+        e.key === forward
+          ? Math.min(dates.length - 1, current + 1)
+          : e.key === backward
+          ? Math.max(0, current - 1)
+          : e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+          ? dates.length - 1
+          : -1;
+      if (next === -1) {
+        return;
+      }
+      e.preventDefault();
+      setActive(next);
+      refs.current[next]?.focus();
+    },
+    [active, dates.length]
+  );
+
+  const bars = (
+    <svg
+      aria-hidden="true"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className="w-full block overflow-visible text-btnPrimary"
+      style={{ height }}
+    >
+      {!compact &&
+        [0.25, 0.5, 0.75].map((ratio) => (
+          <line
+            key={ratio}
+            x1={0}
+            x2={width}
+            y1={height * ratio}
+            y2={height * ratio}
+            className="stroke-newTableBorder"
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      {values.map((value, index) =>
+        value === null ? null : (
+          <rect
+            key={dates[index]}
+            x={index * slot + gap / 2}
+            y={height - barHeight(value)}
+            width={Math.max(1, slot - gap)}
+            height={barHeight(value)}
+            rx={compact ? 0.5 : 1.5}
+            fill="currentColor"
+            opacity={active === null || active === index ? 1 : 0.45}
+          />
+        )
+      )}
+    </svg>
+  );
+
+  if (compact) {
+    return <div aria-hidden="true">{bars}</div>;
+  }
 
   return (
     <figure className="flex flex-col gap-[6px] m-0 min-w-0">
       <div className="relative">
-        <svg
-          role="img"
-          aria-label={summary}
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
-          className="w-full block overflow-visible text-btnPrimary"
-          style={{ height }}
+        {bars}
+        <div
+          role="group"
+          aria-label={label}
+          onKeyDown={onKeyDown}
           onMouseLeave={() => setActive(null)}
+          className="absolute inset-0 flex"
         >
-          {!compact &&
-            [0.25, 0.5, 0.75].map((ratio) => (
-              <line
-                key={ratio}
-                x1={0}
-                x2={width}
-                y1={height * ratio}
-                y2={height * ratio}
-                className="stroke-newTableBorder"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
-          {values.map((value, index) => {
-            const x = index * slot + gap / 2;
-            return (
-              <g key={dates[index]}>
-                {value !== null && (
-                  <rect
-                    x={x}
-                    y={height - barHeight(value)}
-                    width={Math.max(1, slot - gap)}
-                    height={barHeight(value)}
-                    rx={compact ? 0.5 : 1.5}
-                    fill="currentColor"
-                    opacity={
-                      active === null || active === index ? 1 : 0.45
-                    }
-                  />
-                )}
-                {!compact && (
-                  // the whole column is the hover target, so short bars are easy to hit
-                  <rect
-                    x={index * slot}
-                    y={0}
-                    width={slot}
-                    height={height}
-                    fill="transparent"
-                    onMouseEnter={() => setActive(index)}
-                    onClick={() => setActive(index)}
-                  />
-                )}
-              </g>
-            );
-          })}
-        </svg>
-        {!compact && present.length > 0 && (
+          {dates.map((date, index) => (
+            <button
+              key={date}
+              ref={(el) => {
+                refs.current[index] = el;
+              }}
+              type="button"
+              tabIndex={index === focusable ? 0 : -1}
+              aria-label={dayText(index)}
+              onMouseEnter={() => setActive(index)}
+              onFocus={() => setActive(index)}
+              onClick={() => setActive(index)}
+              className="flex-1 min-w-0 h-full outline-none rounded-[2px] focus-visible:ring-2 focus-visible:ring-btnPrimary"
+            />
+          ))}
+        </div>
+        {present.length > 0 && (
           <div
             aria-hidden="true"
             className="absolute top-0 start-0 text-[10px] text-newTableText pointer-events-none"
@@ -232,40 +284,18 @@ const BarChart: FC<{
           </div>
         )}
       </div>
-      {!compact && (
-        <figcaption
-          aria-hidden="true"
-          className="flex justify-between gap-[8px] text-[11px] text-newTableText"
-        >
-          <span>{dateLabel(dates[0])}</span>
-          {active !== null && (
-            <span className="text-newTextColor font-[500] tabular-nums">
-              {values[active] === null
-                ? t('analytics_views_day_no_data', '{{date}}: no data', {
-                    date: dateLabel(dates[active]),
-                  })
-                : t('analytics_views_day_value', '{{date}}: {{views}} views', {
-                    date: dateLabel(dates[active]),
-                    views: formatNumber(values[active]!),
-                  })}
-            </span>
-          )}
-          <span>{dateLabel(dates[dates.length - 1])}</span>
-        </figcaption>
-      )}
-      <table className="sr-only">
-        <caption>{label}</caption>
-        <tbody>
-          {dates.map((date, index) =>
-            values[index] === null ? null : (
-              <tr key={date}>
-                <th scope="row">{date}</th>
-                <td>{values[index]}</td>
-              </tr>
-            )
-          )}
-        </tbody>
-      </table>
+      <figcaption
+        aria-hidden="true"
+        className="flex justify-between gap-[8px] text-[11px] text-newTableText"
+      >
+        <span>{dateLabel(dates[0])}</span>
+        {active !== null && (
+          <span className="text-newTextColor font-[500] tabular-nums">
+            {dayText(active)}
+          </span>
+        )}
+        <span>{dateLabel(dates[dates.length - 1])}</span>
+      </figcaption>
     </figure>
   );
 };
@@ -374,7 +404,17 @@ const TopViewedPosts: FC<{
   ready: boolean;
 }> = ({ days, integrations, ready }) => {
   const t = useT();
-  const { data, isLoading, error } = useViewGainPosts(days, integrations, ready);
+  const { data, isLoading, error } = useViewGainPosts(days, ready);
+  // narrowed to the selected channels here, without another call
+  const posts = useMemo(
+    () =>
+      (data?.posts || [])
+        .filter(
+          (post) => !integrations.length || integrations.includes(post.channel.id)
+        )
+        .slice(0, TOP_POSTS),
+    [data, integrations]
+  );
 
   if (error && !data) {
     return (
@@ -397,7 +437,7 @@ const TopViewedPosts: FC<{
     );
   }
 
-  if (!data.posts.length) {
+  if (!posts.length) {
     return (
       <p className="text-[13px] text-newTableText">
         {t(
@@ -411,7 +451,7 @@ const TopViewedPosts: FC<{
   return (
     <div className="flex flex-col gap-[8px]">
       <ol className="flex flex-col divide-y divide-newTableBorder" aria-busy={isLoading}>
-        {data.posts.map((post, index) => {
+        {posts.map((post, index) => {
           const title =
             post.title || t('analytics_top_posts_untitled', 'Post without text');
           const href = isWebUrl(post.url)
@@ -573,6 +613,9 @@ export const ViewsSection: FC<{ days: Range }> = ({ days }) => {
     );
   }
 
+  const shown = [...withData, ...tracked];
+  const hasLive = shown.some((channel) => channel.source === 'live');
+  const hasHistory = shown.some((channel) => channel.source === 'history');
   const average =
     summary.total === null
       ? null
@@ -624,10 +667,10 @@ export const ViewsSection: FC<{ days: Range }> = ({ days }) => {
           hint={
             active.length
               ? t('analytics_views_total_selected', 'Selected channels, last {{days}} days', {
-                  days,
+                  days: data.days,
                 })
               : t('analytics_views_total_all', 'All channels with views, last {{days}} days', {
-                  days,
+                  days: data.days,
                 })
           }
         />
@@ -675,6 +718,25 @@ export const ViewsSection: FC<{ days: Range }> = ({ days }) => {
             'analytics_views_note',
             'Live channels report their views per day when you look. Daily history channels are worked out from the daily view counts of the posts PostDelegate tracks: posts published in the last 30 days and the latest posts the network lists. A missed day shares its gain with the days around it.'
           )}
+          {hasLive &&
+            ' ' +
+              t(
+                'analytics_views_note_lag',
+                'Networks report views late: YouTube’s last 2–3 days stay empty or low until its numbers come in.'
+              )}
+          {hasHistory &&
+            data.days >= 90 &&
+            ' ' +
+              t(
+                'analytics_views_note_retention',
+                'Daily post counts are kept for 90 days, so the first days of this range can be undercounted.'
+              )}
+          {data.partial &&
+            ' ' +
+              t(
+                'analytics_views_note_partial',
+                'This range has more daily history than one read takes, so its oldest day is left out.'
+              )}
         </p>
       </Card>
 
@@ -684,7 +746,7 @@ export const ViewsSection: FC<{ days: Range }> = ({ days }) => {
           subtitle={t(
             'analytics_views_by_channel_hint',
             'Views gained per channel in the last {{days}} days',
-            { days }
+            { days: data.days }
           )}
         >
           <ChannelRows data={data} channels={[...withData, ...tracked, ...unsupported]} />
@@ -694,7 +756,7 @@ export const ViewsSection: FC<{ days: Range }> = ({ days }) => {
           subtitle={t(
             'analytics_views_top_posts_hint',
             'The posts that gained the most views in the last {{days}} days',
-            { days }
+            { days: data.days }
           )}
         >
           <TopViewedPosts

@@ -175,6 +175,9 @@ export interface ViewsMetric {
   // day. Only for networks whose analytics() returns a daily series of views,
   // not a running total
   channel?: string;
+  // days to move the dates of that series by, -1 where each point is dated
+  // the end of its day (the start of the next one)
+  channelDateOffset?: number;
   // labels of the postAnalytics() metrics that hold a post's lifetime views,
   // the first one reported wins. The daily analytics history keeps that count
   // and the daily gains are computed from it
