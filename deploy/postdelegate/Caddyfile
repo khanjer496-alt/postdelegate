@@ -45,6 +45,21 @@ app.postdelegate.com {
         rewrite * /api{uri}
         reverse_proxy postiz:5000
     }
+    # MCP discovery documents for directories (Smithery, Glama, Vercel,
+    # Zapier) and the ChatGPT app domain check, also served by the backend
+    # under /api: the root protected-resource metadata and the path-inserted
+    # one of /api/mcp, the server card and the OpenAI challenge.
+    @mcpWellKnown path /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
+    handle @mcpWellKnown {
+        rewrite * /api{uri}
+        reverse_proxy postiz:5000
+    }
+    # Swagger lists every internal route. The backend only serves it with
+    # ENABLE_SWAGGER=true; this keeps it closed even if that is set by mistake.
+    @swagger path /api/docs /api/docs/* /api/docs-json
+    handle @swagger {
+        respond 404
+    }
     @affiliateTerms path /legal/affiliate-terms /legal/affiliate-terms/
     handle @affiliateTerms {
         root * /legal-public

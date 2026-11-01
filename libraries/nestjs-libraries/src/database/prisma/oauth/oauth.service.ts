@@ -59,6 +59,26 @@ const isVerifiedHost = (host: string, verifiedDomains: string[]) =>
     (domain) => host === domain || host.endsWith('.' + domain)
   );
 
+// MCP directories that register through DCR with their own web callbacks.
+// They are accepted on top of DCR_VERIFIED_DOMAINS (which also decides who
+// gets email claims, these never do): https on exactly these hosts. Not
+// their subdomains, where the directories host servers other people deploy
+const directoryRedirectHosts = ['smithery.run', 'smithery.ai', 'glama.ai'];
+// Exact https callbacks: Vercel Connect, plus the ones in the
+// MCP_EXTRA_REDIRECT_URIS env (comma separated), e.g. a Zapier integration's
+// https://zapier.com/dashboard/auth/oauth/return/App123456CLIAPI/
+const directoryRedirectUris = ['https://connect.vercel.com/callback'];
+const extraRedirectUris = () =>
+  (process.env.MCP_EXTRA_REDIRECT_URIS || '')
+    .split(',')
+    .map((uri) => uri.trim())
+    .filter((uri) => uri.startsWith('https://'));
+
+const isDirectoryRedirect = (uri: string, parsed: URL) =>
+  parsed.protocol === 'https:' &&
+  (directoryRedirectHosts.includes(parsed.hostname.toLowerCase()) ||
+    [...directoryRedirectUris, ...extraRedirectUris()].includes(uri));
+
 type EmailClaimsApp = Pick<OAuthApp, 'clientId' | 'dynamic' | 'redirectUris'>;
 
 // Schemes a browser would execute instead of navigating away from the
@@ -219,7 +239,10 @@ export class OAuthService {
       }
 
       const host = parsed.hostname.toLowerCase();
-      if (!isVerifiedHost(host, verifiedDomains)) {
+      if (
+        !isVerifiedHost(host, verifiedDomains) &&
+        !isDirectoryRedirect(uri, parsed)
+      ) {
         throw new HttpException(
           {
             error: 'invalid_redirect_uri',
