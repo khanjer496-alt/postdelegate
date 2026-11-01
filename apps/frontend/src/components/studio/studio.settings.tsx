@@ -15,6 +15,7 @@ import type {
   StudioPosition,
   StudioSpec,
 } from '@gitroom/frontend/components/studio/use.studio';
+import { StudioMusicPicker } from '@gitroom/frontend/components/studio/studio.music';
 
 export interface StudioSettingsProps {
   projectId: string;
@@ -70,7 +71,7 @@ export const Segmented: FC<{
   </div>
 );
 
-const StyleSelect: FC<{
+export const StyleSelect: FC<{
   label: string;
   value: StudioTextStyle;
   onChange: (value: StudioTextStyle) => void;
@@ -98,7 +99,7 @@ const StyleSelect: FC<{
   );
 };
 
-const usePositions = () => {
+export const usePositions = () => {
   const t = useT();
   return [
     { value: 'top', label: t('studio_top', 'Top') },
@@ -174,6 +175,7 @@ const HookSettings: FC<StudioSettingsProps> = ({ spec, change }) => {
           })
         }
       />
+      <StudioMusicPicker spec={spec} change={change} underSound={!spec.mute} />
     </div>
   );
 };
