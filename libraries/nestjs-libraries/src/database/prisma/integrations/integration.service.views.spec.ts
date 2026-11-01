@@ -147,26 +147,14 @@ describe('IntegrationService.checkAnalytics soft refresh (Analytics > Views)', (
     expect(refreshIntegrationService.refresh.mock.calls[0][2]).toBe(true);
   });
 
-  it('keeps a bypassing provider for the short cache only, under its own key', async () => {
+  it('never keeps the data of a provider that bypasses the analytics cache', async () => {
     const analytics = jest.fn().mockResolvedValue(views);
     const { service } = makeService({
       analytics,
       authorizationPolicy: { bypassAnalyticsCache: true },
     });
 
-    await service.checkAnalytics(org, 'int-1', '7', false, 'soft', 600);
-    expect(redis.get).toHaveBeenCalledWith('integration:org-A:int-1:7:short');
-    expect(redis.set).toHaveBeenCalledWith(
-      'integration:org-A:int-1:7:short',
-      JSON.stringify(views),
-      'EX',
-      600
-    );
-
-    // without the short cache a bypassing provider is never kept
-    redis.get.mockClear();
-    redis.set.mockClear();
-    await service.checkAnalytics(org, 'int-1', '7');
+    expect(await service.checkAnalytics(org, 'int-1', '7', false, 'soft')).toEqual(views);
     expect(redis.get).not.toHaveBeenCalled();
     expect(redis.set).not.toHaveBeenCalled();
   });
@@ -194,22 +182,18 @@ describe('IntegrationService.topViewedPosts', () => {
     expect(refreshIntegrationService.refresh).not.toHaveBeenCalled();
   });
 
-  it('keeps a bypassing provider for the short cache, under the purged key pattern', async () => {
+  it('reads a bypassing provider on demand, never from or into the cache', async () => {
     const posts = [{ id: 'v1', views: 5 }];
     const { service } = makeService({
       topViewedPosts: jest.fn().mockResolvedValue(posts),
       authorizationPolicy: { bypassAnalyticsCache: true },
     });
 
-    expect(await service.topViewedPosts(org, 'int-1', 30, 50, 600)).toEqual({
+    expect(await service.topViewedPosts(org, 'int-1', 30, 50)).toEqual({
       supported: true,
       posts,
     });
-    expect(redis.set).toHaveBeenCalledWith(
-      'integration:org-A:int-1:top-viewed:30:50',
-      JSON.stringify(posts),
-      'EX',
-      600
-    );
+    expect(redis.get).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
   });
 });

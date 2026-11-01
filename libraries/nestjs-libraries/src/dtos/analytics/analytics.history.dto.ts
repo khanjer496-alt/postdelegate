@@ -91,7 +91,7 @@ export class AnalyticsViewsDto {
   days: (typeof ANALYTICS_OVERVIEW_RANGES)[number];
 }
 
-// the posts with the most views gained in the range
+// the posts with the most views gained in the range, `limit` per channel
 export class AnalyticsViewPostsDto {
   @Type(() => Number)
   @IsIn(ANALYTICS_OVERVIEW_RANGES)

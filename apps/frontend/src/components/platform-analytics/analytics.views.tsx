@@ -180,14 +180,12 @@ const BarChart: FC<{
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
-      // left and right follow the reading direction
-      const forward = document.dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
-      const backward = document.dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
+      // the chart always runs left to right, like its dates
       const current = active ?? dates.length - 1;
       const next =
-        e.key === forward
+        e.key === 'ArrowRight'
           ? Math.min(dates.length - 1, current + 1)
-          : e.key === backward
+          : e.key === 'ArrowLeft'
           ? Math.max(0, current - 1)
           : e.key === 'Home'
           ? 0
@@ -243,11 +241,17 @@ const BarChart: FC<{
   );
 
   if (compact) {
-    return <div aria-hidden="true">{bars}</div>;
+    return (
+      <div aria-hidden="true" dir="ltr">
+        {bars}
+      </div>
+    );
   }
 
   return (
-    <figure className="flex flex-col gap-[6px] m-0 min-w-0">
+    // ltr: days run left to right in every language, so an RTL page does
+    // not mirror the bars against their readout
+    <figure dir="ltr" className="flex flex-col gap-[6px] m-0 min-w-0">
       <div className="relative">
         {bars}
         <div
@@ -316,8 +320,8 @@ const ChannelStatusNote: FC<{ channel: ViewGainsChannel }> = ({ channel }) => {
     return (
       <>
         {t(
-          'analytics_views_unavailable',
-          'The network did not answer. Try again later, or reconnect the channel.'
+          'analytics_views_unavailable_now',
+          'View data unavailable right now. Try again later.'
         )}
       </>
     );

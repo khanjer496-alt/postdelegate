@@ -253,6 +253,7 @@ export interface ViewGainPost {
 
 export interface ViewGainPostsResponse {
   days: number;
+  // the top posts of each channel by views gained, most first
   posts: ViewGainPost[];
   // channels asked for their posts that did not answer
   unavailable: number;
@@ -283,8 +284,12 @@ const VIEW_GAIN_POSTS_LIMIT = 10;
 // a count read this many times in a row below the highest one is a lasting
 // recount, not a glitch
 const RECOUNT_READINGS = 2;
-// how long the Views section keeps live network data and the history part
-const VIEWS_CACHE_SECONDS = 600;
+// how long the history part of the Views section is kept. Live network data
+// is never kept here: a provider that bypasses the analytics cache is read
+// on demand
+const VIEWS_HISTORY_CACHE_SECONDS = 600;
+// the most posts one Views posts call returns across its channels
+const VIEW_GAIN_POSTS_TOTAL = 1000;
 
 export interface AnalyticsInsightsResponse {
   // PostDelegate posts with metrics in the range
@@ -327,6 +332,9 @@ const isoDay = (date: Date) => dayjs(date).utc().format('YYYY-MM-DD');
 // missed between two readings share the gain evenly. The first reading is the
 // base, unless the post went out at most NEW_POST_DAYS before it: then it had
 // no views before and its count is spread from the day it was published.
+// Known limit: a dip that lasts RECOUNT_READINGS readings and then comes back
+// (1000, 0, 0, 1000) can't be told from a recount followed by real growth, so
+// the recovery counts as gains again.
 export const dailyGains = (
   readings: Array<{ date: string; value: number }>,
   publishedDay?: string
@@ -1078,8 +1086,7 @@ export class AnalyticsService {
                   channel.id,
                   String(days),
                   false,
-                  'soft',
-                  VIEWS_CACHE_SECONDS
+                  'soft'
                 ),
                 ENGAGEMENT_TIMEOUT_MS
               )
@@ -1237,13 +1244,7 @@ export class AnalyticsService {
       live.map((channel) =>
         queue(() =>
           this.withTimeout(
-            this._integrationService.topViewedPosts(
-              org,
-              channel.id,
-              days,
-              limit,
-              VIEWS_CACHE_SECONDS
-            ),
+            this._integrationService.topViewedPosts(org, channel.id, days, limit),
             ENGAGEMENT_TIMEOUT_MS
           ).catch((): null => null)
         )
@@ -1270,12 +1271,20 @@ export class AnalyticsService {
       }
     });
 
+    // the top `limit` of each channel, so narrowing to a smaller channel
+    // still has its posts
+    const perChannel = new Map<string, number>();
     return {
       days,
       posts: posts
         .filter((post) => post.gained > 0)
         .sort((a, b) => b.gained - a.gained || a.id.localeCompare(b.id))
-        .slice(0, limit),
+        .filter((post) => {
+          const count = (perChannel.get(post.channel.id) || 0) + 1;
+          perChannel.set(post.channel.id, count);
+          return count <= limit;
+        })
+        .slice(0, VIEW_GAIN_POSTS_TOTAL),
       unavailable,
       partial: history.partial && byId.size > 0,
     };
@@ -1337,7 +1346,12 @@ export class AnalyticsService {
       ...this.aggregateHistoryViewGains(from, to, readings, posts),
       partial,
     };
-    await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', VIEWS_CACHE_SECONDS);
+    await ioRedis.set(
+      cacheKey,
+      JSON.stringify(result),
+      'EX',
+      VIEWS_HISTORY_CACHE_SECONDS
+    );
     return result;
   }
 

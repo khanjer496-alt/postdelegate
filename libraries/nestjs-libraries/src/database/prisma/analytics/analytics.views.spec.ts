@@ -117,6 +117,21 @@ describe('dailyGains', () => {
     ).toEqual({ '2026-10-02': 0, '2026-10-03': 10 });
   });
 
+  it('counts a two-reading dip that comes back as a recount (known limit)', () => {
+    // two low readings in a row can't be told from a lasting recount, so the
+    // recovery counts again: 1000 views are counted twice here
+    expect(
+      asObject(
+        dailyGains([
+          { date: '2026-10-01', value: 1000 },
+          { date: '2026-10-02', value: 0 },
+          { date: '2026-10-03', value: 0 },
+          { date: '2026-10-04', value: 1000 },
+        ])
+      )
+    ).toEqual({ '2026-10-02': 0, '2026-10-03': 0, '2026-10-04': 1000 });
+  });
+
   it('gives missed days 0 when the count dropped across them', () => {
     expect(
       asObject(
@@ -310,14 +325,13 @@ describe('AnalyticsService.getViewGains', () => {
     );
     expect(repository.getAnalyticsPostsOf.mock.calls[0][0]).toBe('org-A');
     expect(integrationService.checkAnalytics).toHaveBeenCalledTimes(1);
-    // a soft refresh and the short cache, so the page never flags a channel
+    // a soft refresh, so the page never flags a channel
     expect(integrationService.checkAnalytics).toHaveBeenCalledWith(
       org,
       'l1',
       '7',
       false,
-      'soft',
-      600
+      'soft'
     );
   });
 
@@ -439,8 +453,7 @@ describe('AnalyticsService.getViewGainPosts', () => {
       org,
       'l1',
       30,
-      10,
-      600
+      10
     );
   });
 
@@ -533,23 +546,38 @@ describe('AnalyticsService.getViewGainPosts', () => {
     ]);
   });
 
-  it('keeps to the limit', async () => {
+  it('keeps the limit per channel, so a smaller channel keeps its posts', async () => {
     const { service, repository, integrationService } = makeService();
     repository.getOverviewChannels.mockResolvedValue([
-      channel('l1', { providerIdentifier: 'live-network' }),
+      channel('big', { providerIdentifier: 'live-network' }),
+      channel('small', { providerIdentifier: 'live-network' }),
     ]);
-    integrationService.topViewedPosts.mockResolvedValue({
-      supported: true,
-      posts: [
-        { id: 'a', views: 3 },
-        { id: 'b', views: 9 },
-        { id: 'c', views: 5 },
-      ],
-    });
+    integrationService.topViewedPosts.mockImplementation(
+      async (_org: unknown, id: string) => ({
+        supported: true,
+        posts:
+          id === 'big'
+            ? [
+                { id: 'a', views: 3000 },
+                { id: 'b', views: 9000 },
+                { id: 'c', views: 5000 },
+              ]
+            : [
+                { id: 'd', views: 4 },
+                { id: 'e', views: 7 },
+                { id: 'f', views: 1 },
+              ],
+      })
+    );
 
     const result = await service.getViewGainPosts(org, 7, { limit: 2 }, NOW);
 
-    expect(result.posts.map((post) => post.externalId)).toEqual(['b', 'c']);
+    expect(result.posts.map((post) => post.externalId)).toEqual([
+      'b',
+      'c',
+      'e',
+      'd',
+    ]);
   });
 });
 

@@ -1352,7 +1352,7 @@
   "analytics_views_day_no_data": "{{date}}: no data",
   "analytics_views_day_value": "{{date}}: {{views}} views",
   "analytics_views_collecting": "Collecting: gains show after two daily snapshots of its posts.",
-  "analytics_views_unavailable": "The network did not answer. Try again later, or reconnect the channel.",
+  "analytics_views_unavailable_now": "View data unavailable right now. Try again later.",
   "analytics_views_unsupported": "This network doesn’t share view counts yet",
   "analytics_views_source_live": "Live",
   "analytics_views_source_history": "Daily history",
