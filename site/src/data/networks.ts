@@ -21,7 +21,7 @@ export const NETWORKS: Network[] = [
   { key: 'google_business', name: 'Google Business', color: '#4285f4', abbr: 'Gb', limit: 1500, unit: 'codepoints', scheduler: 'google-business-scheduler' },
   { key: 'reddit', name: 'Reddit', color: '#ff4500', abbr: 'Re', limit: 40000, unit: 'codepoints' },
   { key: 'telegram', name: 'Telegram', color: '#26a5e4', abbr: 'Tg', limit: 4096, unit: 'codepoints', scheduler: 'telegram-scheduler', available: true },
-  { key: 'discord', name: 'Discord', color: '#5865f2', abbr: 'Dc', limit: 2000, unit: 'codepoints' },
+  { key: 'discord', name: 'Discord', color: '#5865f2', abbr: 'Dc', limit: 1980, unit: 'codepoints', note: 'Discord allows 2,000; PostDelegate keeps a small margin.', scheduler: 'discord-scheduler', available: true },
   { key: 'slack', name: 'Slack', color: '#8c3a90', abbr: 'Sl', limit: 4000, unit: 'codepoints', scheduler: 'slack-scheduler', available: true },
   { key: 'tumblr', name: 'Tumblr', color: '#5a7396', abbr: 'Tu', limit: 32768, unit: 'codepoints', scheduler: 'tumblr-scheduler', available: true },
   { key: 'lemmy', name: 'Lemmy', color: '#00bc8c', abbr: 'Le', limit: 10000, unit: 'codepoints', scheduler: 'lemmy-scheduler', available: true },

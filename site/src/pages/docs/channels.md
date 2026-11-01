@@ -25,6 +25,7 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | [Dribbble](/docs/channels/dribbble) | Dribbble sign-in | Shots, one image each |
 | [Slack](/docs/channels/slack) | Add PostDelegate to a workspace | Messages to a channel |
 | [Telegram](/docs/channels/telegram) | Add @PostDelegateBot, then send a connect command | Messages to a channel or group |
+| [Discord](/docs/channels/discord) | Discord sign-in, then add the bot to a server | Messages to a channel |
 
 ## Coming soon
 
@@ -32,13 +33,13 @@ Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and several other n
 
 ## How connections work
 
-There are two kinds of connection.
+There are three kinds of connection.
 
-**Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. YouTube, Kick, Twitch, Tumblr, Dribbble and Slack work this way.
+**Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. YouTube, Kick, Twitch, Tumblr, Dribbble, Slack and Discord work this way. For Discord, approving also adds the PostDelegate bot to the server you choose.
 
-**Paste a credential.** You enter an app password, API key or site address into PostDelegate. The other eight networks work this way.
+**Paste a credential.** You enter an app password, API key or site address into PostDelegate. Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr and WordPress work this way. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
 
-**Add a bot.** For Telegram you add @PostDelegateBot to your channel or group and send a short connect command there. No password or key is involved. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
+**Add a bot.** For Telegram you add @PostDelegateBot to your channel or group and send a short connect command there. No password or key is involved.
 
 Whichever kind it is, you start from **Add Channel** on the calendar page.
 
@@ -50,7 +51,7 @@ You can connect several accounts from the same network, such as two YouTube chan
 
 **Connecting the same account twice updates it.** If you connect an account that is already in the workspace, PostDelegate refreshes the existing channel instead of adding a copy.
 
-**Networks you sign in to remember who you are.** YouTube, Kick, Twitch, Tumblr, Dribbble and Slack send you to the network's own page. If you are already signed in there, the network usually approves the account you are signed in to, without asking. To add a different account:
+**Networks you sign in to remember who you are.** YouTube, Kick, Twitch, Tumblr, Dribbble, Slack and Discord send you to the network's own page. If you are already signed in there, the network usually approves the account you are signed in to, without asking. To add a different account:
 
 1. Open the network's website in the same browser and sign out, or switch to the other account.
 2. Back in PostDelegate, choose **Add Channel** and the network again.
@@ -58,7 +59,7 @@ You can connect several accounts from the same network, such as two YouTube chan
 
 A private or incognito window also works, as long as you sign in to PostDelegate in that window too.
 
-Some networks let one login hold several destinations. On YouTube, choose the channel after you sign in; to connect another channel from the same Google account, add YouTube again and choose the other one. On Tumblr, each blog is its own channel. On Slack, each workspace is one channel and you pick the Slack channel for each post. On Telegram, add @PostDelegateBot to each channel or group you want to post to.
+Some networks let one login hold several destinations. On YouTube, choose the channel after you sign in; to connect another channel from the same Google account, add YouTube again and choose the other one. On Tumblr, each blog is its own channel. On Slack, each workspace is one channel and you pick the Slack channel for each post. On Discord, each server is one channel and you pick the Discord channel for each post; add Discord again to connect another server. On Telegram, add @PostDelegateBot to each channel or group you want to post to.
 
 **Networks where you paste a credential** take whatever you enter, so use the app password, API key or site address of the account you want to add.
 

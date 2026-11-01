@@ -115,6 +115,6 @@ If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for **drafts
 
 ## Next steps
 
-The [Telegram scheduler page](/telegram-scheduler) is the short version of this guide, and the [Telegram channel guide](/docs/channels/telegram) is the reference. For other community chats, read [how to schedule Slack announcements](/guides/slack-scheduled-announcements) and [Discord announcement scheduling](/guides/discord-announcement-scheduling), which is coming soon.
+The [Telegram scheduler page](/telegram-scheduler) is the short version of this guide, and the [Telegram channel guide](/docs/channels/telegram) is the reference. For other community chats, read [how to schedule Slack announcements](/guides/slack-scheduled-announcements) and [how to schedule Discord announcements](/guides/discord-announcement-scheduling).
 
 Ready? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.

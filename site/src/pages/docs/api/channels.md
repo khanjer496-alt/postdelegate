@@ -83,12 +83,13 @@ Runs a helper lookup for a channel, for example fetching the categories of a Wor
 | Hashnode | `tagsList`, `publications` |
 | Dribbble | `teams` |
 | Slack | `channels` |
+| Discord | `channels` |
 
 Use the ids and labels these return in a post's `settings`. A `404` with `Tool not found` means the method does not exist for that network. If the network rejects the saved login you get `401` and the channel is disconnected, so reconnect it.
 
 ### `GET /social/:integration`
 
-Starts a connection for a network that signs in on the network's own page, which today means `youtube`, `kick`, `twitch`, `tumblr`, `dribbble` and `slack`. It returns the address to open.
+Starts a connection for a network that signs in on the network's own page, which today means `youtube`, `kick`, `twitch`, `tumblr`, `dribbble`, `slack` and `discord`. It returns the address to open.
 
 ```bash
 curl https://app.postdelegate.com/api/public/v1/social/youtube \
