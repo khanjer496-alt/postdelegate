@@ -106,6 +106,7 @@ describe('StudioService fair use', () => {
       createRender: jest.fn().mockResolvedValue({ id: 'render-1' }),
       updateRender: jest.fn().mockResolvedValue(undefined),
       updateProject: jest.fn().mockResolvedValue(undefined),
+      getProjectAssets: jest.fn().mockResolvedValue([]),
       getRender: jest.fn(),
       getRenderById: jest.fn(),
     };

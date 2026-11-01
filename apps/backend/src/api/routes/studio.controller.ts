@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,19 +7,33 @@ import {
   Param,
   Post,
   Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Organization } from '@prisma/client';
+import { Organization, User } from '@prisma/client';
 import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
+import { StudioScheduleService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.schedule.service';
 import {
   CreateStudioProjectDto,
   StudioTranscribeDto,
   UpdateStudioProjectDto,
 } from '@gitroom/nestjs-libraries/dtos/studio/studio.project.dto';
+import { StudioScheduleRendersDto } from '@gitroom/nestjs-libraries/dtos/studio/studio.schedule.dto';
+import { studioAudioUploadOptions } from '@gitroom/nestjs-libraries/upload/multer.stream.engine';
+import { userActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
+import {
+  AuthorizationActions,
+  Sections,
+  SubscriptionException,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 
 // Every transcription spends the workspace's own OpenAI credit
 const HOUR = 60 * 60 * 1000;
@@ -26,7 +41,11 @@ const HOUR = 60 * 60 * 1000;
 @ApiTags('Studio')
 @Controller('/studio')
 export class StudioController {
-  constructor(private _studioService: StudioService) {}
+  constructor(
+    private _studioService: StudioService,
+    private _studioScheduleService: StudioScheduleService,
+    private _permissionsService: PermissionsService
+  ) {}
 
   @Get('/templates')
   getTemplates() {
@@ -84,9 +103,62 @@ export class StudioController {
     return this._studioService.transcribe(org.id, id, body);
   }
 
+  // Music for the templates that take it: mp3, m4a or wav up to 30 MB,
+  // stored for Studio only and never shown in the media library
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 60, ttl: HOUR } })
+  @Post('/assets')
+  @UseInterceptors(FileInterceptor('file', studioAudioUploadOptions()))
+  uploadAsset(
+    @GetOrgFromRequest() org: Organization,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+    return this._studioService.saveAsset(org.id, file);
+  }
+
   @Post('/projects/:id/render')
   startRender(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
     return this._studioService.startRender(org, id);
+  }
+
+  @Get('/renders')
+  getFinishedRenders(@GetOrgFromRequest() org: Organization) {
+    return this._studioService.getFinishedRenders(org.id);
+  }
+
+  // Finished videos scheduled at once, with every check of the bulk video
+  // upload: the plan check of POST /posts, then the posts left this month
+  @Post('/renders/schedule')
+  async scheduleRenders(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Body() body: StudioScheduleRendersDto
+  ) {
+    const ability = await this._permissionsService.check(
+      org.id,
+      org.createdAt,
+      (org as any).users[0].role,
+      [[AuthorizationActions.Create, Sections.POSTS_PER_MONTH]]
+    );
+    if (!ability.can(AuthorizationActions.Create, Sections.POSTS_PER_MONTH)) {
+      throw new SubscriptionException({
+        action: AuthorizationActions.Create,
+        section: Sections.POSTS_PER_MONTH,
+      });
+    }
+    const remaining = await this._permissionsService.remainingPostsThisMonth(
+      org.id,
+      org.createdAt
+    );
+    return this._studioScheduleService.scheduleRenders(
+      org.id,
+      body,
+      remaining,
+      userActor(user, org as any)
+    );
   }
 
   @Get('/renders/:id')

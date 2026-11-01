@@ -27,6 +27,7 @@ model Organization {
   clippings           Clipping[]
   studioProjects      StudioProject[]
   studioRenders       StudioRender[]
+  studioAssets        StudioAsset[]
   customers           Customer[]
   errors              Errors[]
   github              GitHub[]
@@ -358,6 +359,7 @@ model StudioProject {
   updatedAt      DateTime       @updatedAt
   organization   Organization   @relation(fields: [organizationId], references: [id])
   renders        StudioRender[]
+  assets         StudioAsset[]
 
   @@index([organizationId, deletedAt])
 }
@@ -385,6 +387,28 @@ model StudioRender {
   @@index([organizationId, createdAt])
   @@index([projectId])
   @@index([status])
+}
+
+// A file a workspace uploaded for Studio, music for now. It is not a Media
+// row, so the media library and the composer never show it. "projectId" is
+// the project whose settings use it; one no project uses is removed with its
+// stored file after 7 days, and with the project when that is deleted
+model StudioAsset {
+  id             String         @id @default(uuid())
+  organizationId String
+  projectId      String?
+  kind           String         @default("music")
+  name           String
+  path           String
+  originalName   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  project        StudioProject? @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([updatedAt])
 }
 
 model ClippingClip {

@@ -70,4 +70,18 @@ export class StudioActivity implements OnModuleInit {
   }) {
     return this._studioService.failRender(renderId, error, customer, cancelled);
   }
+
+  // The daily cleanup of studioCleanupWorkflowV1: stored music of deleted
+  // projects and music unused for a week, and render records older than 90
+  // days. Takes an empty object so fields can be added later
+  @ActivityMethod()
+  async cleanupStudioV1(_args: Record<string, never> = {}) {
+    const context = Context.current();
+    return withHeartbeat(() =>
+      this._studioService.cleanup((details) => {
+        setHeartbeatDetails(`cleanupStudioV1: ${details}`);
+        context.heartbeat(details);
+      })
+    );
+  }
 }

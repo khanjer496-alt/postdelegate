@@ -3,14 +3,20 @@ import { StorageEngine } from 'multer';
 import { Readable } from 'stream';
 import { IUploadProvider } from './upload.interface';
 import { UploadFactory } from './upload.factory';
-import { getMaxSize, uploadStreamToStorage } from './custom.upload.validation';
+import {
+  STUDIO_AUDIO_MIME,
+  UploadRules,
+  getMaxSize,
+  uploadStreamToStorage,
+} from './custom.upload.validation';
+import { STUDIO_MUSIC_MAX_BYTES } from '@gitroom/nestjs-libraries/dtos/studio/studio.music.dto';
 
 // Multer storage engine that streams each incoming file straight into
 // storage instead of multer's default of buffering it whole in memory.
 // `file.filename` / `file.path` end up as the stored key and public URL,
 // `file.originalname` keeps the sender's name with the detected extension
 export class MulterStreamEngine implements StorageEngine {
-  constructor(private storage: IUploadProvider) {}
+  constructor(private storage: IUploadProvider, private rules?: UploadRules) {}
 
   _handleFile(
     req: Request,
@@ -19,7 +25,9 @@ export class MulterStreamEngine implements StorageEngine {
   ) {
     uploadStreamToStorage(
       this.storage,
-      Readable.toWeb(file.stream) as any
+      Readable.toWeb(file.stream) as any,
+      0,
+      this.rules
     ).then(
       (uploaded) => {
         const safeBase =
@@ -63,5 +71,21 @@ export function streamUploadOptions() {
   return {
     storage: engine,
     limits: { fileSize: getMaxSize('video/mp4') + 1 },
+  };
+}
+
+let studioAudioEngine: MulterStreamEngine;
+
+// The same for Studio music (POST /studio/assets): audio only, 30 MB at most
+export function studioAudioUploadOptions() {
+  studioAudioEngine =
+    studioAudioEngine ||
+    new MulterStreamEngine(UploadFactory.createStorage(), {
+      allowed: STUDIO_AUDIO_MIME,
+      maxSize: () => STUDIO_MUSIC_MAX_BYTES,
+    });
+  return {
+    storage: studioAudioEngine,
+    limits: { fileSize: STUDIO_MUSIC_MAX_BYTES + 1, files: 1 },
   };
 }

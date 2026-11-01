@@ -29,7 +29,8 @@ export class StudioRepository {
   constructor(
     private _studioProject: PrismaRepository<'studioProject'>,
     private _studioRender: PrismaRepository<'studioRender'>,
-    private _transaction: PrismaTransaction
+    private _transaction: PrismaTransaction,
+    private _studioAsset: PrismaRepository<'studioAsset'>
   ) {}
 
   getProjects(org: string) {
@@ -310,6 +311,173 @@ export class StudioRepository {
           not: 'failed',
         },
         ...(since ? { createdAt: { gte: since } } : {}),
+      },
+    });
+  }
+
+  // The finished videos of the workspace that are still in the media
+  // library's hands, newest first
+  getFinishedRenders(org: string) {
+    return this._studioRender.model.studioRender.findMany({
+      where: {
+        organizationId: org,
+        status: 'completed',
+        mediaId: { not: null },
+        project: { deletedAt: null },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 50,
+      select: {
+        ...renderSelect,
+        project: {
+          select: {
+            name: true,
+            template: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Only finished renders of the workspace with their video
+  getRendersToSchedule(org: string, ids: string[]) {
+    return this._studioRender.model.studioRender.findMany({
+      where: {
+        id: { in: ids },
+        organizationId: org,
+        status: 'completed',
+        mediaId: { not: null },
+      },
+      select: {
+        id: true,
+        mediaId: true,
+      },
+    });
+  }
+
+  // Render records nothing reads anymore; their videos are media and stay
+  pruneRenders(before: Date) {
+    return this._studioRender.model.studioRender.deleteMany({
+      where: {
+        createdAt: { lt: before },
+        status: { in: STUDIO_FINAL_STATUSES },
+      },
+    });
+  }
+
+  createAsset(
+    org: string,
+    data: { kind: string; name: string; path: string; originalName: string }
+  ) {
+    return this._studioAsset.model.studioAsset.create({
+      data: {
+        organizationId: org,
+        ...data,
+      },
+      select: {
+        id: true,
+        originalName: true,
+        path: true,
+      },
+    });
+  }
+
+  getAsset(org: string, id: string) {
+    return this._studioAsset.model.studioAsset.findFirst({
+      where: {
+        id,
+        organizationId: org,
+      },
+      select: {
+        id: true,
+        name: true,
+        path: true,
+        projectId: true,
+      },
+    });
+  }
+
+  countAssets(org: string) {
+    return this._studioAsset.model.studioAsset.count({
+      where: {
+        organizationId: org,
+      },
+    });
+  }
+
+  getProjectAssets(org: string, projectId: string) {
+    return this._studioAsset.model.studioAsset.findMany({
+      where: {
+        organizationId: org,
+        projectId,
+      },
+      select: {
+        id: true,
+        path: true,
+      },
+    });
+  }
+
+  // The project takes an asset of the workspace no other project uses.
+  // False when there is no such asset
+  async attachAsset(org: string, id: string, projectId: string) {
+    return !!(
+      await this._studioAsset.model.studioAsset.updateMany({
+        where: {
+          id,
+          organizationId: org,
+          OR: [{ projectId: null }, { projectId }],
+        },
+        data: {
+          projectId,
+        },
+      })
+    ).count;
+  }
+
+  // The project lets go of every asset but "keep"; one let go of counts as
+  // unused from now on
+  detachAssets(org: string, projectId: string, keep?: string) {
+    return this._studioAsset.model.studioAsset.updateMany({
+      where: {
+        organizationId: org,
+        projectId,
+        ...(keep ? { id: { not: keep } } : {}),
+      },
+      data: {
+        projectId: null,
+      },
+    });
+  }
+
+  // Assets of deleted projects, and assets no project has used since
+  // "unusedSince", leaving out the ones in "skip"
+  getAssetsToRemove(unusedSince: Date, skip: string[], take: number) {
+    return this._studioAsset.model.studioAsset.findMany({
+      where: {
+        ...(skip.length ? { id: { notIn: skip } } : {}),
+        OR: [
+          { projectId: null, updatedAt: { lt: unusedSince } },
+          { project: { deletedAt: { not: null } } },
+        ],
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      take,
+      select: {
+        id: true,
+        path: true,
+      },
+    });
+  }
+
+  deleteAsset(id: string) {
+    return this._studioAsset.model.studioAsset.deleteMany({
+      where: {
+        id,
       },
     });
   }

@@ -10,8 +10,9 @@ import {
 // Every message of a validation, nested ones included. The DTOs word each
 // message for the customer, so the same one twice is said once. A draft may
 // still miss parts, so "partial" drops the "is missing" ones, an empty text
-// (a hook being typed, a caption word being fixed) counting as missing
-const DRAFT_SKIPS = ['isDefined', 'minLength'];
+// (a hook being typed, a caption word being fixed) counting as missing, and
+// a list still being filled (a slideshow with one picture so far)
+const DRAFT_SKIPS = ['isDefined', 'minLength', 'arrayMinSize'];
 const messages = (errors: ValidationError[], partial: boolean): string[] => [
   ...new Set(
     errors.flatMap((error) => [
