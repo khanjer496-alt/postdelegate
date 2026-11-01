@@ -131,5 +131,23 @@ describe('SlackProvider channels', () => {
     ]);
     expect(calls).toHaveLength(2);
     expect(calls[0].url).toContain('exclude_archived=true');
+    expect(calls[0].url).toContain('limit=1000');
+  });
+});
+
+describe('SlackProvider channels rate limit', () => {
+  it('keeps the channels read before Slack rate-limits', async () => {
+    slack((url) =>
+      url.includes('cursor=next')
+        ? { ok: false, error: 'ratelimited' }
+        : {
+            ok: true,
+            channels: [{ id: 'C1', name: 'one' }],
+            response_metadata: { next_cursor: 'next' },
+          }
+    );
+    await expect(new SlackProvider().channels('token', {}, 'T1')).resolves.toEqual([
+      { id: 'C1', name: 'one' },
+    ]);
   });
 });

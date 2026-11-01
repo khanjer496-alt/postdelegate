@@ -200,13 +200,14 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
   })
   async channels(accessToken: string, params: any, id: string) {
     // conversations.list pages its answer (100 by default): read every page,
-    // archived channels can't be posted to
+    // archived channels can't be posted to. A rate limit part way keeps the
+    // channels read so far.
     const channels: { id: string; name: string }[] = [];
     let cursor = '';
     do {
       const list = await (
         await fetch(
-          `https://slack.com/api/conversations.list?types=public_channel,private_channel&exclude_archived=true&limit=200${
+          `https://slack.com/api/conversations.list?types=public_channel,private_channel&exclude_archived=true&limit=1000${
             cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
           }`,
           {
@@ -217,6 +218,9 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
           }
         )
       ).json();
+      if (list?.error === 'ratelimited' && channels.length) {
+        break;
+      }
       this.checkApiError(list);
 
       channels.push(
