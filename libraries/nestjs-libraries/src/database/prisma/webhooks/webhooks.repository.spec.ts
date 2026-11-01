@@ -1,53 +1,71 @@
+import { NotFoundException } from '@nestjs/common';
 import { WebhooksRepository } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.repository';
+import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 
-describe('WebhooksRepository.createWebhook', () => {
-  const makeRepo = () => {
-    const webhooks = {
-      upsert: jest.fn().mockResolvedValue({ id: 'wh-1' }),
-      update: jest.fn().mockResolvedValue({}),
-    };
-    const integration = {
-      findMany: jest.fn().mockResolvedValue([{ id: 'own-int' }]),
-    };
-    const repo = new WebhooksRepository(
-      { model: { webhooks } } as any,
-      { model: { integration } } as any
-    );
-    return { repo, webhooks, integration };
+const makeRepo = (existing: { id: string } | null) => {
+  const webhooks = {
+    findFirst: jest.fn(async () => existing),
+    create: jest.fn(async () => ({ id: 'new' })),
+    update: jest.fn(async () => ({})),
+    upsert: jest.fn(),
   };
+  const integration = {
+    findMany: jest.fn(async () => [{ id: 'i1' }]),
+  };
+  const repo = new WebhooksRepository(
+    { model: { webhooks } } as any,
+    { model: { integration } } as any
+  );
+  return { repo, webhooks };
+};
 
-  it('only links integrations that belong to the organization', async () => {
-    const { repo, webhooks, integration } = makeRepo();
+const body = {
+  id: 'w1',
+  name: 'Hook',
+  url: 'https://example.com/hook',
+  integrations: [{ id: 'i1' }],
+};
 
-    await repo.createWebhook('org-A', {
-      name: 'hook',
-      url: 'https://example.com/hook',
-      integrations: [{ id: 'own-int' }, { id: 'foreign-int' }],
-    } as any);
+describe('WebhooksRepository', () => {
+  it('updates an existing webhook of the organization', async () => {
+    const { repo, webhooks } = makeRepo({ id: 'w1' });
 
-    expect(integration.findMany.mock.calls[0][0].where).toMatchObject({
-      id: { in: ['own-int', 'foreign-int'] },
-      organizationId: 'org-A',
-      deletedAt: null,
-    });
-    expect(webhooks.update.mock.calls[0][0].data.integrations).toEqual({
-      deleteMany: {},
-      create: [{ integrationId: 'own-int' }],
-    });
+    await expect(repo.updateWebhook('org-1', body)).resolves.toEqual({ id: 'w1' });
+    expect(webhooks.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'w1', organizationId: 'org-1', deletedAt: null },
+      })
+    );
+    expect(webhooks.update).toHaveBeenCalledTimes(1);
+    expect(webhooks.create).not.toHaveBeenCalled();
+    expect(webhooks.upsert).not.toHaveBeenCalled();
   });
 
-  it('skips the lookup when no integrations are sent', async () => {
-    const { repo, webhooks, integration } = makeRepo();
+  it('never creates a webhook for an unknown id', async () => {
+    const { repo, webhooks } = makeRepo(null);
 
-    await repo.createWebhook('org-A', {
-      name: 'hook',
-      url: 'https://example.com/hook',
-      integrations: [],
-    } as any);
+    await expect(repo.updateWebhook('org-1', body)).resolves.toBeNull();
+    expect(webhooks.update).not.toHaveBeenCalled();
+    expect(webhooks.create).not.toHaveBeenCalled();
+    expect(webhooks.upsert).not.toHaveBeenCalled();
+  });
 
-    expect(integration.findMany).not.toHaveBeenCalled();
-    expect(webhooks.update.mock.calls[0][0].data.integrations.create).toEqual(
-      []
+  it('creates a new webhook even when an id is sent', async () => {
+    const { repo, webhooks } = makeRepo({ id: 'w1' });
+
+    await expect(repo.createWebhook('org-1', body)).resolves.toEqual({ id: 'new' });
+    expect(webhooks.create).toHaveBeenCalledTimes(1);
+    expect(webhooks.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('WebhooksService.updateWebhook', () => {
+  it('answers 404 for an unknown webhook', async () => {
+    const { repo } = makeRepo(null);
+    const service = new WebhooksService(repo);
+
+    await expect(service.updateWebhook('org-1', body)).rejects.toBeInstanceOf(
+      NotFoundException
     );
   });
 });
