@@ -217,8 +217,9 @@ export class PublicIntegrationsController {
           'Your post should have at least one character or one image.'
         );
       }
-      // like the CSV import: a turned off channel would only fail at publish
-      if (item.disabled && body.type !== 'update') {
+      // a turned off channel would only fail at publish; a draft or an
+      // update never publishes from here
+      if (item.disabled && body.type !== 'update' && body.type !== 'draft') {
         fail(
           item,
           `${item.name} is turned off. Turn it on from the channel menu in the calendar, or pick another channel.`

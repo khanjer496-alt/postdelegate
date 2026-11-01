@@ -92,7 +92,13 @@ describe('PublicIntegrationsController.createPost', () => {
     );
   });
 
-  it.each(['schedule', 'now', 'draft'])(
+  it('keeps a draft for a turned off channel', async () => {
+    const { posts, create } = setup(validationOf({ valid: true, disabled: true }));
+    await create('draft');
+    expect(posts.createPost).toHaveBeenCalled();
+  });
+
+  it.each(['schedule', 'now'])(
     'refuses a %s post for a turned off channel',
     async (type) => {
       const { posts, create } = setup(validationOf({ valid: true, disabled: true }));
