@@ -69,6 +69,18 @@ describe('TelegramProvider.formatMessage', () => {
     );
   });
 
+  it('keeps typed heading tags from unbalancing the message', () => {
+    expect(provider.formatMessage('use </h1> to close <h2>Title')).toBe(
+      'use &lt;/h1&gt; to close <b>Title</b>'
+    );
+  });
+
+  it('takes no markup inside code', () => {
+    expect(
+      provider.formatMessage('<code>a <strong>b</strong> c</code> <b>d</b>')
+    ).toBe('<code>a &lt;strong&gt;b&lt;/strong&gt; c</code> <b>d</b>');
+  });
+
   it('drops a link Telegram cannot open but keeps its text', () => {
     expect(
       provider.formatMessage('<a href="javascript:alert(1)">click</a> done')

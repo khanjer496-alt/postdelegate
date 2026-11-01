@@ -102,13 +102,33 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
       last = match.index! + match[0].length;
       const closing = !!match[1];
       const name = match[2].toLowerCase();
+      const top = open[open.length - 1];
 
-      if (name === 'p') {
+      // Telegram takes no markup inside code, only the closing tag counts
+      if (
+        (top === 'code' || top === 'pre') &&
+        !(closing && TELEGRAM_TAGS[name] === top)
+      ) {
+        text += ['p', 'br'].includes(name)
+          ? closing || name === 'br'
+            ? '\n'
+            : ''
+          : escapeTelegram(match[0]);
+      } else if (name === 'p') {
         text += closing ? '\n' : '';
       } else if (name === 'br') {
         text += '\n';
       } else if (['h1', 'h2', 'h3'].includes(name)) {
-        text += closing ? '</b>\n' : '<b>';
+        // on the stack like the other tags, so a stray heading tag stays balanced
+        if (!closing) {
+          open.push('b');
+          text += '<b>';
+        } else if (top === 'b') {
+          open.pop();
+          text += '</b>\n';
+        } else {
+          text += escapeTelegram(match[0]);
+        }
       } else if (name === 'ul' || name === 'ol') {
         lineBreak();
       } else if (name === 'li') {
@@ -125,7 +145,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
           const link = /^(https?:|tg:|mailto:)/i.test(href) ? 'a' : '';
           open.push(link);
           text += link ? `<a href="${escapeTelegram(href)}">` : '';
-        } else if (['a', ''].includes(open[open.length - 1])) {
+        } else if (['a', ''].includes(top)) {
           text += open.pop() ? '</a>' : '';
         }
       } else if (TELEGRAM_TAGS[name]) {
@@ -133,7 +153,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
         if (!closing) {
           open.push(tag);
           text += `<${tag}>`;
-        } else if (open[open.length - 1] === tag) {
+        } else if (top === tag) {
           open.pop();
           text += `</${tag}>`;
         } else {
