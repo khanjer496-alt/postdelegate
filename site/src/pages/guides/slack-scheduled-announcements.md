@@ -50,7 +50,7 @@ To send the same announcement to two Slack channels in one workspace, create a s
 
 ## Step 4: add details in a thread
 
-Use **Add post in a thread** to add more entries. On Slack, follow-up entries are sent as replies in a thread under the first message.
+Use **Add comment** to add more entries. On Slack, follow-up entries are sent as replies in a thread under the first message.
 
 That suits a common announcement shape:
 

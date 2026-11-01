@@ -72,7 +72,7 @@ Media comes from your device or the [media library](/docs/media). If Telegram ca
 
 ## Step 5: add follow-up messages
 
-Use **Add post in a thread** to add more entries to the same post. On Telegram, follow-up entries are sent as replies to the first message.
+Use **Add comment** to add more entries to the same post. On Telegram, follow-up entries are sent as replies to the first message.
 
 That solves the caption limit neatly: a photo with a short caption first, then the full text as a reply. It also suits a long announcement split into readable parts.
 

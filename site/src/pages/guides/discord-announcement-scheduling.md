@@ -2,13 +2,13 @@
 layout: ../../layouts/Guide.astro
 title: "How to schedule Discord announcements to your server"
 metaTitle: "How to Schedule Discord Announcements | PostDelegate"
-description: "Add the PostDelegate bot to your Discord server, then schedule announcements with Markdown, images and role mentions to the channel you pick, from one calendar."
+description: "Add the PostDelegate bot to your Discord server, then schedule announcements with Markdown, images and mentions to the channel you pick, from one calendar."
 date: "2026-11-01"
 ---
 
 Discord servers run on announcements: patch notes, event reminders, stream alerts, the weekly community call. Most of them are written ahead of time and posted by hand at the right moment, which means someone has to be there at that moment. Scheduling takes that job away.
 
-This guide shows how to schedule Discord announcements with PostDelegate: adding the bot, picking a channel, what a message can contain, and what to check when a post fails. Discord is available to connect today.
+This guide shows how to schedule Discord announcements with PostDelegate: adding the bot, picking a channel, what a message can contain, and what to check when a post fails.
 
 ## How the Discord connection works
 
@@ -28,9 +28,9 @@ On Discord, scheduled posts come from a bot rather than from your own account. W
 1. On the PostDelegate calendar page choose **Add Channel**, then **Discord**.
 2. Discord asks you to sign in if you are not already, then shows which server to add the bot to. Choose the server.
 3. Approve the request. PostDelegate asks to see your Discord username and the servers you are in. The bot is allowed to send messages, create public and private threads, and send messages in threads.
-4. You come back to PostDelegate and the server appears on your calendar.
+4. You come back to PostDelegate and the server appears on your calendar under the bot's name.
 
-If you run several servers, such as a main community and a staff server, connect each one. Rename them with **Rename channel** in the channel's menu so they are easy to tell apart. To change the name the bot shows inside your server, choose **Change Bot Nickname** in the same menu.
+Use **Rename channel** in the channel's menu to give it the server's name. If you run several servers, such as a main community and a staff server, connect and rename each one so they are easy to tell apart. To change the name the bot shows inside your server, choose **Change Bot Nickname** in the same menu. This also renames the channel in PostDelegate, unless you have already renamed it with **Rename channel**.
 
 ## Step 2: write the announcement
 
@@ -40,11 +40,11 @@ Choose **Create Post** and select your Discord server.
 - **Formatting.** Bold, underline, headings, bullet lists and links are kept as Discord Markdown, so they look the way you wrote them.
 - **Media.** Attach images or videos from your device or the [media library](/docs/media). They are uploaded as files with the message, and Discord takes up to 10 files per message. Very large files can be over the upload limit for your server.
 
-## Step 3: mention people and roles
+## Step 3: mention people
 
-Open the Discord version of the post, type **@** and at least two letters. PostDelegate searches your server and offers matching members and roles, plus **@here** and **@everyone**.
+Open the Discord version of the post, type **@** and at least two letters. PostDelegate searches your server and offers matching members, plus **@here** and **@everyone**.
 
-Whether a mention notifies people is Discord's decision, made by your server settings. A member mention always works. A role mention notifies people only if the role can be mentioned, or if the bot's role is allowed to mention all roles. The same permission covers @everyone and @here.
+A member mention always notifies that person. Whether @here and @everyone notify people is Discord's decision: the bot's role needs permission to mention @everyone, @here and all roles in your server.
 
 Ping everyone only for things that affect everyone. A community that is notified about every small update learns to mute the channel.
 
@@ -61,7 +61,7 @@ To send the same announcement to two Discord channels in one server, create a se
 
 ## Step 5: add a follow-up in a thread
 
-Use **Add post in a thread** to add another entry. On Discord, the first follow-up entry opens a thread on your announcement, named "Thread", and is posted inside it. That keeps the details and the discussion under the announcement rather than in the main channel.
+Use **Add comment** to add another entry. On Discord, the first follow-up entry opens a thread on your announcement, named "Thread", and is posted inside it. That keeps the details and the discussion under the announcement rather than in the main channel.
 
 Further entries after the first follow-up are posted in the channel itself, so keep thread content to one follow-up. You can delay a follow-up so it appears later rather than immediately.
 
@@ -114,7 +114,7 @@ If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for a **draf
 - **"Channel no longer exists".** The channel was deleted. Pick another one in the post settings.
 - **"Attachment exceeds Discord's size limit".** Use a smaller or shorter file.
 - **A post to a forum channel fails.** Choose a text or announcement channel instead.
-- **A role or @everyone mention did not notify anyone.** Make the role mentionable in Discord, or allow the bot's role to mention @everyone, @here and all roles.
+- **An @everyone or @here mention did not notify anyone.** In Discord, allow the bot's role to mention @everyone, @here and all roles.
 - **Every post to the server fails.** The bot was removed from the server. Use **Reconnect channel** and add it again. See [reconnecting a channel](/docs/channels#reconnecting-a-channel).
 
 ## Next steps

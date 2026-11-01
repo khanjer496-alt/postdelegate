@@ -360,18 +360,18 @@ export const SCHEDULERS: Scheduler[] = [
   {
     slug: "discord-scheduler", key: "discord", name: "Discord",
     action: "Schedule Discord Messages",
-    description: "Schedule Discord messages to any channel in your server, with Markdown, images, videos and member or role mentions. Add the bot. 7-day free trial, no card.",
+    description: "Schedule Discord messages to any channel in your server, with Markdown, images, videos and member mentions. Add the PostDelegate bot. 7-day free trial, no card.",
     h1: "Schedule Discord messages to your server.",
     intro: "Add the PostDelegate bot to a Discord server you manage, then schedule messages with Markdown, images and videos to the channel you pick.",
     about: [
       "Discord servers run on announcements: patch notes, event reminders, stream alerts and the weekly community call. PostDelegate sends each scheduled post as a message from its bot to the channel you choose, so the announcement goes out on time without anyone online to press send.",
-      "Text can run to 1,980 characters, and bold, underline, headings, bullet lists and links are kept as Discord Markdown. Images and videos are uploaded as files with the message, up to Discord's 10 per message. You can mention members, roles, @here and @everyone. The first follow-up entry opens a thread on your message.",
+      "Text can run to 1,980 characters, and bold, underline, headings, bullet lists and links are kept as Discord Markdown. Images and videos are uploaded as files with the message, up to Discord's 10 per message. You can mention members, @here and @everyone. The first follow-up entry opens a thread on your message.",
     ],
     steps: [
       { name: "Add the bot to your server", text: "On the calendar page choose Add Channel, then Discord. Choose the server and approve. You need the Manage Server permission there. The bot is allowed to send messages, create threads and send messages in threads." },
       { name: "Write the message", text: "Choose Create Post and select the Discord server. Write the message with bold, headings, lists and links, and attach images or videos if you like." },
       { name: "Pick the Discord channel", text: "Choose the channel to post to in the post settings. Pick a text or announcement channel. For a private channel, give the bot access to it in Discord first." },
-      { name: "Schedule it", text: "Pick a date and time and choose Add to Calendar. Add a follow-up entry to post it in a thread under the first message." },
+      { name: "Schedule it", text: "Pick a date and time and choose Add to Calendar. Use Add comment to post a follow-up in a thread under the first message." },
     ],
     plan: ["Add the PostDelegate bot to a server from Add Channel.", "Write a message with Markdown, media and mentions.", "Choose the Discord channel each post goes to."],
     settings: [
@@ -384,7 +384,7 @@ export const SCHEDULERS: Scheduler[] = [
     faq: [
       { q: "Does the message come from my own Discord account?", a: "No. Posts are sent by the PostDelegate bot that you add to your server. PostDelegate never posts as your personal Discord account." },
       { q: "Can I post to a private Discord channel?", a: "Yes. The bot cannot see private channels by default. In Discord, open the channel's settings, then Permissions, and add the PostDelegate bot with View Channel and Send Messages. Then pick the channel in the post settings." },
-      { q: "Can I ping a role or @everyone?", a: "Yes. In the Discord version of the post, type @ and at least two letters to pick a member, a role, @here or @everyone. Whether a role or @everyone mention notifies people depends on that role's settings and the bot's permissions in your server." },
+      { q: "Can I mention members or @everyone?", a: "Yes. In the Discord version of the post, type @ and at least two letters to pick a server member, @here or @everyone. Whether an @here or @everyone mention notifies people depends on the bot's permissions in your server." },
       { q: "Can I schedule to several Discord servers?", a: "Yes. Each server is its own channel in PostDelegate. Add Discord once per server, then select several servers in one post and choose the Discord channel for each." },
     ],
     guides: [{ href: "/guides/discord-announcement-scheduling", label: "How to schedule Discord announcements" }],
