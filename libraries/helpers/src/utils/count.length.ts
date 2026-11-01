@@ -42,6 +42,19 @@ export const weightedLength = (text: string): number => {
   return twitter.parseTweet(text).weightedLength;
 };
 
+// Intl.Segmenter is in every runtime the app supports, code points are the
+// closest count where it is missing
+export const graphemeLength = (text: string): number => {
+  const Segmenter = (Intl as any).Segmenter;
+  if (!Segmenter) {
+    return Array.from(text).length;
+  }
+
+  return Array.from(
+    new Segmenter(undefined, { granularity: 'grapheme' }).segment(text)
+  ).length;
+};
+
 export const countLength = (integrationType: string, text: string): number => {
   if (network(integrationType) === 'x') {
     return weightedLength(text);
@@ -49,6 +62,11 @@ export const countLength = (integrationType: string, text: string): number => {
 
   if (network(integrationType) === 'threads') {
     return new TextEncoder().encode(text).length;
+  }
+
+  // Bluesky counts graphemes: an emoji with its modifiers or a flag is one
+  if (network(integrationType) === 'bluesky') {
+    return graphemeLength(text);
   }
 
   return text.length;

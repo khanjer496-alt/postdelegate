@@ -19,3 +19,18 @@ describe('countLength', () => {
     expect(countLength('linkedin-page', text)).toBe(text.length);
   });
 });
+
+describe('countLength on Bluesky', () => {
+  // Bluesky's 300 limit is in graphemes, not UTF-16 units
+  it('counts an emoji with modifiers or a flag as one', () => {
+    expect(countLength('bluesky', '👍🏽')).toBe(1);
+    expect(countLength('bluesky', '🇫🇷')).toBe(1);
+    expect(countLength('bluesky', '👨‍👩‍👧')).toBe(1);
+    expect(countLength('bluesky', 'é')).toBe(1);
+  });
+
+  it('lets 300 emoji through', () => {
+    expect(countLength('bluesky', '🎉'.repeat(300))).toBe(300);
+    expect('🎉'.repeat(300).length).toBe(600);
+  });
+});
