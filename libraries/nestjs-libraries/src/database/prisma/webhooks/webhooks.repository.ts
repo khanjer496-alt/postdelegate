@@ -6,23 +6,8 @@ import { WebhooksDto } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dt
 export class WebhooksRepository {
   constructor(
     private _webhooks: PrismaRepository<'webhooks'>,
-    private _integration: PrismaRepository<'integration'>,
-    private _subscription: PrismaRepository<'subscription'>
+    private _integration: PrismaRepository<'integration'>
   ) {}
-
-  async getSubscriptionTier(orgId: string) {
-    return (
-      await this._subscription.model.subscription.findFirst({
-        where: {
-          organizationId: orgId,
-          deletedAt: null,
-        },
-        select: {
-          subscriptionTier: true,
-        },
-      })
-    )?.subscriptionTier;
-  }
 
   getTotal(orgId: string) {
     return this._webhooks.model.webhooks.count({

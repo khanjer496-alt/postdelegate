@@ -1,3 +1,5 @@
+jest.mock('@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service', () => ({ SubscriptionService: class {} }));
+
 import { NotFoundException } from '@nestjs/common';
 import { WebhooksRepository } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.repository';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
@@ -14,8 +16,7 @@ const makeRepo = (existing: { id: string } | null) => {
   };
   const repo = new WebhooksRepository(
     { model: { webhooks } } as any,
-    { model: { integration } } as any,
-    { model: { subscription: { findFirst: jest.fn() } } } as any
+    { model: { integration } } as any
   );
   return { repo, webhooks };
 };
@@ -63,7 +64,7 @@ describe('WebhooksRepository', () => {
 describe('WebhooksService.updateWebhook', () => {
   it('answers 404 for an unknown webhook', async () => {
     const { repo } = makeRepo(null);
-    const service = new WebhooksService(repo);
+    const service = new WebhooksService(repo, {} as any);
 
     await expect(service.updateWebhook('org-1', body)).rejects.toBeInstanceOf(
       NotFoundException
@@ -83,10 +84,21 @@ describe('WebhooksService.getWebhooksToSend', () => {
 
   const hooks = Array.from({ length: 5 }, (_, i) => ({ id: `w${i}` }));
   const serviceFor = (tier?: string) =>
-    new WebhooksService({
-      getWebhooks: jest.fn(async () => hooks),
-      getSubscriptionTier: jest.fn(async () => tier),
-    } as any);
+    new WebhooksService(
+      { getWebhooks: jest.fn(async () => hooks) } as any,
+      {
+        getSubscriptionByOrganizationId: jest.fn(async () =>
+          tier ? { subscriptionTier: tier } : null
+        ),
+      } as any
+    );
+
+  it('marks the webhooks over the plan limit as paused in the list', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    expect(
+      (await serviceFor('STANDARD').getWebhooks('org')).map((w) => w.paused)
+    ).toEqual([false, false, true, true, true]);
+  });
 
   it('sends only as many as a downgraded plan holds, the oldest first', async () => {
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
