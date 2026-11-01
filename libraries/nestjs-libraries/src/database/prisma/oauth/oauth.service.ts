@@ -59,25 +59,19 @@ const isVerifiedHost = (host: string, verifiedDomains: string[]) =>
     (domain) => host === domain || host.endsWith('.' + domain)
   );
 
-// MCP directories that register through DCR with their own web callbacks.
-// They are accepted on top of DCR_VERIFIED_DOMAINS (which also decides who
-// gets email claims, these never do): https on exactly these hosts. Not
-// their subdomains, where the directories host servers other people deploy
-const directoryRedirectHosts = ['smithery.run', 'smithery.ai', 'glama.ai'];
-// Exact https callbacks: Vercel Connect, plus the ones in the
-// MCP_EXTRA_REDIRECT_URIS env (comma separated), e.g. a Zapier integration's
-// https://zapier.com/dashboard/auth/oauth/return/App123456CLIAPI/
-const directoryRedirectUris = ['https://connect.vercel.com/callback'];
+// Exact https callbacks of MCP directories and integrations that register
+// through DCR (Vercel Connect, Zapier, ...), from the MCP_EXTRA_REDIRECT_URIS
+// env (comma separated). They are accepted on top of DCR_VERIFIED_DOMAINS,
+// which also decides who gets email claims (these never do). Only the exact
+// URL: a host can serve callbacks of other people's apps on other paths
 const extraRedirectUris = () =>
   (process.env.MCP_EXTRA_REDIRECT_URIS || '')
     .split(',')
     .map((uri) => uri.trim())
     .filter((uri) => uri.startsWith('https://'));
 
-const isDirectoryRedirect = (uri: string, parsed: URL) =>
-  parsed.protocol === 'https:' &&
-  (directoryRedirectHosts.includes(parsed.hostname.toLowerCase()) ||
-    [...directoryRedirectUris, ...extraRedirectUris()].includes(uri));
+const isExtraRedirectUri = (uri: string, parsed: URL) =>
+  parsed.protocol === 'https:' && extraRedirectUris().includes(uri);
 
 type EmailClaimsApp = Pick<OAuthApp, 'clientId' | 'dynamic' | 'redirectUris'>;
 
@@ -241,7 +235,7 @@ export class OAuthService {
       const host = parsed.hostname.toLowerCase();
       if (
         !isVerifiedHost(host, verifiedDomains) &&
-        !isDirectoryRedirect(uri, parsed)
+        !isExtraRedirectUri(uri, parsed)
       ) {
         throw new HttpException(
           {

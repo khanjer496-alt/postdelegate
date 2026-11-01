@@ -58,7 +58,14 @@ describe('public API OpenAPI document', () => {
   it('is an OpenAPI 3.1 document of the hosted API with bare key auth', () => {
     expect(spec.openapi).toBe('3.1.0');
     expect(spec.info.license).toMatchObject({ name: 'MIT' });
-    expect(spec.info.description).toContain('Mintlify');
+    // the MIT notice of the postiz-docs source travels with every copy
+    for (const notice of [spec.info.description, spec.info['x-license-notice']]) {
+      expect(notice).toContain('Copyright (c) 2023 Mintlify');
+      expect(notice).toContain(
+        'The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.'
+      );
+      expect(notice).toContain('THE SOFTWARE IS PROVIDED "AS IS"');
+    }
     expect(spec.servers).toEqual([
       expect.objectContaining({
         url: 'https://app.postdelegate.com/api/public/v1',
@@ -111,8 +118,20 @@ describe('public API OpenAPI document', () => {
     );
   });
 
+  it('documents a POST as 201, which Nest answers without @HttpCode', () => {
+    for (const operations of Object.values<any>(spec.paths)) {
+      if (operations.post) {
+        expect(Object.keys(operations.post.responses)).toContain('201');
+        expect(Object.keys(operations.post.responses)).not.toContain('200');
+      }
+    }
+  });
+
+  // the site copy is not edited by hand: run `pnpm run openapi:sync-site`
   it('is the same file the marketing site serves at /openapi.json', () => {
-    expect(JSON.parse(read('site/public/openapi.json'))).toEqual(spec);
+    expect(read('site/public/openapi.json')).toBe(
+      read('apps/backend/src/public-api/openapi/public.api.openapi.json')
+    );
     expect(read('site/public/_headers')).toMatch(
       /\/openapi\.json\n\s+Content-Type: application\/json; charset=utf-8\n\s+Access-Control-Allow-Origin: \*/
     );

@@ -67,6 +67,8 @@ export class LoadToolsService {
 
   async agent() {
     const tools = await this.loadTools();
+    // the video tools are hidden unless a video provider is configured
+    const canGenerateVideos = !!tools.generateVideoTool;
     return new Agent({
       id: 'postdelegate',
       name: 'postdelegate',
@@ -84,7 +86,7 @@ export class LoadToolsService {
         - Update the settings of a scheduled post or draft that was not published yet (postSettingsTool)
         - Delete a post (deletePostTool)
         - Generate pictures for posts
-        - Generate videos for posts
+        ${renderArray(['Generate videos for posts'], canGenerateVideos)}
         - Generate text for posts
         - Show global analytics about socials
         - List integrations (channels)

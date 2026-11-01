@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PostDelegate Public API",
-    "description": "REST API for PostDelegate, a social media scheduler by Nasida Apps LLC. List channels, upload media and create, read and delete posts.\n\n## Authentication\nSend your workspace API key in the `Authorization` header as the bare key, with no `Bearer` prefix:\n\n```\nAuthorization: YOUR_API_KEY\n```\n\nGet the key in the app under Settings > Agents / Dev (plans that include the API).\n\n## Rate limits\nPOST /posts is limited to 30 requests per hour per workspace. Batch several channels into one request.\n\n## Terminology\nThe app says channel; the API says integration.\n\nDocs: https://postdelegate.com/docs/api\n\n## License\nThis specification is adapted from the Postiz API reference (https://github.com/gitroomhq/postiz-docs), a Mintlify docs project published under the MIT License. The MIT License and its copyright notice apply to this file.",
+    "description": "REST API for PostDelegate, a social media scheduler by Nasida Apps LLC. List channels, upload media and create, read and delete posts.\n\n## Authentication\nSend your workspace API key in the `Authorization` header as the bare key, with no `Bearer` prefix:\n\n```\nAuthorization: YOUR_API_KEY\n```\n\nGet the key in the app under Settings > Agents / Dev (plans that include the API).\n\n## Rate limits\nPOST /posts is limited to 30 requests per hour per workspace. Batch several channels into one request.\n\n## Terminology\nThe app says channel; the API says integration.\n\nDocs: https://postdelegate.com/docs/api\n\n## License\nThis specification is adapted from the Postiz API reference (https://github.com/gitroomhq/postiz-docs), a Mintlify docs project published under the following license:\n\n```\nMIT License\n\nCopyright (c) 2023 Mintlify\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n```",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -13,7 +13,8 @@
       "email": "support@postdelegate.com",
       "url": "https://postdelegate.com/support"
     },
-    "termsOfService": "https://app.postdelegate.com/legal/terms/"
+    "termsOfService": "https://app.postdelegate.com/legal/terms/",
+    "x-license-notice": "MIT License\n\nCopyright (c) 2023 Mintlify\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
   },
   "servers": [
     {
@@ -46,6 +47,10 @@
     {
       "name": "Analytics",
       "description": "View analytics for integrations and posts"
+    },
+    {
+      "name": "Studio",
+      "description": "Render vertical videos from the media library with the Studio templates. A render only saves a video to the media library; it never creates a post. Docs: https://postdelegate.com/docs/api/studio"
     }
   ],
   "paths": {
@@ -383,7 +388,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Tool executed successfully",
             "content": {
               "application/json": {
@@ -1436,7 +1441,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Post created successfully",
             "content": {
               "application/json": {
@@ -2005,7 +2010,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "File uploaded successfully",
             "content": {
               "application/json": {
@@ -2055,7 +2060,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "File uploaded successfully",
             "content": {
               "application/json": {
@@ -2253,6 +2258,179 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/studio/templates": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "summary": "List Studio templates",
+        "operationId": "listStudioTemplates",
+        "description": "Lists the templates with the JSON schema of the `spec` each one takes. New templates appear here by themselves, so read the schema instead of hard-coding it.",
+        "responses": {
+          "200": {
+            "description": "Templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudioTemplate"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/renders": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "summary": "Start a Studio render",
+        "operationId": "startStudioRender",
+        "description": "Makes a Studio project from a template and a spec and starts rendering it. Limited to 30 requests per workspace per hour, refused requests included. Poll GET /studio/renders/{id} until the status is completed, failed or cancelled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioRenderRequest"
+              },
+              "example": {
+                "template": "hook-over-clip",
+                "name": "Launch teaser",
+                "spec": {
+                  "input": {
+                    "mediaId": "MEDIA_ID"
+                  },
+                  "trim": {
+                    "start": 4,
+                    "end": 19
+                  },
+                  "hook": {
+                    "text": "We shipped exports",
+                    "position": "top"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The render started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "id": "RENDER_ID",
+                  "projectId": "PROJECT_ID"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown template, a spec that does not follow the schema, a media that is not in the media library or not ready, or a video longer than 90 seconds"
+          },
+          "406": {
+            "description": "Studio needs an active plan, or the trial videos are used"
+          },
+          "429": {
+            "description": "Too many requests this hour, 3 videos already waiting, or the daily limit is reached"
+          },
+          "503": {
+            "description": "Studio is not available"
+          }
+        }
+      }
+    },
+    "/studio/renders/{id}": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "summary": "Get a Studio render",
+        "operationId": "getStudioRender",
+        "description": "Returns a render. On completed, mediaId and path are the new video in the media library.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The render id returned by POST /studio/renders",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The render",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRender"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Render not found, including renders of another workspace"
+          }
+        }
+      }
+    },
+    "/studio/renders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "summary": "Cancel a Studio render",
+        "operationId": "cancelStudioRender",
+        "description": "Stops a render that is still waiting or rendering and returns it. A render that already ended is returned as it is.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The render id returned by POST /studio/renders",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The render",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRender"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Render not found"
+          },
+          "503": {
+            "description": "Studio is not available"
           }
         }
       }
@@ -3745,6 +3923,131 @@
           "title": {
             "type": "string",
             "description": "Post title"
+          }
+        }
+      },
+      "StudioTemplate": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Pass it as `template` to POST /studio/renders",
+            "example": "hook-over-clip"
+          },
+          "title": {
+            "type": "string",
+            "example": "Hook over clip"
+          },
+          "description": {
+            "type": "string"
+          },
+          "captions": {
+            "type": "boolean",
+            "description": "The template shows captions: send what is said in `captions.script`"
+          },
+          "schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "JSON schema of the `spec` a render of this template takes"
+          }
+        },
+        "required": [
+          "identifier",
+          "title",
+          "description",
+          "captions",
+          "schema"
+        ]
+      },
+      "StudioRenderRequest": {
+        "type": "object",
+        "required": [
+          "template",
+          "spec"
+        ],
+        "properties": {
+          "template": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "An `identifier` from GET /studio/templates"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Name of the project in Studio, the template's title by default"
+          },
+          "spec": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Follows the template's `schema`. Media are ids from your own media library, never URLs"
+          }
+        }
+      },
+      "StudioRender": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "rendering",
+              "uploading",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "seconds": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why a failed render failed"
+          },
+          "mediaId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new video in the media library, once completed"
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thumbnail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

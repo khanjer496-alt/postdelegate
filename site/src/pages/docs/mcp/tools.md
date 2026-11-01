@@ -56,11 +56,16 @@ To post a Studio video, the assistant still goes through `integrationSchedulePos
 
 The server also defines tools for generating images and video and for turning long YouTube videos into short clips: `generateImageTool`, `generateVideoOptions`, `videoFunctionTool`, `generateVideoTool`, `videoStatusTool`, `clippingTool`, `clippingStatusTool` and `clippingWidgetTicketTool`.
 
-PostDelegate does not provide AI generation of its own. `generateImageTool` needs your workspace's own OpenAI key, added by an admin in Settings → AI. The video tools are not available on any plan and answer with an error such as no credits available, and the clipping tools only exist when the service is set up for them. You can also use your own assistant's image and video features, then bring the result into PostDelegate with `uploadFromUrlTool`.
+PostDelegate does not provide AI generation of its own. `generateImageTool` needs your workspace's own OpenAI key, added by an admin in Settings → AI. The video and clipping tools are only listed when the service is set up for them, which it is not today. You can also use your own assistant's image and video features, then bring the result into PostDelegate with `uploadFromUrlTool`.
 
 ## What an assistant sees
 
 - Tools only act on the workspace you approved. A different workspace needs a separate sign-in.
 - Tools that change data are marked as such to clients, so assistants that support confirmation prompts will ask you first.
-- Connections through the API key addresses may also list a general `ask_postdelegate` tool that passes your request to the PostDelegate agent. It needs your workspace's own OpenAI key, added by an admin in Settings → AI. Without a key it answers with an error.
+- Connections through the API key addresses may also list a general `ask_postdelegate` tool that passes your request to the PostDelegate agent. It needs your workspace's own OpenAI key, added by an admin in Settings → AI. Without a key it answers with an error. It returns the agent's answer as `{ "text": "..." }`.
+- Every tool carries a title and read-only, destructive and open-world hints, and the server card at `https://app.postdelegate.com/.well-known/mcp/server-card.json` lists the tools every connection offers.
+
+## Changes
+
+- **November 2026:** `ask_postdelegate` now returns only the agent's answer, as `{ "text": "..." }` in structured content. It used to return the agent's whole run (its steps, token usage and messages) serialized as text. Clients that read the answer from that text should read `text` instead.
 - Content from your posts and videos is just data for the assistant to show you. Be wary of any assistant that treats text in a post as instructions.

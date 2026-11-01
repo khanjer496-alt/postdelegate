@@ -343,9 +343,9 @@ export const startMcp = async (app: INestApplication) => {
   // /mcp (public url <backend>/mcp, e.g. https://app.postdelegate.com/api/mcp)
   // takes an API key, but also the OAuth tokens of the DCR issuer, so it is
   // an RFC 9728 protected resource as well. Its metadata is served at the
-  // path-inserted well-known and at the root one, which clients fall back to
-  // (a client that probes the root before connecting to /mcp/:id may now run
-  // the OAuth flow first, the key in its url keeps working either way)
+  // path-inserted well-known only, which its WWW-Authenticate points at: the
+  // root stays unanswered, or clients probing it would demand OAuth for the
+  // /mcp/:id urls that carry their key
   const apiKeyMcpUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/mcp`;
   const apiKeyMcpPath = new URL(apiKeyMcpUrl).pathname;
   const apiKeyResourceMetadataUrl = new URL(
@@ -360,16 +360,18 @@ export const startMcp = async (app: INestApplication) => {
 
   // The server card (/.well-known/mcp/server-card.json, also served as
   // /.well-known/mcp.json) that MCP directories read to list the server
-  // without connecting: endpoints, how to authenticate and the tools
+  // without connecting: endpoints, how to authenticate and the tools. The
+  // tools are the directory-safe ones (the Claude list: no agent, no AI media
+  // generation, no clipping), which every endpoint offers
   const dynamicIssuer = authorizationServers['/mcp-oauth-dynamic'].issuer;
   const oauthMcpUrl = new URL('/mcp-oauth-dynamic', process.env.NEXT_PUBLIC_BACKEND_URL!).toString();
-  // MCP lists a tool under its id, which is not always its key in apiKeyTools
+  // MCP lists a tool under its id, which is not always its key in claudeTools
   const annotationsById = Object.fromEntries(
-    Object.values(apiKeyTools as Record<string, { id: string; mcp?: { annotations?: { title?: string } } }>).map(
+    Object.values(claudeTools as Record<string, { id: string; mcp?: { annotations?: { title?: string } } }>).map(
       (tool) => [tool.id, tool.mcp?.annotations]
     )
   );
-  const serverCardTools = (await server.getToolListInfo()).tools.map((tool) => {
+  const serverCardTools = (await claudeOauthServer.getToolListInfo()).tools.map((tool) => {
     const annotations = annotationsById[tool.name];
     return {
       name: tool.name,
@@ -465,20 +467,22 @@ export const startMcp = async (app: INestApplication) => {
   }
 
   app.use('/.well-known/oauth-protected-resource', async (req: Request, res: Response, next: () => void) => {
-    // The paths in oauthResources are OAuth-only resources; the root and
-    // the path-inserted form of /mcp describe the API key server above
+    // The paths in oauthResources are OAuth-only resources; the
+    // path-inserted form of /mcp describes the API key server above. The
+    // middleware only answers GET and OPTIONS, anything else moves on
     const middleware =
       oauthResources[req.path]?.middleware ||
-      (['/', '', apiKeyMcpPath].includes(req.path)
-        ? apiKeyResourceMiddleware
-        : undefined);
-    if (!middleware) {
+      (req.path === apiKeyMcpPath ? apiKeyResourceMiddleware : undefined);
+    if (!middleware || !['GET', 'OPTIONS'].includes(req.method)) {
       next();
       return;
     }
 
     const url = new URL('/.well-known/oauth-protected-resource', process.env.NEXT_PUBLIC_BACKEND_URL);
-    await middleware(req, res, url);
+    const result = await middleware(req, res, url);
+    if (!result.handled) {
+      next();
+    }
   });
 
   app.use('/.well-known/oauth-authorization-server', async (req: Request, res: Response, next: () => void) => {
@@ -602,6 +606,17 @@ export const startMcp = async (app: INestApplication) => {
     req.auth = resolved.auth;
     // @ts-ignore
     if (!req.auth) {
+      // RFC 6750: a wrong, rotated or revoked key or token
+      res.setHeader(
+        'WWW-Authenticate',
+        generateWWWAuthenticateHeader({
+          resourceMetadataUrl: apiKeyResourceMetadataUrl,
+          additionalParams: {
+            error: 'invalid_token',
+            error_description: 'Invalid API Key or OAuth token',
+          },
+        })
+      );
       res.status(401).send('Invalid API Key or OAuth token');
       return;
     }

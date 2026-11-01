@@ -93,7 +93,7 @@ The public API and MCP clients send their own `Authorization` header: an API key
 - `/api/public/*`: the public API v1, plus public approval and review links
 - `/api/mcp*`: `/api/mcp`, `/api/mcp/<key>` and `/api/mcp-oauth*`
 - `/api/sse/*`, `/api/message/*`: the legacy MCP transport
-- `/api/.well-known/*`, and the root `/.well-known/oauth-{protected-resource,authorization-server}/mcp-oauth-dynamic` and `/mcp-oauth-dynamic*` (rewritten to `/api`, as in production)
+- `/api/.well-known/*`, and the root `/.well-known/oauth-{protected-resource,authorization-server}/mcp-oauth-dynamic`, `/mcp-oauth-dynamic*`, `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/mcp.json`, `/.well-known/mcp/server-card.json` and `/.well-known/openai-apps-challenge` (rewritten to `/api`, as in production)
 - `/api/oauth/register`, `/api/oauth/token`, `/api/oauth/userinfo`: the machine-to-machine OAuth endpoints MCP clients call
 
 On the protected paths, Caddy removes the basic-auth `Authorization` header before proxying, so the app never sees it. The browser's OAuth consent page (`/oauth/authorize`) stays protected, so connecting an MCP client from Claude or ChatGPT asks for the basic-auth login once in the browser.
@@ -117,12 +117,21 @@ staging.postdelegate.com {
     handle @direct {
         abort
     }
+    @swagger path /api/docs /api/docs/* /api/docs-json /api/docs-yaml
+    handle @swagger {
+        respond 404
+    }
     @machine path /api/public/* /api/mcp* /api/sse/* /api/message/* /api/.well-known/* /api/oauth/register /api/oauth/token /api/oauth/userinfo
     handle @machine {
         reverse_proxy postdelegate-staging-app-1:5000
     }
     @mcpOauth path /mcp-oauth-dynamic /mcp-oauth-dynamic/* /.well-known/oauth-protected-resource/mcp-oauth-dynamic /.well-known/oauth-authorization-server/mcp-oauth-dynamic
     handle @mcpOauth {
+        rewrite * /api{uri}
+        reverse_proxy postdelegate-staging-app-1:5000
+    }
+    @mcpWellKnown path /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
+    handle @mcpWellKnown {
         rewrite * /api{uri}
         reverse_proxy postdelegate-staging-app-1:5000
     }

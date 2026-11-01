@@ -48,7 +48,7 @@ Other addresses exist for directory listings of specific assistants (`/mcp-oauth
 You add the server address to your assistant. The assistant opens a PostDelegate page in your browser, you sign in and approve, and the assistant gets its own token for your workspace. You never copy an API key.
 
 - The client registers itself using dynamic client registration and PKCE (S256). The scopes are `mcp:read` and `mcp:write`.
-- Web assistants may only register callback addresses on claude.ai, claude.com, chatgpt.com or openai.com (and their subdomains), plus the MCP directories Smithery (smithery.ai, smithery.run), Glama (glama.ai) and Vercel Connect (`https://connect.vercel.com/callback`). Local tools can register `http://localhost`, `http://127.0.0.1` or `http://[::1]` callbacks, or a private-use scheme such as `cursor://`, as native apps do.
+- Web assistants may only register callback addresses on claude.ai, claude.com, chatgpt.com or openai.com (and their subdomains), plus a short list of exact callback URLs of MCP directories such as Vercel Connect (`https://connect.vercel.com/callback`). Local tools can register `http://localhost`, `http://127.0.0.1` or `http://[::1]` callbacks, or a private-use scheme such as `cursor://`, as native apps do.
 - Approvals appear under **Settings > Apps > Approved Apps**. Choose **Revoke** to cut an assistant off. These tokens do not expire on their own, so revoking is how you end access.
 
 ### API key

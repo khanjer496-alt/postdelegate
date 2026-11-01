@@ -74,6 +74,19 @@ const agent = {
   name: 'postdelegate',
   getDescription: () => 'Agent that helps schedule and list social media posts',
   listTools: async () => ({
+    generateImageTool: {
+      id: 'generateImageTool',
+      description: 'Generate an image',
+      mcp: {
+        annotations: {
+          title: 'Generate Image',
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+    },
     integrationList: {
       id: 'integrationList',
       description: 'List the channels',
@@ -187,10 +200,13 @@ describe('startMcp', () => {
       });
     });
 
-    it('rejects an unknown key, bare or with Bearer', async () => {
-      for (const authorization of ['nope', 'Bearer nope']) {
+    it('rejects an unknown or revoked key, bare or with Bearer, as invalid_token', async () => {
+      for (const authorization of ['nope', 'Bearer nope', 'pos_revoked']) {
         const response = await mcpPost('/mcp', { Authorization: authorization });
         expect(response.status).toBe(401);
+        expect(response.headers.get('www-authenticate')).toBe(
+          'Bearer resource_metadata="https://app.example.com/.well-known/oauth-protected-resource/api/mcp", error="invalid_token", error_description="Invalid API Key or OAuth token"'
+        );
       }
     });
 
@@ -247,11 +263,9 @@ describe('startMcp', () => {
   });
 
   describe('/.well-known/oauth-protected-resource', () => {
-    it.each(['', '/api/mcp'])(
-      'serves the /mcp resource as JSON at the root%s',
-      async (suffix) => {
+    it('serves the /mcp resource as JSON at its path-inserted form', async () => {
         const response = await fetch(
-          `${base}/.well-known/oauth-protected-resource${suffix}`
+          `${base}/.well-known/oauth-protected-resource/api/mcp`
         );
 
         expect(response.status).toBe(200);
@@ -263,6 +277,24 @@ describe('startMcp', () => {
           scopes_supported: ['mcp:read', 'mcp:write'],
           bearer_methods_supported: ['header'],
         });
+    });
+
+    it('leaves the root unanswered, or clients would demand OAuth for /mcp/:id', async () => {
+      const response = await fetch(`${base}/.well-known/oauth-protected-resource`);
+
+      expect(response.status).toBe(404);
+    });
+
+    it.each(['POST', 'PUT', 'DELETE'])(
+      'moves on for %s instead of leaving the request hanging',
+      async (method) => {
+        for (const path of ['/api/mcp', '/mcp-oauth-dynamic']) {
+          const response = await fetch(
+            `${base}/.well-known/oauth-protected-resource${path}`,
+            { method, signal: AbortSignal.timeout(2000) }
+          );
+          expect(response.status).toBe(404);
+        }
       }
     );
 
@@ -277,7 +309,7 @@ describe('startMcp', () => {
     });
 
     it('answers its preflight', async () => {
-      const response = await fetch(`${base}/.well-known/oauth-protected-resource`, {
+      const response = await fetch(`${base}/.well-known/oauth-protected-resource/api/mcp`, {
         method: 'OPTIONS',
       });
 
@@ -331,13 +363,12 @@ describe('startMcp', () => {
       }
     );
 
-    it('lists the tools with their annotations', async () => {
+    it('lists the directory-safe tools with their annotations', async () => {
       const card = await (await fetch(`${base}/.well-known/mcp.json`)).json();
       const names = card.tools.map((tool: { name: string }) => tool.name);
 
-      expect(names).toEqual(
-        expect.arrayContaining(['integrationList', 'ask_postdelegate'])
-      );
+      // the Claude list: no agent, no AI media generation, no clipping
+      expect(names).toEqual(['integrationList']);
       for (const tool of card.tools) {
         expect(tool.title).toEqual(expect.any(String));
         expect(tool.annotations).toMatchObject({
