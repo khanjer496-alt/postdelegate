@@ -15,11 +15,11 @@ The media library keeps everything you have uploaded in one place, so you can re
 
 These limits apply to uploads from the app, uploads from a URL and uploads through the [API](/docs/api/uploads). Other file types, including audio, are rejected.
 
-GIF, AVIF, BMP and TIFF files are never compressed before upload, so the file itself must be under 10 MB. A larger GIF is refused when you add it.
+The 10 MB image limit applies to the file the server receives. Depending on how PostDelegate is set up, the app may shrink JPEG, PNG and WebP pictures before uploading them, so a larger original can still fit. GIF, AVIF, BMP and TIFF files are never shrunk, so the file you pick must already be 10 MB or less.
 
 <div class="callout">
 
-Posts only accept files that end in `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` or `.mp4`. AVIF, BMP and TIFF files can be stored in the library, but they cannot be attached to a post.
+Posts only accept files that end in `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` or `.mp4`. AVIF, BMP and TIFF files can be stored in the library, but they cannot be attached to a post: the composer marks them **Library only**. The app's uploader takes AVIF and BMP; TIFF, which browsers can't preview, can be added through the API or from a URL.
 
 </div>
 

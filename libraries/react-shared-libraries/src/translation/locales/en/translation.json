@@ -711,6 +711,8 @@
   "media_size_limits": "Pictures up to 10 MB, videos up to 1 GB.",
   "gif_too_large": "GIFs are uploaded without compression, so a GIF can be at most {{size}} MB.",
   "image_too_large": "Pictures can be at most {{size}} MB.",
+  "library_only": "Library only",
+  "media_library_only": "Library only: posts take PNG, JPG, GIF, WebP and MP4",
   "you_dont_have_any_media_yet": "You don't have any media yet",
   "media_library": "Media Library",
   "media_settings": "Media Settings",
