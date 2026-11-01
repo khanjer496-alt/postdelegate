@@ -66,7 +66,7 @@ A cleaner long-term fix is to stop setting `NEXT_PUBLIC_BACKEND_URL` at image bu
 
 ## What is switched off, and what that means
 
-`initialize-staging.py` builds `staging.env` from production's variable names, with staging values. It generates new JWT, token-encryption and database secrets. The only values it copies from production are the non-secret `HIDDEN_PROVIDERS`, `DCR_VERIFIED_DOMAINS` and `API_LIMIT`.
+`initialize-staging.py` builds `staging.env` from production's variable names, with staging values. It generates new JWT, token-encryption and database secrets. The only values it copies from production are the non-secret `HIDDEN_PROVIDERS`, `DCR_VERIFIED_DOMAINS` and `API_LIMIT`. `PREVIEW_PROVIDER_ORGS` is not copied, because staging has its own organization ids: set it by hand to let a staging workspace connect the hidden providers.
 
 | Area | Staging setting | Effect |
 | --- | --- | --- |

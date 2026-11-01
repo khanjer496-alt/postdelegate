@@ -9,7 +9,7 @@ export const MobileIntegration: FC = () => {
   const fetch = useFetch();
 
   const loadIntegrations = useCallback(async () => {
-    setIntegrations(await (await fetch('/integrations')).json());
+    setIntegrations(await (await fetch('/integrations/available')).json());
   }, []);
 
   useEffect(() => {

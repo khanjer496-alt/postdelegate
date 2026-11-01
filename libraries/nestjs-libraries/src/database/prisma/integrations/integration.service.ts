@@ -149,6 +149,38 @@ export class IntegrationService {
     );
   }
 
+  // HIDDEN_PROVIDERS stops new channels on every connect path, not only on the
+  // add-channel screen (PREVIEW_PROVIDER_ORGS are let through). A reconnect of
+  // a channel the org already has keeps working - `refresh` is its internalId -
+  // including one that lands on its MIGRATE_PROVIDERS target.
+  async checkProviderAvailable(org: string, provider: string, refresh?: string) {
+    if (!this._integrationManager.isHiddenFor(provider, org)) {
+      return;
+    }
+
+    const existing = refresh
+      ? await this._integrationRepository.getIntegrationByInternalId(
+          org,
+          refresh
+        )
+      : undefined;
+
+    if (
+      existing &&
+      (existing.providerIdentifier === provider ||
+        this._integrationManager.getMigrationTarget(
+          existing.providerIdentifier
+        ) === provider)
+    ) {
+      return;
+    }
+
+    throw new HttpException(
+      "This network isn't available yet",
+      HttpStatus.BAD_REQUEST
+    );
+  }
+
   async createOrUpdateIntegration(
     additionalSettings:
       | {

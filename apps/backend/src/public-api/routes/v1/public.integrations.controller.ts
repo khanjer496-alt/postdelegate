@@ -407,6 +407,12 @@ export class PublicIntegrationsController {
       throw new HttpException({ msg: 'Integration not allowed' }, 400);
     }
 
+    await this._integrationService.checkProviderAvailable(
+      org.id,
+      integration,
+      refresh
+    );
+
     // A provider migrated via MIGRATE_PROVIDERS reconnects through its target
     // provider's OAuth: the callback lands on the target and the channel is
     // migrated in place (see migrateIntegration).

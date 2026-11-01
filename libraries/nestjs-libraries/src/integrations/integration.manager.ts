@@ -94,6 +94,19 @@ export class IntegrationManager {
       .includes(identifier);
   }
 
+  // PREVIEW_PROVIDER_ORGS ("orgId1,orgId2") lets chosen workspaces (QA, demo
+  // recordings for platform reviews) see and connect the hidden providers.
+  isHiddenFor(identifier: string, orgId?: string) {
+    const previewOrgs = (process.env.PREVIEW_PROVIDER_ORGS || '')
+      .split(',')
+      .map((p) => p.trim());
+
+    return (
+      this.isHiddenProvider(identifier) &&
+      !(orgId && previewOrgs.includes(orgId))
+    );
+  }
+
   // Note: a target provider that implements `reConnect` is not supported - the
   // connect callback would run reConnect with the old app-scoped id before the
   // migration is attempted.
@@ -127,11 +140,11 @@ export class IntegrationManager {
       .map(([from]) => from);
   }
 
-  async getAllIntegrations() {
+  async getAllIntegrations(orgId?: string) {
     return {
       social: await Promise.all(
         socialIntegrationList
-          .filter((p) => !this.isHiddenProvider(p.identifier))
+          .filter((p) => !this.isHiddenFor(p.identifier, orgId))
           .map(async (p) => ({
             name: p.name,
             identifier: p.identifier,

@@ -101,6 +101,14 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`onboarding:${body.state}`);
     }
 
+    // the state could come from another provider's connect link, so the
+    // provider this callback saves is checked again here
+    await this._integrationService.checkProviderAvailable(
+      org.id,
+      integration,
+      refresh || undefined
+    );
+
     const {
       error,
       accessToken,
