@@ -532,8 +532,15 @@ export class IntegrationService {
     const days = Number(date) > 0 ? Number(date) : 7;
     const getIntegration = await this.getIntegrationById(org.id, integration);
 
-    if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
-      throw new Error('Invalid integration');
+    // an id that is not a channel of this workspace
+    if (!getIntegration) {
+      throw new HttpException('Integration not found', HttpStatus.NOT_FOUND);
+    }
+
+    // a disabled, removed or half-connected channel has no analytics: `[]`,
+    // as the API documents, instead of an error the analytics page can't read
+    if (getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
+      return [];
     }
 
     if (getIntegration.type !== 'social') {

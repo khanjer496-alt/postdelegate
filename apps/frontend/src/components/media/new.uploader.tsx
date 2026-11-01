@@ -23,6 +23,12 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import { uniqBy } from 'lodash';
 
+// The server keeps pictures up to 10 MB (getMaxSize). The types compressed
+// here before the upload shrink well under it, so they may start larger.
+const MAX_IMAGE_SIZE_MB = 10;
+const MAX_IMAGE_SIZE_BEFORE_COMPRESSION_MB = 30;
+const COMPRESSED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 export class CompressionWrapper<M = any, B = any> extends Compressor<any, any> {
   override async prepareUpload(fileIDs: string[]) {
     const { files } = this.uppy.getState();
@@ -190,18 +196,35 @@ export function useUppyUploader(props: {
             const isImage = file.type?.startsWith('image/');
             const isVideo = file.type?.startsWith('video/');
 
-            const maxImageSize = 30 * 1024 * 1024; // 30MB
+            const compressed =
+              !disableImageCompression &&
+              !mediaProcessing &&
+              COMPRESSED_IMAGE_TYPES.includes(file.type || '');
+            const maxImageSizeMB = compressed
+              ? MAX_IMAGE_SIZE_BEFORE_COMPRESSION_MB
+              : MAX_IMAGE_SIZE_MB;
+            const maxImageSize = maxImageSizeMB * 1024 * 1024;
             const maxVideoSize = 1000 * 1024 * 1024; // 1GB
 
             if (isImage && file.size > maxImageSize) {
-              const error = new Error(
-                `Image file "${file.name}" is too large. Maximum size allowed is 30MB.`
-              );
+              const isGif =
+                file.type === 'image/gif' ||
+                (file.name || '').toLowerCase().endsWith('.gif');
+              const message = isGif
+                ? t(
+                    'gif_too_large',
+                    'GIFs are uploaded without compression, so a GIF can be at most {{size}} MB.',
+                    { size: maxImageSizeMB }
+                  )
+                : t(
+                    'image_too_large',
+                    'Pictures can be at most {{size}} MB.',
+                    { size: maxImageSizeMB }
+                  );
+              const error = new Error(`${file.name}: ${message}`);
               uppy2.log(error.message, 'error');
               uppy2.info(error.message, 'error', 5000);
-              toast.show(
-                `Image file is too large. Maximum size allowed is 30MB.`
-              );
+              toast.show(message, 'warning');
               uppy2.removeFile(file.id); // Remove file from queue
               return reject(error);
             }
@@ -251,7 +274,7 @@ export function useUppyUploader(props: {
     // the normalizer resizes on the server, shrinking first would only make it upscale a blurry copy
     if (!disableImageCompression && !mediaProcessing) {
       uppy2.use(CompressionWrapper, {
-        convertTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        convertTypes: COMPRESSED_IMAGE_TYPES,
         maxWidth: 1000,
         maxHeight: 1000,
         quality: 1,

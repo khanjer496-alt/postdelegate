@@ -191,13 +191,17 @@ export abstract class SocialAbstract {
    * `posts` mirrors the client shape: the outer array is the main post followed
    * by each comment, the inner array is the media items for that entry.
    *
+   * `texts` holds the text of each of them as `post` receives it, for the
+   * rules that depend on the text (e.g. a caption limit with media).
+   *
    * Note: video-duration validations that used to run in the browser are not
    * re-implemented here (no ffmpeg dependency). Image-dimension checks use sharp.
    */
   async checkValidity(
     posts: Array<ValidityMedia[]>,
     settings: any,
-    additionalSettings: any[]
+    additionalSettings: any[],
+    texts?: string[]
   ): Promise<string | true> {
     return true;
   }
