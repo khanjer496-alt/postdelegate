@@ -1,0 +1,60 @@
+{
+  "name": "Zernio",
+  "slug": "zernio",
+  "site": "https://zernio.com",
+  "pricingUrl": "https://zernio.com/pricing",
+  "checked": "2026-11-02",
+  "kind": {
+    "value": "Social media API for developers",
+    "src": "https://zernio.com/pricing"
+  },
+  "hosting": {
+    "value": "Hosted API",
+    "src": "https://zernio.com/pricing"
+  },
+  "pricingModel": {
+    "value": "Per connected account per month, cheaper per account at volume",
+    "src": "https://zernio.com/pricing"
+  },
+  "freeOption": {
+    "value": "First 2 accounts free, no credit card",
+    "src": "https://zernio.com/pricing"
+  },
+  "entryPaid": {
+    "value": "$6 per account/month for accounts 3 to 10",
+    "src": "https://zernio.com/pricing"
+  },
+  "plans": {
+    "value": "Accounts 1–2 free, 3–10 $6/month each, 11–100 $3/month each, 101+ $1/month each",
+    "src": "https://zernio.com/pricing"
+  },
+  "cost": {
+    "3": {
+      "value": "$6",
+      "note": "2 free + 1 × $6",
+      "src": "https://zernio.com/pricing"
+    },
+    "10": {
+      "value": "$48",
+      "note": "2 free + 8 × $6",
+      "src": "https://zernio.com/pricing"
+    },
+    "30": {
+      "value": "$108",
+      "note": "2 free + 8 × $6 + 20 × $3",
+      "src": "https://zernio.com/pricing"
+    }
+  },
+  "networks": {
+    "value": "Social, messaging, blog and ads platforms through one API, including X, Instagram, TikTok, LinkedIn, Facebook, YouTube, Threads, Reddit, Pinterest and Bluesky",
+    "src": "https://zernio.com/pricing"
+  },
+  "api": {
+    "value": "The product is the API: posting, analytics, comments, messaging, ads and webhooks",
+    "src": "https://zernio.com/pricing"
+  },
+  "mcp": {
+    "value": "MCP server, documented at docs.zernio.com/mcp",
+    "src": "https://docs.zernio.com/mcp"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Postiz",
+  "slug": "postiz",
+  "site": "https://postiz.com",
+  "pricingUrl": "https://postiz.com/pricing",
+  "checked": "2026-11-02",
+  "kind": { "value": "Scheduler: hosted cloud or self-hosted open source", "src": "https://postiz.com/pricing" },
+  "hosting": { "value": "Postiz Cloud, or self-host it on your own server", "src": "https://postiz.com/pricing" },
+  "license": { "value": "AGPL-3.0 (open source)", "src": "https://github.com/gitroomhq/postiz-app" },
+  "pricingModel": { "value": "Flat monthly plans, tiered by number of channels", "src": "https://docs.postiz.com/cloud/plans" },
+  "freeOption": { "value": "No free cloud plan; the self-hosted code is free to run", "src": "https://docs.postiz.com/cloud/plans" },
+  "trial": { "value": "7-day trial; a payment method is required to start it", "src": "https://docs.postiz.com/cloud/trial" },
+  "entryPaid": { "value": "Standard, $29/month for 5 channels", "src": "https://postiz.com/pricing" },
+  "plans": { "value": "Standard $29 (5 channels), Team $39 (10), Pro $49 (30), Ultimate $99 (100)", "src": "https://postiz.com/pricing" },
+  "cost": {
+    "3": { "value": "$29", "note": "Standard, 5 channels", "src": "https://postiz.com/pricing" },
+    "10": { "value": "$39", "note": "Team, 10 channels", "src": "https://postiz.com/pricing" },
+    "30": { "value": "$49", "note": "Pro, 30 channels", "src": "https://postiz.com/pricing" }
+  },
+  "networks": { "value": "30 listed, including Instagram, Facebook, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Reddit, Bluesky and Mastodon", "src": "https://postiz.com/pricing" },
+  "api": { "value": "Public API, CLI and webhooks on every plan", "src": "https://postiz.com/pricing" },
+  "mcp": { "value": "Hosted MCP server on every plan", "src": "https://postiz.com/pricing" },
+  "ai": { "value": "AI copilot on every plan, with monthly AI image, video and clipping allowances by plan", "src": "https://docs.postiz.com/cloud/plans" },
+  "teams": { "value": "Unlimited team members on Team, Pro and Ultimate; none on Standard", "src": "https://docs.postiz.com/cloud/plans" },
+  "selfHostStack": { "value": "Docker Compose with the app, PostgreSQL, Redis and Temporal (with its own PostgreSQL and Elasticsearch)", "src": "https://github.com/gitroomhq/postiz-app/blob/main/docker-compose.yaml" },
+  "selfHostApps": { "value": "Self-hosters get each network's developer app approved themselves; Postiz sells help with this as an optional service", "src": "https://postiz.com/pricing" }
+}

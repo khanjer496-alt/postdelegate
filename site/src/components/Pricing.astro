@@ -30,6 +30,7 @@ const { heading = true } = Astro.props;
       </article>
     ))}
   </div>
+  <p class="pricing-note muted"><strong>Why no AI credits?</strong> You bring your own OpenAI key, or the assistant you already pay for, so you pay OpenAI's own rates with no markup from us and no monthly credit cap.</p>
   <p class="pricing-note muted">Prices in US dollars. AI writing, the Agent and AI images run on your workspace's own OpenAI API key, which you pay OpenAI for directly; PostDelegate never charges for AI, and AI video is not available. You can also bring your own assistant through <a href="/docs/mcp">MCP</a>. More networks, including Facebook, Instagram, TikTok, LinkedIn and X, open as platform approvals come through. One free trial per email address. See <a href="/docs/billing">plans and billing</a> for the details.</p>
 </div>
 <style>
@@ -60,6 +61,8 @@ const { heading = true } = Astro.props;
   .plan-card li > span { flex: none; font-weight: 800; }
   .pricing-note { max-width: 750px; margin: 28px auto 0; text-align: center; font-size: 13px; line-height: 1.8; }
   .pricing-note a { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+  .pricing-note strong { color: #fff; font-weight: 700; }
+  .pricing-note + .pricing-note { margin-top: 12px; }
   @media (max-width: 1000px) { .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) { .plan-grid { grid-template-columns: 1fr; } .plan-topline { min-height: auto; } .plan-description { min-height: auto; } }
 </style>

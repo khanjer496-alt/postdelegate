@@ -1,0 +1,23 @@
+{
+  "name": "Post Bridge",
+  "slug": "post-bridge",
+  "site": "https://www.post-bridge.com",
+  "pricingUrl": "https://www.post-bridge.com/pricing",
+  "checked": "2026-11-02",
+  "kind": { "value": "Hosted cross-posting scheduler for one person", "src": "https://www.post-bridge.com/pricing" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://www.post-bridge.com/pricing" },
+  "pricingModel": { "value": "Flat plan by connected accounts; $1 per account above 99 on Operator", "src": "https://www.post-bridge.com/pricing" },
+  "freeOption": { "value": "Free users can make 5 posts", "src": "https://www.post-bridge.com/pricing" },
+  "trial": { "value": "7-day free trial, $0 due today", "src": "https://www.post-bridge.com/pricing" },
+  "entryPaid": { "value": "Marketer, $39/month for 15 accounts", "src": "https://www.post-bridge.com/pricing" },
+  "plans": { "value": "Marketer $39 (15 accounts), Operator $99 (99 accounts, then $1 each)", "src": "https://www.post-bridge.com/pricing" },
+  "cost": {
+    "3": { "value": "$39", "note": "Marketer, 15 accounts", "src": "https://www.post-bridge.com/pricing" },
+    "10": { "value": "$39", "note": "Marketer, 15 accounts", "src": "https://www.post-bridge.com/pricing" },
+    "30": { "value": "$99", "note": "Operator, 99 accounts", "src": "https://www.post-bridge.com/pricing" }
+  },
+  "networks": { "value": "10: X, Instagram, LinkedIn, Facebook, TikTok, YouTube, Bluesky, Threads, Pinterest and Google Business", "src": "https://www.post-bridge.com/pricing" },
+  "api": { "value": "API included on Marketer", "src": "https://www.post-bridge.com/pricing" },
+  "mcp": { "value": "MCP agent connection included on Marketer", "src": "https://www.post-bridge.com/pricing" },
+  "teams": { "value": "Team members on Operator only", "src": "https://www.post-bridge.com/pricing" }
+}

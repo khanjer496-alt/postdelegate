@@ -4,10 +4,14 @@ import Faq from '../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../data/site';
 import { PLANS, TRIAL_DAYS } from '../data/plans';
 import { AVAILABLE_NETWORKS } from '../data/networks';
+import { tool } from '../data/tools';
 const [starter, team, pro, ultimate] = PLANS;
 const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
+// Monthly-billing rates for Buffer Essentials and Team, from src/data/tools/buffer.json.
+const bufferTiers = tool('buffer').perChannel!.tiers;
+const bufferRates = [bufferTiers.essentials[0][1], bufferTiers.team[0][1]];
 const comparisons = [
-  { href: '/compare/buffer', name: 'Buffer', text: 'Buffer charges $5 to $10 per channel and has a free plan for three channels. It is cheaper for one to three channels; PostDelegate’s flat plans cost less from five channels up.' },
+  { href: '/compare/buffer', name: 'Buffer', text: `Buffer charges $${bufferRates[0]} to $${bufferRates[1]} per channel a month for the first ten channels and has a free plan for three channels. It is cheaper for one to three channels; PostDelegate’s flat plans cost less from five channels up.` },
   { href: '/compare/hootsuite', name: 'Hootsuite', text: 'Hootsuite is a full suite with an inbox and listening, from $99 per user a month. PostDelegate covers scheduling and approvals for a flat price, without the inbox.' },
   { href: '/compare/later', name: 'Later', text: 'Later is built for Instagram, TikTok and visual planning, with AI credits and post caps by plan. PostDelegate suits YouTube, Bluesky, blogs and newsletters today.' },
   { href: '/compare/sprout-social', name: 'Sprout Social', text: 'Sprout Social is a broad platform from $79 per seat a month, with its API on Advanced. PostDelegate includes the API and MCP on every plan.' },
@@ -31,6 +35,12 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <div class="document-grid">
     {comparisons.map((c) => <a href={c.href} class="document-card"><h3>PostDelegate vs {c.name}</h3><p>{c.text}</p><span>See the comparison →</span></a>)}
   </div>
+  <h2>Alternatives to one tool</h2>
+  <div class="document-grid">
+    <a href="/alternatives/postiz" class="document-card"><h3>Postiz alternatives</h3><p>Hosted, self-hosted and API options compared by price, networks and MCP, including when to stay on Postiz.</p><span>See the alternatives →</span></a>
+    <a href="/compare/postiz-vs-buffer" class="document-card"><h3>Postiz vs Buffer</h3><p>Worked monthly costs at 3, 10 and 30 accounts, with every price linked to its source.</p><span>See the comparison →</span></a>
+  </div>
+  <p>PostDelegate is built on the open-source Postiz project (AGPL-3.0). See <a href="/licenses">/licenses</a>.</p>
   <p>Competitor details on each page are taken from their own websites in October 2026. Plans change, so check each service’s website before you decide.</p>
 
   <h2>How to choose a scheduler</h2>

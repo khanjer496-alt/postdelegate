@@ -1,5 +1,11 @@
 ---
 import Doc from '../../layouts/Doc.astro';
+// Head-to-head pages built on CompareTool and Alternatives; add each new pair here.
+const PAIRS = [
+  { href: '/compare/postiz-vs-buffer', title: 'Postiz vs Buffer', text: 'Flat plans or per-channel pricing, worked costs at 3, 10 and 30 accounts, self-hosting, API and MCP.' },
+  { href: '/compare/postiz-vs-mixpost', title: 'Postiz vs Mixpost', text: 'Two self-hosted schedulers: AGPL or MIT and one-time licenses, server stack, 12-month cost and networks.' },
+  { href: '/alternatives/postiz', title: 'Postiz alternatives', text: 'Hosted, self-hosted and API options, with a fair section on when to stay on Postiz.' },
+];
 ---
 <Doc title="Choose your publishing workspace — PostDelegate" description="Compare PostDelegate with Buffer, Hootsuite, Later, Publer, Sprout Social and other social media schedulers: pricing, free trial, AI approach and workflow." h1="Choose the workflow that fits." eyebrow="Explore your options" lead="Start with the channels, people and content you need to manage.">
   <div class="document-grid">
@@ -11,6 +17,12 @@ import Doc from '../../layouts/Doc.astro';
     <a href="/compare/publer" class="document-card"><h2>PostDelegate vs Publer</h2><p>Per-account or flat pricing, free plan and trial, API and MCP access, and networks.</p><span>See the comparison →</span></a>
     <a href="/compare/post-bridge" class="document-card"><h2>PostDelegate and Post Bridge</h2><p>Questions to ask when choosing a social publishing workflow.</p><span>Compare the approach →</span></a>
   </div>
+  <h2>Head-to-head comparisons</h2>
+  <p>Two other tools side by side, with prices read from each vendor's own pricing page and a separate note on where PostDelegate fits.</p>
+  <div class="document-grid">
+    {PAIRS.map((pair) => <a href={pair.href} class="document-card"><h3>{pair.title}</h3><p>{pair.text}</p><span>See the comparison →</span></a>)}
+  </div>
+  <p>PostDelegate is built on the open-source Postiz project (AGPL-3.0). See <a href="/licenses">/licenses</a>.</p>
   <p>Looking for a Buffer or Hootsuite alternative? See <a href="/alternatives">social media scheduler alternatives</a> for a short summary of each comparison.</p>
   <h2>Try the work you actually do</h2>
   <p>Choose an account you manage, prepare a representative post, and check the connection, review and scheduling experience. Confirm the platforms and features you need before choosing a paid service.</p>

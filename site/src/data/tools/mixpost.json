@@ -1,0 +1,89 @@
+{
+  "name": "Mixpost",
+  "slug": "mixpost",
+  "site": "https://mixpost.app",
+  "pricingUrl": "https://mixpost.app/pricing",
+  "checked": "2026-11-02",
+  "kind": {
+    "value": "Self-hosted scheduler, with a hosted cloud option",
+    "src": "https://mixpost.app/pricing"
+  },
+  "hosting": {
+    "value": "Self-host Lite, Pro or Enterprise, or use Mixpost Cloud",
+    "src": "https://mixpost.app/pricing"
+  },
+  "license": {
+    "value": "Lite: MIT (open source). Pro and Enterprise: source-available, one-time license",
+    "src": [
+      "https://github.com/inovector/mixpost",
+      "https://mixpost.app/pricing"
+    ]
+  },
+  "pricingModel": {
+    "value": "Self-hosted: one-time license per domain. Cloud: monthly plans",
+    "src": "https://mixpost.app/pricing"
+  },
+  "freeOption": {
+    "value": "Mixpost Lite is free to self-host (Facebook Pages, X and Mastodon only)",
+    "src": "https://mixpost.app/pricing"
+  },
+  "trial": {
+    "value": "Cloud: 7-day free trial; a card is required to start it. Pro and Enterprise: 14-day money-back guarantee",
+    "src": [
+      "https://mixpost.app/cloud",
+      "https://mixpost.app/pricing"
+    ]
+  },
+  "entryPaid": {
+    "value": "Pro, $299 one-time (1 year of updates). Cloud from $29/month",
+    "src": "https://mixpost.app/pricing"
+  },
+  "plans": {
+    "value": "Self-hosted: Lite free, Pro $299, Enterprise $1,199 (one-time). Cloud: Spark $29, Momentum $49 (24 channels), Business $79 (48), Agency $149 (180)",
+    "src": "https://mixpost.app/cloud"
+  },
+  "cost": {
+    "3": {
+      "value": "$29",
+      "note": "Cloud Spark (1 brand; channel limit not listed)",
+      "src": "https://mixpost.app/cloud"
+    },
+    "10": {
+      "value": "$49",
+      "note": "Cloud Momentum, 24 channels",
+      "src": "https://mixpost.app/cloud"
+    },
+    "30": {
+      "value": "$79",
+      "note": "Cloud Business, 48 channels",
+      "src": "https://mixpost.app/cloud"
+    }
+  },
+  "networks": {
+    "value": "Pro and Enterprise: 12, including Facebook, Instagram, X, LinkedIn, YouTube, TikTok, Pinterest, Threads, Bluesky, Mastodon, Pixelfed and Google Business Profile. Cloud: 11, the same list without X. Lite: Facebook Pages, X and Mastodon",
+    "src": [
+      "https://mixpost.app/pricing",
+      "https://mixpost.app/cloud"
+    ]
+  },
+  "api": {
+    "value": "API and webhooks in Pro and Enterprise, and in Cloud Momentum and up",
+    "src": "https://mixpost.app/pricing"
+  },
+  "mcp": {
+    "value": "MCP server in Pro and Enterprise, and in Cloud Momentum and up",
+    "src": "https://mixpost.app/pricing"
+  },
+  "ai": {
+    "value": "AI Assistant in Pro and Cloud; Cloud plans include monthly AI credits",
+    "src": "https://mixpost.app/cloud"
+  },
+  "teams": {
+    "value": "Pro: unlimited users and workspaces. Cloud: 1 member on Spark and Momentum, 5 on Business, unlimited on Agency",
+    "src": "https://mixpost.app/pricing"
+  },
+  "selfHostStack": {
+    "value": "PHP 8.3+, MySQL, Redis and Nginx or Apache, installed with Docker or Composer",
+    "src": "https://mixpost.app/pricing"
+  }
+}
