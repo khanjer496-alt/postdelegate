@@ -106,13 +106,19 @@ export class PermissionsService {
     );
   }
 
-  // whether one more channel fits the plan (always with billing off)
-  async canAddChannel(orgId: string, created_at: Date) {
+  // whether the plan allows a section, for a check that depends on the
+  // request body or the provider's answer (always with billing off)
+  async allows(orgId: string, created_at: Date, section: Sections) {
     return (
       await this.check(orgId, created_at, 'SUPERADMIN', [
-        [AuthorizationActions.Create, Sections.CHANNEL],
+        [AuthorizationActions.Create, section],
       ])
-    ).can(AuthorizationActions.Create, Sections.CHANNEL);
+    ).can(AuthorizationActions.Create, section);
+  }
+
+  // whether one more channel fits the plan
+  canAddChannel(orgId: string, created_at: Date) {
+    return this.allows(orgId, created_at, Sections.CHANNEL);
   }
 
   async check(
