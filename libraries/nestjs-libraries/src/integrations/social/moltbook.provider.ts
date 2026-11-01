@@ -41,7 +41,15 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
   }
 
   // Moltbook answers { success: false, error } with the HTTP status
-  override handleErrors(body: string, status: number) {
+  override handleErrors(
+    body: string,
+    status: number
+  ):
+    | {
+        type: 'refresh-token' | 'bad-body';
+        value: string;
+      }
+    | undefined {
     let error = '';
     try {
       error = JSON.parse(body)?.error || '';
@@ -51,14 +59,14 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
 
     if (status === 401 || status === 403 || /api key/i.test(error)) {
       return {
-        type: 'refresh-token' as const,
+        type: 'refresh-token',
         value: 'Moltbook no longer accepts the API key, please reconnect the channel',
       };
     }
 
     if (status === 429) {
       return {
-        type: 'bad-body' as const,
+        type: 'bad-body',
         value: `Moltbook limits how often an agent can post${
           error ? `: ${error}` : ''
         }`,
@@ -67,7 +75,7 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
 
     if (status >= 400 && status < 500) {
       return {
-        type: 'bad-body' as const,
+        type: 'bad-body',
         value: `Moltbook rejected the post${error ? `: ${error}` : ''}`,
       };
     }

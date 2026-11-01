@@ -23,7 +23,7 @@ const WhopSettings: FC = () => {
     setSelectedCompany(event.target.value);
     companyRegister.onChange(event);
     // a forum belongs to one company, the one picked before no longer applies
-    form.setValue('experience', '', { shouldValidate: true });
+    form.setValue('experience', '');
   };
 
   return (

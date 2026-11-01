@@ -28,7 +28,15 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
 
   // Medium answers { errors: [{ message, code }] }, codes 6000-6003 are a
   // missing, invalid or revoked token
-  override handleErrors(body: string, status: number) {
+  override handleErrors(
+    body: string,
+    status: number
+  ):
+    | {
+        type: 'refresh-token' | 'bad-body';
+        value: string;
+      }
+    | undefined {
     let error: { message?: string; code?: number } = {};
     try {
       error = JSON.parse(body)?.errors?.[0] || {};
@@ -38,14 +46,14 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
 
     if (status === 401 || (error.code! >= 6000 && error.code! <= 6003)) {
       return {
-        type: 'refresh-token' as const,
+        type: 'refresh-token',
         value: 'Medium no longer accepts the API key, please reconnect the channel',
       };
     }
 
     if (status === 403) {
       return {
-        type: 'bad-body' as const,
+        type: 'bad-body',
         value: `Medium did not allow the post${
           error.message ? `: ${error.message}` : ''
         }`,
@@ -54,7 +62,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
 
     if (status >= 400 && status < 500) {
       return {
-        type: 'bad-body' as const,
+        type: 'bad-body',
         value: `Medium rejected the post${
           error.message ? `: ${error.message}` : ''
         }`,
