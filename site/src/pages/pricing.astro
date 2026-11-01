@@ -9,7 +9,7 @@ import { AVAILABLE_NETWORKS } from '../data/networks';
 const rows: [string, (plan: typeof PLANS[number]) => string][] = [
   ['Monthly price', (plan) => `$${plan.monthly}`],
   ['Yearly price', (plan) => `$${plan.yearly.toLocaleString('en-US')}`],
-  ['Channels', (plan) => String(plan.channels)],
+  ['Channels', (plan) => (plan.extraChannelMonthly ? `${plan.channels}, then $${plan.extraChannelMonthly}/month per extra channel` : String(plan.channels))],
   ['Posts per month', () => 'No practical limit'],
   ['Team members', (plan) => (plan.teamMembers ? 'Yes' : 'No')],
   ['Public API and MCP', () => 'Yes'],
@@ -38,6 +38,7 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
     <div class="question-grid">
       <div><h3>How does the free trial work?</h3><p>Every plan starts with a {TRIAL_DAYS}-day free trial, and you do not need a credit card to start it. Add a card any time before the trial ends to keep your plan; the first payment is taken when the trial ends. If it ends without a card, your workspace is paused until you choose a plan. Your posts are kept, and your channels and team members are switched back on when you subscribe to a plan that includes them. Each email address gets one free trial.</p></div>
       <div><h3>Which channels can I connect?</h3><p>{AVAILABLE_NETWORKS.length} networks connect today, including YouTube, Bluesky, WordPress and Kick. Facebook, Instagram, TikTok, LinkedIn, X and others open as platform approvals come through. See <a href="/platforms">platform coverage</a>.</p></div>
+      <div><h3>What if I need more than 100 channels?</h3><p>Ultimate includes 100 channels, then each extra channel costs $1 a month, or $9.60 a year on yearly billing. A workspace admin adds them under <strong>Extra channels</strong> on the Billing page once the plan is paid. Changes are prorated, and you cannot go below the channels you already have connected.</p></div>
       <div><h3>Can I change or cancel my plan?</h3><p>Workspace admins can change plan, update the payment method or cancel from <strong>Billing</strong> in the app. Cancellation takes effect at the end of the period you have already paid for.</p></div>
       <div><h3>What about AI and automation?</h3><p>AI writing, the Agent and AI images run on your workspace's own OpenAI API key, added by an admin in <strong>Settings → AI</strong>. You pay OpenAI directly, and PostDelegate never charges for AI. AI video is not available. Every plan includes the REST API and MCP server, so you can also bring your own assistant, such as ChatGPT or Claude.</p></div>
     </div>

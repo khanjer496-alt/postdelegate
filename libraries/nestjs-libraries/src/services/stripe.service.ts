@@ -6,7 +6,12 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.subscribe.dto';
 import { escape, groupBy } from 'lodash';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  allowsExtraChannels,
+  MAX_EXTRA_CHANNELS,
+  pricing,
+  totalChannelsOf,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -92,6 +97,78 @@ export async function resolveTierPrice(
       },
     }))
   );
+}
+
+// Extra channels on top of a tier's channels are one more item on the same
+// subscription, priced per channel, its quantity the number of channels
+const EXTRA_CHANNEL_LOOKUP_KEY = 'postdelegate_extra_channel';
+
+export const isExtraChannelItem = (item?: Stripe.SubscriptionItem | null) =>
+  !!item?.price?.lookup_key?.startsWith(`${EXTRA_CHANNEL_LOOKUP_KEY}_`);
+
+// The extra channels a subscription pays for, 0 without the item. Reads the
+// subscription as given, so a webhook can never fail on it
+export const extraChannelsOf = (subscription?: Stripe.Subscription | null) =>
+  subscription?.items?.data?.find(isExtraChannelItem)?.quantity || 0;
+
+// The item of the plan itself, never the extra channels
+export const planItemOf = (subscription?: Stripe.Subscription | null) =>
+  subscription?.items?.data?.find((item) => !isExtraChannelItem(item)) ||
+  subscription?.items?.data?.[0];
+
+// The period the subscription is really billed on (every item shares it),
+// the metadata only when the plan item has no interval
+const billedPeriodOf = (
+  subscription: Stripe.Subscription,
+  fallback?: string
+) => {
+  const interval = planItemOf(subscription)?.price?.recurring?.interval;
+  return (
+    interval === 'year' ? 'YEARLY' : interval === 'month' ? 'MONTHLY' : fallback
+  ) as 'MONTHLY' | 'YEARLY';
+};
+
+// The per channel price of a tier by its lookup_key
+// (postdelegate_extra_channel_<month|year>). Unlike the tier prices it is
+// never found by name or created from code: without it (or with another
+// amount) extra channels are not offered
+export async function resolveExtraChannelPrice(
+  client: Stripe,
+  billing: string,
+  period: 'MONTHLY' | 'YEARLY'
+): Promise<Stripe.Price | null> {
+  const priceData = pricing[billing];
+  const amount =
+    period === 'MONTHLY'
+      ? priceData?.extra_channel_month_price
+      : priceData?.extra_channel_year_price;
+  if (!amount) {
+    return null;
+  }
+
+  const interval = period === 'MONTHLY' ? 'month' : 'year';
+  const lookupKey = `${EXTRA_CHANNEL_LOOKUP_KEY}_${interval}`;
+  const unitAmount = Math.round(amount * 100);
+  const { data } = await client.prices.list({
+    lookup_keys: [lookupKey],
+    active: true,
+  });
+  const found = data[0];
+  if (
+    found &&
+    found.unit_amount === unitAmount &&
+    found.recurring?.interval === interval
+  ) {
+    return found;
+  }
+
+  console.warn('stripe_extra_channel_price_unusable', {
+    lookup_key: lookupKey,
+    found: !!found,
+    expected_amount: unitAmount,
+    found_amount: found?.unit_amount,
+  });
+  return null;
 }
 
 // Events that are not created by our own Stripe objects, so they carry no
@@ -365,7 +442,7 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.status !== 'active',
       uniqueId,
       event.data.object.customer as string,
-      pricing[billing].channel!,
+      totalChannelsOf(billing, extraChannelsOf(event.data.object)),
       billing,
       period,
       event.data.object.cancel_at
@@ -416,7 +493,7 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.status !== 'active',
       uniqueId,
       event.data.object.customer as string,
-      pricing[billing].channel!,
+      totalChannelsOf(billing, extraChannelsOf(event.data.object)),
       billing,
       period,
       event.data.object.cancel_at
@@ -471,7 +548,7 @@ export class StripeService extends PaymentProviderAbstract {
       survivor.status !== 'active',
       uniqueId,
       customer,
-      pricing[billing].channel!,
+      totalChannelsOf(billing, extraChannelsOf(survivor)),
       billing,
       period,
       survivor.cancel_at
@@ -724,6 +801,15 @@ export class StripeService extends PaymentProviderAbstract {
       ).data.filter((f) => f.status === 'active' || f.status === 'trialing'),
     };
 
+    const extraChannelItems = await this.extraChannelItemsForPlan(
+      currentUserSubscription?.data?.[0],
+      body
+    );
+    if (!extraChannelItems) {
+      // the change is refused (subscribe), there is no price to show
+      return {};
+    }
+
     try {
       const price = await stripe.invoices.createPreview({
         customer,
@@ -732,10 +818,11 @@ export class StripeService extends PaymentProviderAbstract {
           proration_behavior: 'always_invoice',
           items: [
             {
-              id: currentUserSubscription?.data?.[0]?.items?.data?.[0]?.id,
+              id: planItemOf(currentUserSubscription?.data?.[0])?.id,
               price: findPrice?.id!,
               quantity: 1,
             },
+            ...extraChannelItems,
           ],
         },
       });
@@ -1498,6 +1585,18 @@ export class StripeService extends PaymentProviderAbstract {
       ).data.filter((f) => f.status === 'active' || f.status === 'trialing'),
     };
 
+    // outside the try: a missing extra channel price is not a card problem
+    const extraChannelItems = await this.extraChannelItemsForPlan(
+      currentUserSubscription.data[0],
+      body
+    );
+    if (!extraChannelItems) {
+      return {
+        error:
+          'Your extra channels cannot move to this billing period right now. Remove them first, or contact support.',
+      };
+    }
+
     try {
       const discounts =
         body.period === 'YEARLY'
@@ -1519,10 +1618,11 @@ export class StripeService extends PaymentProviderAbstract {
         proration_behavior: 'always_invoice',
         items: [
           {
-            id: currentUserSubscription.data[0].items.data[0].id,
+            id: planItemOf(currentUserSubscription.data[0])!.id,
             price: findPrice!.id,
             quantity: 1,
           },
+          ...extraChannelItems,
         ],
       });
 
@@ -1539,6 +1639,242 @@ export class StripeService extends PaymentProviderAbstract {
       return {
         portal: url,
       };
+    }
+  }
+
+  // What a plan change does to the extra channels item: a plan without extra
+  // channels drops it, a new billing period moves it to that period's price
+  // (Stripe needs every item on one interval), otherwise it stays as it is
+  private async extraChannelItemsForPlan(
+    subscription: Stripe.Subscription | undefined,
+    body: BillingSubscribeDto
+  ): Promise<Stripe.SubscriptionUpdateParams.Item[] | null> {
+    const item = subscription?.items?.data?.find(isExtraChannelItem);
+    if (!item) {
+      return [];
+    }
+
+    if (!allowsExtraChannels(body.billing)) {
+      return [{ id: item.id, deleted: true }];
+    }
+
+    const interval = body.period === 'MONTHLY' ? 'month' : 'year';
+    if (item.price?.recurring?.interval === interval) {
+      return [];
+    }
+
+    const price = await resolveExtraChannelPrice(
+      stripe,
+      body.billing,
+      body.period
+    ).catch((err) => {
+      console.error('stripe_extra_channel_price_failed', err);
+      return null;
+    });
+    // null: the extra channels can't follow the plan to this period
+    return price
+      ? [{ id: item.id, price: price.id, quantity: item.quantity }]
+      : null;
+  }
+
+  // The subscription extra channels are bought on: the active or trialing
+  // one, like a plan change
+  private async getExtraChannelsSubscription(organizationId: string) {
+    const current =
+      await this._subscriptionService.getSubscriptionByOrganizationId(
+        organizationId
+      );
+    if (
+      !current ||
+      current.provider !== STRIPE_PROVIDER ||
+      current.isLifetime ||
+      !allowsExtraChannels(current.subscriptionTier)
+    ) {
+      return null;
+    }
+
+    const org = await this._organizationService.getOrgById(organizationId);
+    const [subscription] = (
+      await this.getLiveSubscriptions(org?.paymentId)
+    ).filter((f) => f.status === 'active' || f.status === 'trialing');
+
+    return { current, subscription };
+  }
+
+  async getExtraChannels(organizationId: string) {
+    const found = await this.getExtraChannelsSubscription(organizationId);
+    if (!found?.subscription) {
+      return { available: false };
+    }
+
+    const { current, subscription } = found;
+    const billing = subscription.metadata?.billing || current.subscriptionTier;
+    const period = billedPeriodOf(
+      subscription,
+      subscription.metadata?.period || current.period
+    );
+    const price = await resolveExtraChannelPrice(stripe, billing, period);
+    if (!price) {
+      return { available: false };
+    }
+
+    return {
+      available: true,
+      trialing: subscription.status === 'trialing',
+      extraChannels: extraChannelsOf(subscription),
+      includedChannels: pricing[billing].channel || 0,
+      activeChannels: await this._subscriptionService.getActiveChannelsCount(
+        organizationId
+      ),
+      unitPrice: price.unit_amount! / 100,
+      period,
+      max: MAX_EXTRA_CHANNELS,
+    };
+  }
+
+  // Sets the extra channels to a quantity, prorated like a plan change. The
+  // quantity is the target, so sending the same one twice changes nothing.
+  // A trial adds them once it converts, an unpaid subscription once it's paid
+  async setExtraChannels(organizationId: string, extraChannels: number) {
+    const found = await this.getExtraChannelsSubscription(organizationId);
+    if (!found) {
+      throw new BadRequestException(
+        'Extra channels are only available on the Ultimate plan.'
+      );
+    }
+
+    const { subscription } = found;
+    if (!subscription) {
+      throw new BadRequestException('No active subscription found.');
+    }
+
+    if (subscription.status === 'trialing') {
+      throw new BadRequestException(
+        'Extra channels can be added once your trial ends. Finish the trial on the Billing page to add them now.'
+      );
+    }
+
+    const { uniqueId, billing } = subscription.metadata as {
+      billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
+      uniqueId: string;
+    };
+    // the price follows the real interval, the stored period follows the
+    // metadata like the webhooks do
+    const period = billedPeriodOf(subscription, subscription.metadata?.period);
+    const storedPeriod = (subscription.metadata?.period || period) as
+      | 'MONTHLY'
+      | 'YEARLY';
+    if (!allowsExtraChannels(billing) || !period) {
+      throw new BadRequestException(
+        'Extra channels are only available on the Ultimate plan.'
+      );
+    }
+
+    const customer = subscription.customer as string;
+    const item = subscription.items.data.find(isExtraChannelItem);
+    const currentExtra = extraChannelsOf(subscription);
+
+    // an earlier change still waits for its payment, finish that one first
+    // instead of stacking a second invoice on it
+    if (subscription.pending_update) {
+      return this.pendingExtraChannels(subscription.id, currentExtra);
+    }
+
+    if (extraChannels < currentExtra) {
+      const activeChannels =
+        await this._subscriptionService.getActiveChannelsCount(organizationId);
+      const limit = totalChannelsOf(billing, extraChannels);
+      if (activeChannels > limit) {
+        throw new BadRequestException(
+          `You have ${activeChannels} active channels, so you need at least ${
+            activeChannels - (pricing[billing].channel || 0)
+          } extra channels. Disconnect or disable ${
+            activeChannels - limit
+          } channels first, then lower your extra channels.`
+        );
+      }
+    }
+
+    let updated = subscription;
+    if (extraChannels !== currentExtra) {
+      const price = item
+        ? null
+        : await resolveExtraChannelPrice(stripe, billing, period);
+      if (!item && !price) {
+        throw new BadRequestException(
+          'Extra channels are not available right now. Please contact support.'
+        );
+      }
+
+      const adding = extraChannels > currentExtra;
+      const latestInvoice = subscription.latest_invoice as
+        | Stripe.Invoice
+        | string
+        | null;
+      updated = await stripe.subscriptions.update(
+        subscription.id,
+        {
+          proration_behavior: 'always_invoice',
+          // a charge that fails or needs 3D Secure leaves the quantity as it
+          // was until it is paid
+          ...(adding ? { payment_behavior: 'pending_if_incomplete' } : {}),
+          items: [
+            item
+              ? extraChannels
+                ? { id: item.id, quantity: extraChannels }
+                : { id: item.id, deleted: true }
+              : { price: price!.id, quantity: extraChannels },
+          ],
+        },
+        {
+          // a double click sends the same change twice, the same change
+          // after another one is a new invoice and so a new key
+          idempotencyKey: `extra-channels-${subscription.id}-${
+            typeof latestInvoice === 'string'
+              ? latestInvoice
+              : latestInvoice?.id || 'none'
+          }-${currentExtra}-${extraChannels}`,
+        }
+      );
+
+      if (updated.pending_update) {
+        return this.pendingExtraChannels(subscription.id, currentExtra);
+      }
+    }
+
+    await this._subscriptionService.createOrUpdateSubscription(
+      STRIPE_PROVIDER,
+      updated.status !== 'active',
+      uniqueId,
+      customer,
+      totalChannelsOf(billing, extraChannelsOf(updated)),
+      billing,
+      storedPeriod,
+      updated.cancel_at
+    );
+
+    return {
+      extraChannels: extraChannelsOf(updated),
+      requiresAction: false,
+    };
+  }
+
+  // A change that applies once its invoice is paid: the 3D Secure step to
+  // finish, or still processing. The webhook stores the new limit once the
+  // payment goes through
+  private async pendingExtraChannels(
+    subscriptionId: string,
+    extraChannels: number
+  ) {
+    try {
+      const action = await this.getRequiredActionFromSubscription(
+        subscriptionId
+      );
+      return { extraChannels, pending: true, ...action };
+    } catch (err) {
+      throw new BadRequestException(
+        'We could not charge your card. Update your payment method and try again.'
+      );
     }
   }
 

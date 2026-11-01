@@ -11,16 +11,20 @@ describe('SubscriptionExceptionFilter', () => {
   let status: jest.Mock;
   let host: any;
   let role: 'USER' | 'ADMIN' | 'SUPERADMIN';
+  let subscription:
+    | { subscriptionTier: string; isLifetime: boolean; totalChannels?: number }
+    | undefined;
 
   beforeEach(() => {
     process.env.FRONTEND_URL = 'https://app.example.com';
     json = jest.fn();
     status = jest.fn().mockReturnValue({ json });
     role = 'ADMIN';
+    subscription = undefined;
     host = {
       switchToHttp: () => ({
         getResponse: () => ({ status }),
-        getRequest: () => ({ org: { users: [{ role }] } }),
+        getRequest: () => ({ org: { users: [{ role }], subscription } }),
       }),
     };
   });
@@ -81,6 +85,35 @@ describe('SubscriptionExceptionFilter', () => {
       });
     }
   );
+
+  it('offers extra channels instead of an upgrade on a full Ultimate plan', () => {
+    subscription = {
+      subscriptionTier: 'ULTIMATE',
+      isLifetime: false,
+      totalChannels: 125,
+    };
+    deny(Sections.CHANNEL);
+
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 402,
+      message:
+        'You have used all 125 channels of your Ultimate plan. Add extra channels for $1 a month each.',
+      section: Sections.CHANNEL,
+      url: 'https://app.example.com/billing?extraChannels=true',
+    });
+  });
+
+  it.each([
+    { subscriptionTier: 'PRO', isLifetime: false },
+    { subscriptionTier: 'ULTIMATE', isLifetime: true },
+  ])('keeps the upgrade prompt for %o', (current) => {
+    subscription = current;
+    deny(Sections.CHANNEL);
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://app.example.com/billing' })
+    );
+  });
 
   it('still sends a plan limit to billing', () => {
     deny(Sections.POSTS_PER_MONTH);

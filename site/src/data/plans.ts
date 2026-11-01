@@ -10,6 +10,9 @@ export interface Plan {
   channels: number;
   teamMembers: boolean;
   webhooks: number;
+  // per channel above `channels`, for the plan that sells extra channels
+  extraChannelMonthly?: number;
+  extraChannelYearly?: number;
   popular?: boolean;
 }
 
@@ -35,11 +38,18 @@ export const PLANS: Plan[] = [
     slug: 'ultimate', name: 'Ultimate', tagline: 'For a lot of channels.',
     description: 'For agencies and networks running many accounts and automations.',
     monthly: 79, yearly: 756, channels: 100, teamMembers: true, webhooks: 10000,
+    extraChannelMonthly: 1, extraChannelYearly: 9.6,
   },
 ];
 
+// "100 channels, then $1/month per extra channel"
+export const planChannels = (plan: Plan) =>
+  plan.extraChannelMonthly
+    ? `${plan.channels} channels, then $${plan.extraChannelMonthly}/month per extra channel`
+    : `${plan.channels} channels`;
+
 export const planFeatures = (plan: Plan) => [
-  `${plan.channels} channels`,
+  planChannels(plan),
   plan.teamMembers ? 'Invite team members' : 'Just you, no team seats',
   'No practical limit on posts',
   'Public API and MCP',
