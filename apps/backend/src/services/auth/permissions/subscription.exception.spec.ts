@@ -11,20 +11,16 @@ describe('SubscriptionExceptionFilter', () => {
   let status: jest.Mock;
   let host: any;
   let role: 'USER' | 'ADMIN' | 'SUPERADMIN';
-  let subscription:
-    | { subscriptionTier: string; isLifetime: boolean; totalChannels?: number }
-    | undefined;
 
   beforeEach(() => {
     process.env.FRONTEND_URL = 'https://app.example.com';
     json = jest.fn();
     status = jest.fn().mockReturnValue({ json });
     role = 'ADMIN';
-    subscription = undefined;
     host = {
       switchToHttp: () => ({
         getResponse: () => ({ status }),
-        getRequest: () => ({ org: { users: [{ role }], subscription } }),
+        getRequest: () => ({ org: { users: [{ role }] } }),
       }),
     };
   });
@@ -86,13 +82,23 @@ describe('SubscriptionExceptionFilter', () => {
     }
   );
 
-  it('offers extra channels instead of an upgrade on a full Ultimate plan', () => {
-    subscription = {
-      subscriptionTier: 'ULTIMATE',
-      isLifetime: false,
+  const denyChannel = (extraChannels?: Record<string, unknown>) =>
+    new SubscriptionExceptionFilter().catch(
+      new SubscriptionException({
+        section: Sections.CHANNEL,
+        action: AuthorizationActions.Create,
+        ...(extraChannels ? { extraChannels: extraChannels as any } : {}),
+      }),
+      host
+    );
+
+  it('offers extra channels instead of an upgrade, priced monthly', () => {
+    denyChannel({
+      plan: 'Ultimate',
       totalChannels: 125,
-    };
-    deny(Sections.CHANNEL);
+      price: 1,
+      period: 'MONTHLY',
+    });
 
     expect(json).toHaveBeenCalledWith({
       statusCode: 402,
@@ -103,12 +109,24 @@ describe('SubscriptionExceptionFilter', () => {
     });
   });
 
-  it.each([
-    { subscriptionTier: 'PRO', isLifetime: false },
-    { subscriptionTier: 'ULTIMATE', isLifetime: true },
-  ])('keeps the upgrade prompt for %o', (current) => {
-    subscription = current;
-    deny(Sections.CHANNEL);
+  it('prices the offer yearly on a yearly plan', () => {
+    denyChannel({
+      plan: 'Ultimate',
+      totalChannels: 100,
+      price: 9.6,
+      period: 'YEARLY',
+    });
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message:
+          'You have used all 100 channels of your Ultimate plan. Add extra channels for $9.60 a year each.',
+      })
+    );
+  });
+
+  it('keeps the upgrade prompt without an offer', () => {
+    denyChannel();
 
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://app.example.com/billing' })

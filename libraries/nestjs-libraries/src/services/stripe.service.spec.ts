@@ -13,7 +13,12 @@ const mockStripe = {
   paymentMethods: { list: jest.fn() },
   billingPortal: { sessions: { create: jest.fn() } },
   invoicePayments: { list: jest.fn() },
-  invoices: { retrieve: jest.fn() },
+  invoices: {
+    retrieve: jest.fn(),
+    voidInvoice: jest.fn(),
+    createPreview: jest.fn(),
+  },
+  coupons: { create: jest.fn() },
   charges: { retrieve: jest.fn(), list: jest.fn() },
 };
 
@@ -45,6 +50,7 @@ jest.mock(
 import {
   extraChannelsOf,
   planItemOf,
+  planProductIds,
   resolveExtraChannelPrice,
   resolveTierPrice,
   StripeService,
@@ -1298,11 +1304,16 @@ describe('extra channels', () => {
       ({ type: 'customer.subscription.updated', data: { object } } as any);
 
     it('stores 100 + the extra channels of an Ultimate subscription', async () => {
+      mockStripe.subscriptions.retrieve.mockResolvedValue(
+        stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
+      );
       await service.processWebhook(
         updated(
           stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
         )
       );
+
+      expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_1');
 
       expect(
         subscriptionService.createOrUpdateSubscription
@@ -1316,6 +1327,36 @@ describe('extra channels', () => {
         'MONTHLY',
         null
       );
+    });
+
+    it('counts the extra channels on the subscription as it is now, not a late or replayed event', async () => {
+      // the event still shows 25, they were lowered to 5 since
+      mockStripe.subscriptions.retrieve.mockResolvedValue(
+        stripeSubscription({ items: { data: [planItem(), extraItem(5)] } })
+      );
+      await service.processWebhook(
+        updated(
+          stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
+        )
+      );
+
+      expect(
+        subscriptionService.createOrUpdateSubscription.mock.calls[0][4]
+      ).toBe(105);
+    });
+
+    it('keeps the event count when the subscription cannot be read, never failing the webhook', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockStripe.subscriptions.retrieve.mockRejectedValue(new Error('down'));
+      await service.processWebhook(
+        updated(
+          stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
+        )
+      );
+
+      expect(
+        subscriptionService.createOrUpdateSubscription.mock.calls[0][4]
+      ).toBe(125);
     });
 
     it('keeps 100 for an Ultimate subscription without the item', async () => {
@@ -1341,6 +1382,7 @@ describe('extra channels', () => {
         )
       );
 
+      expect(mockStripe.subscriptions.retrieve).not.toHaveBeenCalled();
       expect(
         subscriptionService.createOrUpdateSubscription.mock.calls[0][4]
       ).toBe(30);
@@ -1622,15 +1664,7 @@ describe('extra channels', () => {
       ]);
     });
 
-    it('says when the card is declined', async () => {
-      live(stripeSubscription());
-      extraPrice();
-      mockStripe.subscriptions.update.mockResolvedValue(
-        stripeSubscription({ pending_update: { expires_at: 1 } })
-      );
-      mockStripe.subscriptions.retrieve.mockResolvedValue({
-        latest_invoice: { id: 'in_new' },
-      });
+    const declinedInvoice = () =>
       mockStripe.invoices.retrieve.mockResolvedValue({
         id: 'in_new',
         status: 'open',
@@ -1645,12 +1679,228 @@ describe('extra channels', () => {
         },
       });
 
+    it('voids the invoice of a declined card so a retry can run, and says so', async () => {
+      live(stripeSubscription());
+      extraPrice();
+      mockStripe.subscriptions.update.mockResolvedValue(
+        stripeSubscription({ pending_update: { expires_at: 1 } })
+      );
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
+        pending_update: { expires_at: 1 },
+        latest_invoice: { id: 'in_new', status: 'open' },
+      });
+      declinedInvoice();
+
       await expect(service.setExtraChannels('org_1', 10)).rejects.toThrow(
         'We could not charge your card'
       );
+      expect(mockStripe.invoices.voidInvoice).toHaveBeenCalledWith('in_new');
       expect(
         subscriptionService.createOrUpdateSubscription
       ).not.toHaveBeenCalled();
+    });
+
+    it('retries a declined change with a new key once its invoice is voided', async () => {
+      live(stripeSubscription({ pending_update: { expires_at: 1 } }));
+      mockStripe.subscriptions.retrieve
+        // getRequiredActionFromSubscription
+        .mockResolvedValueOnce({ latest_invoice: { id: 'in_new' } })
+        // voidDeclinedInvoice
+        .mockResolvedValueOnce({
+          pending_update: { expires_at: 1 },
+          latest_invoice: { id: 'in_new', status: 'open' },
+        })
+        // the subscription after the void, the pending update is gone
+        .mockResolvedValueOnce(
+          stripeSubscription({ latest_invoice: { id: 'in_new' } })
+        );
+      declinedInvoice();
+      extraPrice();
+      mockStripe.subscriptions.update.mockResolvedValue(
+        stripeSubscription({ items: { data: [planItem(), extraItem(10)] } })
+      );
+
+      expect(await service.setExtraChannels('org_1', 10)).toEqual({
+        extraChannels: 10,
+        requiresAction: false,
+      });
+      expect(mockStripe.invoices.voidInvoice).toHaveBeenCalledWith('in_new');
+      expect(mockStripe.subscriptions.update.mock.calls[0][2]).toEqual({
+        idempotencyKey: 'extra-channels-sub_1-in_new-0-10',
+      });
+    });
+
+    it('does not void an invoice that only waits for 3D Secure', async () => {
+      live(stripeSubscription({ pending_update: { expires_at: 1 } }));
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
+        latest_invoice: { id: 'in_new' },
+      });
+      mockStripe.invoices.retrieve.mockResolvedValue({
+        id: 'in_new',
+        status: 'open',
+        payments: {
+          data: [
+            {
+              payment: {
+                payment_intent: {
+                  status: 'requires_action',
+                  client_secret: 'pi_secret',
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(await service.setExtraChannels('org_1', 10)).toEqual(
+        expect.objectContaining({ requiresAction: true })
+      );
+      expect(mockStripe.invoices.voidInvoice).not.toHaveBeenCalled();
+      expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancel', () => {
+    beforeEach(() => {
+      subscriptionService['updateCancelAt'] = jest.fn();
+      mockStripe.subscriptions.update.mockResolvedValue({
+        cancel_at: 1900000000,
+      });
+    });
+
+    it('cancels at the period end when the open invoice belongs to a pending extra channels update', async () => {
+      live(
+        stripeSubscription({
+          pending_update: { expires_at: 1 },
+          latest_invoice: { id: 'in_new', status: 'open' },
+        })
+      );
+
+      const result = await service.setToCancel('org_1');
+
+      expect(mockStripe.subscriptions.cancel).not.toHaveBeenCalled();
+      expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
+        'sub_1',
+        expect.objectContaining({ cancel_at_period_end: true })
+      );
+      expect(result.cancel_at).toEqual(new Date(1900000000 * 1000));
+    });
+
+    it('still cancels right away after a failed renewal', async () => {
+      live(
+        stripeSubscription({
+          latest_invoice: { id: 'in_renewal', status: 'open' },
+        })
+      );
+
+      await service.setToCancel('org_1');
+
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith('sub_1');
+      expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
+        'cus_1',
+        'stripe'
+      );
+    });
+  });
+
+  describe('refund preview', () => {
+    it('refunds from the last plan payment, not a later extra channels charge', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue({
+        subscriptionTier: 'ULTIMATE',
+        period: 'MONTHLY',
+      });
+      live(stripeSubscription());
+      mockStripe.charges.list.mockResolvedValue({
+        data: [
+          {
+            id: 'ch_extra',
+            status: 'succeeded',
+            amount: 500,
+            currency: 'usd',
+            created: now,
+            invoice: 'in_extra',
+            amount_refunded: 0,
+          },
+          {
+            id: 'ch_plan',
+            status: 'succeeded',
+            amount: 7900,
+            currency: 'usd',
+            created: now - 100,
+            invoice: 'in_plan',
+            amount_refunded: 0,
+          },
+        ],
+      });
+      mockStripe.invoices.retrieve.mockImplementation(async (id: string) => ({
+        id,
+        billing_reason:
+          id === 'in_extra' ? 'subscription_update' : 'subscription_cycle',
+        parent: { subscription_details: { subscription: 'sub_1' } },
+      }));
+
+      expect(await service.chatbaseRefundPreview('org_1')).toEqual(
+        expect.objectContaining({
+          eligible: true,
+          chargeId: 'ch_plan',
+          amount: 79,
+        })
+      );
+    });
+  });
+
+  describe('admin coupons', () => {
+    it('finds the plan products from the plan lookup keys', async () => {
+      mockStripe.prices.list.mockResolvedValueOnce({
+        data: [
+          { id: 'p1', product: 'prod_starter' },
+          { id: 'p2', product: 'prod_starter' },
+          { id: 'p3', product: { id: 'prod_ultimate' } },
+        ],
+      });
+
+      expect(await planProductIds(mockStripe as any)).toEqual([
+        'prod_starter',
+        'prod_ultimate',
+      ]);
+      expect(mockStripe.prices.list.mock.calls[0][0].lookup_keys).toEqual([
+        'postdelegate_starter_month',
+        'postdelegate_starter_year',
+        'postdelegate_team_month',
+        'postdelegate_team_year',
+        'postdelegate_pro_month',
+        'postdelegate_pro_year',
+        'postdelegate_ultimate_month',
+        'postdelegate_ultimate_year',
+      ]);
+    });
+
+    it('limits an admin coupon to the plan products, so extra channels keep their price', async () => {
+      live(stripeSubscription({ discounts: [] }));
+      mockStripe.invoices.createPreview.mockResolvedValue({ total: 7900 });
+      mockStripe.prices.list.mockResolvedValueOnce({
+        data: [
+          { id: 'p1', product: 'prod_pro' },
+          { id: 'p2', product: 'prod_ultimate' },
+        ],
+      });
+      mockStripe.coupons.create.mockResolvedValue({ id: 'coupon_1' });
+
+      expect(
+        await service.applyCoupon('org_1', {
+          type: 'percentage',
+          value: 50,
+          months: 3,
+        })
+      ).toEqual({ applied: true });
+      expect(mockStripe.coupons.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          percent_off: 50,
+          applies_to: { products: ['prod_pro', 'prod_ultimate'] },
+        })
+      );
     });
   });
 

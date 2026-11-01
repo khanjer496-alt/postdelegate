@@ -665,7 +665,12 @@ export const MainBillingComponent: FC<{
             `Your extra channels will be removed and the unused time credited to your next invoice`
           );
         }
-        const newLimit = pricing[billing].channel || 0;
+        // a switch between two plans that sell extra channels (monthly and
+        // yearly Ultimate) keeps them, so the limit stays the same
+        const newLimit =
+          allowsExtraChannels(fromTier) && allowsExtraChannels(billing)
+            ? subscription?.totalChannels || 0
+            : pricing[billing].channel || 0;
         if (
           billing !== 'FREE' &&
           newLimit < (subscription?.totalChannels || 0)

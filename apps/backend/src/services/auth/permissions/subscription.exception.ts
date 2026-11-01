@@ -4,12 +4,13 @@ import {
   ExceptionFilter,
   HttpException,
 } from '@nestjs/common';
-import { AuthorizationActions, Sections, SubscriptionException } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { MISSING_AI_KEY } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 import {
-  allowsExtraChannels,
-  pricing,
-} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+  AuthorizationActions,
+  ExtraChannelsOffer,
+  Sections,
+  SubscriptionException,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { MISSING_AI_KEY } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 
 // a member can't add the workspace's key, only an admin can
 const ASK_ADMIN_FOR_AI_KEY =
@@ -26,25 +27,19 @@ export class SubscriptionExceptionFilter implements ExceptionFilter {
       section: Sections;
       action: AuthorizationActions;
       message?: string;
+      extraChannels?: ExtraChannelsOffer;
     } = exception.getResponse() as any;
 
     const isMember = request?.org?.users?.[0]?.role === 'USER';
-    // a full plan that sells extra channels adds them instead of upgrading
-    const extraChannelsTier =
-      error.section === Sections.CHANNEL &&
-      !request?.org?.subscription?.isLifetime &&
-      allowsExtraChannels(request?.org?.subscription?.subscriptionTier)
-        ? (request.org.subscription.subscriptionTier as string)
-        : undefined;
-    const message = extraChannelsTier
-      ? `You have used all ${
-          request.org.subscription.totalChannels ||
-          pricing[extraChannelsTier].channel
-        } channels of your ${
-          pricing[extraChannelsTier].label
-        } plan. Add extra channels for $${
-          pricing[extraChannelsTier].extra_channel_month_price
-        } a month each.`
+    // a full plan that sells extra channels adds them instead of upgrading,
+    // priced for the subscription's billing period
+    const offer = error.extraChannels;
+    const message = offer
+      ? `You have used all ${offer.totalChannels} channels of your ${
+          offer.plan
+        } plan. Add extra channels for $${offer.price.toFixed(
+          offer.price % 1 ? 2 : 0
+        )} a ${offer.period === 'YEARLY' ? 'year' : 'month'} each.`
       : getErrorMessage(error, isMember);
 
     // AI is denied only when the workspace has no OpenAI key of its own, which
@@ -62,7 +57,7 @@ export class SubscriptionExceptionFilter implements ExceptionFilter {
               process.env.FRONTEND_URL +
               (error.section === Sections.AI
                 ? '/settings?tab=ai'
-                : extraChannelsTier
+                : offer
                 ? '/billing?extraChannels=true'
                 : '/billing'),
           }),

@@ -10,7 +10,7 @@ description: What each PostDelegate plan includes, how the 7-day trial works and
 | --- | --- | --- | --- | --- |
 | Monthly price | $19 | $29 | $39 | $79 |
 | Yearly price | $180 | $276 | $372 | $756 |
-| Channels | 5 | 10 | 30 | 100, then $1/month per extra channel |
+| Channels | 5 | 10 | 30 | 100, then $1/month per extra channel, up to 1,000 |
 | Posts per month | No practical limit | No practical limit | No practical limit | No practical limit |
 | Team members | No | Yes | Yes | Yes |
 | Public API and MCP | Yes | Yes | Yes | Yes |
@@ -24,7 +24,7 @@ PostDelegate never charges for AI. AI writing, the Agent and AI images run on yo
 
 Ultimate includes 100 channels. If you need more, each extra channel above 100 costs $1 a month, or $9.60 a year on yearly billing (the same 20% yearly saving as the plans).
 
-- A workspace admin sets the number of extra channels under **Extra channels** on the Billing page.
+- A workspace admin sets the number of extra channels under **Extra channels** on the Billing page, up to 900 extra channels (1,000 channels in total).
 - Adding channels charges a prorated amount today for the rest of the billing period. Removing them credits the unused time to your next invoice.
 - You cannot lower your extra channels below the channels you already have connected. Disconnect or disable channels first.
 - Extra channels need a paid plan. During the free trial, finish the trial on the Billing page to add them right away.

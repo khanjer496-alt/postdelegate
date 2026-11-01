@@ -62,3 +62,53 @@ describe('PoliciesGuard', () => {
     expect(check).not.toHaveBeenCalled();
   });
 });
+
+describe('PoliciesGuard channel limit', () => {
+  class Handlers {
+    @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
+    channel() {}
+  }
+
+  const deny = async (offer: unknown) => {
+    const extraChannelsOffer = jest.fn().mockResolvedValue(offer);
+    const guard = new PoliciesGuard(new Reflector(), {
+      check: jest.fn().mockResolvedValue({ can: () => false }),
+      extraChannelsOffer,
+    } as any);
+    const org = {
+      id: 'o',
+      createdAt: new Date(),
+      paymentId: 'cus_1',
+      users: [{ role: 'ADMIN' }],
+    };
+    const error = await guard
+      .canActivate({
+        getHandler: () => Handlers.prototype.channel,
+        switchToHttp: () => ({
+          getRequest: () => ({ path: '/integrations/social/x', query: {}, org }),
+        }),
+      } as any)
+      .catch((e) => e);
+    return { response: error.getResponse(), extraChannelsOffer, org };
+  };
+
+  it('adds the extra channels offer to a denied channel', async () => {
+    const offer = { plan: 'Ultimate', totalChannels: 100, price: 1, period: 'MONTHLY' };
+    const { response, extraChannelsOffer, org } = await deny(offer);
+
+    expect(extraChannelsOffer).toHaveBeenCalledWith(org);
+    expect(response).toEqual({
+      section: Sections.CHANNEL,
+      action: AuthorizationActions.Create,
+      extraChannels: offer,
+    });
+  });
+
+  it('leaves it out when there is no offer', async () => {
+    const { response } = await deny(null);
+    expect(response).toEqual({
+      section: Sections.CHANNEL,
+      action: AuthorizationActions.Create,
+    });
+  });
+});

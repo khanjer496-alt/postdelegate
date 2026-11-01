@@ -49,7 +49,7 @@ For example, you can schedule your posts on X, Facebook, Instagram, TikTok, YouT
       ),
       description: t(
         'faq_extra_channels_description',
-        'The Ultimate plan includes 100 channels, and each extra channel above that costs $1 a month ($9.60 a year on yearly billing). Once your plan is paid, a workspace admin adds them under Extra channels on this page. Changes are prorated, and you cannot go below the channels you already have connected.'
+        'The Ultimate plan includes 100 channels, and each extra channel above that costs $1 a month ($9.60 a year on yearly billing). Once your plan is paid, a workspace admin adds them under Extra channels on this page, up to 900 extra channels (1,000 in total). Changes are prorated, and you cannot go below the channels you already have connected.'
       ),
     },
     {

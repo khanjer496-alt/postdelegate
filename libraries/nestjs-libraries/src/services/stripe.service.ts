@@ -128,6 +128,30 @@ const billedPeriodOf = (
   ) as 'MONTHLY' | 'YEARLY';
 };
 
+// The Stripe products of the paid plans, from their prices' lookup_keys
+// (postdelegate_<slug>_<month|year>), so a coupon can leave extra channels
+// out. Empty when no plan price has a lookup_key
+export async function planProductIds(client: Stripe) {
+  const lookupKeys = Object.values(pricing)
+    .filter((plan) => plan.slug)
+    .flatMap((plan) => [
+      `postdelegate_${plan.slug}_month`,
+      `postdelegate_${plan.slug}_year`,
+    ]);
+  const { data } = await client.prices.list({
+    lookup_keys: lookupKeys,
+    active: true,
+    limit: 100,
+  });
+  return [
+    ...new Set(
+      data.map((price) =>
+        typeof price.product === 'string' ? price.product : price.product.id
+      )
+    ),
+  ];
+}
+
 // The per channel price of a tier by its lookup_key
 // (postdelegate_extra_channel_<month|year>). Unlike the tier prices it is
 // never found by name or created from code: without it (or with another
@@ -189,6 +213,9 @@ const NOT_ENTITLED_STATUSES: Stripe.Subscription.Status[] = [
 ];
 
 export const TRIAL_DAYS = 7;
+
+const DECLINED_EXTRA_CHANNELS =
+  'We could not charge your card. Update your payment method and try again.';
 
 // A trial started without a card is canceled by Stripe when it ends, unless a
 // card was added before
@@ -442,7 +469,10 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.status !== 'active',
       uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(billing, extraChannelsOf(event.data.object)),
+      totalChannelsOf(
+        billing,
+        await this.currentExtraChannels(billing, event.data.object)
+      ),
       billing,
       period,
       event.data.object.cancel_at
@@ -493,7 +523,10 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.status !== 'active',
       uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(billing, extraChannelsOf(event.data.object)),
+      totalChannelsOf(
+        billing,
+        await this.currentExtraChannels(billing, event.data.object)
+      ),
       billing,
       period,
       event.data.object.cancel_at
@@ -548,7 +581,10 @@ export class StripeService extends PaymentProviderAbstract {
       survivor.status !== 'active',
       uniqueId,
       customer,
-      totalChannelsOf(billing, extraChannelsOf(survivor)),
+      totalChannelsOf(
+        billing,
+        await this.currentExtraChannels(billing, survivor)
+      ),
       billing,
       period,
       survivor.cancel_at
@@ -894,12 +930,15 @@ export class StripeService extends PaymentProviderAbstract {
       };
     }
 
-    // Check if the latest invoice has a failed payment
+    // Check if the latest invoice has a failed payment. The open invoice of a
+    // pending update (extra channels waiting for 3D Secure or a new card) is
+    // not one: the subscription itself is paid
     const latestInvoice = sub.latest_invoice as Stripe.Invoice | null;
     const hasFailedPayment =
       sub.status === 'past_due' ||
-      latestInvoice?.status === 'open' ||
-      latestInvoice?.status === 'uncollectible';
+      (!sub.pending_update &&
+        (latestInvoice?.status === 'open' ||
+          latestInvoice?.status === 'uncollectible'));
 
     if (hasFailedPayment) {
       // Payment already failed — cancel immediately and delete subscription
@@ -1642,6 +1681,29 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
+  // Webhooks can arrive late or be replayed, so the extra channels are counted
+  // on the subscription as it is now, not as the event shows it. Never
+  // throws: a failed read keeps the event's own count
+  private async currentExtraChannels(
+    billing: string,
+    subscription: Stripe.Subscription
+  ) {
+    if (!allowsExtraChannels(billing)) {
+      return 0;
+    }
+    try {
+      return extraChannelsOf(
+        await stripe.subscriptions.retrieve(subscription.id)
+      );
+    } catch (err) {
+      console.error('stripe_extra_channels_refetch_failed', {
+        stripe_subscription_id: subscription.id,
+        err,
+      });
+      return extraChannelsOf(subscription);
+    }
+  }
+
   // What a plan change does to the extra channels item: a plan without extra
   // channels drops it, a new billing period moves it to that period's price
   // (Stripe needs every item on one interval), otherwise it stays as it is
@@ -1743,7 +1805,7 @@ export class StripeService extends PaymentProviderAbstract {
       );
     }
 
-    const { subscription } = found;
+    let { subscription } = found;
     if (!subscription) {
       throw new BadRequestException('No active subscription found.');
     }
@@ -1775,9 +1837,22 @@ export class StripeService extends PaymentProviderAbstract {
     const currentExtra = extraChannelsOf(subscription);
 
     // an earlier change still waits for its payment, finish that one first
-    // instead of stacking a second invoice on it
+    // instead of stacking a second invoice on it. A declined one is voided,
+    // then this request is a fresh attempt
     if (subscription.pending_update) {
-      return this.pendingExtraChannels(subscription.id, currentExtra);
+      const pending = await this.pendingExtraChannels(
+        subscription.id,
+        currentExtra
+      );
+      if (pending) {
+        return pending;
+      }
+      subscription = await stripe.subscriptions.retrieve(subscription.id, {
+        expand: ['latest_invoice'],
+      });
+      if (subscription.pending_update) {
+        throw new BadRequestException(DECLINED_EXTRA_CHANNELS);
+      }
     }
 
     if (extraChannels < currentExtra) {
@@ -1838,7 +1913,14 @@ export class StripeService extends PaymentProviderAbstract {
       );
 
       if (updated.pending_update) {
-        return this.pendingExtraChannels(subscription.id, currentExtra);
+        const pending = await this.pendingExtraChannels(
+          subscription.id,
+          currentExtra
+        );
+        if (!pending) {
+          throw new BadRequestException(DECLINED_EXTRA_CHANNELS);
+        }
+        return pending;
       }
     }
 
@@ -1861,7 +1943,8 @@ export class StripeService extends PaymentProviderAbstract {
 
   // A change that applies once its invoice is paid: the 3D Secure step to
   // finish, or still processing. The webhook stores the new limit once the
-  // payment goes through
+  // payment goes through. A declined card gives null, after its invoice is
+  // voided so the next attempt doesn't wait for the update to expire
   private async pendingExtraChannels(
     subscriptionId: string,
     extraChannels: number
@@ -1872,9 +1955,38 @@ export class StripeService extends PaymentProviderAbstract {
       );
       return { extraChannels, pending: true, ...action };
     } catch (err) {
-      throw new BadRequestException(
-        'We could not charge your card. Update your payment method and try again.'
+      await this.voidDeclinedInvoice(subscriptionId);
+      return null;
+    }
+  }
+
+  // Voids the open invoice of a pending update whose payment needs a new
+  // payment method, which discards the pending update with it
+  private async voidDeclinedInvoice(subscriptionId: string) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+        expand: ['latest_invoice'],
+      });
+      const invoice = subscription.latest_invoice as Stripe.Invoice | null;
+      if (!subscription.pending_update || invoice?.status !== 'open') {
+        return;
+      }
+      const { payments } = await stripe.invoices.retrieve(invoice.id!, {
+        expand: ['payments.data.payment.payment_intent'],
+      });
+      const declined = payments?.data.some(
+        (p) =>
+          typeof p.payment.payment_intent === 'object' &&
+          p.payment.payment_intent?.status === 'requires_payment_method'
       );
+      if (declined) {
+        await stripe.invoices.voidInvoice(invoice.id!);
+      }
+    } catch (err) {
+      console.error('stripe_extra_channels_void_failed', {
+        stripe_subscription_id: subscriptionId,
+        err,
+      });
     }
   }
 
@@ -2313,6 +2425,8 @@ export class StripeService extends PaymentProviderAbstract {
       };
     }
 
+    // the plans only, extra channels keep their price
+    const planProducts = await planProductIds(stripe);
     const coupon = await stripe.coupons.create({
       name: `Admin coupon for ${org!.name}`,
       ...(body.type === 'percentage'
@@ -2321,6 +2435,9 @@ export class StripeService extends PaymentProviderAbstract {
       ...(body.months === 1
         ? { duration: 'once' }
         : { duration: 'repeating', duration_in_months: body.months }),
+      ...(planProducts.length
+        ? { applies_to: { products: planProducts } }
+        : {}),
       metadata: { service: 'gitroom', organizationId },
     });
 
@@ -2413,6 +2530,13 @@ export class StripeService extends PaymentProviderAbstract {
 
       try {
         const invoice = await stripe.invoices.retrieve(invoiceId);
+        // the plan's own payments, not a prorated extra channels charge
+        if (
+          invoice.billing_reason !== 'subscription_create' &&
+          invoice.billing_reason !== 'subscription_cycle'
+        ) {
+          continue;
+        }
         const invoiceSubscription =
           invoice.parent?.subscription_details?.subscription;
         const subscriptionId =
