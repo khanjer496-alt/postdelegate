@@ -177,6 +177,7 @@ export interface ChannelPost {
   state?: string;
   approvalStatus?: ApprovalStatus | string | null;
   publishDate?: string | Date | null;
+  integration?: { name?: string | null } | null;
 }
 
 export type ReviewAction =
@@ -187,15 +188,20 @@ export type ReviewAction =
   | 'share';
 
 // A post made for several channels is one post per channel. An action on the
-// channel in view also covers the other channels that are at the same review
-// step, never one that went out or is going out now
+// channel in view also covers the other channels at exactly the same review
+// step (a channel the client sent back is not approved along with one still in
+// review), never one that went out or is going out now
 export const channelsToActOn = (
   siblings: ChannelPost[],
   action: ReviewAction,
+  current: ApprovalStatus | string | null | undefined,
   now: Date = new Date()
 ) =>
   siblings.filter((post) => {
     const status = post.approvalStatus || 'NONE';
+    if (action !== 'share' && status !== (current || 'NONE')) {
+      return false;
+    }
     if (post.state === 'PUBLISHED' || post.state === 'ERROR') {
       return false;
     }

@@ -110,7 +110,25 @@ export const CommentModal: FC<{
   );
 };
 
-type PostRef = { id: string; publishDate?: string | Date | null };
+type PostRef = {
+  id: string;
+  publishDate?: string | Date | null;
+  // the channel, named when the action also covers it
+  name?: string;
+};
+
+// the other channels an action also changes, added to its dialog
+const alsoOn = (others: PostRef[], t: ReturnType<typeof useT>) => {
+  const names = others.map((post) => post.name).filter(Boolean);
+  return names.length
+    ? ' ' +
+        String(
+          t('approval_also_applies_to', 'This also applies to: {{channels}}.', {
+            channels: names.join(', '),
+          })
+        )
+    : '';
+};
 
 // approve, request changes, reject and submit, with the dialogs they need.
 // Each resolves to true when the post changed.
@@ -246,10 +264,11 @@ export const useApprovalActions = () => {
       askComment({
         title: t('approval_request_changes', 'Request changes'),
         label: t('approval_what_to_change', 'What should change?'),
-        description: t(
-          'approval_request_changes_description',
-          "The post won't publish until it's sent for review again and approved."
-        ),
+        description:
+          t(
+            'approval_request_changes_description',
+            "The post won't publish until it's sent for review again and approved."
+          ) + alsoOn(others, t),
         required: true,
         confirmLabel: t('approval_send_feedback', 'Send feedback'),
         send: async (comment) => {
@@ -284,10 +303,11 @@ export const useApprovalActions = () => {
       askComment({
         title: t('approval_reject', 'Reject'),
         label: t('approval_reject_reason', 'Reason'),
-        description: t(
-          'approval_reject_description',
-          "Rejected posts won't publish. They stay as a draft you can delete or send for review again."
-        ),
+        description:
+          t(
+            'approval_reject_description',
+            "Rejected posts won't publish. They stay as a draft you can delete or send for review again."
+          ) + alsoOn(others, t),
         confirmLabel: t('approval_reject_post', 'Reject post'),
         destructive: true,
         send: async (comment) => {

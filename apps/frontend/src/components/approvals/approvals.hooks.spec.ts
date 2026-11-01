@@ -18,24 +18,30 @@ describe('channelsToActOn', () => {
     { id: 'going_out', state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: earlier },
     { id: 'published', state: 'PUBLISHED', approvalStatus: 'IN_REVIEW', publishDate: earlier },
   ];
-  const ids = (action: Parameters<typeof channelsToActOn>[1]) =>
-    channelsToActOn(siblings, action, now).map((p) => p.id);
+  const ids = (
+    action: Parameters<typeof channelsToActOn>[1],
+    current: string
+  ) => channelsToActOn(siblings, action, current, now).map((p) => p.id);
 
-  it('approves and rejects every other channel still waiting', () => {
-    expect(ids('approve')).toEqual(['waiting', 'sent_back']);
-    expect(ids('reject')).toEqual(['waiting', 'sent_back']);
+  it('approves and rejects only the other channels at the same step', () => {
+    expect(ids('approve', 'IN_REVIEW')).toEqual(['waiting']);
+    expect(ids('reject', 'IN_REVIEW')).toEqual(['waiting']);
+    // a channel the client sent back is not approved with one in review
+    expect(ids('approve', 'CHANGES_REQUESTED')).toEqual(['sent_back']);
   });
 
   it('requests changes only on channels in review', () => {
-    expect(ids('request_changes')).toEqual(['waiting']);
+    expect(ids('request_changes', 'IN_REVIEW')).toEqual(['waiting']);
+    expect(ids('request_changes', 'CHANGES_REQUESTED')).toEqual([]);
   });
 
-  it('submits the channels that can go back to review', () => {
-    expect(ids('submit')).toEqual(['sent_back', 'rejected', 'draft']);
+  it('submits the channels at the same step that can go back to review', () => {
+    expect(ids('submit', 'CHANGES_REQUESTED')).toEqual(['sent_back']);
+    expect(ids('submit', 'NONE')).toEqual(['draft']);
   });
 
   it('shares every channel that has not gone out', () => {
-    expect(ids('share')).toEqual([
+    expect(ids('share', 'IN_REVIEW')).toEqual([
       'waiting',
       'sent_back',
       'rejected',
@@ -45,6 +51,6 @@ describe('channelsToActOn', () => {
   });
 
   it('acts on nothing more for a single channel post', () => {
-    expect(channelsToActOn([], 'approve', now)).toEqual([]);
+    expect(channelsToActOn([], 'approve', 'IN_REVIEW', now)).toEqual([]);
   });
 });

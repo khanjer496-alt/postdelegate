@@ -83,9 +83,25 @@ export const PostReviewPanel: FC<{
   );
 
   const others = useCallback(
-    (action: ReviewAction) => channelsToActOn(siblings || [], action),
-    [siblings]
+    (action: ReviewAction) =>
+      channelsToActOn(siblings || [], action, status).map((post) => ({
+        ...post,
+        name: post.integration?.name || undefined,
+      })),
+    [siblings, status]
   );
+  // the other channels an action also changes, said before it runs
+  const alsoOn = (action: ReviewAction) => {
+    const names = others(action)
+      .map((post) => post.name)
+      .filter(Boolean);
+    return names.length
+      ? ' ' +
+          t('approval_also_applies_to', 'This also applies to: {{channels}}.', {
+            channels: names.join(', '),
+          })
+      : '';
+  };
 
   const share = useCallback(() => {
     modals.openModal({
@@ -162,7 +178,7 @@ export const PostReviewPanel: FC<{
                           t(
                             'approval_approve_saved_confirm',
                             'Approving publishes the saved version. Unsaved edits in the editor will be lost. To keep them, save with "Approve and schedule" instead.'
-                          ),
+                          ) + alsoOn('approve'),
                           t('approval_approve', 'Approve'),
                           t('approval_approve_saved_title', 'Approve the saved version?'),
                           t('approval_cancel', 'Cancel')
