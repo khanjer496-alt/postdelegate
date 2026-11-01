@@ -1,6 +1,6 @@
 ---
 name: postdelegate
-description: "Draft, schedule and manage social media posts in PostDelegate through its MCP server (or REST API). Use when the user wants to create a draft, schedule or publish a post, list or check posts on their PostDelegate calendar, change a post's network settings, delete a post, or upload images or video for a post on their connected channels ({{network_names}}). Covers connecting, the channel, schema, media, draft workflow, per-network rules, approvals and safety rules."
+description: "Draft, schedule and manage social media posts in PostDelegate through its MCP server (or REST API). Use when the user wants to create a draft, schedule or publish a post, list or check posts on their PostDelegate calendar, change a post's network settings, delete a post, or upload images or video for a post, or make a vertical Studio video from their media library, on their connected channels ({{network_names}}). Covers connecting, the channel, schema, media, draft workflow, per-network rules, approvals and safety rules."
 ---
 
 # PostDelegate
@@ -32,6 +32,10 @@ Tool names are exactly as the server reports them.
 | `mediaStatusTool` | Check an adjusted upload by `id`: `processing` or `ready`. | No |
 | `uploadWidgetTool` | Show an upload widget for files on the user's device. Only in hosts that support MCP Apps. Returns a `sessionId`. | Yes |
 | `uploadWidgetStatusTool` | List files uploaded through the widget, by `sessionId`. | No |
+| `studioTemplatesTool` | List the 7 Studio templates: `identifier`, `title`, `description`, `captions`, `ai` and `schema` (JSON schema of the `spec`). | No |
+| `studioRenderTool` | Render a vertical 1080×1920 video. Input: `template`, `spec` (follows the schema, media as `mediaId` from the media library), optional `name`. Returns `renderId`, or `error` with the reason. Only saves a video to the media library, never posts. | Yes |
+| `studioRenderStatusTool` | Wait up to 25 s for a render by `renderId`. Returns `status` (`pending`, `completed`, `failed`, `cancelled`), `progress`, and on `completed` the video's `mediaId` and `path`. | No |
+| `studioCancelTool` | Stop a waiting or running render by `renderId`. It still counts toward the daily and trial limits. | Yes |
 
 `uploadWidgetTicketTool` is called by the widget itself. Do not call it. `generateImageTool` only works if the workspace admin added their own OpenAI key in Settings → AI. The AI video tools are not available. Prefer your own image features, then bring the file in with `uploadFromUrlTool`.
 
@@ -48,6 +52,20 @@ Tool names are exactly as the server reports them.
    - Posts accept `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` and `.mp4`. Images up to 10 MB, MP4 video up to 1 GB.
 5. **Confirm, then create.** Show the full post (text, media, channel, account, date and time in the user's time zone). Then call `integrationSchedulePostTool`, with `type: "draft"` unless the user said to schedule or publish now.
 6. **Report the result.** Share each `previewUrl` (`https://app.postdelegate.com/p/POST_ID?share=true`). If `approvalStatus` is `IN_REVIEW`, say the post waits for a teammate's approval. If the result is `output.errors`, fix what it names and try again, or explain it to the user.
+
+### Studio videos
+
+Studio turns videos already in the media library into vertical videos. Follow this order:
+
+1. **List templates.** Call `studioTemplatesTool`. Pick the template that fits and read its `schema`. Times are seconds on the source video, and a video is at most 90 seconds after speed changes.
+2. **Find the media.** Use `mediaListTool` for the video's `id`, or `uploadFromUrlTool` for a public link (wait for `ready` if you used `adjust`). Put only that id in `mediaId`. Never put a link in the spec.
+3. **Confirm, then render.** Tell the user the video, template, trim and text, get an OK, then call `studioRenderTool` with `template` and `spec`. For a template with `captions: true`, put what is said in `captions.script` and leave `captions.words` out: Studio times the words.
+4. **Wait.** Call `studioRenderStatusTool` with the `renderId`. Each call waits up to 25 seconds. Call it again while `status` is `pending`.
+5. **Schedule.** On `completed`, attach the returned `path` to `integrationSchedulePostTool` and follow the post workflow above: draft by default, the user's yes before scheduling, approvals still apply.
+
+Templates (`identifier`): `hook-over-clip`, `talking-head-captions`, `image-slideshow`, `before-after`, `top-n-list`, `quote-card` and `ai-ugc`. For `ai-ugc`, write `script` (`hook`, `lines`, `cta`) yourself and leave `voiceover` at its default `false`: it renders with no AI key. `voiceover: true` and `stills` need the workspace's own OpenAI key. `music.assetId` must be a music already uploaded in Studio.
+
+Fair use: one render at a time per workspace with up to 3 waiting, 30 videos a day, 10 videos in total on the trial, and a paid plan is needed. A render that failed is not counted.
 
 ### `integrationSchedulePostTool` input
 
@@ -111,6 +129,9 @@ Only these networks can be connected today. Others in PostDelegate's directory a
 | `429` (REST `POST /posts`) | Over 30 post-creation requests this hour | Wait. Batch channels into one request |
 | "channel was disconnected" / "reconnect" | The network rejected the saved login | Ask the user to reconnect the channel in PostDelegate |
 | `processing` media | The adjusted file is not ready | Wait about 10 s and check again before publishing |
+| Studio: "Studio needs an active plan" or trial videos used | No paid plan, or the 10 trial videos are used | Point the user to {{app}}/billing |
+| Studio: "Studio is busy", "already waiting", "fair use limit" | A Studio fair use limit | Tell the user and try later. Do not loop |
+| Studio: "is not in the media library of this workspace" | The `mediaId` is not this workspace's media | Find it with `mediaListTool` or upload it first |
 
 ## REST fallback
 
@@ -125,6 +146,7 @@ Base `{{rest_base}}`, header `Authorization: YOUR_API_KEY` (no `Bearer `). Call 
 | `postSettingsTool` | `PUT /posts/:id/settings` `{ "settings": { ... } }` |
 | `deletePostTool` | `DELETE /posts/:id` (also deletes posts created with it in the same group) |
 | `uploadFromUrlTool`, `mediaListTool`, `mediaStatusTool` | `POST /upload-from-url`, `GET /media`, `GET /media/:id/status`. Local files: `POST /upload` (multipart `file`) |
+| `studioTemplatesTool`, `studioRenderTool`, `studioRenderStatusTool`, `studioCancelTool` | `GET /studio/templates`, `POST /studio/renders` `{ "template", "spec", "name"? }`, `GET /studio/renders/:id` (no long wait, poll it), `POST /studio/renders/:id/cancel`. Reference: {{site}}/docs/api/studio |
 
 In REST `POST /posts`, `type` and `date` apply to the whole request, `posts[]` has one entry per channel with `integration.id`, `value[]` (`content`, `image: [{ id, path }]`), and `settings` is an **object** (`{}` when none), not a key/value list. `shortLink` and `tags` (`[]`) are required. Reference: {{site}}/docs/api/posts.
 
@@ -139,5 +161,10 @@ In REST `POST /posts`, `type` and `date` apply to the whole request, `posts[]` h
 1. `integrationList` gives the YouTube channel. `integrationSchema` with `platform: "youtube"` says exactly one MP4 video, and `title` and `type` are required.
 2. `uploadFromUrlTool` with `{ "url": "https://example.com/demo.mp4" }` returns `path`.
 3. Confirm the summary. On a yes, call `integrationSchedulePostTool` with `type: "schedule"`, `postsAndComments: [{ "content": "<p>Video description</p>", "attachments": ["PATH"] }]` and `settings: [{ "key": "title", "value": "Product demo" }, { "key": "type", "value": "unlisted" }]`.
+
+**Studio video.** User: "Make a vertical teaser from seconds 4 to 19 of launch.mp4 with the hook 'We shipped exports', and draft it for Bluesky."
+1. `studioTemplatesTool` lists `hook-over-clip`. `mediaListTool` with `search: "launch"` gives the video's `id`.
+2. Confirm the video, the trim and the hook. On a yes, `studioRenderTool` with `{ "template": "hook-over-clip", "spec": { "input": { "mediaId": "MEDIA_ID" }, "trim": { "start": 4, "end": 19 }, "hook": { "text": "We shipped exports" } } }`.
+3. `studioRenderStatusTool` with the `renderId` until `completed`. Then draft the post with `integrationSchedulePostTool` and `attachments: ["PATH"]`, as in the draft example.
 
 **Delete.** User: "Remove tomorrow's Discord post." Call `postsListTool` for tomorrow, show the matching post, get a yes, then `deletePostTool` with its `id`.

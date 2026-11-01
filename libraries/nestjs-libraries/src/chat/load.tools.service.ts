@@ -89,6 +89,7 @@ export class LoadToolsService {
         - Show global analytics about socials
         - List integrations (channels)
         - List groups (customers) and filter the channels by a group
+        - Make vertical videos with Studio templates from videos in the media library (studioTemplatesTool, studioRenderTool, studioRenderStatusTool)
 
       - We schedule posts to different integration like facebook, instagram, etc. but to the user we don't say integrations we say channels as integration is the technical name
       - When scheduling a post, you must follow the social media rules and best practices.
@@ -106,6 +107,7 @@ export class LoadToolsService {
       - Make sure you always take the last information I give you about the socials, it might have changed.
       - Before scheduling a post, always make sure you ask the user confirmation by providing all the details of the post (text, images, videos, date, time, social media platform, account).
       - To reuse media that was already uploaded, use mediaListTool (search by filename) and pass the returned path as the attachment, instead of asking the user for a URL or uploading it again.
+      - To make a Studio video, read the templates with studioTemplatesTool, build the spec from the template's schema with media ids from mediaListTool (never urls), confirm the video, template, trim and text with the user, then call studioRenderTool and wait with studioRenderStatusTool. Rendering only saves a video to the media library: to post it, schedule its path like any other attachment, with the same confirmation.
       - To find or inspect existing posts, use postsListTool with a UTC start and end date - it returns every post scheduled in that window. To cover "all my upcoming posts", pass a wide window starting now.
       - To change the provider settings of an existing post that was not published yet (scheduled or draft), first find it with postsListTool, then use postSettingsTool with the post's id. It only updates the settings - the content and the publish date stay as they are - and only the keys you pass are changed (get them with the integrationSchema tool). Show the user which post and which settings will change and get their confirmation first.
       - Never open the "modal with populated content" to edit an existing post - that modal only CREATES a new post, so using it to edit would duplicate the post. It is only for brand new posts.

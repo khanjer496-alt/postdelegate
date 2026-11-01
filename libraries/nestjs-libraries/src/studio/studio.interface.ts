@@ -29,6 +29,11 @@ export interface StudioTemplateParams {
   identifier: string;
   title: string;
   description: string;
+  // what assistants and the public API read in place of the description,
+  // when the editor's wording does not fit them
+  agentDescription?: string;
+  // what assistants and the public API get when their spec leaves it out
+  agentDefaults?: Record<string, unknown>;
   dto: Type<any>;
   // the template burns captions in, so the editor offers to transcribe
   captions: boolean;

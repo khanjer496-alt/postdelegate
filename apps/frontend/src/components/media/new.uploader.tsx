@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 // @ts-ignore
 import Uppy, { BasePlugin, UploadResult, UppyFile } from '@uppy/core';
 // @ts-ignore
@@ -37,6 +43,45 @@ export class CompressionWrapper<M = any, B = any> extends Compressor<any, any> {
     return super.prepareUpload(filteredIDs);
   }
 }
+
+// Every byte is sent but the upload is not done yet: the storage still
+// assembles the file and the server saves it, which can take a few seconds.
+// The status bar would sit at 100% meanwhile, so this says it is processing
+export const UploadProcessing: FC<{ uppy: any }> = ({ uppy }) => {
+  const t = useT();
+  const [processing, setProcessing] = useState(false);
+  useEffect(() => {
+    const progress = (value: number) => setProcessing(value >= 100);
+    const done = () => setProcessing(false);
+    uppy.on('progress', progress);
+    uppy.on('complete', done);
+    uppy.on('error', done);
+    uppy.on('cancel-all', done);
+    return () => {
+      uppy.off('progress', progress);
+      uppy.off('complete', done);
+      uppy.off('error', done);
+      uppy.off('cancel-all', done);
+    };
+  }, [uppy]);
+
+  if (!processing) {
+    return null;
+  }
+
+  return (
+    <div
+      role="status"
+      className="absolute inset-0 z-[1] flex items-center gap-[8px] px-[16px] bg-newBgColorInner text-[14px] text-textColor"
+    >
+      <span
+        aria-hidden="true"
+        className="w-[14px] h-[14px] rounded-full border-2 border-newTableBorder border-t-btnCta animate-spin"
+      />
+      {t('processing', 'Processing...')}
+    </div>
+  );
+};
 
 export function useUppyUploader(props: {
   // @ts-ignore

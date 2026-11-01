@@ -16,6 +16,8 @@ const CAPTIONS_FILE = 'captions.ass';
   title: 'Talking head + captions',
   description:
     'Your clip with burned-in captions that light up word by word, from your AI key or a typed script.',
+  agentDescription:
+    'A clip with burned-in captions that light up word by word, from a typed script (captions.script, timed over the clip by Studio) or your own word timings (captions.words).',
   dto: TalkingHeadCaptionsDto,
   captions: true,
 })

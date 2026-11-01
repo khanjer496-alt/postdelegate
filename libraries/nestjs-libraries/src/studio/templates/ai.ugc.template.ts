@@ -63,6 +63,9 @@ const clip = (text: string | undefined, length: number) =>
   title: 'AI UGC',
   description:
     'Your AI writes a short script and voices it, Studio cuts your footage to it with word-by-word captions. Runs on your own OpenAI key.',
+  agentDescription:
+    'A spoken script over your own footage (videos of the media library), cut line by line with word-by-word captions. Write the script yourself (hook, lines, cta). By default there is no AI voice: the script is shown as captions for "seconds" and no AI key is needed. An AI voice (voiceover: true) and AI stills (stills) need the workspace\'s own OpenAI key.',
+  agentDefaults: { voiceover: false },
   dto: AiUgcDto,
   captions: false,
   ai: true,

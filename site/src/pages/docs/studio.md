@@ -111,6 +111,17 @@ A render that fails on our side is never counted.
 
 </div>
 
+## From Claude, ChatGPT or the API
+
+Your assistant can make Studio videos for you through the [MCP server](/docs/mcp), and your own software through the [Studio API](/docs/api/studio). Both use the same templates, the same fair use limits and only the videos in your media library.
+
+1. The assistant lists the templates with `studioTemplatesTool`, which describes the inputs of each one.
+2. It finds your video with `mediaListTool`, or adds one from a public link with `uploadFromUrlTool`. Links are never used directly in a video.
+3. It renders with `studioRenderTool` and waits for the video with `studioRenderStatusTool`. The project also shows up in Studio when you turn on **Show projects made by assistants and the API** under the list, so you can edit it and render it again.
+4. The finished video is in your media library. To post it, the assistant schedules it like any other post, which is a draft unless you say otherwise, and your workspace's [approvals](/docs/approvals) still apply.
+
+Every template works this way. For captions the assistant writes what is said as a script, and Studio times the words over the clip. For AI UGC it writes the script too, and the video renders without an AI voice unless you ask for one, so no AI key is needed; an AI voice or AI stills use your workspace's own OpenAI key. Music must already be uploaded in Studio. Rendering never posts anything on its own, and an assistant can stop a render with `studioCancelTool`.
+
 ## What Studio reads
 
 Studio only reads videos and pictures from your own media library and the music you upload. Videos up to 500 MB, 10 minutes long and 4K are supported. Records of renders are kept for 90 days; the videos stay in your media library until you delete them. The fonts are open source (SIL Open Font License) and bundled with PostDelegate.

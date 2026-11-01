@@ -47,6 +47,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Posts', href: '/docs/api/posts', description: 'Create, list, update and delete posts.' },
     { title: 'Uploads and media', href: '/docs/api/uploads', description: 'Upload files or fetch them from a URL.' },
     { title: 'Channels and customers', href: '/docs/api/channels', description: 'List channels, read settings and start a connection.' },
+    { title: 'Studio', href: '/docs/api/studio', description: 'List templates, render vertical videos and check renders.' },
     { title: 'Analytics and other endpoints', href: '/docs/api/more', description: 'Analytics, notifications, free slots and account info.' },
   ] },
   { title: 'AI assistants (MCP)', items: [
