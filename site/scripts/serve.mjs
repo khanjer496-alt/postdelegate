@@ -25,7 +25,8 @@ const TYPES = {
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf',
   '.eot': 'application/vnd.ms-fontobject', '.gz': 'application/gzip', '.gzip': 'application/gzip',
   '.tar': 'application/x-tar', '.pdf': 'application/pdf', '.mp4': 'video/mp4', '.webm': 'video/webm',
-  '.map': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8', '.md': 'text/markdown; charset=utf-8',
+  '.mdc': 'text/markdown; charset=utf-8', '.zip': 'application/zip',
 };
 const redirectsFile = join(DIST, '_redirects');
 const rules = existsSync(redirectsFile)

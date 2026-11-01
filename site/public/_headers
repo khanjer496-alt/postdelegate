@@ -11,5 +11,25 @@
   Cache-Control: public, max-age=86400
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+/agents/postdelegate/SKILL.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+/agents/AGENTS.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+/agents/chatgpt-instructions.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+/agents/postdelegate.mdc
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+/agents/postdelegate-skill.zip
+  Content-Type: application/zip
+  Content-Disposition: attachment; filename="postdelegate-skill.zip"
+  Cache-Control: public, max-age=3600
 /website-source.tar.gz
   Cache-Control: no-cache

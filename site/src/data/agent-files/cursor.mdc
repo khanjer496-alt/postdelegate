@@ -1,0 +1,41 @@
+---
+description: PostDelegate social media scheduling. Apply when code or a request uses the PostDelegate REST API or MCP server to list channels, upload media, or draft, schedule, list or delete posts.
+globs:
+alwaysApply: false
+---
+
+# PostDelegate
+
+PostDelegate is a social media scheduler. Use its MCP server for interactive work and its REST API from code. Latest version of this rule: {{site}}/agents/postdelegate.mdc. Full agent guide: {{site}}/agents/AGENTS.md.
+
+## Connect
+
+{{connect}}
+
+Cursor MCP config (`.cursor/mcp.json`):
+
+```json
+{ "mcpServers": { "postdelegate": { "url": "{{mcp_oauth}}" } } }
+```
+
+## Workflow
+
+1. List channels: MCP `integrationList` / REST `GET /integrations` (REST also returns `disabled`; skip channels with `disabled: true`, they are paused).
+2. Read the network's rules and settings: MCP `integrationSchema` (`platform`, `isPremium: false`) / REST `GET /integration-settings/:id`. Look up ids with MCP `triggerTool` / REST `POST /integration-trigger/:id`.
+3. Upload media first: MCP `uploadFromUrlTool` / REST `POST /upload` or `POST /upload-from-url`. With `adjust`, wait for `ready` (MCP `mediaStatusTool` / REST `GET /media/:id/status`).
+4. Create a **draft**: MCP `integrationSchedulePostTool` (`settings` is a `[{key, value}]` list) / REST `POST /posts` (`settings` is an object, `{}` when none; `shortLink` and `tags` required; one `date` per request).
+5. List, change or delete: MCP `postsListTool`, `postSettingsTool`, `deletePostTool` / REST `GET /posts`, `PUT /posts/:id/settings`, `DELETE /posts/:id`.
+
+Content is HTML: each line in `<p>`. Dates are UTC ISO 8601. REST `POST /posts` is limited to 30 requests per workspace per hour, so batch channels that share a date into one request.
+
+## Networks you can connect today
+
+{{networks}}
+
+Follow-ups are published on: {{followup_names}}. Only YouTube returns analytics today.
+
+## Rules
+
+{{safety}}
+- Read `POSTDELEGATE_API_KEY` from the environment. Never commit it or put it in front-end code.
+- Errors: `401` is a bad or rotated key (REST takes no `Bearer `). `400` is validation, so fix the named field. `402` is a plan limit. `429` is the hourly post limit.

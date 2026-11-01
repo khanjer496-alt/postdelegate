@@ -20,6 +20,14 @@ export const GET: APIRoute = () => {
 ## Documentation
 ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.title}](${SITE.url}${item.href}): ${item.description}`).join('\n')}
 
+## Agent instruction files
+- [Claude skill (SKILL.md)](${SITE.url}/agents/postdelegate/SKILL.md): how to use PostDelegate over MCP or the REST API, with per-network rules and safety rules.
+- [Claude skill (zip for claude.ai)](${SITE.url}/agents/postdelegate-skill.zip)
+- [AGENTS.md for coding agents](${SITE.url}/agents/AGENTS.md): REST API and MCP guidance for Codex, Cursor, Claude Code and others.
+- [ChatGPT instructions](${SITE.url}/agents/chatgpt-instructions.md): paste into a custom GPT or Project that uses the PostDelegate connector.
+- [Cursor rule](${SITE.url}/agents/postdelegate.mdc)
+- [How to install them](${SITE.url}/docs/mcp/agent-files)
+
 ## Pages
 - [Product facts](${SITE.url}/llms-full.txt)
 - [Plans and pricing](${SITE.url}/pricing)
