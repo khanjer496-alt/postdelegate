@@ -4,10 +4,14 @@ import Faq from '../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../data/site';
 import { PLANS, TRIAL_DAYS } from '../data/plans';
 import { AVAILABLE_NETWORKS } from '../data/networks';
+import { tool } from '../data/tools';
 const [starter, team, pro, ultimate] = PLANS;
 const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
+// Monthly-billing rates for Buffer Essentials and Team, from src/data/tools/buffer.json.
+const bufferTiers = tool('buffer').perChannel!.tiers;
+const bufferRates = [bufferTiers.essentials[0][1], bufferTiers.team[0][1]];
 const comparisons = [
-  { href: '/compare/buffer', name: 'Buffer', text: 'Buffer charges $5 to $10 per channel and has a free plan for three channels. It is cheaper for one to three channels; PostDelegate’s flat plans cost less from five channels up.' },
+  { href: '/compare/buffer', name: 'Buffer', text: `Buffer charges $${bufferRates[0]} to $${bufferRates[1]} per channel a month for the first ten channels and has a free plan for three channels. It is cheaper for one to three channels; PostDelegate’s flat plans cost less from five channels up.` },
   { href: '/compare/hootsuite', name: 'Hootsuite', text: 'Hootsuite is a full suite with an inbox and listening, from $99 per user a month. PostDelegate covers scheduling and approvals for a flat price, without the inbox.' },
   { href: '/compare/later', name: 'Later', text: 'Later is built for Instagram, TikTok and visual planning, with AI credits and post caps by plan. PostDelegate suits YouTube, Bluesky, blogs and newsletters today.' },
   { href: '/compare/sprout-social', name: 'Sprout Social', text: 'Sprout Social is a broad platform from $79 per seat a month, with its API on Advanced. PostDelegate includes the API and MCP on every plan.' },

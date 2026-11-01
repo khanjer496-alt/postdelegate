@@ -4,7 +4,7 @@ title: Claude Code, Cursor and other MCP clients
 description: Copy-paste MCP configuration for Claude Code, Cursor, Claude Desktop, VS Code, Codex, Windsurf and other clients, using sign-in with PostDelegate or an API key.
 ---
 
-The snippets below are the ones PostDelegate shows under **Settings > Agents / Dev** in the app, with the address filled in. The configuration formats belong to each client and may change, so if a client rejects a snippet, check its own MCP documentation and use the address and header from this page.
+The snippets below are the ones PostDelegate shows under **Settings > Agents / Dev** in the app, with the address filled in. The Claude Desktop snippet is the exception: the app does not show it, and it is listed here for convenience. The configuration formats belong to each client and may change, so if a client rejects a snippet, check its own MCP documentation and use the address and header from this page.
 
 Prefer **sign in with PostDelegate** where the client supports OAuth. The client opens your browser and you approve it once. Use an API key for clients that cannot do that. Replace `YOUR_API_KEY` with the key from Settings > Agents / Dev and keep it out of anything you commit.
 

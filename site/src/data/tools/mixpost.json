@@ -28,8 +28,11 @@
     "src": "https://mixpost.app/pricing"
   },
   "trial": {
-    "value": "Cloud: 7-day free trial. Pro and Enterprise: 14-day money-back guarantee",
-    "src": "https://mixpost.app/cloud"
+    "value": "Cloud: 7-day free trial; a card is required to start it. Pro and Enterprise: 14-day money-back guarantee",
+    "src": [
+      "https://mixpost.app/cloud",
+      "https://mixpost.app/pricing"
+    ]
   },
   "entryPaid": {
     "value": "Pro, $299 one-time (1 year of updates). Cloud from $29/month",
@@ -57,8 +60,11 @@
     }
   },
   "networks": {
-    "value": "Pro and Cloud: 11, including Facebook, Instagram, LinkedIn, YouTube, TikTok, Pinterest, Threads, Bluesky, Mastodon, Pixelfed and Google Business Profile. Lite: Facebook Pages, X and Mastodon",
-    "src": "https://mixpost.app/cloud"
+    "value": "Pro and Enterprise: 12, including Facebook, Instagram, X, LinkedIn, YouTube, TikTok, Pinterest, Threads, Bluesky, Mastodon, Pixelfed and Google Business Profile. Cloud: 11, the same list without X. Lite: Facebook Pages, X and Mastodon",
+    "src": [
+      "https://mixpost.app/pricing",
+      "https://mixpost.app/cloud"
+    ]
   },
   "api": {
     "value": "API and webhooks in Pro and Enterprise, and in Cloud Momentum and up",

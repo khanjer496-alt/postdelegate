@@ -7,12 +7,14 @@ import { PLANS, type Plan } from './plans';
 import { SITE } from './site';
 
 export interface Fact { value: string; src: string | string[]; note?: string }
+// Per-unit prices that drop at volume: [up to this many units, price per unit per month], in order.
+export interface TieredFact extends Fact { tiers: Record<string, [number, number][]> }
 export const COST_POINTS = ['3', '10', '30'] as const;
 export type CostPoint = (typeof COST_POINTS)[number];
 export interface Tool {
   name: string; slug: string; site: string; pricingUrl: string; checked: string;
   kind?: Fact; hosting?: Fact; license?: Fact; pricingModel?: Fact; freeOption?: Fact; trial?: Fact;
-  entryPaid?: Fact; plans?: Fact; cost?: Partial<Record<CostPoint, Fact>>; networks?: Fact; api?: Fact;
+  entryPaid?: Fact; plans?: Fact; perChannel?: TieredFact; cost?: Partial<Record<CostPoint, Fact>>; networks?: Fact; api?: Fact;
   mcp?: Fact; ai?: Fact; teams?: Fact; selfHostStack?: Fact; selfHostApps?: Fact;
 }
 
@@ -60,6 +62,21 @@ export function tool(slug: string): Tool {
 }
 
 export const sources = (fact?: Fact) => (fact ? (Array.isArray(fact.src) ? fact.src : [fact.src]) : []);
+
+// Monthly total for `units` on a tiered plan, e.g. tieredMonthly(tool('buffer'), 'team', 30).
+export function tieredMonthly(t: Tool, plan: string, units: number): number {
+  const tiers = t.perChannel?.tiers[plan];
+  if (!tiers) throw new Error(`src/data/tools/${t.slug}.json has no perChannel tiers for "${plan}"`);
+  let total = 0;
+  let from = 0;
+  for (const [upTo, price] of tiers) {
+    if (units <= from) break;
+    total += (Math.min(units, upTo) - from) * price;
+    from = upTo;
+  }
+  if (units > from) throw new Error(`${t.name} ${plan} tiers in src/data/tools/${t.slug}.json stop at ${from} units`);
+  return total;
+}
 
 // The oldest `checked` date among the tools on a page: the page's "Prices checked on" date.
 export const checkedOn = (tools: Tool[]) => tools.map((t) => t.checked).sort()[0];
