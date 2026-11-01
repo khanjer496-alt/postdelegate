@@ -4,7 +4,10 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import {
+  BadBody,
+  SocialAbstract,
+} from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
@@ -21,6 +24,44 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
   dto = MediumSettingsDto;
   maxLength() {
     return 100000;
+  }
+
+  // Medium answers { errors: [{ message, code }] }, codes 6000-6003 are a
+  // missing, invalid or revoked token
+  override handleErrors(body: string, status: number) {
+    let error: { message?: string; code?: number } = {};
+    try {
+      error = JSON.parse(body)?.errors?.[0] || {};
+    } catch (err) {
+      error = {};
+    }
+
+    if (status === 401 || (error.code! >= 6000 && error.code! <= 6003)) {
+      return {
+        type: 'refresh-token' as const,
+        value: 'Medium no longer accepts the API key, please reconnect the channel',
+      };
+    }
+
+    if (status === 403) {
+      return {
+        type: 'bad-body' as const,
+        value: `Medium did not allow the post${
+          error.message ? `: ${error.message}` : ''
+        }`,
+      };
+    }
+
+    if (status >= 400 && status < 500) {
+      return {
+        type: 'bad-body' as const,
+        value: `Medium rejected the post${
+          error.message ? `: ${error.message}` : ''
+        }`,
+      };
+    }
+
+    return undefined;
   }
 
   async generateAuthUrl() {
@@ -107,7 +148,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
   ): Promise<PostResponse[]> {
     const { settings } = postDetails?.[0] || { settings: {} };
     const { data } = await (
-      await fetch(
+      await this.fetch(
         settings?.publication
           ? `https://api.medium.com/v1/publications/${settings?.publication}/posts`
           : `https://api.medium.com/v1/users/${id}/posts`,
@@ -127,9 +168,19 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
+        'medium'
       )
     ).json();
+
+    if (!data?.id) {
+      throw new BadBody(
+        'medium',
+        JSON.stringify(data || {}),
+        Buffer.from('{}'),
+        'Medium did not return the published post, please check your Medium account'
+      );
+    }
 
     return [
       {
