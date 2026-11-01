@@ -1,7 +1,10 @@
 import type { APIRoute } from 'astro';
 import { SITE } from '../data/site';
 import { DOC_SECTIONS } from '../data/docs';
+import { AVAILABLE_NETWORKS } from '../data/networks';
+import { PLANS, TRIAL_DAYS } from '../data/plans';
 export const GET: APIRoute = () => {
+  const live = AVAILABLE_NETWORKS.map((network) => network.name).join(', ');
   const body = `# PostDelegate
 
 > A social media scheduler with one visual calendar, operated independently by ${SITE.operator}.
@@ -18,6 +21,53 @@ export const GET: APIRoute = () => {
 - AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI. The customer pays OpenAI directly; PostDelegate never charges for AI. AI video is not available. Customers can also bring their own AI assistant, such as ChatGPT or Claude, through MCP.
 - Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram and Discord. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
 - Application source code (AGPL-3.0): ${SITE.source}. License details: ${SITE.url}/licenses.
+
+## When to use PostDelegate
+- You want an AI assistant (Claude, ChatGPT, Cursor, Claude Code, Codex) to draft and schedule posts through MCP, with drafts held for a person to approve.
+- You publish to networks that connect today: ${live}.
+- You want flat pricing by channel count (from $${PLANS[0].monthly}/month after a ${TRIAL_DAYS}-day free trial, no card) and the REST API, MCP and webhooks on every plan.
+- You want to bring your own AI: your own OpenAI key or assistant, with no AI markup or credit allowance.
+- You need client approval links that need no account, bulk video scheduling or CSV import.
+
+## When not to use PostDelegate
+- Your main channel is Instagram, Facebook, Threads, TikTok, LinkedIn or X. These are pending platform approval and cannot be connected yet.
+- You want AI credits included in the plan, or AI video generation. PostDelegate does neither.
+- You need a shared social inbox for replies and messages, or social listening.
+- You want a free plan. There is a ${TRIAL_DAYS}-day free trial, then a paid plan.
+- You want to run the software on your own server. PostDelegate is hosted; the upstream open-source Postiz project can be self-hosted.
+
+## Connect over MCP (copy and paste)
+Server address (sign in with PostDelegate, OAuth): https://app.postdelegate.com/mcp-oauth-dynamic
+With an API key instead: https://app.postdelegate.com/api/mcp and the header "Authorization: Bearer YOUR_API_KEY". Full setup: ${SITE.url}/docs/mcp/clients
+
+Claude Code:
+\`\`\`bash
+claude mcp add --transport http postdelegate https://app.postdelegate.com/mcp-oauth-dynamic
+\`\`\`
+Then run /mcp inside Claude Code and authenticate the postdelegate server.
+
+Cursor (.cursor/mcp.json):
+\`\`\`json
+{
+  "mcpServers": {
+    "postdelegate": {
+      "url": "https://app.postdelegate.com/mcp-oauth-dynamic"
+    }
+  }
+}
+\`\`\`
+
+Claude Desktop: the simplest route is Settings > Connectors > Add custom connector with the server address above (${SITE.url}/docs/mcp/claude). To use claude_desktop_config.json instead, bridge the remote server with mcp-remote (needs Node.js):
+\`\`\`json
+{
+  "mcpServers": {
+    "postdelegate": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://app.postdelegate.com/mcp-oauth-dynamic"]
+    }
+  }
+}
+\`\`\`
 
 ## Documentation
 ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.title}](${SITE.url}${item.href}): ${item.description}`).join('\n')}
