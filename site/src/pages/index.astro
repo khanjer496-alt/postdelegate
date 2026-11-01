@@ -14,9 +14,10 @@ import { NETWORKS, AVAILABLE_NETWORKS, type Network } from '../data/networks';
 import { FAQ } from '../data/faq';
 import { PLANS, TRIAL_DAYS } from '../data/plans';
 import { SITE, CTA_LABEL, CTA_SHORT, CTA_NOTE } from '../data/site';
+import { AGENT_FILES } from '../data/agent-files';
 import '../styles/home.css';
 const faqLd={'@context':'https://schema.org','@type':'FAQPage',mainEntity:FAQ.map(f=>({'@type':'Question',name:f.q,acceptedAnswer:{'@type':'Answer',text:f.a}}))};
-const appLd={'@context':'https://schema.org','@type':'SoftwareApplication',name:'PostDelegate',applicationCategory:'BusinessApplication',operatingSystem:'Web',url:SITE.url,description:`A social media scheduler for planning, writing and scheduling posts from one visual calendar. Every plan starts with a ${TRIAL_DAYS}-day free trial with no credit card needed. Channel connections are rolling out in stages.`,offers:{'@type':'AggregateOffer',priceCurrency:'USD',lowPrice:Math.min(...PLANS.map(p=>p.monthly)),highPrice:Math.max(...PLANS.map(p=>p.monthly)),offerCount:PLANS.length}};
+const appLd={'@context':'https://schema.org','@type':'SoftwareApplication',name:'PostDelegate',applicationCategory:'BusinessApplication',operatingSystem:'Web',url:SITE.url,description:`A social media scheduler for planning, writing and scheduling posts from one visual calendar, with Content Studio for vertical videos and bulk video scheduling. Every plan starts with a ${TRIAL_DAYS}-day free trial with no credit card needed. Channel connections are rolling out in stages.`,featureList:['Visual content calendar','Post composer with per-channel settings','Content Studio: vertical 1080×1920 videos with a hook line or word-by-word captions','Bulk video scheduling across your posting time slots','Bulk post import from CSV','Daily views gained analytics for YouTube channels','YouTube publish later and AI content label','Media library','Workspaces and team members','REST API and MCP server','Agent files for Claude, ChatGPT, Cursor and coding agents'],offers:{'@type':'AggregateOffer',priceCurrency:'USD',lowPrice:Math.min(...PLANS.map(p=>p.monthly)),highPrice:Math.max(...PLANS.map(p=>p.monthly)),offerCount:PLANS.length}};
 const liveCount=AVAILABLE_NETWORKS.length;
 const soonNetworks=NETWORKS.filter(n=>!n.available);
 const lowestPrice=Math.min(...PLANS.map(p=>p.monthly));
@@ -38,7 +39,7 @@ const trialSteps=[
  {title:'Keep what works',text:'Add a card any time before the trial ends to stay on your plan.',when:'By day 7',days:[7]},
 ];
 const personas:{kind:'creator'|'team'|'developer';kicker:string;title:string;copy:string;tools:string[]}[]=[
- {kind:'creator',kicker:'On your own',title:'Creators & marketers',copy:'A place for the ideas, drafts and assets that make your next post. Give your content a little more room to come together.',tools:['Visual calendar','Composer','Media library']},
+ {kind:'creator',kicker:'On your own',title:'Creators & marketers',copy:'A place for the ideas, drafts and assets that make your next post. Give your content a little more room to come together.',tools:['Visual calendar','Composer','Content Studio','Media library']},
  {kind:'team',kicker:'With a team',title:'Brands & teams',copy:'Bring a clearer view to your content calendar. Organize your workspace around the brands and channels you manage.',tools:['Shared calendar','Workspaces','Team members']},
  {kind:'developer',kicker:'From your code',title:'Developers & builders',copy:'A public REST API and an MCP server on every plan. Connect your own code, scripts and agents, and build the workflow your team needs.',tools:['REST API','MCP server','Webhooks']},
 ];
@@ -56,20 +57,31 @@ const integrations=[
  {name:'Codex & coding agents',route:'/codex',style:'codex-card',text:'Bring your content workflow closer to the tools you build with.',prompt:'Launch notes → draft ideas',response:'ideas → draft → review → calendar',label:'Explore coding agents'},
  {name:'Automation tools',route:'/api',style:'automation-card',text:'Create a repeatable path from your ideas to your calendar.',prompt:'New idea → prepare a draft',response:'Review content → choose a channel → pick a time',label:'Explore the API'},
 ];
-type FeatureKind='planning'|'media'|'teams'|'analytics'|'workflow'|'composer';
-const features:{kind:FeatureKind;tag:string;title:string;text:string;theme:string;link:string;cta:string}[]=[
+type FeatureKind='planning'|'media'|'teams'|'analytics'|'bulk'|'composer';
+const features:{kind:FeatureKind;tag:string;title:string;text:string;points?:string[];theme:string;link:string;cta:string}[]=[
  {kind:'planning',tag:'Planning',title:'See the whole week. Make room for the good stuff.',text:'Bring your content into a visual calendar. Give every idea a place, keep your plans in view, and make the next step easier to see.',theme:'feature-purple',link:SITE.signup,cta:'Try the calendar free'},
- {kind:'composer',tag:'Composing',title:'One idea. Your own way of telling it.',text:'Shape your content in a composer designed around social publishing. Keep the message together while making room for each channel’s format.',theme:'feature-blue',link:'/platforms',cta:'Explore channel workflows'},
- {kind:'media',tag:'Media library',title:'Your content deserves a place of its own.',text:'Keep your public-use images and assets close to your drafts. Upload, find and organize media without losing your place in the workflow.',theme:'feature-pink',link:SITE.signup,cta:'Try the media library free'},
+ {kind:'composer',tag:'Composing',title:'One idea. Your own way of telling it.',text:'Shape your content in a composer designed around social publishing. Keep the message together while making room for each channel’s format and settings.',points:['YouTube publish later: the video uploads as private and YouTube makes it public at the time you set','YouTube’s label for realistic altered or AI-made content, one setting away'],theme:'feature-blue',link:'/docs/channels/youtube',cta:'See the YouTube settings'},
+ {kind:'bulk',tag:'Bulk video',title:'A folder of videos. Weeks of posts.',text:'Drop in up to 50 videos, pick your channels, and PostDelegate spreads them across your posting time slots. You check every date in a preview before anything is scheduled.',theme:'feature-pink',link:'/docs/bulk-import#bulk-schedule-videos',cta:'How bulk video works'},
+ {kind:'analytics',tag:'Views analytics',title:'See which posts keep earning views.',text:'The Views tab charts the views each channel gains per day and ranks your top posts by views gained. YouTube shares view counts today. Other networks join as their connections are approved.',theme:'feature-blue',link:'/docs/analytics#views',cta:'How analytics work'},
+ {kind:'media',tag:'Media library',title:'Your content deserves a place of its own.',text:'Keep your public-use images and videos close to your drafts. Upload, find and organize media without losing your place in the workflow.',theme:'feature-purple',link:SITE.signup,cta:'Try the media library free'},
  {kind:'teams',tag:'Workspaces',title:'A little more clarity for every brand.',text:'Start with an organized workspace for your content and channels. Team, Pro and Ultimate plans add team members and room for more channels.',theme:'feature-violet',link:'/about',cta:'Get to know PostDelegate'},
- {kind:'workflow',tag:'Your workflow',title:'Make a habit of showing up.',text:'Ideas, drafts and a calendar belong together. Build a content routine you can come back to, with channel publishing opening in stages.',theme:'feature-purple',link:'/platforms',cta:'View the channel directory'},
- {kind:'analytics',tag:'What’s next',title:'Learn from what you put out into the world.',text:'Channel analytics and connected workflows are part of the rollout ahead. Availability will depend on the networks and permissions you connect.',theme:'feature-blue',link:'/support',cta:'Ask about the rollout'},
 ];
+// Content Studio (docs/studio.md). The phone on the right is an illustration, not a screenshot.
+const studioPoints=[
+ {title:'Two templates',text:'Hook over clip puts a bold line over your footage. Talking head + captions burns in captions that light up word by word.',icon:'M4 5h16v14H4zM4 9h16M9 9v10'},
+ {title:'Trim, crop and speed',text:'Drag the handles to trim, move the vertical frame to choose what stays in view, and play at 0.5× to 2×.',icon:'M6 4v16M18 4v16M6 8h12M6 16h12'},
+ {title:'Captions, your way',text:'From your own OpenAI key with Whisper, billed to you by OpenAI, or from a script you type. Fix any word before you render.',icon:'M4 6h16v10H8l-4 4zM8 10h3m2 0h3M8 13h6'},
+ {title:'Ready for the calendar',text:'A 1080×1920 MP4 of up to 90 seconds, saved to your media library. Open in composer and schedule it like any other video.',icon:'M7 3v4m10-4v4M4 10h16M5 5h14v15H5zM9 15l2 2 4-4'},
+];
+const captionWords=['here’s','the','first','one'];
+// The hosted instruction files with a body, linked to their section of /docs/mcp/agent-files.
+const agentFileAnchors:Record<string,string>={'Claude skill':'claude-skill','AGENTS.md':'agents-md','ChatGPT instructions':'chatgpt','Cursor rule':'cursor'};
+const agentFiles=AGENT_FILES.filter(f=>f.body&&agentFileAnchors[f.title]).map(f=>({title:f.title,file:f.path.split('/').pop(),href:`/docs/mcp/agent-files#${agentFileAnchors[f.title]}`}));
 const leadFeatures=features.slice(0,2);
 const moreFeatures=features.slice(2);
 const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
 ---
-<Base title="PostDelegate: Social Media Scheduler for Teams and AI Agents" description={`Schedule social media posts from one visual calendar, or let Claude and ChatGPT draft them for your approval. ${TRIAL_DAYS}-day free trial, no credit card.`} jsonLd={[appLd,faqLd]}>
+<Base title="PostDelegate: Social Media Scheduler for Teams and AI Agents" description={`Schedule social posts from one visual calendar, turn clips into vertical videos, and let Claude or ChatGPT draft for your approval. ${TRIAL_DAYS}-day free trial, no card.`} jsonLd={[appLd,faqLd]}>
   <section class="home-hero" aria-labelledby="hero-title">
     <div class="hero-sky" aria-hidden="true"><span class="hero-grid"></span><span class="hero-glow"></span></div>
     <OrbitAccent kind="planet" class="hero-star-one" />
@@ -81,7 +93,7 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
           <li><a href="/platforms">{liveCount} channels <span>Connect today</span></a></li>
         </ul>
         <h1 id="hero-title">Your social media, all in <span class="hero-mark">one place.<OrbitAccent kind="arc" /></span></h1>
-        <p class="hero-description">Plan, write and schedule your posts from one visual calendar. Bring your team, your media and the AI assistant you already use.</p>
+        <p class="hero-description">Plan, write and schedule your posts from one visual calendar. Turn clips into vertical videos, and bring your team and the AI assistant you already use.</p>
         <div class="hero-actions">
           <a class="hero-cta" href={SITE.signup}><span>{CTA_LABEL}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span><strong>{CTA_NOTE}</strong><span class="note-extra">Plans from ${lowestPrice}/month after your trial</span></p>
@@ -141,12 +153,47 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
       <div class="demo-cta reveal"><a class="button button-lime" href={SITE.signup}>Try it free for {TRIAL_DAYS} days <span aria-hidden="true">↗</span></a><p class="demo-caption">A screenshot of the real PostDelegate workspace. {CTA_NOTE}.</p></div>
     </div>
   </section>
-  <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap reveal"><span class="eyebrow">BRING YOUR OWN AI</span><h2 class="section-heading" id="ai-title">Your ideas. Your tools.<br/>A more connected <span class="ink-circle">workflow.<OrbitAccent kind="ring"/></span></h2><p class="section-intro">PostDelegate doesn’t sell AI. Connect the assistant you already use through MCP, or automate with the REST API.</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card','reveal',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview" aria-hidden="true"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>Example workflow</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">Draft idea</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">Illustrative conversations. Your assistant does the writing under your own account; PostDelegate keeps the calendar.</p></div></section>
+  <section class="studio-section section" id="studio" aria-labelledby="studio-title">
+    <div class="home-wide">
+      <div class="studio-card">
+        <div class="studio-copy reveal">
+          <span class="studio-kicker"><b>New</b>Content Studio</span>
+          <h2 class="section-heading" id="studio-title">Turn a clip into a <span class="ink-underline">vertical video.<OrbitAccent kind="arc"/></span></h2>
+          <p class="studio-intro">Pick a video from your media library, trim it, choose what stays in frame and add a hook or captions. PostDelegate renders it and hands it to your composer, ready to schedule.</p>
+          <ul class="studio-points">{studioPoints.map(p=><li><span class="studio-point-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d={p.icon}/></svg></span><div><h3>{p.title}</h3><p>{p.text}</p></div></li>)}</ul>
+          <div class="studio-actions"><a class="button button-lime" href={SITE.signup}>Try Studio free <span aria-hidden="true">↗</span></a><a class="text-link" href="/docs/studio">Read the Studio guide <span aria-hidden="true">↗</span></a></div>
+          <p class="studio-terms">Included on every paid plan with fair use. The free trial includes 10 videos. More templates coming.</p>
+        </div>
+        <div class="studio-visual reveal">
+          <div class="studio-stage" role="img" aria-label="Illustration of Content Studio: a vertical 9:16 video that takes turns showing the two templates, Hook over clip with a bold hook line and Talking head + captions with the spoken word highlighted, above a trim bar with two handles.">
+            <div class="studio-templates"><span>Hook over clip</span><span class="is-on">Talking head + captions</span></div>
+            <div class="studio-phone">
+              <div class="studio-screen">
+                <svg class="studio-scene" viewBox="0 0 270 480" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="studio-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a66"/><stop offset="1" stop-color="#120f1c"/></linearGradient><radialGradient id="studio-light" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#c8ff4d" stop-opacity=".22"/><stop offset="1" stop-color="#c8ff4d" stop-opacity="0"/></radialGradient></defs><rect width="270" height="480" fill="url(#studio-bg)"/><circle cx="205" cy="150" r="130" fill="url(#studio-light)"/><rect x="160" y="96" width="78" height="118" rx="6" fill="#ffffff0a" stroke="#ffffff1a"/><path d="M199 96v118M160 155h78" stroke="#ffffff1a"/><rect x="16" y="246" width="74" height="4" rx="2" fill="#ffffff1f"/><rect x="24" y="214" width="10" height="32" rx="2" fill="#7357ff73"/><rect x="36" y="221" width="8" height="25" rx="2" fill="#c8ff4d59"/><rect x="46" y="210" width="11" height="36" rx="2" fill="#ffffff26"/><rect x="62" y="226" width="20" height="20" rx="10" fill="#ffffff14"/><path d="M40 480c0-92 46-132 95-132s95 40 95 132z" fill="#2a2147"/><rect x="120" y="322" width="30" height="34" rx="12" fill="#2f2550"/><circle cx="135" cy="290" r="44" fill="#352a5c"/><path d="M91 284c2-30 22-46 44-46s44 16 44 46c-10-14-26-20-44-20s-34 6-44 20z" fill="#211a38"/><path d="M175 270a44 44 0 0 1 0 40" stroke="#c8ff4d" stroke-opacity=".55" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>
+                <span class="studio-hook">3 things I wish<br/>I knew <mark>sooner</mark></span>
+                <p class="studio-captions">{captionWords.map((w,i)=><span class:list={{'is-now':i===2}} style={`--i:${i}`}>{w}</span>)}</p>
+                <span class="studio-meta"><span>1080×1920</span><span>0:07 / 0:24</span></span>
+              </div>
+            </div>
+            <div class="studio-trim">
+              <div class="trim-top"><span>Trim</span><span class="trim-speed"><span>0.5×</span><b>1×</b><span>1.5×</span><span>2×</span></span></div>
+              <div class="trim-strip"><span class="trim-frames"></span><span class="trim-window"><i></i><i></i></span><span class="trim-playhead"></span></div>
+              <div class="trim-times"><span>0:00</span><span class="trim-kept">24 s kept</span><span>0:41</span></div>
+            </div>
+            <span class="studio-float studio-float-captions"><i class="card-spark">✦</i><span><b>Word-by-word captions</b><small>Your OpenAI key or a typed script</small></span></span>
+            <span class="studio-float studio-float-compose"><i class="card-check">✓</i><span><b>Rendered</b><small>Open in composer</small></span></span>
+          </div>
+          <p class="orbit-legend studio-legend"><span><i class="legend-live" aria-hidden="true"></i>The word being spoken</span><span class="legend-note">Illustration</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap reveal"><span class="eyebrow">BRING YOUR OWN AI</span><h2 class="section-heading" id="ai-title">Your ideas. Your tools.<br/>A more connected <span class="ink-circle">workflow.<OrbitAccent kind="ring"/></span></h2><p class="section-intro">PostDelegate doesn’t sell AI. Connect the assistant you already use through MCP, or automate with the REST API.</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card','reveal',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview" aria-hidden="true"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>Example workflow</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">Draft idea</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">Illustrative conversations. Your assistant does the writing under your own account; PostDelegate keeps the calendar.</p><div class="agent-files-band reveal"><div class="agent-files-copy"><span class="agent-files-kicker">Ready-made assistant files</span><h3>Teach your assistant the PostDelegate way.</h3><p>A Claude skill, AGENTS.md, ChatGPT instructions and a Cursor rule. Each one tells your assistant to draft first and never schedule or publish without your OK.</p><a class="text-link" href="/docs/mcp/agent-files">Get the agent files <span aria-hidden="true">↗</span></a></div><ul class="agent-files-list" aria-label="Agent files">{agentFiles.map(f=><li><a href={f.href}><span class="agent-file-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5M10 15h5"/></svg></span><span><b>{f.title}</b><small>{f.file}</small></span></a></li>)}</ul></div></div></section>
   <section class="features-section section" id="features" aria-labelledby="features-title">
     <div class="container"><div class="features-title reveal"><span class="eyebrow">Inside PostDelegate</span><h2 class="section-heading" id="features-title">Room for your ideas.<br/>Tools for your <span class="ink-underline">everyday.<OrbitAccent kind="arc"/></span></h2><OrbitAccent kind="planet" class="features-star"/></div></div>
     <div class="home-wide feature-list">
-      {leadFeatures.map((f,i)=><article class:list={['feature-row','reveal',f.theme,{'feature-reverse':i%2===1}]}><div class="feature-copy"><span class="feature-tag"><b class="feature-index">0{i+1}</b>{f.tag}</span><h3>{f.title}</h3><p>{f.text}</p><a href={f.link} class="feature-link">{f.cta}<span aria-hidden="true">↗</span></a></div><div class="feature-art"><FeatureVisual kind={f.kind}/></div></article>)}
-      <div class="feature-duo">{moreFeatures.map((f,i)=><article class:list={['feature-card','reveal',f.theme]}><div class="feature-art"><FeatureVisual kind={f.kind}/></div><div class="feature-copy"><span class="feature-tag"><b class="feature-index">0{i+3}</b>{f.tag}</span><h3>{f.title}</h3><p>{f.text}</p><a href={f.link} class="feature-link">{f.cta}<span aria-hidden="true">↗</span></a></div></article>)}</div>
+      {leadFeatures.map((f,i)=><article class:list={['feature-row','reveal',f.theme,{'feature-reverse':i%2===1}]}><div class="feature-copy"><span class="feature-tag"><b class="feature-index">0{i+1}</b>{f.tag}</span><h3>{f.title}</h3><p>{f.text}</p>{f.points&&<ul class="feature-points">{f.points.map(p=><li>{p}</li>)}</ul>}<a href={f.link} class="feature-link">{f.cta}<span aria-hidden="true">↗</span></a></div><div class="feature-art"><FeatureVisual kind={f.kind}/></div></article>)}
+      <div class="feature-duo">{moreFeatures.map((f,i)=><article class:list={['feature-card','reveal',f.theme]}><div class="feature-art"><FeatureVisual kind={f.kind}/></div><div class="feature-copy"><span class="feature-tag"><b class="feature-index">0{i+3}</b>{f.tag}</span><h3>{f.title}</h3><p>{f.text}</p>{f.points&&<ul class="feature-points">{f.points.map(p=><li>{p}</li>)}</ul>}<a href={f.link} class="feature-link">{f.cta}<span aria-hidden="true">↗</span></a></div></article>)}</div>
     </div>
   </section>
   <section class="channels-section section" id="channels" aria-labelledby="channels-title">
