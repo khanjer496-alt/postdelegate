@@ -29,6 +29,9 @@ jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service',
   () => ({ NotificationService: class {} })
 );
+jest.mock('@gitroom/backend/services/auth/permissions/permissions.service', () => ({
+  PermissionsService: class {},
+}));
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service',
   () => ({ OrganizationService: class {} })
@@ -95,6 +98,7 @@ const channels = [
   { organizationId: 'org-1', internalId: 'x-acc', providerIdentifier: 'x' },
   { organizationId: 'org-1', internalId: 'bsky-acc', providerIdentifier: 'bluesky' },
   { organizationId: 'org-1', internalId: 'tt-acc', providerIdentifier: 'tiktok' },
+  { organizationId: 'org-1', internalId: 'wp-acc', providerIdentifier: 'wordpress' },
 ];
 
 const setup = (providerExtras: object = {}) => {
@@ -140,7 +144,9 @@ const setup = (providerExtras: object = {}) => {
     .spyOn(service, 'createOrUpdateIntegration')
     .mockResolvedValue({ id: 'int-1' } as any);
   jest.spyOn(service, 'checkCappedProviderSwitch').mockResolvedValue();
-  jest.spyOn(service, 'migrateIntegrationOnConnect').mockResolvedValue(undefined);
+  const adopted = jest
+    .spyOn(service, 'migrateIntegrationOnConnect')
+    .mockResolvedValue(undefined);
   const migrated = jest
     .spyOn(service, 'migrateIntegration')
     .mockResolvedValue({} as any);
@@ -156,7 +162,9 @@ const setup = (providerExtras: object = {}) => {
     manager,
     service,
     { startRefreshWorkflow: jest.fn(async () => undefined) } as any,
-    { getOrgById: jest.fn(getOrg) } as any
+    { getOrgById: jest.fn(getOrg) } as any,
+    // the plan's channel limit is covered by its own specs
+    { canAddChannel: jest.fn(async () => true) } as any
   );
   const enterprise = new EnterpriseController(
     manager,
@@ -176,6 +184,7 @@ const setup = (providerExtras: object = {}) => {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
     {} as any
   );
 
@@ -188,6 +197,7 @@ const setup = (providerExtras: object = {}) => {
     repository,
     saved,
     migrated,
+    adopted,
   };
 };
 
@@ -328,6 +338,42 @@ describe('hidden providers on the connect paths', () => {
       await connect(callback, 'tiktok-business', 'org-1', 'tt-acc');
       expect(migrated).toHaveBeenCalledTimes(1);
       expect(saved).toHaveBeenCalledTimes(1);
+    });
+
+    describe('custom-field reconnect that comes back with another id', () => {
+      // WordPress and Listmonk build the id from the site URL the person typed
+      const retyped = {
+        customFields: async (): Promise<unknown[]> => [],
+        authenticate: jest.fn(async () => ({
+          id: 'wp-acc-retyped',
+          name: 'Blog',
+          accessToken: 'a',
+          refreshToken: '',
+          expiresIn: 1,
+          picture: '',
+          username: 'blog',
+        })),
+      };
+
+      it('saves it as a fresh connect for a visible provider', async () => {
+        const { callback, saved, migrated, adopted } = setup(retyped);
+        await connect(callback, 'wordpress', 'org-1', 'wp-acc');
+        expect(migrated).not.toHaveBeenCalled();
+        expect(adopted).toHaveBeenCalledTimes(1);
+        expect(saved).toHaveBeenCalledTimes(1);
+        expect(redis.data.has('refresh:s1')).toBe(false);
+      });
+
+      it('still blocks it for a hidden provider, keeping the state for a retry', async () => {
+        process.env.HIDDEN_PROVIDERS = 'wordpress';
+        const { callback, saved, migrated } = setup(retyped);
+        await expect(
+          connect(callback, 'wordpress', 'org-1', 'wp-acc')
+        ).rejects.toMatchObject(unavailable);
+        expect(migrated).not.toHaveBeenCalled();
+        expect(saved).not.toHaveBeenCalled();
+        expect(redis.data.get('refresh:s1')).toBe('wp-acc');
+      });
     });
 
     it('rejects a refresh state of another provider reused for a hidden one', async () => {

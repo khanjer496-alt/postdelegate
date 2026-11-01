@@ -213,7 +213,7 @@ export const CustomVariables: FC<{
     async (data: FieldValues) => {
       const params = [
         onboarding ? 'onboarding=true' : '',
-        refresh ? `refresh=${refresh}` : '',
+        refresh ? `refresh=${encodeURIComponent(refresh)}` : '',
       ]
         .filter(Boolean)
         .join('&');

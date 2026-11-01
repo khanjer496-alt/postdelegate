@@ -34,6 +34,15 @@ describe('IntegrationManager hidden providers', () => {
     expect(manager.isHiddenFor('pinterest', 'org-demo')).toBe(false);
   });
 
+  it('reads HIDDEN_PROVIDERS case-insensitively and org ids exactly', () => {
+    process.env.HIDDEN_PROVIDERS = ' X , Pinterest ';
+    process.env.PREVIEW_PROVIDER_ORGS = ' org-qa ,org-demo';
+    expect(manager.isHiddenFor('x', 'org-1')).toBe(true);
+    expect(manager.isHiddenFor('pinterest', 'org-1')).toBe(true);
+    expect(manager.isHiddenFor('x', 'org-qa')).toBe(false);
+    expect(manager.isHiddenFor('x', 'ORG-QA')).toBe(true);
+  });
+
   it('allowlists nobody when PREVIEW_PROVIDER_ORGS is unset or empty', () => {
     delete process.env.PREVIEW_PROVIDER_ORGS;
     expect(manager.isHiddenFor('x', 'org-qa')).toBe(true);

@@ -90,12 +90,13 @@ export class IntegrationManager {
   isHiddenProvider(identifier: string) {
     return (process.env.HIDDEN_PROVIDERS || '')
       .split(',')
-      .map((p) => p.trim())
-      .includes(identifier);
+      .map((p) => p.trim().toLowerCase())
+      .includes(identifier.toLowerCase());
   }
 
   // PREVIEW_PROVIDER_ORGS ("orgId1,orgId2") lets chosen workspaces (QA, demo
   // recordings for platform reviews) see and connect the hidden providers.
+  // Org ids are case-sensitive, so they are only trimmed.
   isHiddenFor(identifier: string, orgId?: string) {
     const previewOrgs = (process.env.PREVIEW_PROVIDER_ORGS || '')
       .split(',')
@@ -103,7 +104,7 @@ export class IntegrationManager {
 
     return (
       this.isHiddenProvider(identifier) &&
-      !(orgId && previewOrgs.includes(orgId))
+      !(orgId && previewOrgs.includes(orgId.trim()))
     );
   }
 
