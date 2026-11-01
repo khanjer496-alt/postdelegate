@@ -29,7 +29,7 @@ const maxChannels = Math.max(...PLANS.map((plan) => plan.maxChannels || plan.cha
       <article class:list={['plan-card', { 'plan-featured': plan.popular }]}>
         <div class="plan-topline">
           <h3>{plan.name}</h3>
-          {plan.popular && <span class="plan-badge">Most popular</span>}
+          {plan.popular && <span class="plan-badge">Recommended</span>}
         </div>
         <p class="plan-tagline">{plan.tagline}</p>
         <p class="plan-price price-monthly"><strong>${plan.monthly}</strong><span>/month</span></p>
@@ -45,7 +45,7 @@ const maxChannels = Math.max(...PLANS.map((plan) => plan.maxChannels || plan.cha
     ))}
   </div>
   <div class="plan-custom">
-    <div><h3>Custom</h3><p>Need more than {maxChannels} channels or custom terms? We can set custom limits for your workspace.</p></div>
+    <div><h3>Custom</h3><p>Need more than {maxChannels} channels? Talk to us.</p></div>
     <a href={`mailto:${SITE.email}?subject=Custom%20plan`} class="button button-outline">Talk to us</a>
   </div>
   <p class="pricing-note muted"><strong>Why no AI credits?</strong> You bring your own OpenAI key, or the assistant you already pay for, so you pay OpenAI's own rates with no markup from us and no monthly credit cap.</p>

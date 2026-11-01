@@ -89,7 +89,7 @@ const compareCards=[
         </ul>
         <p class="eyebrow hero-eyebrow">Social media scheduler for teams and AI agents</p>
         <h1 id="hero-title">Let your AI draft it. You approve it. PostDelegate <span class="hero-mark">posts it.<OrbitAccent kind="arc" /></span></h1>
-        <p class="hero-description">A social media scheduler with an MCP server and a REST API on every plan. Claude, ChatGPT or your own scripts prepare posts, you review them on one calendar, and they go out on time to {liveCount} live networks.</p>
+        <p class="hero-description">A social media scheduler with an MCP server and a REST API on every plan. Claude, ChatGPT or your own scripts prepare posts, you can review them on one calendar before they go out, and they publish on time to {liveCount} live networks.</p>
         <div class="hero-actions">
           <a class="hero-cta" href={SITE.signup}><span>{CTA_LABEL}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span><strong>{TRIAL_DAYS}-day free trial · No credit card · API + MCP on every plan · Cancel anytime</strong><span class="note-extra">Then from ${lowestPrice}/month</span></p>
@@ -115,7 +115,7 @@ const compareCards=[
     </div>
     <div class="container">
       <ul class="channel-grid" aria-label="Networks you can connect today">{AVAILABLE_NETWORKS.map(n=><li><a class="channel-pill is-live" href={channelHref(n)}><NetworkBadge n={n} size="md"/><span><b>{n.name}</b><small><i aria-hidden="true"></i>Connect today</small></span></a></li>)}</ul>
-      <p class="channels-pending">Instagram, Facebook, LinkedIn, TikTok, X and Threads are in platform review. <a class="text-link" href="/platforms">See all platforms <span aria-hidden="true">↗</span></a></p>
+      <p class="channels-pending">Instagram, Facebook, Threads, TikTok and LinkedIn are waiting for platform approval, and X is not available yet. <a class="text-link" href="/platforms">See all platforms <span aria-hidden="true">↗</span></a></p>
     </div>
   </section>
   <section class="demo-section section" id="workspace" aria-labelledby="demo-title">

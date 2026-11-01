@@ -26,7 +26,7 @@ const columns: { title: string; links: readonly (readonly [string, string])[] }[
       <div class="footer-social"><h2>Follow PostDelegate</h2><ul>{SOCIAL_PROFILES.map((profile) => <li><a href={profile.href} rel="me noopener" target="_blank">{profile.name}</a></li>)}</ul></div>
       {FEATURED_ON.length > 0 && <div class="footer-featured"><h2>Featured on</h2><ul>{FEATURED_ON.map((badge) => <li class="featured-badge" set:html={badge.html} />)}</ul></div>}
     </div>
-    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. PostDelegate is operated by {SITE.operator}. All rights reserved.</p><p><a href={SITE.source}>Source code (AGPL-3.0)</a></p><p>Network names and logos belong to their respective owners.</p></div>
+    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. All rights reserved.</p><p>{SITE.operator} · {SITE.address}</p><p><a href={SITE.source}>Source code (AGPL-3.0)</a></p><p>Network names and logos belong to their respective owners.</p></div>
   </div>
 </footer>
 <style>
