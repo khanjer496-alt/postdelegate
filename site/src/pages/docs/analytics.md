@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Analytics and reports
-description: Workspace analytics with daily history, trends, top posts, best times and insights, CSV exports, PDF and scheduled reports, and the weekly summary email.
+description: Workspace analytics with daily history, trends, daily view gains, top posts, best times and insights, CSV exports, PDF and scheduled reports, and the weekly summary email.
 ---
 
 Open **Analytics** from the main menu. The top of the page is **Workspace analytics**, which covers every channel in the workspace. Below it, each channel on a network that shares statistics has its own view.
@@ -15,7 +15,7 @@ Two kinds of numbers appear on this page:
 - **Post counts** come from your PostDelegate calendar: how many posts were published, scheduled and failed. They cover every channel.
 - **Engagement, views and followers** come from the networks. A network only appears in these figures if it shares statistics with PostDelegate, and each network decides which numbers it shares. A count that a network does not report is left out, not shown as zero.
 
-Of the networks you can [connect today](/docs/channels), YouTube is the one that shares statistics. Google does not allow YouTube statistics to be stored, so PostDelegate reads them when you look and never saves them in the daily history. YouTube channels therefore have their own view on this page but do not feed trends, top posts or insights. More networks will feed these sections as their connections open. See [Coming soon](/docs/channels/coming-soon).
+Of the networks you can [connect today](/docs/channels), YouTube is the one that shares statistics. Google does not allow YouTube statistics to be stored, so PostDelegate reads them when you look and never saves them in the daily history. YouTube channels therefore have their own view on this page and appear in [Views](#views), but do not feed trends, top posts or insights. More networks will feed these sections as their connections open. See [Coming soon](/docs/channels/coming-soon).
 
 ## Daily history
 
@@ -34,6 +34,22 @@ History is only kept for channels whose network allows it. A channel without his
 ## Trends
 
 **Follower growth** charts the total followers across every channel that has a follower count. **By channel** lists each channel's followers now and how many it gained in the range.
+
+## Views
+
+**Views** charts the new views your channels get each day, like a daily bar chart per channel. Today YouTube is the only network you can connect that shares view counts, so a workspace with a YouTube channel sees its views here and other channels say "This network doesn't share view counts yet". TikTok, Instagram and Facebook are ready for this section and fill in once their connections open.
+
+- **Views gained**, **Best day** and **Daily average** for the range.
+- **Daily views gained**: a bar chart of new views per day across the selected channels. Hover or tap a bar to read that day. When more than one channel has views, pick channels at the top to narrow the chart, the totals and the top posts. With none picked, every channel with views counts.
+- **By channel**: each channel's views gained in the range, its best day and a small daily chart.
+- **Top posts by views gained**: the 10 posts that gained the most views in the range, with the channel and, where PostDelegate knows it, the post's views in all.
+
+Each channel is marked with where its numbers come from:
+
+| Mark | What it means |
+| --- | --- |
+| **Live** | The network reports views per day, and PostDelegate reads them when you open the section. Nothing is stored. YouTube works this way, and its top posts are read live too. Networks report recent days with a delay, so the last day or two can be empty. |
+| **Daily history** | The network only reports each post's total views, so PostDelegate works out the daily gain from the daily history: today's total minus the last one. It covers the posts the history tracks, which are posts published through PostDelegate in the last 30 days and the latest posts the network lists. A new post counts from the day it went out. A day the history missed shares its gain with the days around it, and a total that drops (a network recount) counts as no gain instead of a loss, with gains counting again once it passes its earlier high. These channels need two daily snapshots before they show gains. |
 
 ## Top posts
 
