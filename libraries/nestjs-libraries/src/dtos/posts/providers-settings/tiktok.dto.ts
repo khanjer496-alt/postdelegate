@@ -218,6 +218,8 @@ export class TikTokDto {
   @JSONSchema({
     description:
       'Legacy TikTok DIRECT_POST only. Explicit user acceptance of TikTok Music Usage Confirmation; must be true.',
+    // the composer shows TikTok's confirmation text with it, a bulk form can't
+    'x-composer-only': true,
   })
   music_usage_consent?: boolean;
 
@@ -229,6 +231,7 @@ export class TikTokDto {
   @JSONSchema({
     description:
       'Legacy TikTok DIRECT_POST only. Composer has loaded current creator information and validated the media. The server independently queries creator permissions again.',
+    'x-composer-only': true,
   })
   creator_info_verified?: boolean;
 

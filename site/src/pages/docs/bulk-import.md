@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Bulk import from CSV
-description: Schedule many posts at once from a spreadsheet. The columns the importer reads, date and channel formats, limits, and how imports follow approval rules.
+description: Schedule many posts at once from a spreadsheet, or many videos at once from your computer. The columns the importer reads, date and channel formats, how videos are spread over your time slots, limits, and how imports follow approval rules.
 ---
 
 Schedule many posts at once from a spreadsheet. Save it as a CSV file with one post per row, upload it, check the preview, and PostDelegate schedules the rows that are ready.
@@ -68,3 +68,33 @@ The same file is only imported once. Uploading it again returns the first result
 ## Imports and approvals
 
 Imported posts follow the same [approval rules](/docs/approvals) as posts saved in the composer. If your workspace requires approval and you can't approve, your imported posts are sent for review instead of being scheduled.
+
+## Bulk schedule videos
+
+Turn a folder of videos into posts in one go. Each video becomes one post on the channels you pick, spread over your posting times.
+
+1. On the calendar page, choose the video button next to the import button. Its tooltip reads "Bulk schedule videos: one post for every video".
+2. Choose **Choose videos or drop them here** and add up to 50 MP4 videos, up to 1 GB each. They upload one after another into your [media library](/docs/media), with the progress, length and size of each. Use **Remove** to leave a video out. A removed video stays in the media library.
+3. Choose **Next**, then pick one or more channels. Only channels whose network can post a video are shown.
+4. Fill in the settings a network asks for, such as the YouTube title and visibility. They go to every video. A required title starts as `{filename}`, which becomes the name of each video file without the extension.
+5. Optionally write a caption for all the videos. `{filename}` works here too. To give one video a different text, write it in the box under that video. An empty box uses the shared caption.
+6. Choose **Next**, then pick how to spread the posts and the date to start from:
+   - **Next free time slots** (the default) fills each channel's [time slots](/docs/getting-started) in order, day by day, and skips any slot where that channel already has a post. Each channel uses its own slots, so one video can go out at different times on different channels. A channel without time slots uses the same default times as **Create Post**.
+   - **One every few hours or days** posts the first video at the start time, then one every N hours or days. Daily posts keep the same time of day when the clocks change.
+7. Choose **Add them as drafts** instead of **Schedule them** to save drafts you can finish later in the calendar.
+8. Check the preview. It lists every video with the date and time on each channel, and marks the ones that need a fix. Fix the caption or a text setting, such as a title, right in the preview, then choose **Check again**.
+9. Choose **Schedule 12 videos** (or **Add 12 drafts**). The button works once every video is ready. Nothing is created while a video still needs a fix.
+
+Every video goes through the same checks as a post made in the composer, including each network's length limit, media rules and required settings. Drafts only get the checks a draft gets in the composer, the rest run when you schedule them.
+
+Settings that are picked from a list loaded from the network, like a Pinterest board or a Discord channel, can't be set here. Schedule those videos as drafts and finish them in the composer. For TikTok direct posts, the composer checks your current TikTok account and asks for TikTok's music confirmation before posting. Use **Add them as drafts**, or TikTok's upload to inbox option, for TikTok.
+
+### Limits and partial results
+
+- Up to 50 videos at a time, up to 1 GB each.
+- Each channel of a video counts as one post. Five videos on two channels are ten posts.
+- If your plan's monthly post limit, or a network's monthly cap, is reached part way, PostDelegate stops there and tells you how many videos were created. The rest are listed, and **Try the rest again** goes back to them once you have room.
+- A video that fails for another reason is listed with the reason, and the others are still created.
+- Sending the same videos with the same settings twice doesn't create them twice. The second time says "These videos were already scheduled, nothing new was added."
+
+Videos follow the same [approval rules](/docs/approvals) as posts saved in the composer.
