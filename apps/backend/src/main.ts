@@ -67,12 +67,14 @@ async function start() {
     })
   );
 
-  app.use(
-    ['/copilot/{*splat}', '/posts', '/posts-bulk-videos'],
-    (req: any, res: any, next: any) => {
-      json({ limit: '50mb' })(req, res, next);
-    }
-  );
+  app.use(['/copilot/{*splat}', '/posts'], (req: any, res: any, next: any) => {
+    json({ limit: '50mb' })(req, res, next);
+  });
+
+  // 50 videos with their captions and settings
+  app.use('/posts-bulk-videos', (req: any, res: any, next: any) => {
+    json({ limit: '2mb' })(req, res, next);
+  });
 
   app.use(cookieParser());
   app.use(compression());

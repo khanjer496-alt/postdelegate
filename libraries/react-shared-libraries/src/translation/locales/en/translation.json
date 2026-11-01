@@ -1669,5 +1669,11 @@
   "bulk_videos_failed_count": "{{count}} could not be created.",
   "bulk_videos_rest": "Try the rest again",
   "bulk_videos": "Bulk schedule videos",
-  "bulk_videos_tooltip": "Bulk schedule videos: one post for every video"
+  "bulk_videos_tooltip": "Bulk schedule videos: one post for every video",
+  "bulk_videos_drafts_only": "Drafts only",
+  "bulk_videos_drafts_only_note": "{{names}} need a setting picked in the composer, like a board or a channel, so the videos are added as drafts. Finish them in the composer to schedule them.",
+  "bulk_videos_drafts_only_short": "{{names}}: drafts only, finish them in the composer.",
+  "bulk_videos_still_running": "This may still be running. We are checking every few seconds, so don't send it again. The result shows here when it is done.",
+  "bulk_videos_capped": "A monthly limit of your plan stopped {{names}}, so those posts were skipped. The other channels got their videos.",
+  "bulk_videos_not_posted_to": "Not posted to {{names}}."
 }

@@ -12,14 +12,38 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateBy,
   ValidateIf,
   ValidateNested,
+  ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export const BULK_VIDEO_LIMIT = 50;
 export const BULK_VIDEO_CHANNEL_LIMIT = 20;
 export const BULK_VIDEO_CAPTION_LIMIT = 10_000;
+// the settings of a channel, or of one video, as JSON
+export const BULK_VIDEO_SETTINGS_LIMIT = 5_000;
+
+// an object no longer than `max` characters as JSON
+const MaxJsonLength = (max: number, options?: ValidationOptions) =>
+  ValidateBy(
+    {
+      name: 'maxJsonLength',
+      validator: {
+        validate: (value) => {
+          try {
+            return JSON.stringify(value ?? null).length <= max;
+          } catch (err) {
+            return false;
+          }
+        },
+        defaultMessage: (args) =>
+          `${args?.property} must be shorter than ${max} characters`,
+      },
+    },
+    options
+  );
 
 export class BulkVideoChannelDto {
   @IsDefined()
@@ -30,6 +54,7 @@ export class BulkVideoChannelDto {
   // can hold {filename}
   @IsOptional()
   @IsObject()
+  @MaxJsonLength(BULK_VIDEO_SETTINGS_LIMIT)
   settings?: Record<string, any>;
 }
 
@@ -48,7 +73,15 @@ export class BulkVideoItemDto {
   // settings of this video only, by channel id, over the channel settings
   @IsOptional()
   @IsObject()
+  @MaxJsonLength(BULK_VIDEO_SETTINGS_LIMIT)
   settings?: Record<string, Record<string, any>>;
+
+  // the date of this video on each channel, by channel id, as the preview
+  // showed it; kept when it is still free
+  @IsOptional()
+  @IsObject()
+  @MaxJsonLength(BULK_VIDEO_SETTINGS_LIMIT)
+  dates?: Record<string, string>;
 }
 
 export class BulkVideoScheduleDto {

@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { JSONSchema } from 'class-validator-jsonschema';
+import { ComposerOnly } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/composer.only.decorator';
 
 export class TikTokMusic {
   @IsDefined()
@@ -218,9 +219,8 @@ export class TikTokDto {
   @JSONSchema({
     description:
       'Legacy TikTok DIRECT_POST only. Explicit user acceptance of TikTok Music Usage Confirmation; must be true.',
-    // the composer shows TikTok's confirmation text with it, a bulk form can't
-    'x-composer-only': true,
   })
+  @ComposerOnly()
   music_usage_consent?: boolean;
 
   @ValidateIf(requiresDirectPostAcknowledgements)
@@ -231,8 +231,8 @@ export class TikTokDto {
   @JSONSchema({
     description:
       'Legacy TikTok DIRECT_POST only. Composer has loaded current creator information and validated the media. The server independently queries creator permissions again.',
-    'x-composer-only': true,
   })
+  @ComposerOnly()
   creator_info_verified?: boolean;
 
   @Type(() => TikTokMusic)

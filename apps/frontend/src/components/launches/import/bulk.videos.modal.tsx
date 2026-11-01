@@ -49,6 +49,8 @@ type BulkChannel = {
   picture?: string | null;
   refreshNeeded?: boolean;
   acceptsVideo: boolean;
+  // needs a setting picked in the composer, so bulk adds drafts only
+  draftsOnly: boolean;
   settings: SettingField[];
 };
 
@@ -98,17 +100,21 @@ type Preview = {
   posts: PreviewPost[];
 };
 
+type SkippedChannel = { id: string; name: string; error: string };
+
 type CreateResult = {
   type: 'schedule' | 'draft';
   created: number;
   skipped: number;
   failed: number;
   limitReached: string | null;
+  cappedChannels?: SkippedChannel[];
   posts: Array<{
     index: number;
     name: string;
     status: 'created' | 'skipped' | 'failed';
     error?: string;
+    skippedChannels?: SkippedChannel[];
   }>;
   alreadyCreated?: boolean;
 };
@@ -361,6 +367,9 @@ export const BulkVideosModal: FC<{
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<CreateResult | null>(null);
+  // a request that timed out may still be running on the server
+  const [running, setRunning] = useState(false);
+  const pending = useRef('');
   const sentKeys = useRef<string[]>([]);
 
   // one upload at a time, so every saved file is matched to its row
@@ -559,6 +568,14 @@ export const BulkVideosModal: FC<{
     []
   );
 
+  // a network that needs a setting picked in the composer gets drafts only
+  const draftsOnly = selectedChannels.filter((channel) => channel.draftsOnly);
+  useEffect(() => {
+    if (draftsOnly.length && type === 'schedule') {
+      setType('draft');
+    }
+  }, [draftsOnly.length, type]);
+
   const ready = useMemo(
     () => videos.filter((video) => video.status === 'done' && video.media),
     [videos]
@@ -645,14 +662,44 @@ export const BulkVideosModal: FC<{
     }
   }, [step]);
 
-  const create = useCallback(async () => {
-    setLoading(true);
-    try {
-      sentKeys.current = ready.map((video) => video.key);
-      const response = await fetch('/posts-bulk-videos', {
-        method: 'POST',
-        body: bodyKey,
-      });
+  // the request to create: the preview's dates go with it, so the posts
+  // land where the preview showed them while those times are still free
+  const createKey = useMemo(() => {
+    if (!preview || !fresh) {
+      return '';
+    }
+    return JSON.stringify({
+      ...body,
+      videos: body.videos.map((video, index) => ({
+        ...video,
+        dates: Object.fromEntries(
+          (preview.posts[index]?.channels || [])
+            .filter((channel) => channel.date)
+            .map((channel) => [channel.id, channel.date])
+        ),
+      })),
+    });
+  }, [body, preview, fresh]);
+
+  // One try. A timeout or a server error may leave the request running, the
+  // same body is then sent again: 409 while it runs, the result once done
+  const send = useCallback(
+    async (
+      payload: string,
+      retry: boolean
+    ): Promise<'done' | 'running' | 'error'> => {
+      let response: Response;
+      try {
+        response = await fetch('/posts-bulk-videos', {
+          method: 'POST',
+          body: payload,
+        });
+      } catch (err) {
+        return 'running';
+      }
+      if (response.status === 409 || response.status >= 500) {
+        return 'running';
+      }
       if (!response.ok) {
         // a 402 (plan limit) is handled by the app already
         if (response.status !== 402) {
@@ -664,23 +711,50 @@ export const BulkVideosModal: FC<{
             'warning'
           );
         }
-        return;
+        // the dates may have moved on, the preview has to be checked again
+        setPreviewKey('');
+        return 'error';
       }
       const data: CreateResult = await response.json();
-      setResult(data);
+      // after a timeout, the first run's result is this run's result
+      setResult(retry ? { ...data, alreadyCreated: false } : data);
       setStep('done');
       if (data.created) {
         onCreated();
       }
-    } catch (err) {
-      toaster.show(
-        t('bulk_videos_failed', 'The videos were not scheduled.'),
-        'warning'
-      );
-    } finally {
-      setLoading(false);
+      return 'done';
+    },
+    [onCreated]
+  );
+
+  const create = useCallback(async () => {
+    if (!createKey) {
+      return;
     }
-  }, [bodyKey, ready, onCreated]);
+    setLoading(true);
+    sentKeys.current = ready.map((video) => video.key);
+    pending.current = createKey;
+    let outcome = await send(createKey, false);
+    while (outcome === 'running' && pending.current === createKey) {
+      setRunning(true);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      if (pending.current !== createKey) {
+        break;
+      }
+      outcome = await send(createKey, true);
+    }
+    pending.current = '';
+    setRunning(false);
+    setLoading(false);
+  }, [createKey, ready, send]);
+
+  // closing the window stops checking, the server finishes on its own
+  useEffect(
+    () => () => {
+      pending.current = '';
+    },
+    []
+  );
 
   // back to the videos that were not created, as a new request
   const scheduleRest = useCallback(() => {
@@ -893,10 +967,24 @@ export const BulkVideosModal: FC<{
                       name={channel.name}
                     />
                     {channel.name}
+                    {channel.draftsOnly && (
+                      <span className="text-[12px] text-newTextColor/60">
+                        {t('bulk_videos_drafts_only', 'Drafts only')}
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
             </ul>
+            {!!draftsOnly.length && (
+              <Alert tone="warn">
+                {t(
+                  'bulk_videos_drafts_only_note',
+                  '{{names}} need a setting picked in the composer, like a board or a channel, so the videos are added as drafts. Finish them in the composer to schedule them.',
+                  { names: draftsOnly.map((channel) => channel.name).join(', ') }
+                )}
+              </Alert>
+            )}
             {hiddenChannels > 0 && (
               <div className="text-[12px] text-newTextColor/60">
                 {t(
@@ -1030,6 +1118,15 @@ export const BulkVideosModal: FC<{
 
       {step === 'schedule' && (
         <>
+          {/* nothing changes while the videos are being created */}
+          <fieldset
+            disabled={loading}
+            aria-busy={loading}
+            className={clsx(
+              'flex flex-col gap-[20px] min-w-0',
+              loading && 'pointer-events-none opacity-70'
+            )}
+          >
           <div className="grid grid-cols-2 mobile:grid-cols-1 gap-[16px]">
             <fieldset className="flex flex-col gap-[8px]">
               <legend className="text-[14px] font-[600] mb-[8px]">
@@ -1103,11 +1200,17 @@ export const BulkVideosModal: FC<{
                 <legend className="sr-only">
                   {t('bulk_videos_save_as', 'Save as')}
                 </legend>
-                <label className="flex items-center gap-[8px] text-[14px] cursor-pointer">
+                <label
+                  className={clsx(
+                    'flex items-center gap-[8px] text-[14px] cursor-pointer',
+                    !!draftsOnly.length && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
                   <input
                     type="radio"
                     name={`${inputId}-type`}
                     checked={type === 'schedule'}
+                    disabled={!!draftsOnly.length}
                     onChange={() => setType('schedule')}
                   />
                   {t('bulk_videos_type_schedule', 'Schedule them')}
@@ -1121,6 +1224,15 @@ export const BulkVideosModal: FC<{
                   />
                   {t('bulk_videos_type_draft', 'Add them as drafts')}
                 </label>
+                {!!draftsOnly.length && (
+                  <span className="text-[12px] text-newTextColor/60">
+                    {t(
+                      'bulk_videos_drafts_only_short',
+                      '{{names}}: drafts only, finish them in the composer.',
+                      { names: draftsOnly.map((channel) => channel.name).join(', ') }
+                    )}
+                  </span>
+                )}
               </fieldset>
             </div>
           </div>
@@ -1290,6 +1402,17 @@ export const BulkVideosModal: FC<{
             </div>
           )}
 
+          </fieldset>
+
+          {running && (
+            <Alert tone="warn">
+              {t(
+                'bulk_videos_still_running',
+                'This may still be running. We are checking every few seconds, so don\'t send it again. The result shows here when it is done.'
+              )}
+            </Alert>
+          )}
+
           <div className="flex flex-wrap gap-[10px] items-center justify-between">
             <button
               type="button"
@@ -1315,7 +1438,9 @@ export const BulkVideosModal: FC<{
                 onClick={create}
                 loading={loading}
                 disabled={
-                  !fresh || !preview?.total || preview.valid !== preview.total
+                  !createKey ||
+                  !preview?.total ||
+                  preview.valid !== preview.total
                 }
                 className="rounded-[8px]"
               >
@@ -1359,6 +1484,20 @@ export const BulkVideosModal: FC<{
                 )}
               </Alert>
             )}
+            {!!result.cappedChannels?.length && (
+              <Alert tone="warn">
+                {t(
+                  'bulk_videos_capped',
+                  'A monthly limit of your plan stopped {{names}}, so those posts were skipped. The other channels got their videos.',
+                  {
+                    names: result.cappedChannels
+                      .map((channel) => channel.name)
+                      .join(', '),
+                  }
+                )}{' '}
+                {result.cappedChannels[0].error}
+              </Alert>
+            )}
             {result.failed > 0 && (
               <div className="text-[14px] text-newTextColor/70">
                 {t('bulk_videos_failed_count', '{{count}} could not be created.', {
@@ -1367,17 +1506,28 @@ export const BulkVideosModal: FC<{
               </div>
             )}
           </div>
-          {result.posts.some((post) => post.status !== 'created') && (
+          {result.posts.some(
+            (post) => post.status !== 'created' || post.skippedChannels?.length
+          ) && (
             <ul className="flex flex-col gap-[6px] max-h-[40vh] overflow-y-auto text-[13px]">
               {result.posts
-                .filter((post) => post.status !== 'created')
+                .filter(
+                  (post) =>
+                    post.status !== 'created' || post.skippedChannels?.length
+                )
                 .map((post) => (
                   <li key={post.index} className="flex gap-[8px]">
                     <span className="font-[600] shrink-0 max-w-[40%] truncate">
                       {post.name}
                     </span>
                     <span className="text-red-600 dark:text-red-400">
-                      {post.error}
+                      {post.status === 'created'
+                        ? t('bulk_videos_not_posted_to', 'Not posted to {{names}}.', {
+                            names: (post.skippedChannels || [])
+                              .map((channel) => channel.name)
+                              .join(', '),
+                          })
+                        : post.error}
                     </span>
                   </li>
                 ))}

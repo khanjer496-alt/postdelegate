@@ -15,8 +15,12 @@ jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
   IntegrationManager: class {},
 }));
 
+import 'reflect-metadata';
+import { IsDefined, IsString } from 'class-validator';
+import { ComposerOnly } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/composer.only.decorator';
 import {
   PostsBulkVideosService,
+  bulkSettings,
   bulkVideosHash,
   fileTitle,
   fillPlaceholders,
@@ -46,6 +50,18 @@ describe('nextFreeSlots', () => {
       '2026-11-02T17:00:00.000Z',
       '2026-11-03T09:00:00.000Z',
     ]);
+  });
+
+  it('keeps 5 minutes between now and the first slot', () => {
+    const dates = nextFreeSlots({
+      // 10:03 and 10:06 UTC, now is 10:00
+      times: [603, 606],
+      start: new Date('2026-11-01T00:00:00.000Z'),
+      count: 1,
+      taken: new Set(),
+      now,
+    });
+    expect(iso(dates)).toEqual(['2026-11-01T10:06:00.000Z']);
   });
 
   it('skips the slots that already have a post', () => {
@@ -169,6 +185,36 @@ describe('placeholders and settings', () => {
     ).toEqual({ title: 'Demo', type: 'public', duet: false });
   });
 
+  it('leaves composer-only settings out, and drafts only when one is required', () => {
+    class Channel {
+      @IsDefined()
+      @IsString()
+      @ComposerOnly()
+      channel: string;
+    }
+    class Check {
+      @IsString()
+      title: string;
+
+      @IsString()
+      @ComposerOnly()
+      verified?: string;
+    }
+    const schemas = {
+      Channel: { properties: { channel: { type: 'string' } }, required: ['channel'] },
+      Check: {
+        properties: { title: { type: 'string' }, verified: { type: 'string' } },
+        required: ['title'],
+      },
+    };
+    expect(bulkSettings(Channel, schemas)).toEqual({ fields: [], draftsOnly: true });
+    expect(bulkSettings(Check, schemas)).toEqual({
+      fields: [{ key: 'title', type: 'text', required: true, defaultValue: '{filename}' }],
+      draftsOnly: false,
+    });
+    expect(bulkSettings(undefined, schemas)).toEqual({ fields: [], draftsOnly: false });
+  });
+
   it('describes the settings a bulk form can fill', () => {
     const fields = settingFields({
       properties: {
@@ -176,13 +222,13 @@ describe('placeholders and settings', () => {
         type: { type: 'string', enum: ['public', 'private'] },
         duet: { type: 'boolean' },
         consent: { type: 'boolean', enum: [true] },
-        verified: { type: 'boolean', enum: [true], 'x-composer-only': true },
+        verified: { type: 'boolean', enum: [true] },
         tags: { type: 'array', items: {} },
         thumbnail: { type: 'object', properties: {} },
         __type: { type: 'string' },
       },
       required: ['title', 'type'],
-    });
+    }, ['verified']);
     expect(fields).toEqual([
       {
         key: 'title',
@@ -225,8 +271,6 @@ describe('PostsBulkVideosService', () => {
       ),
       mapTypeToPost: jest.fn().mockImplementation(async (body) => body),
       createPost: jest.fn().mockResolvedValue([{ postId: 'p-1' }]),
-    };
-    const postsRepository = {
       getPublishDatesOfIntegrations: jest.fn().mockResolvedValue([]),
     };
     const repo = {
@@ -243,14 +287,13 @@ describe('PostsBulkVideosService', () => {
         .mockImplementation(async (_org, id) => (id === 'yt' ? [540] : [720])),
     };
     const integrationManager = {
-      getSocialIntegration: jest.fn(),
+      getSocialIntegration: jest.fn().mockReturnValue(undefined),
     };
     const mediaService = {
       getOrgMediaById: jest.fn().mockImplementation(async (_org, id) => media[id] || null),
     };
     const service = new PostsBulkVideosService(
       postsService as any,
-      postsRepository as any,
       repo as any,
       integrationService as any,
       integrationManager as any,
@@ -259,7 +302,6 @@ describe('PostsBulkVideosService', () => {
     return {
       service,
       postsService,
-      postsRepository,
       repo,
       integrationService,
       integrationManager,
@@ -288,8 +330,8 @@ describe('PostsBulkVideosService', () => {
   });
 
   it('plans one post a video, each channel at its own next free slot', async () => {
-    const { service, postsRepository } = make();
-    postsRepository.getPublishDatesOfIntegrations.mockResolvedValueOnce([
+    const { service, postsService } = make();
+    postsService.getPublishDatesOfIntegrations.mockResolvedValueOnce([
       { integrationId: 'yt', publishDate: new Date('2026-11-02T09:00:00.000Z') },
     ]);
     const preview = await service.preview('org-1', body(), null);
@@ -340,7 +382,7 @@ describe('PostsBulkVideosService', () => {
   });
 
   it('spreads the videos every N hours on every channel', async () => {
-    const { service, postsRepository } = make();
+    const { service, postsService } = make();
     const preview = await service.preview(
       'org-1',
       body({
@@ -356,7 +398,7 @@ describe('PostsBulkVideosService', () => {
       ['2026-11-02T08:00:00.000Z', '2026-11-02T08:00:00.000Z'],
       ['2026-11-02T12:00:00.000Z', '2026-11-02T12:00:00.000Z'],
     ]);
-    expect(postsRepository.getPublishDatesOfIntegrations).not.toHaveBeenCalled();
+    expect(postsService.getPublishDatesOfIntegrations).not.toHaveBeenCalled();
   });
 
   it('refuses an interval that starts in the past, unless the posts are drafts', async () => {
@@ -479,20 +521,44 @@ describe('PostsBulkVideosService', () => {
     expect(postsService.createPost).toHaveBeenCalledTimes(1);
   });
 
-  it('stops at a network cap of the plan', async () => {
+  it('skips only the network a cap of the plan stops, and keeps going', async () => {
     const { service, postsService } = make();
-    postsService.createPost
-      .mockResolvedValueOnce([{ postId: 'p-1' }])
-      .mockRejectedValueOnce(
-        new HttpException({ message: "You've used your 50 X posts for this month." }, 402)
-      );
+    const cap = new HttpException({ message: "You've used your 50 X posts for this month." }, 402);
+    postsService.createPost.mockImplementation(async (_org, request) => {
+      if (request.posts.some((post: any) => post.integration.id === 'tt')) {
+        throw cap;
+      }
+      return [{ postId: 'p-1' }];
+    });
     const result = await service.create(
       'org-1',
       body({ videos: [{ mediaId: 'm-1' }, { mediaId: 'm-2' }, { mediaId: 'm-3' }] })
     );
-    expect(result).toMatchObject({ created: 1, skipped: 2, failed: 0 });
-    expect(result.limitReached).toContain('50 X posts');
-    expect(postsService.createPost).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ created: 3, skipped: 0, failed: 0, limitReached: null });
+    expect(result.cappedChannels).toEqual([
+      { id: 'tt', name: 'Acme TikTok', error: "You've used your 50 X posts for this month." },
+    ]);
+    // every video still went to YouTube, TikTok is reported on each one
+    expect(result.posts.map((post: any) => post.skippedChannels?.[0]?.id)).toEqual(['tt', 'tt', 'tt']);
+    const channels = postsService.createPost.mock.calls.map((call: any) =>
+      call[1].posts.map((post: any) => post.integration.id).join('+')
+    );
+    // the first video finds the cap and splits, the next ones skip TikTok
+    expect(channels).toEqual(['yt+tt', 'yt', 'tt', 'yt', 'yt']);
+  });
+
+  it('skips a video whose only channel is capped', async () => {
+    const { service, postsService } = make();
+    postsService.createPost.mockRejectedValue(
+      new HttpException({ message: 'X cap reached' }, 402)
+    );
+    const result = await service.create(
+      'org-1',
+      body({ channels: [{ id: 'tt' }], videos: [{ mediaId: 'm-1' }, { mediaId: 'm-2' }] })
+    );
+    expect(result).toMatchObject({ created: 0, skipped: 2 });
+    expect(result.posts[1].error).toBe('X cap reached');
+    expect(postsService.createPost).toHaveBeenCalledTimes(1);
   });
 
   it('reports a video that failed and keeps going', async () => {
@@ -556,7 +622,7 @@ describe('PostsBulkVideosService', () => {
     expect(postsService.createPost).toHaveBeenCalledTimes(1);
   });
 
-  it('resumes after the start of an interval passed', async () => {
+  it('ends a resumed run whose interval start passed with what it created', async () => {
     const { service, postsService, repo } = make();
     repo.claim.mockResolvedValueOnce({
       claimed: true,
@@ -568,19 +634,23 @@ describe('PostsBulkVideosService', () => {
         schedule: { mode: 'interval', start: '2026-10-31T08:00:00.000Z', every: 1, unit: 'days' },
       })
     );
-    expect(result).toMatchObject({ created: 2 });
-    expect(postsService.createPost).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ created: 1, failed: 1 });
+    expect(result.posts[1].error).toContain('at least 5 minutes from now');
+    expect(postsService.createPost).not.toHaveBeenCalled();
+    expect(repo.finish).toHaveBeenCalled();
+    expect(repo.release).not.toHaveBeenCalled();
   });
 
-  it('keeps the progress of a resumed run that fails before creating anything', async () => {
+  it('ends a resumed run that fails before creating anything with the saved progress', async () => {
     const { service, postsService, repo } = make();
     repo.claim.mockResolvedValueOnce({
       claimed: true,
       progress: JSON.stringify({ posts: [{ index: 0, status: 'created' }] }),
     });
-    await expect(
-      service.create('org-1', body({ channels: [{ id: 'off' }] }))
-    ).rejects.toThrow('turned off');
+    const result = await service.create('org-1', body({ channels: [{ id: 'off' }] }));
+    expect(result).toMatchObject({ created: 1, failed: 1 });
+    expect(result.posts[1].error).toContain('turned off');
+    expect(repo.finish).toHaveBeenCalledWith('org-1', expect.any(String), expect.any(String));
     expect(repo.release).not.toHaveBeenCalled();
     expect(postsService.createPost).not.toHaveBeenCalled();
   });
@@ -594,6 +664,98 @@ describe('PostsBulkVideosService', () => {
     await service.create('org-1', body());
     expect(postsService.mapTypeToPost).toHaveBeenCalledTimes(2);
     expect(postsService.createPost.mock.calls[0][1].checked).toBe(true);
+  });
+
+  it('creates at the dates the preview showed while they are still free', async () => {
+    const { service, postsService } = make();
+    const dates = { yt: '2026-11-05T09:00:00.000Z', tt: '2026-11-05T12:00:00.000Z' };
+    const result = await service.create(
+      'org-1',
+      body({ videos: [{ mediaId: 'm-1', dates }] })
+    );
+    expect(result.created).toBe(1);
+    const request = postsService.createPost.mock.calls[0][1];
+    expect(request.posts.map((post: any) => post.date)).toEqual([dates.yt, dates.tt]);
+    expect(request.date).toBe(dates.yt);
+  });
+
+  it('refuses a preview date taken since, or used twice, or too close', async () => {
+    const { service, postsService } = make();
+    postsService.getPublishDatesOfIntegrations.mockResolvedValue([
+      { integrationId: 'yt', publishDate: new Date('2026-11-05T09:00:00.000Z') },
+    ]);
+    const preview = await service.preview(
+      'org-1',
+      body({
+        videos: [
+          { mediaId: 'm-1', dates: { yt: '2026-11-05T09:00:00.000Z', tt: '2026-11-06T12:00:00.000Z' } },
+          { mediaId: 'm-2', dates: { yt: '2026-11-06T09:00:00.000Z', tt: '2026-11-06T12:00:00.000Z' } },
+          { mediaId: 'm-3', dates: { yt: '2026-11-01T10:02:00.000Z', tt: 'soon' } },
+        ],
+      })
+    );
+    const errors = preview.posts.map((post) =>
+      post.channels.map((channel) => channel.errors[0]?.message || '')
+    );
+    expect(errors[0][0]).toContain('taken since the preview');
+    expect(errors[0][1]).toBe('');
+    expect(errors[1]).toEqual(['', expect.stringContaining('taken since the preview')]);
+    expect(errors[2][0]).toContain('less than 5 minutes away');
+    expect(errors[2][1]).toContain("can't be read");
+    await expect(
+      service.create('org-1', body({ videos: [{ mediaId: 'm-1', dates: { yt: '2026-11-05T09:00:00.000Z', tt: '2026-11-06T12:00:00.000Z' } }] }))
+    ).rejects.toThrow('1 of 1 videos need a fix');
+    expect(postsService.createPost).not.toHaveBeenCalled();
+  });
+
+  it('keeps every N hours or days within a year', async () => {
+    const { service } = make();
+    const preview = await service.preview(
+      'org-1',
+      body({
+        schedule: { mode: 'interval', start: '2026-11-02T08:00:00.000Z', every: 400, unit: 'days' },
+      })
+    );
+    expect(preview.posts[0].channels[0].errors).toEqual([]);
+    expect(preview.posts[1].channels[0].errors[0].message).toContain('more than a year');
+    expect(preview.invalid).toBe(1);
+    await expect(
+      service.preview(
+        'org-1',
+        body({ schedule: { mode: 'slots', start: '2028-01-01T00:00:00.000Z' } })
+      )
+    ).rejects.toThrow('within the next year');
+  });
+
+  it('refuses an interval that starts in less than 5 minutes', async () => {
+    const { service } = make();
+    await expect(
+      service.preview(
+        'org-1',
+        body({
+          schedule: { mode: 'interval', start: '2026-11-01T10:03:00.000Z', every: 1, unit: 'days' },
+        })
+      )
+    ).rejects.toThrow('at least 5 minutes from now');
+  });
+
+  it('refuses to schedule on a network that needs a setting picked in the composer', async () => {
+    const { service, integrationManager } = make();
+    class NeedsChannel {
+      @IsDefined()
+      @IsString()
+      @ComposerOnly()
+      channel: string;
+    }
+    integrationManager.getSocialIntegration.mockImplementation((identifier: string) =>
+      identifier === 'tiktok' ? { dto: NeedsChannel } : undefined
+    );
+    const schemas = jest
+      .spyOn(require('@gitroom/nestjs-libraries/chat/validation.schemas.helper'), 'getValidationSchemas')
+      .mockReturnValue({ NeedsChannel: { properties: { channel: { type: 'string' } }, required: ['channel'] } });
+    await expect(service.preview('org-1', body())).rejects.toThrow('Add the videos as drafts');
+    await expect(service.preview('org-1', body({ type: 'draft' }))).resolves.toMatchObject({ valid: 2 });
+    schemas.mockRestore();
   });
 
   it('lists the channels that take a video, with their settings', async () => {

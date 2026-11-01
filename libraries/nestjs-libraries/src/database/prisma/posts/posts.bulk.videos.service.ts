@@ -10,13 +10,13 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { uniq, uniqBy } from 'lodash';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { PostsImportRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.repository';
 import { isValidTimezone } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
+import { composerOnlySettings } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/composer.only.decorator';
 import {
   BULK_VIDEO_LIMIT,
   BulkVideoPostsDto,
@@ -32,8 +32,10 @@ dayjs.extend(timezone);
 const DAY = 24 * 60;
 // the times findFreeDateTime uses for a channel without time slots
 const DEFAULT_TIMES = [120, 400, 700];
-// how far ahead free time slots are looked for
+// how far ahead a video can be scheduled, in both modes
 const SLOT_SEARCH_DAYS = 366;
+// the least time between now and a scheduled post
+const MARGIN = 5 * 60 * 1000;
 // the hash key of a bulk schedule, apart from the CSV imports
 const HASH_PREFIX = 'bulk-videos';
 
@@ -44,8 +46,8 @@ export type BulkVideoIssue = {
 };
 
 // a provider setting the bulk form can show: text, a list of choices, a
-// yes/no or a number. Settings picked from a list loaded from the network
-// (boards, server channels) are left to the composer
+// yes/no or a number. Composer-only settings (picked from a list loaded from
+// the network, or set by a check of the composer) are left out
 export type BulkVideoSettingField = {
   key: string;
   type: 'text' | 'select' | 'boolean' | 'number';
@@ -88,7 +90,7 @@ const minuteKey = (date: Date | number) =>
 
 // The next `count` time slots of a channel from `start`, day by day in slot
 // order, skipping the dates that already have a post (`taken`, as
-// minuteKey) and the past. Fewer come back when the year runs out.
+// minuteKey) and the next 5 minutes. Fewer come back when the year runs out.
 export const nextFreeSlots = (options: {
   times: number[];
   start: Date;
@@ -97,7 +99,7 @@ export const nextFreeSlots = (options: {
   now?: number;
   days?: number;
 }): Date[] => {
-  const now = options.now ?? Date.now();
+  const now = (options.now ?? Date.now()) + MARGIN;
   const from = Math.max(options.start.getTime(), now);
   const minutes = slotMinutes(options.times);
   const firstDay = dayjs.utc(from).startOf('day');
@@ -158,14 +160,16 @@ export const intervalDates = (options: {
 };
 
 // The top level settings of a provider DTO (its JSON schema) the bulk form
-// can fill. A required free text "title" starts as the file name.
-export const settingFields = (schema: any): BulkVideoSettingField[] => {
+// can fill, without the composer-only ones. A required free text "title"
+// starts as the file name.
+export const settingFields = (
+  schema: any,
+  composerOnly: string[] = []
+): BulkVideoSettingField[] => {
   const required: string[] = schema?.required || [];
   return Object.entries<any>(schema?.properties || {}).flatMap(
     ([key, property]): BulkVideoSettingField[] => {
-      // composer-only: a check the composer makes on its own (loading the
-      // account's current options), never a box to tick in a bulk form
-      if (key.startsWith('__') || !property || property['x-composer-only']) {
+      if (key.startsWith('__') || !property || composerOnly.includes(key)) {
         return [];
       }
       const base = { key, required: required.includes(key) };
@@ -197,6 +201,18 @@ export const settingFields = (schema: any): BulkVideoSettingField[] => {
   );
 };
 
+// The bulk form of a provider: the settings it can fill, and whether the
+// network requires a composer-only setting, which leaves drafts only
+export const bulkSettings = (dto: any, schemas: Record<string, any>) => {
+  const schema = dto ? schemas[dto.name] : undefined;
+  const composerOnly = composerOnlySettings(dto);
+  const required: string[] = schema?.required || [];
+  return {
+    fields: settingFields(schema, composerOnly),
+    draftsOnly: composerOnly.some((key) => required.includes(key)),
+  };
+};
+
 // the unique key of a bulk schedule: same videos, channels and settings
 export const bulkVideosHash = (body: BulkVideoPostsDto) =>
   createHash('sha256')
@@ -225,6 +241,17 @@ type PlanChannel = {
   errors: BulkVideoIssue[];
 };
 
+// a channel a video did not go to, and why
+type SkippedChannel = { id: string; name: string; error: string };
+
+type BulkVideoResult = {
+  index: number;
+  name: string;
+  status: 'created' | 'skipped' | 'failed';
+  error?: string;
+  skippedChannels?: SkippedChannel[];
+};
+
 type PlanItem = {
   index: number;
   mediaId: string;
@@ -244,7 +271,6 @@ const hasErrors = (item: PlanItem) =>
 export class PostsBulkVideosService {
   constructor(
     private _postsService: PostsService,
-    private _postsRepository: PostsRepository,
     private _importRepository: PostsImportRepository,
     private _integrationService: IntegrationService,
     private _integrationManager: IntegrationManager,
@@ -286,6 +312,7 @@ export class PostsBulkVideosService {
             acceptsVideo = true;
           }
         }
+        const form = bulkSettings(provider?.dto, schemas);
         return {
           id: integration.id,
           name: integration.name,
@@ -293,20 +320,24 @@ export class PostsBulkVideosService {
           picture: integration.picture,
           refreshNeeded: integration.refreshNeeded,
           acceptsVideo,
-          settings: provider?.dto
-            ? settingFields(schemas[provider.dto.name])
-            : [],
+          settings: form.fields,
+          // a network that needs a setting picked in the composer
+          draftsOnly: form.draftsOnly,
         };
       })
     );
   }
 
-  // the dates of every video on every channel, by channel id
+  // The dates of every video on every channel, and in slots mode the
+  // minutes each channel already posts at (minuteKey), by channel id
   private async dates(
     orgId: string,
     body: BulkVideoPostsDto,
     channelIds: string[]
-  ): Promise<Record<string, Date[]>> {
+  ): Promise<{
+    dates: Record<string, Date[]>;
+    taken: Record<string, Set<number>>;
+  }> {
     const count = body.videos.length;
     const start = new Date(body.schedule.start);
 
@@ -318,33 +349,90 @@ export class PostsBulkVideosService {
         unit: body.schedule.unit!,
         tz: body.schedule.timezone,
       });
-      return Object.fromEntries(channelIds.map((id) => [id, dates]));
+      return {
+        dates: Object.fromEntries(channelIds.map((id) => [id, dates])),
+        taken: {},
+      };
     }
 
     const from = dayjs
       .utc(Math.max(start.getTime(), Date.now()))
       .startOf('day');
-    const taken = await this._postsRepository.getPublishDatesOfIntegrations(
+    const posts = await this._postsService.getPublishDatesOfIntegrations(
       orgId,
       channelIds,
       from.toDate(),
       from.add(SLOT_SEARCH_DAYS + 1, 'day').toDate()
     );
 
-    const result: Record<string, Date[]> = {};
+    const dates: Record<string, Date[]> = {};
+    const taken: Record<string, Set<number>> = {};
     for (const id of channelIds) {
-      result[id] = nextFreeSlots({
+      taken[id] = new Set(
+        posts
+          .filter((post) => post.integrationId === id)
+          .map((post) => minuteKey(post.publishDate))
+      );
+      dates[id] = nextFreeSlots({
         times: await this._integrationService.findFreeDateTime(orgId, id),
         start,
         count,
-        taken: new Set(
-          taken
-            .filter((post) => post.integrationId === id)
-            .map((post) => minuteKey(post.publishDate))
-        ),
+        taken: taken[id],
       });
     }
-    return result;
+    return { dates, taken };
+  }
+
+  // The problem of the date a video gets on a channel: the planned one, or
+  // the one the preview showed (`sent`), which must still be free
+  private dateIssue(options: {
+    date: Date | undefined;
+    sent: boolean;
+    body: BulkVideoPostsDto;
+    taken?: Set<number>;
+    used: Set<number>;
+  }): BulkVideoIssue | null {
+    const { date, sent, body, taken, used } = options;
+    if (!date || isNaN(date.getTime())) {
+      return sent
+        ? {
+            field: 'date',
+            message: "This date can't be read.",
+            hint: 'Check again to get new dates.',
+          }
+        : {
+            field: 'date',
+            message: 'There is no free time slot in the next year.',
+            hint: 'Add time slots to this channel, or post every few hours or days instead.',
+          };
+    }
+    const time = date.getTime();
+    if (body.type === 'schedule' && time <= Date.now() + MARGIN) {
+      return {
+        field: 'date',
+        message: 'This time has passed or is less than 5 minutes away.',
+        hint: 'Check again to get new dates.',
+      };
+    }
+    if (time > Date.now() + SLOT_SEARCH_DAYS * DAY * 60_000) {
+      return {
+        field: 'date',
+        message: 'This is more than a year from now.',
+        hint: 'Start sooner, post more often, or schedule fewer videos.',
+      };
+    }
+    if (body.schedule.mode === 'slots') {
+      const minute = minuteKey(time);
+      if (taken?.has(minute) || used.has(minute)) {
+        return {
+          field: 'date',
+          message: 'This time slot was taken since the preview.',
+          hint: 'Check again to get a new one.',
+        };
+      }
+      used.add(minute);
+    }
+    return null;
   }
 
   // the checks of POST /posts for one video, as issues instead of an error
@@ -405,30 +493,32 @@ export class PostsBulkVideosService {
   }
 
   // Every video as the post request the composer would send (all the
-  // channels in one post, each at its own date), with its problems.
-  // `resuming`: a run that stopped half way, its start may have passed since
-  private async plan(
-    orgId: string,
-    body: BulkVideoPostsDto,
-    resuming = false
-  ) {
+  // channels in one post, each at its own date), with its problems. The
+  // dates the preview showed are kept when they are still free.
+  private async plan(orgId: string, body: BulkVideoPostsDto) {
     if (body.videos.length > BULK_VIDEO_LIMIT) {
       throw new BadRequestException(
         `Schedule up to ${BULK_VIDEO_LIMIT} videos at a time.`
       );
     }
+    const start = new Date(body.schedule.start).getTime();
+    if (start > Date.now() + SLOT_SEARCH_DAYS * DAY * 60_000) {
+      throw new BadRequestException('Pick a start date within the next year.');
+    }
     if (
-      !resuming &&
       body.type === 'schedule' &&
       body.schedule.mode === 'interval' &&
-      new Date(body.schedule.start).getTime() <= Date.now()
+      start <= Date.now() + MARGIN
     ) {
-      throw new BadRequestException('Pick a start time in the future.');
+      throw new BadRequestException(
+        'Pick a start time at least 5 minutes from now.'
+      );
     }
 
     const integrations = await this._integrationService.getIntegrationsList(
       orgId
     );
+    const schemas = getValidationSchemas() as Record<string, any>;
     const channels = uniqBy(body.channels, (channel) => channel.id).map(
       (channel) => {
         const integration = integrations.find((p) => p.id === channel.id);
@@ -442,14 +532,29 @@ export class PostsBulkVideosService {
             `${integration.name} is turned off or not fully connected. Pick another channel.`
           );
         }
+        const provider = this._integrationManager.getSocialIntegration(
+          integration.providerIdentifier
+        );
+        if (
+          body.type === 'schedule' &&
+          bulkSettings(provider?.dto, schemas).draftsOnly
+        ) {
+          throw new BadRequestException(
+            `${integration.name} needs a setting picked in the composer, like a board or a channel. Add the videos as drafts and finish them in the composer, or leave ${integration.name} out.`
+          );
+        }
         return { ...channel, integration };
       }
     );
 
-    const dates = await this.dates(
+    const { dates, taken } = await this.dates(
       orgId,
       body,
       channels.map((channel) => channel.id)
+    );
+    // the dates this batch gives each channel, so none is used twice
+    const used: Record<string, Set<number>> = Object.fromEntries(
+      channels.map((channel) => [channel.id, new Set<number>()])
     );
 
     const items: PlanItem[] = [];
@@ -472,22 +577,22 @@ export class PostsBulkVideosService {
         request: null,
         mapped: null,
         channels: channels.map((channel) => {
-          const date = dates[channel.id]?.[index];
+          const sent = video.dates?.[channel.id];
+          const date = sent ? new Date(sent) : dates[channel.id]?.[index];
+          const issue = this.dateIssue({
+            date,
+            sent: !!sent,
+            body,
+            taken: taken[channel.id],
+            used: used[channel.id],
+          });
           return {
             id: channel.id,
             name: channel.integration.name,
             identifier: channel.integration.providerIdentifier,
             picture: channel.integration.picture,
-            date: date ? date.toISOString() : null,
-            errors: date
-              ? []
-              : [
-                  {
-                    field: 'date',
-                    message: 'There is no free time slot in the next year.',
-                    hint: 'Add time slots to this channel, or post every few hours or days instead.',
-                  },
-                ],
+            date: date && !isNaN(date.getTime()) ? date.toISOString() : null,
+            errors: issue ? [issue] : [],
           };
         }),
       };
@@ -578,8 +683,11 @@ export class PostsBulkVideosService {
   // Creates a post for every video once all of them pass the checks. The
   // same request only ever runs once: a second one returns the first result.
   // `remaining` is how many posts the plan still allows this month (null for
-  // no limit). At a plan limit the rest are skipped and the result says how
-  // many went in. `actor` is the member scheduling, approvals apply.
+  // no limit). At the monthly post limit the rest are skipped and the result
+  // says how many went in; a network's cap only skips that network. A run
+  // that stopped half way resumes, and ends with what it created even when
+  // the rest can't go in any more. `actor` is the member scheduling,
+  // approvals apply.
   async create(
     orgId: string,
     body: BulkVideoPostsDto,
@@ -597,13 +705,10 @@ export class PostsBulkVideosService {
       );
     }
 
-    const results: Array<{
-      index: number;
-      name: string;
-      status: 'created' | 'skipped' | 'failed';
-      error?: string;
-    }> = [];
+    const results: BulkVideoResult[] = [];
     let limitReached = '';
+    // the channels a network cap of the plan stopped, for the rest of the run
+    const capped = new Map<string, SkippedChannel>();
 
     // videos created by an earlier attempt that stopped half way
     const done = new Set<number>();
@@ -618,7 +723,7 @@ export class PostsBulkVideosService {
     }
 
     try {
-      const items = await this.plan(orgId, body, done.size > 0);
+      const items = await this.plan(orgId, body);
       const invalid = items.filter(
         (item) => !done.has(item.index) && hasErrors(item)
       ).length;
@@ -634,10 +739,24 @@ export class PostsBulkVideosService {
           results.push({ index: item.index, name: item.name, status: 'created' });
           continue;
         }
+        const open = item.channels.filter((channel) => !capped.has(channel.id));
+        const skipped = item.channels
+          .filter((channel) => capped.has(channel.id))
+          .map((channel) => capped.get(channel.id)!);
+        if (!open.length) {
+          results.push({
+            index: item.index,
+            name: item.name,
+            status: 'skipped',
+            error: skipped[0].error,
+            skippedChannels: skipped,
+          });
+          continue;
+        }
         if (
           !limitReached &&
           remaining !== null &&
-          posts + item.channels.length > remaining
+          posts + open.length > remaining
         ) {
           limitReached =
             "Your plan's monthly post limit is reached. Upgrade your plan or schedule the rest next month.";
@@ -652,18 +771,16 @@ export class PostsBulkVideosService {
           continue;
         }
         try {
-          const request =
-            item.mapped ||
-            (await this._postsService.mapTypeToPost(item.request!, orgId));
-          await this._postsService.createPost(
-            orgId,
-            request,
-            'WEB',
-            false,
-            actor
-          );
-          posts += item.channels.length;
-          results.push({ index: item.index, name: item.name, status: 'created' });
+          const outcome = await this.createVideo(orgId, item, open, capped, actor);
+          posts += outcome.created;
+          const problems = [...skipped, ...outcome.problems];
+          results.push({
+            index: item.index,
+            name: item.name,
+            status: outcome.created ? 'created' : 'skipped',
+            ...(outcome.created ? {} : { error: problems[0]?.error }),
+            ...(problems.length ? { skippedChannels: problems } : {}),
+          });
           // the progress keeps the claim fresh and survives a crash
           await this._importRepository.touch(
             orgId,
@@ -671,16 +788,6 @@ export class PostsBulkVideosService {
             JSON.stringify({ posts: results })
           );
         } catch (err) {
-          if (isLimit(err)) {
-            limitReached = errorMessage(err);
-            results.push({
-              index: item.index,
-              name: item.name,
-              status: 'skipped',
-              error: limitReached,
-            });
-            continue;
-          }
           results.push({
             index: item.index,
             name: item.name,
@@ -695,10 +802,21 @@ export class PostsBulkVideosService {
         await this._importRepository.release(orgId, hash);
         throw err;
       }
-      // a resumed run that stopped before creating anything keeps the
-      // progress of the earlier one for the next try
+      // a resumed run that stopped before creating anything ends with what
+      // the earlier run created, the rest failed
       if (!results.length) {
-        throw err;
+        body.videos.forEach((_, index) =>
+          results.push(
+            done.has(index)
+              ? { index, name: `Video ${index + 1}`, status: 'created' }
+              : {
+                  index,
+                  name: `Video ${index + 1}`,
+                  status: 'failed',
+                  error: errorMessage(err),
+                }
+          )
+        );
       }
     }
 
@@ -708,6 +826,7 @@ export class PostsBulkVideosService {
       skipped: results.filter((result) => result.status === 'skipped').length,
       failed: results.filter((result) => result.status === 'failed').length,
       limitReached: limitReached || null,
+      cappedChannels: [...capped.values()],
       posts: results,
     };
 
@@ -719,5 +838,68 @@ export class PostsBulkVideosService {
     }
 
     return summary;
+  }
+
+  // Creates a video on the channels still open. A network's monthly cap
+  // (402) refuses the whole save, so each channel is then tried on its own:
+  // a capped one is skipped here and for the rest of the run, the others go
+  // ahead. Returns how many posts went in and the channels left out.
+  private async createVideo(
+    orgId: string,
+    item: PlanItem,
+    open: PlanChannel[],
+    capped: Map<string, SkippedChannel>,
+    actor?: ApprovalActor
+  ) {
+    const mapped =
+      item.mapped ||
+      (await this._postsService.mapTypeToPost(item.request!, orgId));
+    const only = (channels: PlanChannel[]) => {
+      const ids = channels.map((channel) => channel.id);
+      const posts = mapped.posts
+        .filter((post) => ids.includes(post.integration.id))
+        .map((post) => ({ ...post }));
+      return {
+        ...mapped,
+        date: posts.map((post) => post.date!).sort()[0] || mapped.date,
+        posts,
+      } as CreatePostDto;
+    };
+
+    try {
+      await this._postsService.createPost(orgId, only(open), 'WEB', false, actor);
+      return { created: open.length, problems: [] as SkippedChannel[] };
+    } catch (err) {
+      if (!isLimit(err)) {
+        throw err;
+      }
+      if (open.length === 1) {
+        const skipped = { id: open[0].id, name: open[0].name, error: errorMessage(err) };
+        capped.set(open[0].id, skipped);
+        return { created: 0, problems: [skipped] };
+      }
+    }
+
+    let created = 0;
+    const problems: SkippedChannel[] = [];
+    for (const channel of open) {
+      try {
+        await this._postsService.createPost(
+          orgId,
+          only([channel]),
+          'WEB',
+          false,
+          actor
+        );
+        created++;
+      } catch (err) {
+        const skipped = { id: channel.id, name: channel.name, error: errorMessage(err) };
+        if (isLimit(err)) {
+          capped.set(channel.id, skipped);
+        }
+        problems.push(skipped);
+      }
+    }
+    return { created, problems };
   }
 }

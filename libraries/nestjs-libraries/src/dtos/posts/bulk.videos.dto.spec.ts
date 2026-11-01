@@ -95,6 +95,29 @@ describe('BulkVideoPostsDto', () => {
     ]);
   });
 
+  it('caps the size of settings and dates', async () => {
+    const big = { title: 'a'.repeat(5_000) };
+    expect(
+      await check({
+        ...valid,
+        channels: [{ id: 'yt', settings: big }],
+        videos: [{ mediaId: 'm-1', settings: { yt: big }, dates: { yt: 'a'.repeat(5_000) } }],
+      })
+    ).toEqual(['channels.0.settings', 'videos.0.dates', 'videos.0.settings']);
+  });
+
+  it('takes the dates the preview showed', async () => {
+    expect(
+      await check({
+        ...valid,
+        videos: [{ mediaId: 'm-1', dates: { yt: '2026-11-03T09:00:00.000Z' } }],
+      })
+    ).toEqual([]);
+    expect(
+      await check({ ...valid, videos: [{ mediaId: 'm-1', dates: ['x'] }] })
+    ).toEqual(['videos.0.dates']);
+  });
+
   it('refuses a caption longer than any network takes', async () => {
     expect(await check({ ...valid, caption: 'a'.repeat(10_001) })).toEqual([
       'caption',
