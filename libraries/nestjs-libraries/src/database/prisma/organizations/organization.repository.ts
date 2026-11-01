@@ -639,6 +639,38 @@ export class OrganizationRepository {
     });
   }
 
+  // the members who still get the workspace's emails (digest, streak):
+  // not disabled, not deleted
+  getActiveTeam(orgId: string) {
+    return this._organization.model.organization.findUnique({
+      where: {
+        id: orgId,
+      },
+      select: {
+        users: {
+          where: {
+            disabled: false,
+            user: {
+              deletedAt: null,
+            },
+          },
+          select: {
+            role: true,
+            user: {
+              select: {
+                email: true,
+                id: true,
+                sendSuccessEmails: true,
+                sendFailureEmails: true,
+                sendStreakEmails: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   getOrgAdmins(orgId: string) {
     return this._userOrg.model.userOrganization.findMany({
       where: {
@@ -668,6 +700,13 @@ export class OrganizationRepository {
       },
       select: {
         users: {
+          // a disabled member or a deleted account gets no post emails
+          where: {
+            disabled: false,
+            user: {
+              deletedAt: null,
+            },
+          },
           select: {
             user: {
               select: {

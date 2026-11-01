@@ -129,3 +129,28 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
     });
   });
 });
+
+describe('OrganizationRepository member emails', () => {
+  const makeEmailRepo = () => {
+    const organization = { findUnique: jest.fn().mockResolvedValue({ users: [] }) };
+    const repo = new OrganizationRepository(
+      { model: { organization } } as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { repo, organization };
+  };
+
+  it.each(['getAllUsersOrgs', 'getActiveTeam'] as const)(
+    '%s leaves out disabled members and deleted accounts',
+    async (method) => {
+      const { repo, organization } = makeEmailRepo();
+      await repo[method]('org-A');
+      expect(organization.findUnique.mock.calls[0][0].select.users.where).toEqual({
+        disabled: false,
+        user: { deletedAt: null },
+      });
+    }
+  );
+});

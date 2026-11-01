@@ -97,6 +97,10 @@ export class OrganizationService {
     return this._organizationRepository.getTeam(orgId);
   }
 
+  getActiveTeam(orgId: string) {
+    return this._organizationRepository.getActiveTeam(orgId);
+  }
+
   async setStreak(organizationId: string, type: 'start' | 'end') {
     return this._organizationRepository.setStreak(organizationId, type);
   }

@@ -14,6 +14,8 @@ import { Context } from '@temporalio/activity';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { lowerFirst } from 'lodash';
+import dayjs from 'dayjs';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 export type NotificationType = 'success' | 'fail' | 'info';
 
@@ -34,6 +36,9 @@ const DIGEST_SUBJECT = '[PostDelegate] Your latest notifications';
 const PUBLISHED_MESSAGE = /^Your post has been published on (\S+) at ?(\S*)\s*$/;
 const ERROR_MESSAGE =
   /^An error occurred while posting (comments )?on (\S+?)(?:: ([\s\S]+))?$/;
+// a scheduled post held because its channel is turned off (a trial that
+// ended, a downgrade), written once per post by the publishing workflow
+const DISABLED_CHANNEL_MESSAGE = /because it's disabled\. Please enable it and try again\.$/;
 
 @Injectable()
 export class NotificationService {
@@ -89,6 +94,7 @@ export class NotificationService {
   ) {
     const postId = this.activityPostId();
     if (postId === null) return;
+    const channelDisabled = DISABLED_CHANNEL_MESSAGE.test(message);
     let integrationId = scope?.integrationId;
     let providerIdentifier: string | undefined;
     let settings: string | null | undefined;
@@ -127,6 +133,12 @@ export class NotificationService {
       await this._notificationRepository.createNotification(orgId, message);
     }
     if (!sendEmail) {
+      return;
+    }
+
+    // every held post would email everyone, one notice a day is enough
+    if (channelDisabled && !digest) {
+      await this.sendChannelsPausedEmail(orgId);
       return;
     }
 
@@ -366,6 +378,32 @@ export class NotificationService {
       }
       await this.sendEmail(user.user.email, subject, message);
     }
+  }
+
+  // Once a day per workspace, however many posts were held, and only to the
+  // members who want failure emails
+  private async sendChannelsPausedEmail(orgId: string) {
+    try {
+      const first = await ioRedis.set(
+        `channels-paused-email:${orgId}:${dayjs().format('YYYY-MM-DD')}`,
+        '1',
+        'EX',
+        24 * 60 * 60,
+        'NX'
+      );
+      if (first !== 'OK') {
+        return;
+      }
+    } catch (err) {
+      // without redis the notice still goes out
+    }
+
+    await this.sendEmailsToOrg(
+      orgId,
+      'Some scheduled posts were not published',
+      'One or more scheduled posts were not published because their channel is turned off. This happens when a trial ends or the plan changes. Turn the channels back on from the calendar, or upgrade your plan, then reschedule the posts.',
+      'fail'
+    );
   }
 
   // Account matters (billing, the plan) only the admins can act on
