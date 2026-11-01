@@ -305,6 +305,12 @@ export abstract class StudioTemplateAbstract<
     return [];
   }
 
+  // What stops a spec an assistant or the public API sent, on top of
+  // check(): settings the editor quietly hides are refused there instead
+  agentCheck(spec: T): string | undefined {
+    return undefined;
+  }
+
   speed(spec: T) {
     return this.clip(spec).speed || 1;
   }

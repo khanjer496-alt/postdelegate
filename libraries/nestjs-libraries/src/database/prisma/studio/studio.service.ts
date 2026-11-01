@@ -1014,8 +1014,14 @@ export class StudioService {
         this.agentSchema(value),
       ])
     );
+    if (copy.properties?.path) {
+      delete copy.properties.path;
+      if (Array.isArray(copy.required)) {
+        copy.required = copy.required.filter((p: string) => p !== 'path');
+      }
+    }
     if (copy.properties?.mediaId || copy.properties?.assetId) {
-      const { path, ...properties } = copy.properties;
+      const properties = copy.properties;
       copy.properties = {
         ...properties,
         ...(properties.mediaId
@@ -1030,13 +1036,10 @@ export class StudioService {
               assetId: {
                 ...properties.assetId,
                 description:
-                  'The id of a music uploaded to Studio in this workspace. Urls are not accepted',
+                  'The id of a music uploaded to Studio in this workspace that no other project uses. Urls are not accepted',
               },
             }),
       };
-      if (Array.isArray(copy.required)) {
-        copy.required = copy.required.filter((p: string) => p !== 'path');
-      }
     }
 
     return copy;
@@ -1112,12 +1115,19 @@ export class StudioService {
       paths.set(mediaId, media.path);
     }
 
+    // a music belongs to one project (it goes with the project), and this
+    // project does not exist yet
     const musicId = template.instance.musicAssetId(spec);
     if (musicId) {
       const music = await this._studioRepository.getAsset(org, musicId);
       if (!music) {
         throw new BadRequestException(
           `Music ${musicId} is not a Studio music of this workspace`
+        );
+      }
+      if (music.projectId) {
+        throw new BadRequestException(
+          'That music belongs to another Studio project; upload it again in Studio'
         );
       }
       paths.set(musicId, music.path);
@@ -1134,21 +1144,35 @@ export class StudioService {
       const result = Object.fromEntries(
         Object.entries(value).map(([key, item]) => [key, withPaths(item)])
       );
+      // a path is only ever the stored one of a media or music
       const id =
         typeof value.mediaId === 'string'
           ? value.mediaId
           : typeof value.assetId === 'string'
           ? value.assetId
           : undefined;
-      if (!id) {
-        return result;
-      }
-
       const { path, ...rest } = result;
-      return paths.has(id) ? { ...rest, path: paths.get(id) } : rest;
+      return id && paths.has(id) ? { ...rest, path: paths.get(id) } : rest;
     };
 
     return withPaths(spec);
+  }
+
+  private withoutNulls(value: any): any {
+    if (Array.isArray(value)) {
+      return value
+        .filter((item) => item !== null)
+        .map((item) => this.withoutNulls(item));
+    }
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, item]) => item !== null)
+        .map(([key, item]) => [key, this.withoutNulls(item)])
+    );
   }
 
   // A render in one call, for assistants and the public API: a project of the
@@ -1177,10 +1201,18 @@ export class StudioService {
       !!captions.script.trim() &&
       !captions?.words?.length;
     // what the template gives assistants by default, like the AI UGC path
-    // without a voice that needs no key
+    // without a voice that needs no key. A null counts as left out, and a
+    // switch that is off by default is on only when it is true
+    const defaults = template.agentDefaults || {};
+    const given = this.withoutNulls(body.spec) || {};
     const filled = {
-      ...(template.agentDefaults || {}),
-      ...body.spec,
+      ...defaults,
+      ...given,
+      ...Object.fromEntries(
+        Object.entries(defaults)
+          .filter(([, value]) => value === false)
+          .map(([key]) => [key, given[key] === true])
+      ),
     };
     const validated = await this._templateManager.validateSpec(
       body.template,
@@ -1190,6 +1222,10 @@ export class StudioService {
       false
     );
     this.renderableSeconds(template, validated, timeScript);
+    const agentProblem = template.instance.agentCheck(validated);
+    if (agentProblem) {
+      throw new BadRequestException(agentProblem);
+    }
     const spec = await this.withWorkspaceMedia(
       org.id,
       template,

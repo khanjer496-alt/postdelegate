@@ -82,7 +82,7 @@ All paths are relative to `{{rest_base}}`.
 2. Media are ids from `GET /media` or an upload, never URLs. A `path` in the spec is replaced with the stored one.
 3. `POST /studio/renders` with `{ "template", "spec", "name"? }` returns `{ "id", "projectId" }`. For a template with `"captions": true`, send `captions.script` and leave `captions.words` out.
 
-Templates (`identifier`): `hook-over-clip`, `talking-head-captions`, `image-slideshow`, `before-after`, `top-n-list`, `quote-card` and `ai-ugc`. For `ai-ugc`, write `script` (`hook`, `lines`, `cta`) yourself and leave `voiceover` at its default `false`: it renders with no AI key. `voiceover: true` and `stills` need the workspace's own OpenAI key. `music.assetId` must be a music already uploaded in Studio.
+Templates (`identifier`): `hook-over-clip`, `talking-head-captions`, `image-slideshow`, `before-after`, `top-n-list`, `quote-card` and `ai-ugc`. For `ai-ugc`, write `script` (`hook`, `lines`, `cta`) yourself and leave `voiceover` at its default `false`: it renders with no AI key. `voiceover: true` needs the workspace's own OpenAI key, and `stills` need `voiceover: true` (refused otherwise). `music.assetId` must be a music already uploaded in Studio that no other project uses; music used by another project is refused, so the user uploads it again in Studio. There is no music upload or list API yet.
 4. Poll `GET /studio/renders/:id` every few seconds until `status` is `completed`, `failed` or `cancelled`. On `completed`, `mediaId` and `path` are the new video. Post it with `POST /posts` (`image: [{ "id": mediaId, "path": path }]`), as a draft unless the user asked otherwise.
 
 ```bash

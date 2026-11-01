@@ -63,7 +63,7 @@ Studio turns videos already in the media library into vertical videos. Follow th
 4. **Wait.** Call `studioRenderStatusTool` with the `renderId`. Each call waits up to 25 seconds. Call it again while `status` is `pending`.
 5. **Schedule.** On `completed`, attach the returned `path` to `integrationSchedulePostTool` and follow the post workflow above: draft by default, the user's yes before scheduling, approvals still apply.
 
-Templates (`identifier`): `hook-over-clip`, `talking-head-captions`, `image-slideshow`, `before-after`, `top-n-list`, `quote-card` and `ai-ugc`. For `ai-ugc`, write `script` (`hook`, `lines`, `cta`) yourself and leave `voiceover` at its default `false`: it renders with no AI key. `voiceover: true` and `stills` need the workspace's own OpenAI key. `music.assetId` must be a music already uploaded in Studio.
+Templates (`identifier`): `hook-over-clip`, `talking-head-captions`, `image-slideshow`, `before-after`, `top-n-list`, `quote-card` and `ai-ugc`. For `ai-ugc`, write `script` (`hook`, `lines`, `cta`) yourself and leave `voiceover` at its default `false`: it renders with no AI key. `voiceover: true` needs the workspace's own OpenAI key, and `stills` need `voiceover: true` (refused otherwise). `music.assetId` must be a music already uploaded in Studio that no other project uses; music used by another project is refused, so the user uploads it again in Studio. There is no music upload or list API yet.
 
 Fair use: one render at a time per workspace with up to 3 waiting, 30 videos a day, 10 videos in total on the trial, and a paid plan is needed. A render that failed is not counted.
 

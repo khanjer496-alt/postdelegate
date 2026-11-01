@@ -120,7 +120,7 @@ Your assistant can make Studio videos for you through the [MCP server](/docs/mcp
 3. It renders with `studioRenderTool` and waits for the video with `studioRenderStatusTool`. The project also shows up in Studio when you turn on **Show projects made by assistants and the API** under the list, so you can edit it and render it again.
 4. The finished video is in your media library. To post it, the assistant schedules it like any other post, which is a draft unless you say otherwise, and your workspace's [approvals](/docs/approvals) still apply.
 
-Every template works this way. For captions the assistant writes what is said as a script, and Studio times the words over the clip. For AI UGC it writes the script too, and the video renders without an AI voice unless you ask for one, so no AI key is needed; an AI voice or AI stills use your workspace's own OpenAI key. Music must already be uploaded in Studio. Rendering never posts anything on its own, and an assistant can stop a render with `studioCancelTool`.
+Every template works this way. For captions the assistant writes what is said as a script, and Studio times the words over the clip. For AI UGC it writes the script too, and the video renders without an AI voice unless you ask for one, so no AI key is needed; an AI voice uses your workspace's own OpenAI key, and AI stills come only with the voice. Music must already be uploaded in Studio and not used by another project. Rendering never posts anything on its own, and an assistant can stop a render with `studioCancelTool`.
 
 ## What Studio reads
 

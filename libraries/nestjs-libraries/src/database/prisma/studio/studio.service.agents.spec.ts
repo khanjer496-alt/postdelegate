@@ -111,6 +111,7 @@ const MEDIA_ID = '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f';
 const OTHER_ORG_MEDIA_ID = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 const MUSIC_ID = '0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e';
 const OTHER_MUSIC_ID = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
+const USED_MUSIC_ID = '2d3e4f5a-6b7c-4d8e-9f0a-1b2c3d4e5f6a';
 
 // AI UGC as an assistant sends it: its own script over the footage
 const ugcSpec = {
@@ -202,9 +203,12 @@ describe('StudioService for assistants and the public API', () => {
       getRender: jest.fn(),
       getRenderById: jest.fn(),
       // MUSIC_ID is a Studio music of org-1
+      // USED_MUSIC_ID is one already used by another project
       getAsset: jest.fn(async (o: string, id: string) =>
         o === 'org-1' && id === MUSIC_ID
-          ? { id: MUSIC_ID, path: 'https://media.example/song.mp3' }
+          ? { id: MUSIC_ID, path: 'https://media.example/song.mp3', projectId: null }
+          : o === 'org-1' && id === USED_MUSIC_ID
+          ? { id, path: 'https://media.example/used.mp3', projectId: 'project-9' }
           : null
       ),
     };
@@ -494,6 +498,35 @@ describe('StudioService for assistants and the public API', () => {
       );
     });
 
+    it('refuses music another project uses', async () => {
+      const err = await errorOf(
+        service.renderFromSpec(org, {
+          template: 'hook-over-clip',
+          spec: { ...hookSpec, music: { assetId: USED_MUSIC_ID } },
+        })
+      );
+
+      expect((err as Error).message).toBe(
+        'That music belongs to another Studio project; upload it again in Studio'
+      );
+      expect(repository.createProject).not.toHaveBeenCalled();
+    });
+
+    it('drops a path that is not the stored one of a media or music', async () => {
+      await service.renderFromSpec(org, {
+        template: 'quote-card',
+        spec: {
+          quote: 'Ship small, ship often',
+          background: { color: '#112233', path: 'https://tracker.example/a.jpg' },
+          seconds: 8,
+        },
+      });
+
+      expect(JSON.parse(projects.get('project-1').spec).background).toEqual({
+        color: '#112233',
+      });
+    });
+
     it('renders a template without trim or media by its own length', async () => {
       await expect(
         service.renderFromSpec(org, {
@@ -521,6 +554,36 @@ describe('StudioService for assistants and the public API', () => {
       const spec = JSON.parse(projects.get('project-1').spec);
       expect(spec.voiceover).toBe(false);
       expect(spec.footage[0].path).toBe('https://media.example/abc.mp4');
+    });
+
+    it('reads a null as left out, so the voice stays off', async () => {
+      await expect(
+        service.renderFromSpec(org, {
+          template: 'ai-ugc',
+          spec: { ...ugcSpec, voiceover: null, topic: null, music: null },
+        })
+      ).resolves.toMatchObject({ id: 'render-1' });
+
+      const spec = JSON.parse(projects.get('project-1').spec);
+      expect(spec.voiceover).toBe(false);
+      expect(spec).not.toHaveProperty('topic');
+      expect(aiCredentialService.hasCredential).not.toHaveBeenCalled();
+    });
+
+    it('refuses AI stills without the AI voice', async () => {
+      for (const voiceover of [false, undefined]) {
+        const err = await errorOf(
+          service.renderFromSpec(org, {
+            template: 'ai-ugc',
+            spec: { ...ugcSpec, voiceover, stills: 2 },
+          })
+        );
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as Error).message).toContain(
+          'AI stills need the AI voice'
+        );
+      }
+      expect(repository.createProject).not.toHaveBeenCalled();
     });
 
     it('needs the workspace key for an AI voice, before making anything', async () => {

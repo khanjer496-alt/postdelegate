@@ -48,7 +48,7 @@ Local files cannot be fetched by an assistant. Upload them through the app, the 
 | `studioRenderStatusTool` | Waits up to 25 seconds for a render to finish, then returns its status. When it is done, it returns the `mediaId` and `path` of the video, ready to attach to a post with `integrationSchedulePostTool`. | No |
 | `studioCancelTool` | Stops a render that is still waiting or rendering. A cancelled render still counts toward the daily and trial limits. | Yes |
 
-All seven templates work from an assistant: Hook over clip, Talking head + captions, Image slideshow, Before/after, Top-N list, Quote card and AI UGC. For AI UGC the assistant writes the script itself, and by default it renders without an AI voice, so no AI key is needed. An AI voice or AI stills need your workspace's own OpenAI key.
+All seven templates work from an assistant: Hook over clip, Talking head + captions, Image slideshow, Before/after, Top-N list, Quote card and AI UGC. For AI UGC the assistant writes the script itself, and by default it renders without an AI voice, so no AI key is needed. An AI voice needs your workspace's own OpenAI key, and AI stills only come with the AI voice. Music must already be uploaded in Studio and not used by another project.
 
 To post a Studio video, the assistant still goes through `integrationSchedulePostTool`, so drafts by default and your workspace's [approvals](/docs/approvals) apply as usual.
 

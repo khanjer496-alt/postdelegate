@@ -62,8 +62,9 @@ Makes a Studio project from a template and a spec and starts rendering it.
 
 - **Media are ids only.** Every `mediaId` must be a media in your own media library, from [`GET /media`](/docs/api/uploads#get-media) or an upload. URLs are not accepted, and a `path` you send is replaced with the stored one. An upload with `adjust` must be `ready` first.
 - **Captions.** For a template with `"captions": true`, send what is said in `captions.script` and leave `captions.words` out. Studio spreads the words over the clip, giving longer words more time. You can also send `captions.words` with your own timings.
-- **AI UGC without a key.** `ai-ugc` takes your own script (`script.hook`, `script.lines`, `script.cta`) and, unless you send `"voiceover": true`, renders it as captions over your footage for `seconds`, with no AI key. An AI voice (`voiceover: true`) and AI stills (`stills`) run on your workspace's own OpenAI key and answer `400` without one.
-- **Music.** `music.assetId` must be a music uploaded in Studio in the app. The API cannot upload music yet.
+- **AI UGC without a key.** `ai-ugc` takes your own script (`script.hook`, `script.lines`, `script.cta`) and, unless you send `"voiceover": true`, renders it as captions over your footage for `seconds`, with no AI key. An AI voice (`voiceover: true`) runs on your workspace's own OpenAI key and answers `400` without one. AI stills (`stills`) only come with the voice: `stills` without `voiceover: true` answers `400`. A `null` counts as left out.
+- **Music.** `music.assetId` must be a music uploaded in Studio in the app that no other project uses. A music already used by another project answers `400` ("That music belongs to another Studio project; upload it again in Studio"). The API cannot upload or list music yet.
+- **Paths.** Any `path` in the spec is replaced with the stored path of its media or music, or dropped.
 - A video is at most 90 seconds long after speed changes, and each template's own rules (like a clip's end after its start) are checked before anything is made.
 
 ```bash
@@ -121,7 +122,7 @@ Studio is included in every paid plan with fair use: one render at a time per wo
 
 | Status | When |
 | --- | --- |
-| `400` | Unknown template, a spec that does not follow the schema (the `message` array says what to fix), a media that is not in your media library, still processing or of the wrong kind (a picture where a video is needed), a music that is not yours, an AI voice or stills without an AI key, or a video longer than 90 seconds |
+| `400` | Unknown template, a spec that does not follow the schema (the `message` array says what to fix), a media that is not in your media library, still processing or of the wrong kind (a picture where a video is needed), a music that is not yours or belongs to another project, an AI voice without an AI key, AI stills without the AI voice, or a video longer than 90 seconds |
 | `404` | `Render not found`, including renders of another workspace |
 | `406` | `Studio needs an active plan`, or the trial's 10 videos are used |
 | `429` | More than 30 `POST /studio/renders` requests this hour, 3 videos are already waiting, the 30 videos a day are reached, another render is being started, or `Studio is busy right now` |
