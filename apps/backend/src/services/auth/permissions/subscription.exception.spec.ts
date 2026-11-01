@@ -164,4 +164,16 @@ describe('SubscriptionExceptionFilter', () => {
       url: 'https://app.example.com/billing',
     });
   });
+
+  it('answers 403 and asks a member to ask an admin for an admin-only action', () => {
+    role = 'USER';
+    deny(Sections.ADMIN);
+
+    expect(status).toHaveBeenCalledWith(403);
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 403,
+      message: 'Only workspace admins can do this. Ask a workspace admin.',
+      section: Sections.ADMIN,
+    });
+  });
 });
