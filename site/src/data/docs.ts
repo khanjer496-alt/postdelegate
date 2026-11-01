@@ -8,6 +8,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Getting started', href: '/docs/getting-started', description: 'Start your free trial, connect a channel and schedule your first post.' },
     { title: 'Creating and scheduling posts', href: '/docs/posts', description: 'Drafts, schedules, immediate posts, repeats, previews and the calendar.' },
     { title: 'Media library', href: '/docs/media', description: 'Upload images and video, supported formats and size limits.' },
+    { title: 'Studio', href: '/docs/studio', description: 'Make vertical videos with a hook or word-by-word captions from your media library.' },
     { title: 'Team and customers', href: '/docs/team', description: 'Invite team members and group channels by customer.' },
     { title: 'Plans and billing', href: '/docs/billing', description: 'Plan information, the trial and how cancellation works.' },
   ] },
