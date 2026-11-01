@@ -10,6 +10,8 @@ const canonical = new URL(canonicalPath, SITE.url).href;
 const og = new URL(ogImage, SITE.url).href;
 const org = { '@context': 'https://schema.org', '@type': 'Organization', name: 'PostDelegate', legalName: SITE.operator, url: SITE.url, logo: new URL('/postdelegate-icon-512.png', SITE.url).href, email: SITE.email };
 const website = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'PostDelegate', url: SITE.url };
+// The body sits between email_off markers: Cloudflare's email obfuscation would swap
+// support@ and every other address for a link that only works with JavaScript.
 const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 ---
 <!doctype html>
@@ -57,10 +59,12 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     </script>
   </head>
   <body>
+    <!--email_off-->
     <a href="#main" class="skip-link">Skip to content</a>
     <Header />
     <main id="main"><slot /></main>
     <Footer />
+    <!--/email_off-->
   </body>
 </html>
 <style>.skip-link{position:fixed;top:12px;left:16px;z-index:100;transform:translateY(-180%);padding:12px 18px;background:#fff;border-radius:999px;color:#111;font-size:13px;font-weight:600;text-decoration:none}.skip-link:focus{transform:translateY(0);outline:2px solid var(--accent,#7357ff);outline-offset:4px}</style>
