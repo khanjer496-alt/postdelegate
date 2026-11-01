@@ -656,8 +656,18 @@ describe('PostsService monthly cap on one network', () => {
   });
 
   describe('a passed date on a capped network', () => {
-    const save = async (integration: string) => {
-      const { service, postRepository } = makeLimitService({ x: 30 }, 0);
+    const save = async (
+      integration: string,
+      type: 'schedule' | 'update' = 'schedule',
+      stored: any[] = [],
+      value: any = post(integration, 1)
+    ) => {
+      const { service, postRepository } = makeLimitService(
+        { x: 30 },
+        0,
+        0,
+        stored
+      );
       (postRepository as any).createOrUpdatePost = jest
         .fn()
         .mockResolvedValue({ posts: [{ id: 'p-1', state: 'QUEUE' }] });
@@ -667,11 +677,11 @@ describe('PostsService monthly cap on one network', () => {
       await service.createPost(
         'org-1',
         {
-          type: 'schedule',
+          type,
           date: '2020-01-01T10:00:00',
           shortLink: false,
           tags: [],
-          posts: [post(integration, 1)],
+          posts: [value],
         } as any,
         'API'
       );
@@ -686,6 +696,43 @@ describe('PostsService monthly cap on one network', () => {
 
     it('stays as it is on other networks', async () => {
       expect(await save('i-li')).toBe('2020-01-01T10:00:00');
+    });
+
+    it('keeps the date of a published X post when its text is edited', async () => {
+      const published = {
+        id: 'i-x-0',
+        state: 'PUBLISHED',
+        publishDate: new Date('2020-01-01T10:00:00'),
+        deletedAt: null,
+      };
+      expect(
+        await save('i-x', 'update', [published], post('i-x', 1, true))
+      ).toBe('2020-01-01T10:00:00');
+    });
+
+    it('still counts a new entry an update adds with a passed date', async () => {
+      const { service, postRepository } = makeLimitService({ x: 30 }, 30, 0, [
+        {
+          id: 'i-x-0',
+          state: 'PUBLISHED',
+          publishDate: new Date('2020-01-01T10:00:00'),
+          deletedAt: null,
+        },
+      ]);
+      await expect(
+        service.checkProviderPostsLimit('org-1', {
+          type: 'update',
+          date: '2020-01-01T10:00:00',
+          posts: [{ integration: { id: 'i-x' }, value: [{ id: 'i-x-0' }, {}] }],
+        })
+      ).rejects.toMatchObject({ status: 402 });
+      // counted in the current plan month, not the passed one
+      expect(postRepository.countProviderUsage).toHaveBeenCalledWith(
+        'org-1',
+        'x',
+        monthStart,
+        nextMonth.toDate()
+      );
     });
   });
 

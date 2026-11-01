@@ -1379,9 +1379,12 @@ export class PostsService {
         body.type === 'now'
           ? dayjs().format('YYYY-MM-DDTHH:mm:00')
           : // a passed date on a capped network is stored as now, the
-          // plan month it was counted in
+          // plan month it was counted in. Not for an in-place update: it
+          // keeps the date of posts already published, and the new entries
+          // it adds are counted in the current month and checked again
+          // when they go out
           cappedChannels.has(post.integration.id) &&
-            body.type !== 'draft' &&
+            body.type === 'schedule' &&
             dayjs(post.date || body.date).isBefore(dayjs())
           ? dayjs().format('YYYY-MM-DDTHH:mm:ss')
           : post.date || body.date,
