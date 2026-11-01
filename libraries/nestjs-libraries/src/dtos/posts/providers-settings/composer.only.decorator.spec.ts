@@ -49,7 +49,7 @@ describe('ComposerOnly', () => {
       'music_usage_consent',
       'creator_info_verified',
     ]);
-    expect(composerOnlySettings(YoutubeSettingsDto)).toEqual([]);
+    expect(composerOnlySettings(YoutubeSettingsDto)).toEqual(['publishAt']);
   });
 
   it('leaves the JSON schema alone', () => {

@@ -278,6 +278,7 @@ describe('PostsBulkVideosService', () => {
       finish: jest.fn(),
       release: jest.fn(),
       touch: jest.fn(),
+      get: jest.fn().mockResolvedValue(null),
     };
     const integrationService = {
       getIntegrationsList: jest.fn().mockResolvedValue(integrations),
@@ -756,6 +757,19 @@ describe('PostsBulkVideosService', () => {
     await expect(service.preview('org-1', body())).rejects.toThrow('Add the videos as drafts');
     await expect(service.preview('org-1', body({ type: 'draft' }))).resolves.toMatchObject({ valid: 2 });
     schemas.mockRestore();
+  });
+
+  it('tells where a request stands, keyed like create', async () => {
+    const { service, repo } = make();
+    expect(await service.status('org-1', body())).toEqual({ status: 'none' });
+    expect(repo.get).toHaveBeenCalledWith('org-1', bulkVideosHash(body()));
+    repo.get.mockResolvedValueOnce({ status: 'processing', result: null });
+    expect(await service.status('org-1', body())).toEqual({ status: 'running' });
+    repo.get.mockResolvedValueOnce({ status: 'done', result: JSON.stringify({ created: 2 }) });
+    expect(await service.status('org-1', body())).toEqual({
+      status: 'done',
+      result: { created: 2 },
+    });
   });
 
   it('lists the channels that take a video, with their settings', async () => {

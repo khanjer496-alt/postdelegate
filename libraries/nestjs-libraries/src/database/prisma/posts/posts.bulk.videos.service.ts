@@ -680,6 +680,20 @@ export class PostsBulkVideosService {
     };
   }
 
+  // Where a bulk request stands: never sent (or sent and freed because
+  // nothing went in), still running, or done with its result. Read without
+  // the plan checks, so a request that timed out can always be followed.
+  async status(orgId: string, body: BulkVideoPostsDto) {
+    const claim = await this._importRepository.get(orgId, bulkVideosHash(body));
+    if (!claim) {
+      return { status: 'none' as const };
+    }
+    if (claim.status === 'done' && claim.result) {
+      return { status: 'done' as const, result: JSON.parse(claim.result) };
+    }
+    return { status: 'running' as const };
+  }
+
   // Creates a post for every video once all of them pass the checks. The
   // same request only ever runs once: a second one returns the first result.
   // `remaining` is how many posts the plan still allows this month (null for

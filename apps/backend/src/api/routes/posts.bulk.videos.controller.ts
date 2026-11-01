@@ -4,10 +4,10 @@ import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { userActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import {
   AuthorizationActions,
   Sections,
+  SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PostsBulkVideosService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.bulk.videos.service';
 import { BulkVideoPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.videos.dto';
@@ -40,14 +40,39 @@ export class PostsBulkVideosController {
     return this._bulkVideosService.preview(org.id, body, remaining);
   }
 
+  // where a request that timed out stands, without the plan checks
+  @Post('/status')
+  status(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: BulkVideoPostsDto
+  ) {
+    return this._bulkVideosService.status(org.id, body);
+  }
+
   @Post('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async create(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Body() body: BulkVideoPostsDto
   ) {
-    // the policy above checks the plan once, this creates many posts
+    // The plan check of @CheckPolicies([Create, POSTS_PER_MONTH]), only for a
+    // request never sent before: sending a running or finished one again
+    // gets its 409 or its result, even once its own posts used up the month
+    if ((await this._bulkVideosService.status(org.id, body)).status === 'none') {
+      const ability = await this._permissionsService.check(
+        org.id,
+        org.createdAt,
+        (org as any).users[0].role,
+        [[AuthorizationActions.Create, Sections.POSTS_PER_MONTH]]
+      );
+      if (!ability.can(AuthorizationActions.Create, Sections.POSTS_PER_MONTH)) {
+        throw new SubscriptionException({
+          action: AuthorizationActions.Create,
+          section: Sections.POSTS_PER_MONTH,
+        });
+      }
+    }
+    // the check above is for the plan once, this creates many posts
     const remaining = await this._permissionsService.remainingPostsThisMonth(
       org.id,
       org.createdAt

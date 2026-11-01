@@ -681,13 +681,21 @@ export const BulkVideosModal: FC<{
     });
   }, [body, preview, fresh]);
 
-  // One try. A timeout or a server error may leave the request running, the
-  // same body is then sent again: 409 while it runs, the result once done
+  const showResult = useCallback(
+    (data: CreateResult) => {
+      setResult(data);
+      setStep('done');
+      if (data.created) {
+        onCreated();
+      }
+    },
+    [onCreated]
+  );
+
+  // The create request. A timeout, a gateway error or a 409 may leave it
+  // running on the server: 'running' then follows it through the status
   const send = useCallback(
-    async (
-      payload: string,
-      retry: boolean
-    ): Promise<'done' | 'running' | 'error'> => {
+    async (payload: string): Promise<'done' | 'running' | 'error'> => {
       let response: Response;
       try {
         response = await fetch('/posts-bulk-videos', {
@@ -697,34 +705,88 @@ export const BulkVideosModal: FC<{
       } catch (err) {
         return 'running';
       }
-      if (response.status === 409 || response.status >= 500) {
+      if (response.status === 409) {
         return 'running';
+      }
+      if (response.status >= 500) {
+        // an error of the app itself says what went wrong, a gateway's doesn't
+        const body = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        if (!body?.message) {
+          return 'running';
+        }
       }
       if (!response.ok) {
         // a 402 (plan limit) is handled by the app already
         if (response.status !== 402) {
-          toaster.show(
+          setError(
             await errorMessage(
               response,
               t('bulk_videos_failed', 'The videos were not scheduled.')
-            ),
-            'warning'
+            )
           );
         }
         // the dates may have moved on, the preview has to be checked again
         setPreviewKey('');
+        pending.current = '';
         return 'error';
       }
-      const data: CreateResult = await response.json();
-      // after a timeout, the first run's result is this run's result
-      setResult(retry ? { ...data, alreadyCreated: false } : data);
-      setStep('done');
-      if (data.created) {
-        onCreated();
-      }
+      // a status check that may be running stops here
+      pending.current = '';
+      showResult(await response.json());
       return 'done';
     },
-    [onCreated]
+    [showResult]
+  );
+
+  // Follows a request that may still be running, now and then every 5
+  // seconds for up to 10 minutes. The status is read without the plan checks, so it never
+  // opens the payment dialog.
+  const follow = useCallback(
+    async (payload: string) => {
+      setRunning(true);
+      const until = Date.now() + 10 * 60 * 1000;
+      while (pending.current === payload) {
+        if (Date.now() > until) {
+          setError(
+            t(
+              'bulk_videos_too_long',
+              'This is taking longer than expected. Check the calendar before you schedule these videos again.'
+            )
+          );
+          setPreviewKey('');
+          return;
+        }
+        let status: { status: string; result?: CreateResult } | null = null;
+        try {
+          const response = await fetch('/posts-bulk-videos/status', {
+            method: 'POST',
+            body: payload,
+          });
+          status = response.ok ? await response.json() : null;
+        } catch (err) {
+          status = null;
+        }
+        if (status?.status === 'done' && status.result) {
+          showResult(status.result);
+          return;
+        }
+        if (status?.status === 'none') {
+          setError(
+            t(
+              'bulk_videos_not_created',
+              'The videos were not scheduled. Check the preview, then try again.'
+            )
+          );
+          setPreviewKey('');
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    },
+    [showResult]
   );
 
   const create = useCallback(async () => {
@@ -732,21 +794,32 @@ export const BulkVideosModal: FC<{
       return;
     }
     setLoading(true);
+    setError('');
     sentKeys.current = ready.map((video) => video.key);
     pending.current = createKey;
-    let outcome = await send(createKey, false);
-    while (outcome === 'running' && pending.current === createKey) {
-      setRunning(true);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-      if (pending.current !== createKey) {
-        break;
-      }
-      outcome = await send(createKey, true);
+    // "Move to billing" in the payment dialog never answers the request:
+    // coming back to the page while it is still waiting follows the status
+    let hidden = false;
+    let onVisible = () => undefined as void;
+    const back = new Promise<'running'>((resolve) => {
+      onVisible = () => {
+        if (document.visibilityState === 'hidden') {
+          hidden = true;
+        } else if (hidden) {
+          resolve('running');
+        }
+      };
+      document.addEventListener('visibilitychange', onVisible);
+    });
+    const outcome = await Promise.race([send(createKey), back]);
+    document.removeEventListener('visibilitychange', onVisible);
+    if (outcome === 'running') {
+      await follow(createKey);
     }
     pending.current = '';
     setRunning(false);
     setLoading(false);
-  }, [createKey, ready, send]);
+  }, [createKey, ready, send, follow]);
 
   // closing the window stops checking, the server finishes on its own
   useEffect(

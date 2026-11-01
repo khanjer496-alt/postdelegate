@@ -73,7 +73,7 @@ async function start() {
 
   // 50 videos with their captions and settings
   app.use('/posts-bulk-videos', (req: any, res: any, next: any) => {
-    json({ limit: '2mb' })(req, res, next);
+    json({ limit: '4mb' })(req, res, next);
   });
 
   app.use(cookieParser());
