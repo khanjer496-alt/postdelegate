@@ -380,30 +380,36 @@ export class NotificationService {
     }
   }
 
-  // Once a day per workspace, however many posts were held, and only to the
-  // members who want failure emails
+  // Once a day per workspace, however many posts were held. A held post is a
+  // publishing failure, so it goes to the members who want failure emails
+  // (the 'info' type would skip every preference). The day is claimed first
+  // so posts held at the same moment send one notice, and released when the
+  // send fails so the next held post tries again
   private async sendChannelsPausedEmail(orgId: string) {
+    const key = `channels-paused-email:${orgId}:${dayjs().format('YYYY-MM-DD')}`;
+    let claimed = false;
     try {
-      const first = await ioRedis.set(
-        `channels-paused-email:${orgId}:${dayjs().format('YYYY-MM-DD')}`,
-        '1',
-        'EX',
-        24 * 60 * 60,
-        'NX'
-      );
-      if (first !== 'OK') {
+      if ((await ioRedis.set(key, '1', 'EX', 24 * 60 * 60, 'NX')) !== 'OK') {
         return;
       }
+      claimed = true;
     } catch (err) {
       // without redis the notice still goes out
     }
 
-    await this.sendEmailsToOrg(
-      orgId,
-      'Some scheduled posts were not published',
-      'One or more scheduled posts were not published because their channel is turned off. This happens when a trial ends or the plan changes. Turn the channels back on from the calendar, or upgrade your plan, then reschedule the posts.',
-      'fail'
-    );
+    try {
+      await this.sendEmailsToOrg(
+        orgId,
+        'Some scheduled posts were not published',
+        'One or more scheduled posts were not published because their channel is turned off. This happens when a trial ends or the plan changes. Turn the channels back on from the calendar, or upgrade your plan, then reschedule the posts.',
+        'fail'
+      );
+    } catch (err) {
+      if (claimed) {
+        await ioRedis.del(key).catch(() => undefined);
+      }
+      throw err;
+    }
   }
 
   // Account matters (billing, the plan) only the admins can act on

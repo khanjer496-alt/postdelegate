@@ -24,6 +24,7 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
         keys.add(key);
         return 'OK';
       }),
+      del: jest.fn(async (key: string) => keys.delete(key)),
     },
   };
 });
@@ -392,6 +393,14 @@ describe('NotificationService turned off channel notices', () => {
     expect(emails.sendEmail).toHaveBeenCalledTimes(1);
     // every held post still shows in the app
     expect(repo.createScopedNotification).toHaveBeenCalledTimes(3);
+  });
+
+  it('tries again with the next held post when the notice could not be sent', async () => {
+    emails.sendEmail.mockRejectedValueOnce(new Error('smtp down'));
+    await expect(held()).rejects.toThrow('smtp down');
+    await held();
+    // the failed attempt and the retry
+    expect(emails.sendEmail).toHaveBeenCalledTimes(2);
   });
 
   it('respects the failure email preference', async () => {
