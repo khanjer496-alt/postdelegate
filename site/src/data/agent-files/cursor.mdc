@@ -1,5 +1,5 @@
 ---
-description: PostDelegate social media scheduling. Apply when code or a request uses the PostDelegate REST API or MCP server to list channels, upload media, or draft, schedule, list or delete posts.
+description: PostDelegate social media scheduling. Apply when code or a request uses the PostDelegate REST API or MCP server to list channels, upload media, render Studio videos, or draft, schedule, list or delete posts.
 globs:
 alwaysApply: false
 ---
@@ -25,6 +25,8 @@ Cursor MCP config (`.cursor/mcp.json`):
 3. Upload media first: MCP `uploadFromUrlTool` / REST `POST /upload` or `POST /upload-from-url`. With `adjust`, wait for `ready` (MCP `mediaStatusTool` / REST `GET /media/:id/status`).
 4. Create a **draft**: MCP `integrationSchedulePostTool` (`settings` is a `[{key, value}]` list) / REST `POST /posts` (`settings` is an object, `{}` when none; `shortLink` and `tags` required; one `date` per request).
 5. List, change or delete: MCP `postsListTool`, `postSettingsTool`, `deletePostTool` / REST `GET /posts`, `PUT /posts/:id/settings`, `DELETE /posts/:id`.
+
+6. Studio video: MCP `studioTemplatesTool` → `studioRenderTool` → `studioRenderStatusTool` / REST `GET /studio/templates` → `POST /studio/renders` `{ template, spec, name? }` → poll `GET /studio/renders/:id`. Follow the template's `schema`, media are `mediaId`s from the media library (never URLs). On `completed`, post the returned `path` as a draft with step 4. Rendering never posts. Templates (`identifier`): `hook-over-clip`, `talking-head-captions`, `image-slideshow`, `before-after`, `top-n-list`, `quote-card` and `ai-ugc`. For `ai-ugc`, write `script` (`hook`, `lines`, `cta`) yourself and leave `voiceover` at its default `false`: it renders with no AI key. `voiceover: true` needs the workspace's own OpenAI key, and `stills` need `voiceover: true` (refused otherwise). `music.assetId` must be a music already uploaded in Studio that no other project uses; music used by another project is refused, so the user uploads it again in Studio. There is no music upload or list API yet.
 
 Content is HTML: each line in `<p>`. Dates are UTC ISO 8601. REST `POST /posts` is limited to 30 requests per workspace per hour, so batch channels that share a date into one request.
 

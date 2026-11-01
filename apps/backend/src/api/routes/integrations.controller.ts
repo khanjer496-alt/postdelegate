@@ -520,8 +520,10 @@ export class IntegrationsController {
     }
   }
 
-  @Get('/moltbook/status')
-  async moltbookStatus(@Query('apiKey') apiKey: string) {
+  // the API key travels in the body: a query string ends up in access logs
+  @Post('/moltbook/status')
+  async moltbookStatus(@Body() body: { apiKey: string }) {
+    const apiKey = body?.apiKey;
     try {
       const provider = new MoltbookProvider();
       const result = await provider.checkAgentStatus(apiKey);

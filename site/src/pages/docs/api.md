@@ -4,7 +4,7 @@ title: REST API overview
 description: Base URL, authentication, rate limits and error formats for the PostDelegate public API, with a first request you can run in a minute.
 ---
 
-The public API lets your own software list channels, upload media and create, read and delete posts in your workspace. It is the same engine the app and the [MCP server](/docs/mcp) use.
+The public API lets your own software list channels, upload media, render [Studio](/docs/studio) videos and create, read and delete posts in your workspace. It is the same engine the app and the [MCP server](/docs/mcp) use.
 
 ## Base URL
 
@@ -55,7 +55,7 @@ Creating posts, that is `POST /posts`, is limited per workspace per hour. PostDe
 
 One request can include several channels in its `posts` array, and they all share the request's `date`. Batch the channels of one post into a single request rather than sending one request per channel. Posts on different dates need separate requests.
 
-Other endpoints are not covered by this limit. Keep your usage reasonable: the networks apply their own limits when posts publish.
+Starting a Studio render, `POST /studio/renders`, has its own limit of 30 requests per workspace per hour. Other endpoints are not covered by these limits. Keep your usage reasonable: the networks apply their own limits when posts publish.
 
 ## Errors
 
@@ -69,7 +69,7 @@ Errors are JSON. The shape depends on where the error came from.
 | `400` | The request body or query is malformed | `{ "statusCode": 400, "message": ["date must be a valid ISO 8601 date string"], "error": "Bad Request" }` |
 | `400`, `404` | A route-specific problem | `{ "msg": "Integration not found" }` |
 | `402` | You reached a plan limit, such as posts or channels | `{ "statusCode": 402, "message": "…", "url": "https://app.postdelegate.com/billing" }` |
-| `429` | Too many `POST /posts` requests this hour | Standard throttling response |
+| `429` | Too many `POST /posts` or `POST /studio/renders` requests this hour, or a [Studio](/docs/api/studio#limits-and-errors) fair use limit | Standard throttling response, or `{ "statusCode": 429, "message": "…" }` |
 
 Read `message` or `msg` for the reason. Post validation errors name the channel, so you know which entry in `posts` to fix.
 
@@ -86,6 +86,7 @@ Read `message` or `msg` for the reason. Post validation errors name the channel,
 | --- | --- |
 | [Posts](/docs/api/posts) | `POST /posts`, `GET /posts`, `DELETE /posts/:id`, `DELETE /posts/group/:group`, `PUT /posts/:id/status`, `PUT /posts/:id/settings`, `PUT /posts/:id/release-id`, `GET /posts/:id/missing` |
 | [Uploads and media](/docs/api/uploads) | `POST /upload`, `POST /upload-from-url`, `GET /media`, `GET /media/:id/status` |
+| [Studio](/docs/api/studio) | `GET /studio/templates`, `POST /studio/renders`, `GET /studio/renders/:id`, `POST /studio/renders/:id/cancel` |
 | [Channels and customers](/docs/api/channels) | `GET /integrations`, `GET /groups`, `GET /integration-settings/:id`, `POST /integration-trigger/:id`, `GET /social/:integration`, `DELETE /integrations/:id` |
 | [Analytics and more](/docs/api/more) | `GET /analytics/:integration`, `GET /analytics/post/:postId`, `GET /notifications`, `GET /find-slot/:id`, `GET /is-connected`, `GET /me` |
 

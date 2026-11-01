@@ -63,6 +63,9 @@ const clip = (text: string | undefined, length: number) =>
   title: 'AI UGC',
   description:
     'Your AI writes a short script and voices it, Studio cuts your footage to it with word-by-word captions. Runs on your own OpenAI key.',
+  agentDescription:
+    'A spoken script over your own footage (videos of the media library), cut line by line with word-by-word captions. Write the script yourself (hook, lines, cta). By default there is no AI voice: the script is shown as captions for "seconds" and no AI key is needed. An AI voice (voiceover: true) needs the workspace\'s own OpenAI key, and AI stills (stills) only come with the voice, so they need voiceover: true too.',
+  agentDefaults: { voiceover: false },
   dto: AiUgcDto,
   captions: false,
   ai: true,
@@ -80,6 +83,14 @@ export class AiUgcTemplate extends StudioTemplateAbstract<any> {
 
   voiced(spec: AiUgcDto) {
     return spec.voiceover !== false;
+  }
+
+  // the editor hides the stills without a voice and makes none, an
+  // assistant asking for them is told instead
+  agentCheck(spec: AiUgcDto) {
+    return spec.stills && !this.voiced(spec)
+      ? 'AI stills need the AI voice: set voiceover to true (it needs the workspace\'s own OpenAI key) or leave stills out'
+      : undefined;
   }
 
   // What is said, part by part: the hook, every line, the call to action

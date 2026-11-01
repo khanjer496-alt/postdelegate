@@ -1179,3 +1179,54 @@ describe('PostsService.validatePosts post date context', () => {
     expect(result.disabled).toBe(true);
   });
 });
+
+describe('PostsService.validatePosts text for the provider rules', () => {
+  it('hands checkValidity each entry as the provider receives it', async () => {
+    const checkValidity = jest.fn(async () => 'too long' as const);
+    const service = new PostsService(
+      {} as any,
+      {
+        getSocialIntegration: () => ({
+          editor: 'html',
+          checkValidity,
+          maxLength: () => 4096,
+        }),
+      } as any,
+      {
+        getIntegrationById: jest.fn().mockResolvedValue({
+          id: 'tg-1',
+          name: 'Channel',
+          providerIdentifier: 'telegram',
+          additionalSettings: '[]',
+        }),
+      } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const [result] = await service.validatePosts('org-1', [
+      {
+        integration: { id: 'tg-1' },
+        value: [
+          { content: '<p dir="auto">One &amp; two</p>', image: [{ path: 'a.png' }] },
+          { content: 'plain reply', image: [] },
+        ],
+        settings: {},
+      },
+    ]);
+
+    expect(result.errors).toBe('too long');
+    expect(checkValidity).toHaveBeenCalledWith(
+      [[{ path: 'a.png' }], []],
+      { __type: 'telegram' },
+      [],
+      ['<p dir="auto">One & two</p>', 'plain reply']
+    );
+  });
+});

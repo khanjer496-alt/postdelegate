@@ -16,6 +16,7 @@ import {
 import { streamUploadOptions } from '@gitroom/nestjs-libraries/upload/multer.stream.engine';
 import { omit } from 'lodash';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetIncludeDeletedFromRequest } from '@gitroom/nestjs-libraries/user/include.deleted.from.request';
 import { GetOAuthUserIdFromRequest } from '@gitroom/nestjs-libraries/user/oauth.user.id.from.request';
@@ -40,6 +41,8 @@ import { UploadDto } from '@gitroom/nestjs-libraries/dtos/media/upload.dto';
 import { GetMediaDto } from '@gitroom/nestjs-libraries/dtos/media/get.media.dto';
 import { ClippingDto } from '@gitroom/nestjs-libraries/dtos/clipping/clipping.dto';
 import { ClippingService } from '@gitroom/nestjs-libraries/database/prisma/clipping/clipping.service';
+import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
+import { CreateStudioRenderDto } from '@gitroom/nestjs-libraries/dtos/studio/studio.render.dto';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { GetNotificationsDto } from '@gitroom/nestjs-libraries/dtos/notifications/get.notifications.dto';
 import * as Sentry from '@sentry/nestjs';
@@ -76,7 +79,8 @@ export class PublicIntegrationsController {
     private _adminStatsService: AdminStatsService,
     private _organizationService: OrganizationService,
     private _clippingService: ClippingService,
-    private _subscriptionService: SubscriptionService
+    private _subscriptionService: SubscriptionService,
+    private _studioService: StudioService
   ) {}
 
   @Post('/upload')
@@ -590,6 +594,45 @@ export class PublicIntegrationsController {
   getClipping(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
     Sentry.metrics.count('public_api-request', 1);
     return this._clippingService.getClipping(org.id, id);
+  }
+
+  // Studio: renders only save a video to the media library, never a post.
+  // Fair use, the plan check and the media of the workspace are enforced by
+  // the service, the same way as in the app
+  @Get('/studio/templates')
+  getStudioTemplates() {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._studioService.getTemplateSchemas();
+  }
+
+  // each attempt validates media and checks the limits, so attempts are
+  // capped too, not only the renders that start
+  @Throttle({ default: { limit: 30, ttl: 60 * 60 * 1000 } })
+  @Post('/studio/renders')
+  startStudioRender(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: CreateStudioRenderDto
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._studioService.renderFromSpec(org, body);
+  }
+
+  @Get('/studio/renders/:id')
+  getStudioRender(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._studioService.getRender(org.id, id);
+  }
+
+  @Post('/studio/renders/:id/cancel')
+  cancelStudioRender(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._studioService.cancelRender(org.id, id);
   }
 
   @Delete('/integrations/:id')

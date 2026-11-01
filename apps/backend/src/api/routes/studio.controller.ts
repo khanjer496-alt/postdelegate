@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -23,6 +24,7 @@ import { StudioScheduleService } from '@gitroom/nestjs-libraries/database/prisma
 import { StudioAiService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.ai.service';
 import {
   CreateStudioProjectDto,
+  GetStudioProjectsDto,
   StudioTranscribeDto,
   UpdateStudioProjectDto,
 } from '@gitroom/nestjs-libraries/dtos/studio/studio.project.dto';
@@ -69,8 +71,11 @@ export class StudioController {
   }
 
   @Get('/projects')
-  getProjects(@GetOrgFromRequest() org: Organization) {
-    return this._studioService.getProjects(org.id);
+  getProjects(
+    @GetOrgFromRequest() org: Organization,
+    @Query() query: GetStudioProjectsDto
+  ) {
+    return this._studioService.getProjects(org.id, !!query.api);
   }
 
   @Post('/projects')
