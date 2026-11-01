@@ -483,7 +483,8 @@ describe('ErasureService', () => {
       });
 
       await expect(report).resolves.toMatchObject({ status: 'completed' });
-    });
+      // writing under /proc fails slowly on Linux CI runners
+    }, 30_000);
   });
 
   describe('several accounts with the same email', () => {

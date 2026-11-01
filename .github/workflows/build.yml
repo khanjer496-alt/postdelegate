@@ -44,7 +44,7 @@ jobs:
         # the jest suite never ran in CI before; a failing spec now blocks the PR
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-        run: pnpm exec jest --ci
+        run: pnpm exec jest --ci --forceExit
 
       - name: Build
         # the default Node heap runs out building the backend; the release
