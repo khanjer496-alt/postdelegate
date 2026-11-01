@@ -66,6 +66,24 @@ describe('DiscordProvider mentions', () => {
     expect(list.every((p: any) => p.label)).toBe(true);
   });
 
+  it('never shares server members with other workspaces, and asks for up to 10', async () => {
+    const { instance, fetched } = provider((url) =>
+      url.endsWith('/roles') ? roles : members
+    );
+    const list = await instance.mention(
+      'token',
+      { query: 'bo b' },
+      GUILD,
+      {} as any
+    );
+    expect(list).toContainEqual(
+      expect.objectContaining({ id: '222', label: 'Bob', doNotCache: true })
+    );
+    expect(fetched).toContain(
+      `https://discord.com/api/guilds/${GUILD}/members/search?query=bo%20b&limit=10`
+    );
+  });
+
   it('offers @everyone once, not again as the guild role', async () => {
     const list = await mentionsFor('every');
     expect(list.filter((p: any) => p.label === 'everyone')).toEqual([

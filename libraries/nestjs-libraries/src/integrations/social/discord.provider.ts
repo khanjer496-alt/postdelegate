@@ -335,7 +335,9 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
 
     const list = await (
       await this.fetch(
-        `https://discord.com/api/guilds/${id}/members/search?query=${data.query}`,
+        `https://discord.com/api/guilds/${id}/members/search?query=${encodeURIComponent(
+          data.query
+        )}&limit=10`,
         {
           headers: {
             Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
@@ -372,6 +374,8 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         id: String(p.user.id),
         label: p.user.global_name || p.user.username,
         image: `https://cdn.discordapp.com/avatars/${p.user.id}/${p.user.avatar}.png`,
+        // members of a private server, never shared with other workspaces
+        doNotCache: true,
       })),
     ];
   }
