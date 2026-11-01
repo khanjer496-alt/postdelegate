@@ -1,0 +1,436 @@
+// the service builds its storage at construction and pulls in the media and
+// AI stacks at import time
+const storage = {
+  signDownloadUrl: jest.fn().mockResolvedValue('https://r2.example/signed'),
+  uploadStream: jest.fn(),
+};
+jest.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
+  UploadFactory: { createStorage: () => storage },
+}));
+const redisSet = jest.fn();
+const redisDel = jest.fn();
+jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
+  ioRedis: {
+    set: (...args: unknown[]) => redisSet(...args),
+    del: (...args: unknown[]) => redisDel(...args),
+  },
+}));
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/media/media.service',
+  () => ({ MediaService: class {} })
+);
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service',
+  () => ({
+    AiCredentialService: class {},
+    MISSING_AI_KEY: 'Add your OpenAI key in Settings → AI',
+  })
+);
+jest.mock('nestjs-temporal-core', () => ({ TemporalService: class {} }));
+
+import 'reflect-metadata';
+import { BadRequestException, HttpException } from '@nestjs/common';
+import dayjs from 'dayjs';
+import {
+  STUDIO_LIMITS,
+  StudioService,
+} from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
+import { StudioTemplateManager } from '@gitroom/nestjs-libraries/studio/studio.manager';
+import { HookOverClipTemplate } from '@gitroom/nestjs-libraries/studio/templates/hook.over.clip.template';
+import { TalkingHeadCaptionsTemplate } from '@gitroom/nestjs-libraries/studio/templates/talking.head.captions.template';
+
+const MISSING = 'Add your OpenAI key in Settings → AI';
+
+const spec = {
+  input: { mediaId: 'media-1' },
+  trim: { start: 0, end: 20 },
+  hook: { text: 'Watch this' },
+};
+
+const status = async (promise: Promise<unknown>) => {
+  try {
+    await promise;
+  } catch (err) {
+    return err instanceof HttpException ? err.getStatus() : err;
+  }
+  return 'resolved';
+};
+
+describe('StudioService fair use', () => {
+  let repository: Record<string, jest.Mock>;
+  let mediaService: { getOrgMediaById: jest.Mock };
+  let aiCredentialService: { hasCredential: jest.Mock };
+  let workflowStart: jest.Mock;
+  let workflowCancel: jest.Mock;
+  let service: StudioService;
+  const paid = { id: 'org-1', isTrailing: false } as any;
+  const trial = { id: 'org-1', isTrailing: true } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    redisSet.mockResolvedValue('OK');
+    repository = {
+      getProject: jest.fn().mockResolvedValue({
+        id: 'project-1',
+        name: 'My video',
+        template: 'hook-over-clip',
+        spec: JSON.stringify(spec),
+        renders: [],
+      }),
+      getActiveRenders: jest.fn().mockResolvedValue([]),
+      countRendersSince: jest.fn().mockResolvedValue(0),
+      countQueuedRenders: jest.fn().mockResolvedValue(0),
+      createRender: jest.fn().mockResolvedValue({ id: 'render-1' }),
+      updateRender: jest.fn().mockResolvedValue(undefined),
+      updateProject: jest.fn().mockResolvedValue(undefined),
+      getRender: jest.fn(),
+      getRenderById: jest.fn(),
+    };
+    mediaService = {
+      getOrgMediaById: jest.fn().mockResolvedValue({
+        id: 'media-1',
+        name: 'abc.mp4',
+        path: 'https://media.example/abc.mp4',
+        status: 'ready',
+        deletedAt: null,
+      }),
+    };
+    aiCredentialService = { hasCredential: jest.fn().mockResolvedValue(false) };
+    workflowStart = jest.fn().mockResolvedValue(undefined);
+    workflowCancel = jest.fn().mockResolvedValue(undefined);
+    const templates = new Map<any, any>([
+      [HookOverClipTemplate, new HookOverClipTemplate()],
+      [TalkingHeadCaptionsTemplate, new TalkingHeadCaptionsTemplate()],
+    ]);
+    service = new StudioService(
+      repository as any,
+      new StudioTemplateManager({
+        get: (target: any) => templates.get(target),
+      } as any),
+      mediaService as any,
+      aiCredentialService as any,
+      {
+        client: {
+          getRawClient: () => ({
+            workflow: {
+              start: workflowStart,
+              getHandle: () => ({ cancel: workflowCancel }),
+            },
+          }),
+        },
+      } as any
+    );
+  });
+
+  afterEach(() => {
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+  });
+
+  it('starts a render on the main queue under a start lock', async () => {
+    await expect(service.startRender(paid, 'project-1')).resolves.toEqual({
+      id: 'render-1',
+    });
+    expect(redisSet).toHaveBeenCalledWith(
+      'studioStart:org-1',
+      '1',
+      'EX',
+      15,
+      'NX'
+    );
+    expect(repository.createRender).toHaveBeenCalledWith(
+      'org-1',
+      'project-1',
+      20,
+      expect.any(String)
+    );
+    expect(workflowStart).toHaveBeenCalledWith(
+      'studioRenderWorkflowV1',
+      expect.objectContaining({
+        workflowId: 'studio_render-1',
+        taskQueue: 'main',
+        args: [{ renderId: 'render-1' }],
+      })
+    );
+    expect(redisDel).toHaveBeenCalledWith('studioStart:org-1');
+  });
+
+  it('refuses a second start while the lock is held', async () => {
+    redisSet.mockResolvedValue(null);
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(429);
+    expect(repository.createRender).not.toHaveBeenCalled();
+  });
+
+  it(`refuses a trial workspace after ${STUDIO_LIMITS.trialRenders} renders`, async () => {
+    repository.countRendersSince.mockImplementation(
+      async (_org: string, since?: Date) =>
+        since ? 0 : STUDIO_LIMITS.trialRenders
+    );
+    expect(await status(service.startRender(trial, 'project-1'))).toBe(406);
+    expect(repository.createRender).not.toHaveBeenCalled();
+    // the lock is given back either way
+    expect(redisDel).toHaveBeenCalledWith('studioStart:org-1');
+  });
+
+  it('lets a trial workspace render below the cap', async () => {
+    repository.countRendersSince.mockResolvedValue(
+      STUDIO_LIMITS.trialRenders - 1
+    );
+    expect(await status(service.startRender(trial, 'project-1'))).toBe(
+      'resolved'
+    );
+  });
+
+  it('never applies the trial cap to a paid workspace or without billing', async () => {
+    repository.countRendersSince.mockImplementation(
+      async (_org: string, since?: Date) => (since ? 0 : 500)
+    );
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(
+      'resolved'
+    );
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+    expect(await status(service.startRender(trial, 'project-1'))).toBe(
+      'resolved'
+    );
+  });
+
+  it(`refuses after ${STUDIO_LIMITS.maxPerDay} renders in 24 hours`, async () => {
+    repository.countRendersSince.mockImplementation(
+      async (_org: string, since?: Date) =>
+        since ? STUDIO_LIMITS.maxPerDay : 0
+    );
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(429);
+    const since = repository.countRendersSince.mock.calls.find(
+      (call) => call[1]
+    )![1] as Date;
+    expect(dayjs().diff(since, 'hour')).toBe(24);
+  });
+
+  it(`refuses when ${STUDIO_LIMITS.maxQueuedPerWorkspace} renders already wait`, async () => {
+    repository.getActiveRenders.mockResolvedValue(
+      [1, 2, 3].map((i) => ({
+        id: `r-${i}`,
+        status: 'queued',
+        createdAt: new Date(),
+      }))
+    );
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(429);
+  });
+
+  it('allows a render to wait behind the running one', async () => {
+    repository.getActiveRenders.mockResolvedValue([
+      { id: 'r-1', status: 'rendering', createdAt: new Date() },
+      { id: 'r-2', status: 'queued', createdAt: new Date() },
+    ]);
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(
+      'resolved'
+    );
+  });
+
+  it(`refuses when ${STUDIO_LIMITS.maxQueuedGlobal} renders wait on the server`, async () => {
+    repository.countQueuedRenders.mockResolvedValue(
+      STUDIO_LIMITS.maxQueuedGlobal
+    );
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(429);
+  });
+
+  it('closes renders whose workflow died before counting the queue', async () => {
+    const old = dayjs().subtract(3, 'hour').toDate();
+    repository.getActiveRenders.mockResolvedValue(
+      [1, 2, 3].map((i) => ({ id: `r-${i}`, status: 'queued', createdAt: old }))
+    );
+    repository.getRenderById.mockResolvedValue({
+      id: 'r-1',
+      status: 'queued',
+      mediaId: null,
+    });
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(
+      'resolved'
+    );
+    expect(repository.updateRender).toHaveBeenCalledWith(
+      'r-1',
+      expect.objectContaining({ status: 'failed' })
+    );
+  });
+
+  it(`refuses an output longer than ${STUDIO_LIMITS.maxSeconds} seconds`, async () => {
+    repository.getProject.mockResolvedValue({
+      id: 'project-1',
+      template: 'hook-over-clip',
+      spec: JSON.stringify({ ...spec, trim: { start: 0, end: 200 }, speed: 2 }),
+    });
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(400);
+
+    // the same clip at double speed fits
+    repository.getProject.mockResolvedValue({
+      id: 'project-1',
+      template: 'hook-over-clip',
+      spec: JSON.stringify({ ...spec, trim: { start: 0, end: 180 }, speed: 2 }),
+    });
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(
+      'resolved'
+    );
+  });
+
+  it('refuses media of another workspace', async () => {
+    mediaService.getOrgMediaById.mockResolvedValue(null);
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(400);
+    expect(mediaService.getOrgMediaById).toHaveBeenCalledWith(
+      'org-1',
+      'media-1'
+    );
+  });
+
+  it('marks a render failed when its workflow can not start', async () => {
+    workflowStart.mockRejectedValue(new Error('down'));
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(503);
+    expect(repository.updateRender).toHaveBeenCalledWith('render-1', {
+      status: 'failed',
+      error: 'Could not start the render',
+    });
+  });
+
+  it('reports usage with the trial renders left', async () => {
+    repository.countRendersSince.mockImplementation(
+      async (_org: string, since?: Date) => (since ? 2 : 4)
+    );
+    await expect(service.getUsage(trial)).resolves.toEqual(
+      expect.objectContaining({
+        trial: true,
+        trialUsed: 4,
+        usedToday: 2,
+        trialRenders: 10,
+        maxPerDay: 30,
+        maxSeconds: 90,
+      })
+    );
+  });
+});
+
+describe('StudioService render turn', () => {
+  let repository: Record<string, jest.Mock>;
+  let service: StudioService;
+
+  beforeEach(() => {
+    repository = {
+      getRenderById: jest.fn(),
+      getActiveRenders: jest.fn(),
+      updateRender: jest.fn(),
+    };
+    service = new StudioService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+  });
+
+  it('lets only the oldest active render of a workspace go', async () => {
+    repository.getRenderById.mockResolvedValue({
+      id: 'r-2',
+      organizationId: 'org-1',
+      status: 'queued',
+      createdAt: new Date(),
+    });
+    repository.getActiveRenders.mockResolvedValue([
+      { id: 'r-1', status: 'rendering', createdAt: new Date() },
+      { id: 'r-2', status: 'queued', createdAt: new Date() },
+    ]);
+    await expect(service.prepareRender('r-2')).resolves.toBe('wait');
+
+    repository.getActiveRenders.mockResolvedValue([
+      { id: 'r-2', status: 'queued', createdAt: new Date() },
+    ]);
+    await expect(service.prepareRender('r-2')).resolves.toBe('ready');
+  });
+
+  it('stops a render that was cancelled while it waited', async () => {
+    repository.getRenderById.mockResolvedValue({
+      id: 'r-2',
+      organizationId: 'org-1',
+      status: 'cancelled',
+    });
+    await expect(service.prepareRender('r-2')).resolves.toBe('gone');
+  });
+
+  it('keeps a saved video when the render fails after it', async () => {
+    repository.getRenderById.mockResolvedValue({
+      id: 'r-1',
+      status: 'uploading',
+      mediaId: 'media-9',
+    });
+    await service.failRender('r-1', 'boom');
+    expect(repository.updateRender).toHaveBeenCalledWith(
+      'r-1',
+      expect.objectContaining({ status: 'completed' })
+    );
+  });
+
+  it('records a cancel without an error', async () => {
+    repository.getRenderById.mockResolvedValue({
+      id: 'r-1',
+      status: 'rendering',
+      mediaId: null,
+    });
+    await service.failRender('r-1', 'Cancelled', true, true);
+    expect(repository.updateRender).toHaveBeenCalledWith('r-1', {
+      status: 'cancelled',
+      error: null,
+    });
+  });
+});
+
+describe('StudioService transcribe', () => {
+  let repository: Record<string, jest.Mock>;
+  let aiCredentialService: { hasCredential: jest.Mock };
+  let service: StudioService;
+
+  beforeEach(() => {
+    repository = {
+      getProject: jest.fn().mockResolvedValue({
+        id: 'project-1',
+        template: 'talking-head-captions',
+        spec: JSON.stringify({
+          input: { mediaId: 'media-1' },
+          trim: { start: 5, end: 9 },
+        }),
+      }),
+      updateProject: jest.fn(),
+    };
+    aiCredentialService = { hasCredential: jest.fn().mockResolvedValue(false) };
+    const templates = new Map<any, any>([
+      [TalkingHeadCaptionsTemplate, new TalkingHeadCaptionsTemplate()],
+      [HookOverClipTemplate, new HookOverClipTemplate()],
+    ]);
+    service = new StudioService(
+      repository as any,
+      new StudioTemplateManager({
+        get: (target: any) => templates.get(target),
+      } as any),
+      {} as any,
+      aiCredentialService as any,
+      {} as any
+    );
+  });
+
+  it('spreads a typed script without any AI key', async () => {
+    const { words } = await service.transcribe('org-1', 'project-1', {
+      script: 'one two',
+    });
+    expect(words[0].start).toBe(5);
+    expect(words[1].end).toBe(9);
+    expect(aiCredentialService.hasCredential).not.toHaveBeenCalled();
+    expect(
+      JSON.parse(repository.updateProject.mock.calls[0][2].spec).captions
+    ).toEqual(expect.objectContaining({ source: 'script', words }));
+  });
+
+  it('asks for a key when there is no script and no key', async () => {
+    const result = service.transcribe('org-1', 'project-1', {});
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.transcribe('org-1', 'project-1', {})
+    ).rejects.toMatchObject({ message: MISSING });
+  });
+});

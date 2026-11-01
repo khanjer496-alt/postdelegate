@@ -67,6 +67,7 @@ import { IdeasController } from '@gitroom/backend/api/routes/ideas.controller';
 import { EvergreenController } from '@gitroom/backend/api/routes/evergreen.controller';
 import { PostsImportController } from '@gitroom/backend/api/routes/posts.import.controller';
 import { WeeklySummaryController } from '@gitroom/backend/api/routes/weekly.summary.controller';
+import { StudioController } from '@gitroom/backend/api/routes/studio.controller';
 
 const authenticatedController = [
   UsersController,
@@ -98,6 +99,7 @@ const authenticatedController = [
   EvergreenController,
   PostsImportController,
   WeeklySummaryController,
+  StudioController,
 ];
 @Module({
   imports: [UploadModule],
