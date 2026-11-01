@@ -4,14 +4,14 @@ const { id, compact = false } = Astro.props;
 const days = Array.from({ length: 35 }, (_, i) => i + 1);
 const posts: Record<number, { title: string; time: string; art: string; channel: string; draft?: boolean }> = {
   1: { title: 'A fresh perspective', time: '09:00', art: 'peach', channel: '◎' },
-  3: { title: 'Inside the studio', time: '12:30', art: 'lilac', channel: 'in' },
+  3: { title: 'Inside the workshop', time: '12:30', art: 'lilac', channel: 'in' },
   5: { title: 'Small things, made well', time: '10:00', art: 'lime', channel: '◎', draft: true },
   8: { title: 'Room for a new idea', time: '09:00', art: 'blue', channel: 'in' },
   10: { title: 'The details matter', time: '15:00', art: 'peach', channel: '◎' },
   12: { title: 'Meet the makers', time: '11:00', art: 'lime', channel: '▶' },
   16: { title: 'Something to share', time: '09:30', art: 'lilac', channel: '◎', draft: true },
   18: { title: 'A little behind the scenes', time: '14:00', art: 'blue', channel: 'in' },
-  23: { title: 'Notes from the studio', time: '10:00', art: 'lime', channel: '◎', draft: true },
+  23: { title: 'Notes from the week', time: '10:00', art: 'lime', channel: '◎', draft: true },
   26: { title: 'From an idea to a story', time: '12:00', art: 'peach', channel: '▶' },
   29: { title: 'Make space for what’s next', time: '09:00', art: 'lilac', channel: 'in', draft: true },
 };
@@ -29,11 +29,11 @@ const navigation = [
   <div class="pp-workspace" aria-hidden="true">
     <aside class="pp-sidebar">
       <div class="pp-brand"><span class="pp-mark"><img src="/mark.svg?v=orbit-slot" alt="" width="25" height="25"/></span><strong>PostDelegate<small>WORKSPACE</small></strong></div>
-      <div class="pp-picker"><span>S</span><b>Studio workspace</b><i>⌄</i></div>
-      <span class="pp-aside-label">YOUR STUDIO</span>
+      <div class="pp-picker"><span>M</span><b>Maya’s workspace</b><i>⌄</i></div>
+      <span class="pp-aside-label">YOUR WORKSPACE</span>
       <div class="pp-navigation">{navigation.map(({ name, path }) => <div class:list={['pp-nav', { 'pp-active': name === 'Calendar' }]}><svg viewBox="0 0 20 20"><path d={path} /></svg><span>{name}</span>{name === 'Calendar' && <i></i>}</div>)}</div>
-      <div class="pp-channels"><span class="pp-aside-label">CHANNELS <b>+</b></span>{[{ name: 'Studio journal', network: 'Instagram', icon: '◎', initial: 'S', tone: 'peach' }, { name: 'Made by Studio', network: 'LinkedIn', icon: 'in', initial: 'M', tone: 'lilac' }, { name: 'Studio films', network: 'YouTube', icon: '▶', initial: 'S', tone: 'blue' }].map((channel) => <div class="pp-channel-row"><span class:list={['pp-avatar', `pp-avatar-${channel.tone}`]}>{channel.initial}<i>{channel.icon}</i></span><span>{channel.name}<small>{channel.network}</small></span><b></b></div>)}</div>
-      <div class="pp-aside-bottom"><span class="pp-orbit">✳</span><strong>A home for your ideas.</strong><p>From the first draft to the next post.</p><div class="pp-profile"><span>M</span><div>Maya’s workspace<small>Personal workspace</small></div><b>⌄</b></div></div>
+      <div class="pp-channels"><span class="pp-aside-label">CHANNELS <b>+</b></span>{[{ name: 'Maya’s journal', network: 'Instagram', icon: '◎', initial: 'M', tone: 'peach' }, { name: 'Made by Maya', network: 'LinkedIn', icon: 'in', initial: 'M', tone: 'lilac' }, { name: 'Maya on film', network: 'YouTube', icon: '▶', initial: 'M', tone: 'blue' }].map((channel) => <div class="pp-channel-row"><span class:list={['pp-avatar', `pp-avatar-${channel.tone}`]}>{channel.initial}<i>{channel.icon}</i></span><span>{channel.name}<small>{channel.network}</small></span><b></b></div>)}</div>
+      <div class="pp-aside-bottom"><span class="pp-orbit">✳</span><strong>A home for your ideas.</strong><p>From the first draft to the next post.</p><div class="pp-profile"><span>M</span><div>Maya<small>Workspace owner</small></div><b>⌄</b></div></div>
     </aside>
     <div class="pp-content">
       <header class="pp-topbar"><div><span>Workspace <i>/</i></span>Calendar</div><div class="pp-top-actions"><span class="pp-search"><svg viewBox="0 0 20 20"><circle cx="8" cy="8" r="5"/><path d="m12 12 4 4"/></svg><span>Search anything</span><kbd>⌘ K</kbd></span><span class="pp-user">M</span></div></header>
@@ -42,7 +42,7 @@ const navigation = [
       <div class="pp-weekdays">{['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => <span>{day}</span>)}</div>
       <div class="pp-calendar">{days.map((day) => {
         const post = posts[day];
-        return <div class:list={['pp-day', { 'pp-outside': day > 30, 'pp-selected': day === 10 }]}><span class="pp-number">{day > 30 ? day - 30 : day}</span>{post && <div class:list={['pp-post', { 'pp-draft': post.draft }]}><div class:list={['pp-art', `pp-art-${post.art}`]}><i></i><b></b><span>{post.art === 'lime' ? 'MAKE SPACE.' : post.art === 'blue' ? 'A NEW PERSPECTIVE.' : 'studio notes.'}</span><small>{post.channel}</small></div><strong>{post.title}</strong><div class="pp-post-meta"><i class:list={{ 'pp-is-draft': post.draft }}></i>{post.draft ? 'Draft' : post.time}<span>···</span></div></div>}{day === 10 && <span class="pp-add-hint">+</span>}</div>;
+        return <div class:list={['pp-day', { 'pp-outside': day > 30, 'pp-selected': day === 10 }]}><span class="pp-number">{day > 30 ? day - 30 : day}</span>{post && <div class:list={['pp-post', { 'pp-draft': post.draft }]}><div class:list={['pp-art', `pp-art-${post.art}`]}><i></i><b></b><span>{post.art === 'lime' ? 'MAKE SPACE.' : post.art === 'blue' ? 'A NEW PERSPECTIVE.' : 'weekly notes.'}</span><small>{post.channel}</small></div><strong>{post.title}</strong><div class="pp-post-meta"><i class:list={{ 'pp-is-draft': post.draft }}></i>{post.draft ? 'Draft' : post.time}<span>···</span></div></div>}{day === 10 && <span class="pp-add-hint">+</span>}</div>;
       })}</div>
       <div class="pp-footer"><span><i></i>A little planning. A lot more breathing room.</span><span>Sample content</span></div>
     </div>
