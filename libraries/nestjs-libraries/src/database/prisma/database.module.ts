@@ -72,6 +72,7 @@ import { PostsEvergreenRepository } from '@gitroom/nestjs-libraries/database/pri
 import { PostsEvergreenService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.service';
 import { PostsImportRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.repository';
 import { PostsImportService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.service';
+import { PostsBulkVideosService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.bulk.videos.service';
 import { WeeklySummaryRepository } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.repository';
 import { WeeklySummaryService } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.service';
 import { TrialOnboardingRepository } from '@gitroom/nestjs-libraries/database/prisma/trial-onboarding/trial.onboarding.repository';
@@ -169,6 +170,7 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
     PostsEvergreenService,
     PostsImportRepository,
     PostsImportService,
+    PostsBulkVideosService,
     WeeklySummaryRepository,
     WeeklySummaryService,
     TrialOnboardingRepository,
