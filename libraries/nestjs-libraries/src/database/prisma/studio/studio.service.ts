@@ -41,9 +41,14 @@ import {
 } from '@gitroom/nestjs-libraries/dtos/studio/studio.clip.dto';
 import { STUDIO_MUSIC_MAX_BYTES } from '@gitroom/nestjs-libraries/dtos/studio/studio.music.dto';
 import {
+  StudioPlanContext,
   StudioPlanInput,
   StudioTemplateAbstract,
 } from '@gitroom/nestjs-libraries/studio/studio.interface';
+import {
+  studioAiAssetFromRow,
+  studioAiAssetKey,
+} from '@gitroom/nestjs-libraries/studio/ai/studio.ai.interface';
 
 // A reason retrying can't change (a deleted video, a broken file): the
 // workflow stops and the message is what the customer reads
@@ -199,7 +204,7 @@ export class StudioService {
     private _organizationService: OrganizationService
   ) {}
 
-  private tmpRoot() {
+  tmpRoot() {
     return resolve(
       process.env.STUDIO_TMP_DIR || join(tmpdir(), 'postdelegate-studio')
     );
@@ -216,7 +221,7 @@ export class StudioService {
   // no subscription on it. Without billing (self-hosted) everyone may render.
   // A workspace that stopped paying has no subscription row anymore, and a
   // trial is a subscription still marked as trialing
-  private async billing(org: string) {
+  async billing(org: string) {
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
       return { subscribed: true, trial: false };
     }
@@ -250,6 +255,7 @@ export class StudioService {
       title: template.title,
       description: template.description,
       captions: template.captions,
+      ai: !!template.ai,
     }));
   }
 
@@ -389,6 +395,19 @@ export class StudioService {
     }
 
     return { file };
+  }
+
+  // A file the AI made, copied from our storage to a local file
+  async downloadStored(
+    stored: { name: string; path: string },
+    target: string,
+    signal?: AbortSignal
+  ) {
+    const source = await this.storedSource(stored.name, stored.path);
+    if (!source) {
+      throw new StudioStop('A file of this video is missing. Try again.');
+    }
+    await this.download(source, target, signal);
   }
 
   // Where a media of the workspace can be read
@@ -729,6 +748,14 @@ export class StudioService {
       );
     }
 
+    // a voice or stills need the workspace's own key, before anything waits
+    if (
+      template.instance.aiAssets(spec).length &&
+      !(await this._aiCredentialService.hasCredential(org.id))
+    ) {
+      throw new BadRequestException(MISSING_AI_KEY);
+    }
+
     const names = new Map<string, string>();
     for (const mediaId of uniq(template.instance.mediaIds(spec))) {
       const source = await this.mediaSource(org.id, mediaId);
@@ -780,7 +807,7 @@ export class StudioService {
       );
 
       try {
-        await client.workflow.start('studioRenderWorkflowV1', {
+        await client.workflow.start('studioRenderWorkflowV2', {
           workflowId: `studio_${render.id}`,
           taskQueue: 'main',
           args: [{ renderId: render.id }],
@@ -1413,11 +1440,18 @@ export class StudioService {
         dir,
         hooks
       );
+      const ai = await this.downloadAi(
+        render.projectId,
+        template.instance.aiAssets(spec),
+        dir,
+        hooks
+      );
 
       const plan = template.instance.plan(spec, {
         inputs,
         fontsDir: this.fontsDir(),
         ...(music ? { music } : {}),
+        ...(ai.length ? { ai } : {}),
       });
       for (const file of plan.files) {
         await writeFile(join(dir, file.name), file.content, 'utf8');
@@ -1534,6 +1568,38 @@ export class StudioService {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  }
+
+  // What the workspace's AI made in the step before the render (a voice,
+  // stills), next to the inputs, in the order the template asked for them
+  private async downloadAi(
+    projectId: string,
+    requests: ReturnType<StudioTemplateAbstract['aiAssets']>,
+    dir: string,
+    hooks: StudioRenderHooks
+  ) {
+    const ai: NonNullable<StudioPlanContext['ai']> = [];
+    if (!requests.length) {
+      return ai;
+    }
+
+    const made = (await this._studioRepository.getAiAssets(projectId))
+      .map(studioAiAssetFromRow)
+      .filter((p) => !!p);
+    for (const [index, request] of requests.entries()) {
+      const key = studioAiAssetKey(request);
+      const asset = made.find((p) => p!.key === key);
+      if (!asset) {
+        throw new StudioStop(
+          'What your AI made for this video is missing. Render it again.'
+        );
+      }
+      hooks.heartbeat?.(`downloading ai file ${index}`);
+      const file = `ai-${index}.${asset.kind === 'voice' ? 'mp3' : 'jpg'}`;
+      await this.downloadStored(asset, join(dir, file), hooks.signal);
+      ai.push({ file, seconds: asset.seconds, words: asset.words });
+    }
+    return ai;
   }
 
   // The music of the workspace the spec picked, next to the inputs

@@ -16,6 +16,7 @@ Studio makes short vertical videos from the videos and pictures you already have
 | Before/after | Two pictures or videos with a label each, one above the other or the second wiping over the first half way through. 2 to 30 seconds. |
 | Top-N list | A title over 3 to 7 pictures or clips shown one after the other, each numbered with its label. Count down to #1 or up from #1. A clip plays the part you pick, a picture stays 1 to 10 seconds. |
 | Quote card | A quote that appears word by word, with its author, over a colour, a picture or a video. 5 to 15 seconds. |
+| AI UGC | A short spoken script over your own footage, with a voiceover and captions that light up word by word. Your AI writes and voices it, or you type it. See [AI UGC](#ai-ugc). |
 
 Every video comes out as an MP4 of 1080×1920 at 30 fps, with H.264 video and AAC sound, which every network accepts.
 
@@ -49,6 +50,39 @@ There are two ways to make captions:
 - **With a typed script**: no key needed. Type or paste what is said and Studio spreads the words over the clip, giving longer words more time.
 
 Either way you can fix any word before you render, and choose the caption style, position, words per line and highlight colour.
+
+## AI UGC
+
+AI UGC turns a topic or product into a 15 to 45 second talking-style video over footage you already have.
+
+1. **Footage**: pick up to 6 videos from your media library. Each line of the script gets the next clip, cut to the length of that line. When there are more lines than clips, the clips repeat and pick up where they stopped.
+2. **Script**: describe the topic or product, pick a tone (friendly, excited, calm, expert or funny) and a length, then click **Write the script with my AI**. You get a hook, a few lines, a call to action and a post text. Edit any of it before you render. You can also type the whole script yourself.
+3. **Voice**: choose a voice and click **Hear the voice** to listen first. The render uses the voice you heard, so you only pay for it once. Pick **No voice, captions only** to render the script as captions over the footage with no voice at all.
+4. **AI stills** (optional, with the AI voice): up to 3 images made from your script, shown between your clips with a slow pan.
+5. **Music** (optional): add your own music like in the other templates. Under the AI voice it is lowered and ducked whenever the voice speaks.
+6. **Render**: Studio voices the script if you have not heard it yet, times every spoken word, makes the stills and renders the video with captions that light up word by word. **Open in composer** starts the post with your post text.
+
+<div class="callout">
+
+AI UGC runs on **your own OpenAI key** from **Settings → AI**, and OpenAI bills you for what it uses. PostDelegate never pays for AI and never adds a markup. Studio uses these OpenAI models:
+
+- `gpt-6-luna` writes the script
+- `gpt-4o-mini-tts` makes the voice
+- `whisper-1` times the spoken words
+- `gpt-image-2.5-flare` makes the stills (1024×1536)
+
+OpenAI no longer offers video generation through its API, so AI UGC uses your own footage. If OpenAI refuses a request, Studio shows OpenAI's message. If your key is rejected or your OpenAI account has no credit, Studio tells you so and does not retry.
+
+</div>
+
+### Without an OpenAI key
+
+You can still make AI UGC videos:
+
+- **Type the script** and pick **No voice, captions only**. No key is needed.
+- **Use Claude or ChatGPT over MCP**: connect your assistant (see [agent files](/docs/mcp/agent-files)), ask it to write the script for a Studio project and render it. Your assistant does the writing, and Studio renders the typed script with captions and no voice.
+
+Writing a script and hearing a voice are limited to 30 times an hour, and they need an active plan, like rendering.
 
 ## Rendering
 

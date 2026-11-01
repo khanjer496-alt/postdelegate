@@ -3,6 +3,7 @@ import { Activity, ActivityMethod } from 'nestjs-temporal-core';
 import { Context } from '@temporalio/activity';
 import { CancelledFailure } from '@temporalio/common';
 import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
+import { StudioAiService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.ai.service';
 import {
   setHeartbeatDetails,
   withHeartbeat,
@@ -14,7 +15,10 @@ import {
 @Injectable()
 @Activity()
 export class StudioActivity implements OnModuleInit {
-  constructor(private _studioService: StudioService) {}
+  constructor(
+    private _studioService: StudioService,
+    private _studioAiService: StudioAiService
+  ) {}
 
   // folders a worker that crashed mid render left behind
   async onModuleInit() {
@@ -41,6 +45,28 @@ export class StudioActivity implements OnModuleInit {
             context.heartbeat(details);
           },
         });
+      } catch (err) {
+        if (context.cancellationSignal.aborted) {
+          throw new CancelledFailure('The render was cancelled');
+        }
+        throw err;
+      }
+    });
+  }
+
+  // What the template asks the workspace's own AI for (a voice, stills), made
+  // before the render on the main queue: it waits on the AI, not on the CPU,
+  // so it never holds a render slot. Heartbeats carry a cancel to the calls
+  @ActivityMethod()
+  async prepareStudioAiV1({ renderId }: { renderId: string }) {
+    const context = Context.current();
+    return withHeartbeat(async () => {
+      try {
+        setHeartbeatDetails('prepareStudioAiV1: generating');
+        await this._studioAiService.generateForRender(
+          renderId,
+          context.cancellationSignal
+        );
       } catch (err) {
         if (context.cancellationSignal.aborted) {
           throw new CancelledFailure('The render was cancelled');

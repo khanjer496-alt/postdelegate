@@ -13,6 +13,23 @@ export type StudioTemplate = {
   title: string;
   description: string;
   captions: boolean;
+  // runs on the workspace's own AI key
+  ai?: boolean;
+};
+
+// What the workspace's own AI can do in Studio
+export type StudioAi = {
+  connected: boolean;
+  provider?: string;
+  voices: string[];
+  video: boolean;
+};
+
+export type StudioAiScript = {
+  hook: string;
+  lines: string[];
+  cta?: string;
+  postText?: string;
 };
 
 export type StudioUsage = {
@@ -32,6 +49,7 @@ export type StudioRender = {
   projectId: string;
   status:
     | 'queued'
+    | 'generating'
     | 'rendering'
     | 'uploading'
     | 'completed'
@@ -127,6 +145,20 @@ export type StudioSpec = {
   };
   textColor?: string;
   dim?: boolean;
+  // AI UGC
+  topic?: string;
+  tone?: 'friendly' | 'excited' | 'calm' | 'expert' | 'funny';
+  voiceover?: boolean;
+  voice?: string;
+  footage?: { mediaId: string; path?: string }[];
+  stills?: number;
+  script?: StudioAiScript;
+  captionStyle?: {
+    font?: StudioTextStyle;
+    maxWords?: number;
+    position?: StudioPosition;
+    highlight?: string;
+  };
 };
 
 export type StudioProjectSummary = {
@@ -194,6 +226,16 @@ export const useStudioUsage = () => {
     return json(await fetch('/studio/usage'));
   }, []);
   return useSWR<StudioUsage>('studio-usage', load, {
+    revalidateOnFocus: false,
+  });
+};
+
+export const useStudioAi = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    return (await fetch('/studio/ai')).json();
+  }, []);
+  return useSWR<StudioAi>('studio-ai', load, {
     revalidateOnFocus: false,
   });
 };

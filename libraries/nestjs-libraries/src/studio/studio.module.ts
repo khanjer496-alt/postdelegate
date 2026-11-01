@@ -6,6 +6,9 @@ import { ImageSlideshowTemplate } from '@gitroom/nestjs-libraries/studio/templat
 import { BeforeAfterTemplate } from '@gitroom/nestjs-libraries/studio/templates/before.after.template';
 import { TopNListTemplate } from '@gitroom/nestjs-libraries/studio/templates/top.n.list.template';
 import { QuoteCardTemplate } from '@gitroom/nestjs-libraries/studio/templates/quote.card.template';
+import { AiUgcTemplate } from '@gitroom/nestjs-libraries/studio/templates/ai.ugc.template';
+import { StudioAiManager } from '@gitroom/nestjs-libraries/studio/ai/studio.ai.manager';
+import { OpenAiStudioProvider } from '@gitroom/nestjs-libraries/studio/ai/providers/openai.studio.provider';
 
 @Global()
 @Module({
@@ -16,7 +19,10 @@ import { QuoteCardTemplate } from '@gitroom/nestjs-libraries/studio/templates/qu
     BeforeAfterTemplate,
     TopNListTemplate,
     QuoteCardTemplate,
+    AiUgcTemplate,
     StudioTemplateManager,
+    OpenAiStudioProvider,
+    StudioAiManager,
   ],
   get exports() {
     return this.providers;

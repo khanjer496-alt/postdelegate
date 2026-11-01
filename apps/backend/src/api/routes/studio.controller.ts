@@ -20,6 +20,7 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
 import { StudioScheduleService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.schedule.service';
+import { StudioAiService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.ai.service';
 import {
   CreateStudioProjectDto,
   StudioTranscribeDto,
@@ -37,7 +38,8 @@ import {
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { StudioAssetGuard } from '@gitroom/backend/services/auth/studio.asset.guard';
 
-// Every transcription spends the workspace's own OpenAI credit
+// Every transcription, script and voice spends the workspace's own OpenAI
+// credit
 const HOUR = 60 * 60 * 1000;
 
 @ApiTags('Studio')
@@ -46,12 +48,19 @@ export class StudioController {
   constructor(
     private _studioService: StudioService,
     private _studioScheduleService: StudioScheduleService,
-    private _permissionsService: PermissionsService
+    private _permissionsService: PermissionsService,
+    private _studioAiService: StudioAiService
   ) {}
 
   @Get('/templates')
   getTemplates() {
     return this._studioService.getTemplates();
+  }
+
+  // What the workspace's own AI can do in Studio (voices, video)
+  @Get('/ai')
+  getAi(@GetOrgFromRequest() org: Organization) {
+    return this._studioAiService.getCapabilities(org.id);
   }
 
   @Get('/usage')
@@ -120,6 +129,20 @@ export class StudioController {
       throw new BadRequestException('No file provided');
     }
     return this._studioService.saveAsset(org.id, file);
+  }
+
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 30, ttl: HOUR } })
+  @Post('/projects/:id/ai-script')
+  writeScript(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+    return this._studioAiService.writeScript(org.id, id);
+  }
+
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 30, ttl: HOUR } })
+  @Post('/projects/:id/voiceover')
+  voiceover(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+    return this._studioAiService.voiceover(org.id, id);
   }
 
   @Post('/projects/:id/render')

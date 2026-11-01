@@ -6,7 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
-import { ConnectAiKey } from '@gitroom/frontend/components/agents/agent';
+import { ConnectAiKey } from '@gitroom/frontend/components/settings/connect.ai.key';
 import {
   StudioTextStyle,
   studioTextStyles,

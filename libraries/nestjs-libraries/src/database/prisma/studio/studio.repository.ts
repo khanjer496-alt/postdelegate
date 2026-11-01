@@ -3,6 +3,7 @@ import {
   PrismaTransaction,
 } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import { STUDIO_AI_ASSET_KINDS } from '@gitroom/nestjs-libraries/studio/ai/studio.ai.interface';
 
 // statuses of a render nothing will ever change again
 export const STUDIO_FINAL_STATUSES = ['completed', 'failed', 'cancelled'];
@@ -389,6 +390,7 @@ export class StudioRepository {
       where: {
         id,
         organizationId: org,
+        kind: 'music',
       },
       select: {
         id: true,
@@ -404,6 +406,7 @@ export class StudioRepository {
     return this._studioAsset.model.studioAsset.count({
       where: {
         organizationId: org,
+        kind: 'music',
       },
     });
   }
@@ -429,6 +432,7 @@ export class StudioRepository {
         where: {
           id,
           organizationId: org,
+          kind: 'music',
           OR: [{ projectId: null }, { projectId }],
         },
         data: {
@@ -445,12 +449,73 @@ export class StudioRepository {
       where: {
         organizationId: org,
         projectId,
+        kind: 'music',
         ...(keep ? { id: { not: keep } } : {}),
       },
       data: {
         projectId: null,
       },
     });
+  }
+
+  // The voices and stills the AI made for a project. They stay with it while
+  // it lives, so the cleanup of unused assets never takes them; a file no
+  // longer asked for is removed at once, and all of them with the project
+  getAiAssets(projectId: string) {
+    return this._studioAsset.model.studioAsset.findMany({
+      where: {
+        projectId,
+        kind: { in: STUDIO_AI_ASSET_KINDS },
+      },
+      select: {
+        id: true,
+        kind: true,
+        name: true,
+        path: true,
+        data: true,
+      },
+    });
+  }
+
+  createAiAsset(
+    org: string,
+    projectId: string,
+    data: { kind: string; name: string; path: string; data: string }
+  ) {
+    return this._studioAsset.model.studioAsset.create({
+      data: {
+        organizationId: org,
+        projectId,
+        ...data,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  updateAiAssetData(id: string, data: string) {
+    return this._studioAsset.model.studioAsset.updateMany({
+      where: {
+        id,
+        kind: { in: STUDIO_AI_ASSET_KINDS },
+      },
+      data: {
+        data,
+      },
+    });
+  }
+
+  // Whether the row was there to delete
+  async deleteAiAsset(id: string) {
+    return !!(
+      await this._studioAsset.model.studioAsset.deleteMany({
+        where: {
+          id,
+          kind: { in: STUDIO_AI_ASSET_KINDS },
+        },
+      })
+    ).count;
   }
 
   // Assets of deleted projects, and assets no project has used since
