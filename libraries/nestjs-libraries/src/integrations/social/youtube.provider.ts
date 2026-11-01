@@ -26,11 +26,14 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import * as process from 'node:process';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { createReadStream, statSync } from 'fs';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { setHeartbeatDetails } from '@gitroom/nestjs-libraries/temporal/temporal.heartbeat';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { DashboardFunction } from '@gitroom/nestjs-libraries/integrations/dashboard.function.decorator';
+
+dayjs.extend(utc);
 
 const clientAndYoutube = () => {
   const client = new google.auth.OAuth2({
@@ -813,6 +816,21 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     const path = firstPost?.media?.[0]?.path!;
     const videoSize = await this.youtubeMediaSize(path);
 
+    // "Publish later on YouTube": the video is uploaded as private and YouTube
+    // makes it public at publishAt (it only accepts publishAt on a private
+    // video). A time that passed meanwhile (the post went out late or was
+    // moved after it) publishes the video now, like YouTube does for a past
+    // publishAt.
+    const publishAt =
+      settings?.publishAt && dayjs.utc(settings.publishAt).isAfter(dayjs())
+        ? dayjs.utc(settings.publishAt).toISOString()
+        : undefined;
+    const privacyStatus = settings?.publishAt
+      ? publishAt
+        ? 'private'
+        : 'public'
+      : settings.type;
+
     // Start a resumable upload session: nothing exists on the channel until
     // the final byte is received, so nothing here is irreversible yet - the
     // bytes themselves are streamed by finalizePost, outside this activity.
@@ -835,8 +853,12 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
               : {}),
           },
           status: {
-            privacyStatus: settings.type,
+            privacyStatus,
+            ...(publishAt ? { publishAt } : {}),
             selfDeclaredMadeForKids: settings.selfDeclaredMadeForKids === 'yes',
+            ...(settings?.containsSyntheticMedia === 'yes'
+              ? { containsSyntheticMedia: true }
+              : {}),
           },
         }),
       }

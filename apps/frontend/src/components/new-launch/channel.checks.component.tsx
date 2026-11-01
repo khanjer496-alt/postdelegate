@@ -63,13 +63,16 @@ export const ChannelChecks: FC<{
   onFix: (where: 'fix' | 'preview') => void;
 }> = ({ providers, onFix }) => {
   const t = useT();
-  const { global, internal, selectedIntegrations } = useLaunchStore(
-    useShallow((state) => ({
-      global: state.global,
-      internal: state.internal,
-      selectedIntegrations: state.selectedIntegrations,
-    }))
-  );
+  const { global, internal, selectedIntegrations, date, channelDates } =
+    useLaunchStore(
+      useShallow((state) => ({
+        global: state.global,
+        internal: state.internal,
+        selectedIntegrations: state.selectedIntegrations,
+        date: state.date,
+        channelDates: state.channelDates,
+      }))
+    );
 
   // the channel settings live in their own forms, a change there checks again
   const [revision, setRevision] = useState(0);
@@ -135,8 +138,16 @@ export const ChannelChecks: FC<{
       setBody(
         JSON.stringify({
           type: 'schedule',
+          date: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
           posts: values.map((post) => ({
             integration: { id: post.id },
+            ...(channelDates[post.id]
+              ? {
+                  date: channelDates[post.id]
+                    .utc()
+                    .format('YYYY-MM-DDTHH:mm:ss'),
+                }
+              : {}),
             settings: post.settings || {},
             value: (post.values || []).map((value: any) => ({
               content: value.content,
@@ -156,7 +167,7 @@ export const ChannelChecks: FC<{
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [global, internal, selectedIntegrations, revision]);
+  }, [global, internal, selectedIntegrations, date, channelDates, revision]);
 
   const { data } = useChannelChecks(check);
 

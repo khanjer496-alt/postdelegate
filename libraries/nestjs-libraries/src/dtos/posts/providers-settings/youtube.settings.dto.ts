@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsDateString,
   IsDefined,
   IsIn,
   IsOptional,
@@ -7,6 +8,7 @@ import {
   MaxLength,
   MinLength,
   registerDecorator,
+  ValidateBy,
   ValidateNested,
   ValidationArguments,
   ValidationOptions,
@@ -15,6 +17,11 @@ import {
 } from 'class-validator';
 import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import { Type } from 'class-transformer';
+import { JSONSchema } from 'class-validator-jsonschema';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 // YouTube caps the combined length of all tags at 500 characters.
 // Tags containing whitespace are wrapped in quotes by YouTube, which adds
@@ -55,6 +62,58 @@ export function IsYoutubeTagsLength(validationOptions?: ValidationOptions) {
   };
 }
 
+// The server supplies this ephemeral context while it validates: the operation
+// it will execute and the date the post itself goes out. The time rules only
+// apply while the video is still to be uploaded (schedule / now, or an update
+// of a post that has not gone out yet), editing a published video or saving a
+// draft keeps ordinary validation.
+type YoutubeValidationContext = {
+  publishAt?: string;
+  __validationOperation?: string;
+  __validationDate?: string;
+};
+
+const getYoutubePublishAtError = (
+  settings: YoutubeValidationContext
+): string | undefined => {
+  const operation = settings?.__validationOperation || '';
+  // post dates are stored without a zone and are UTC
+  const postDate = settings?.__validationDate
+    ? dayjs.utc(settings.__validationDate)
+    : undefined;
+  const notUploadedYet =
+    operation === 'update' &&
+    !!postDate?.isValid() &&
+    postDate.isAfter(dayjs.utc());
+
+  if (
+    !settings?.publishAt ||
+    !(['schedule', 'now'].includes(operation) || notUploadedYet)
+  ) {
+    return undefined;
+  }
+
+  const publishAt = dayjs.utc(settings.publishAt);
+  if (!publishAt.isValid()) {
+    return undefined;
+  }
+
+  if (!publishAt.isAfter(dayjs.utc())) {
+    return 'The time YouTube makes the video public must be in the future.';
+  }
+
+  // a post sent now is uploaded now, the check above already covers it
+  if (
+    operation !== 'now' &&
+    postDate?.isValid() &&
+    !publishAt.isAfter(postDate)
+  ) {
+    return 'The time YouTube makes the video public must be after the post is published, the video is uploaded at the post time.';
+  }
+
+  return undefined;
+};
+
 export class YoutubeTagsSettings {
   @IsString()
   value: string;
@@ -77,6 +136,36 @@ export class YoutubeSettingsDto {
   @IsIn(['yes', 'no'])
   @IsOptional()
   selfDeclaredMadeForKids: 'no' | 'yes';
+
+  @IsOptional()
+  @IsDateString(
+    {},
+    { message: 'Pick a valid date and time for YouTube to publish the video.' }
+  )
+  @ValidateBy({
+    name: 'youtubePublishAt',
+    validator: {
+      validate: (_value, args) =>
+        !getYoutubePublishAtError(args?.object as YoutubeValidationContext),
+      defaultMessage: (args) =>
+        getYoutubePublishAtError(args?.object as YoutubeValidationContext) ||
+        '',
+    },
+  })
+  @JSONSchema({
+    format: 'date-time',
+    description:
+      'Publish later on YouTube: an ISO 8601 date and time (e.g. 2026-11-05T15:00:00Z) after the post date. The video is still uploaded at the post date, as private whatever the type is, and YouTube itself makes it public at this time. Leave it out to publish with the type at the post date.',
+  })
+  publishAt?: string;
+
+  @IsIn(['yes', 'no'])
+  @IsOptional()
+  @JSONSchema({
+    description:
+      'Set to "yes" when the video contains realistic altered or synthetic content (for example AI that makes a real person appear to say or do something they did not, alters footage of a real event or place, or generates a realistic scene that did not happen). YouTube requires this disclosure for such content. Defaults to "no".',
+  })
+  containsSyntheticMedia?: 'no' | 'yes';
 
   @IsOptional()
   @ValidateNested()
