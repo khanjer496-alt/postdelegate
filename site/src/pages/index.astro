@@ -62,7 +62,7 @@ const features:{kind:FeatureKind;tag:string;title:string;text:string;points?:str
  {kind:'planning',tag:'Planning',title:'See the whole week. Make room for the good stuff.',text:'Bring your content into a visual calendar. Give every idea a place, keep your plans in view, and make the next step easier to see.',theme:'feature-purple',link:SITE.signup,cta:'Try the calendar free'},
  {kind:'composer',tag:'Composing',title:'One idea. Your own way of telling it.',text:'Shape your content in a composer designed around social publishing. Keep the message together while making room for each channel’s format and settings.',points:['YouTube publish later: the video uploads as private and YouTube makes it public at the time you set','YouTube’s label for realistic altered or AI-made content, one setting away'],theme:'feature-blue',link:'/docs/channels/youtube',cta:'See the YouTube settings'},
  {kind:'bulk',tag:'Bulk video',title:'A folder of videos. Weeks of posts.',text:'Drop in up to 50 videos, pick your channels, and PostDelegate spreads them across your posting time slots. You check every date in a preview before anything is scheduled.',theme:'feature-pink',link:'/docs/bulk-import#bulk-schedule-videos',cta:'How bulk video works'},
- {kind:'analytics',tag:'Views analytics',title:'See which posts keep earning views.',text:'The Views tab charts the views each channel gains per day and ranks your top posts by views gained. YouTube shares view counts today. Other networks join as their connections are approved.',theme:'feature-blue',link:'/docs/analytics#views',cta:'How analytics work'},
+ {kind:'analytics',tag:'Views analytics',title:'See which posts keep earning views.',text:'The Views section charts the views each channel gains per day and ranks your top posts by views gained. YouTube shares view counts today. Other networks join as their connections are approved.',theme:'feature-blue',link:'/docs/analytics#views',cta:'How analytics work'},
  {kind:'media',tag:'Media library',title:'Your content deserves a place of its own.',text:'Keep your public-use images and videos close to your drafts. Upload, find and organize media without losing your place in the workflow.',theme:'feature-purple',link:SITE.signup,cta:'Try the media library free'},
  {kind:'teams',tag:'Workspaces',title:'A little more clarity for every brand.',text:'Start with an organized workspace for your content and channels. Team, Pro and Ultimate plans add team members and room for more channels.',theme:'feature-violet',link:'/about',cta:'Get to know PostDelegate'},
 ];
@@ -81,7 +81,7 @@ const leadFeatures=features.slice(0,2);
 const moreFeatures=features.slice(2);
 const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
 ---
-<Base title="PostDelegate: Social Media Scheduler for Teams and AI Agents" description={`Schedule social posts from one visual calendar, turn clips into vertical videos, and let Claude or ChatGPT draft for your approval. ${TRIAL_DAYS}-day free trial, no card.`} jsonLd={[appLd,faqLd]}>
+<Base title="PostDelegate: Social Media Scheduler for Teams and AI Agents" description={`Schedule social posts from one calendar, turn clips into vertical videos, and let Claude or ChatGPT draft for approval. ${TRIAL_DAYS}-day free trial, no card.`} jsonLd={[appLd,faqLd]}>
   <section class="home-hero" aria-labelledby="hero-title">
     <div class="hero-sky" aria-hidden="true"><span class="hero-grid"></span><span class="hero-glow"></span></div>
     <OrbitAccent kind="planet" class="hero-star-one" />
@@ -165,7 +165,7 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
           <p class="studio-terms">Included on every paid plan with fair use. The free trial includes 10 videos. More templates coming.</p>
         </div>
         <div class="studio-visual reveal">
-          <div class="studio-stage" role="img" aria-label="Illustration of Content Studio: a vertical 9:16 video that takes turns showing the two templates, Hook over clip with a bold hook line and Talking head + captions with the spoken word highlighted, above a trim bar with two handles.">
+          <div class="studio-stage" role="img" aria-label="Illustration of Studio’s two templates">
             <div class="studio-templates"><span>Hook over clip</span><span class="is-on">Talking head + captions</span></div>
             <div class="studio-phone">
               <div class="studio-screen">
@@ -183,7 +183,7 @@ const channelHref=(n:Network)=>n.scheduler?'/'+n.scheduler:'/platforms';
             <span class="studio-float studio-float-captions"><i class="card-spark">✦</i><span><b>Word-by-word captions</b><small>Your OpenAI key or a typed script</small></span></span>
             <span class="studio-float studio-float-compose"><i class="card-check">✓</i><span><b>Rendered</b><small>Open in composer</small></span></span>
           </div>
-          <p class="orbit-legend studio-legend"><span><i class="legend-live" aria-hidden="true"></i>The word being spoken</span><span class="legend-note">Illustration</span></p>
+          <p class="orbit-legend studio-legend" aria-hidden="true"><span class="studio-legend-word"><i class="legend-live"></i>The word being spoken</span><span class="legend-note">Illustration</span></p>
         </div>
       </div>
     </div>
