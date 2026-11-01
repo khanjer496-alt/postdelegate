@@ -14,7 +14,8 @@ const makeRepo = (existing: { id: string } | null) => {
   };
   const repo = new WebhooksRepository(
     { model: { webhooks } } as any,
-    { model: { integration } } as any
+    { model: { integration } } as any,
+    { model: { subscription: { findFirst: jest.fn() } } } as any
   );
   return { repo, webhooks };
 };
@@ -67,5 +68,41 @@ describe('WebhooksService.updateWebhook', () => {
     await expect(service.updateWebhook('org-1', body)).rejects.toBeInstanceOf(
       NotFoundException
     );
+  });
+});
+
+describe('WebhooksService.getWebhooksToSend', () => {
+  const key = process.env.STRIPE_PUBLISHABLE_KEY;
+  afterEach(() => {
+    if (key === undefined) {
+      delete process.env.STRIPE_PUBLISHABLE_KEY;
+    } else {
+      process.env.STRIPE_PUBLISHABLE_KEY = key;
+    }
+  });
+
+  const hooks = Array.from({ length: 5 }, (_, i) => ({ id: `w${i}` }));
+  const serviceFor = (tier?: string) =>
+    new WebhooksService({
+      getWebhooks: jest.fn(async () => hooks),
+      getSubscriptionTier: jest.fn(async () => tier),
+    } as any);
+
+  it('sends only as many as a downgraded plan holds, the oldest first', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    // STANDARD holds 2 webhooks
+    expect(
+      (await serviceFor('STANDARD').getWebhooksToSend('org')).map((w) => w.id)
+    ).toEqual(['w0', 'w1']);
+  });
+
+  it('sends none from a lapsed workspace', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    expect(await serviceFor(undefined).getWebhooksToSend('org')).toEqual([]);
+  });
+
+  it('sends all with billing off', async () => {
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+    expect(await serviceFor(undefined).getWebhooksToSend('org')).toHaveLength(5);
   });
 });
