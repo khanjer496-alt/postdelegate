@@ -34,3 +34,19 @@ describe('countLength on Bluesky', () => {
     expect('🎉'.repeat(300).length).toBe(600);
   });
 });
+
+describe('textSlicer on Bluesky', () => {
+  // the preview crops where the counter says the limit is
+  it('cuts after the 300th grapheme', () => {
+    const text = '🎉'.repeat(305);
+    const { end } = textSlicer('bluesky', 300, text);
+    expect(countLength('bluesky', text.slice(0, end))).toBe(300);
+    expect(end).toBe(600);
+  });
+
+  it('keeps a short text whole and never splits a flag', () => {
+    expect(textSlicer('bluesky', 300, 'hello')).toEqual({ start: 0, end: 5 });
+    const flags = '🇫🇷'.repeat(3);
+    expect(flags.slice(0, textSlicer('bluesky', 2, flags).end)).toBe('🇫🇷🇫🇷');
+  });
+});
