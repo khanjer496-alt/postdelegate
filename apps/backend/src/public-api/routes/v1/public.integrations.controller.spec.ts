@@ -11,6 +11,7 @@ jest.mock('@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.ser
 jest.mock('@gitroom/nestjs-libraries/database/prisma/organizations/organization.service', () => ({ OrganizationService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/database/prisma/clipping/clipping.service', () => ({ ClippingService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service', () => ({ SubscriptionService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/database/prisma/studio/studio.service', () => ({ StudioService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/chat/validation.schemas.helper', () => ({ getValidationSchemas: jest.fn() }));
 jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({ ioRedis: {} }));
 jest.mock('@gitroom/backend/services/auth/super.admin.guard', () => ({ SuperAdminGuard: class {} }));
