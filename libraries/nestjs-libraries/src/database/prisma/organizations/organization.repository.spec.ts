@@ -165,3 +165,37 @@ describe('OrganizationRepository member emails', () => {
     }
   );
 });
+
+describe('OrganizationRepository.changeTeamMemberRole', () => {
+  const makeRoleRepo = (role: string, owners: number) => {
+    const tx = {
+      userOrganization: {
+        findFirst: jest.fn(async () => ({ role })),
+        count: jest.fn(async () => owners),
+        update: jest.fn(async (args: any) => ({ role: args.data.role })),
+      },
+    };
+    const $transaction = jest.fn(async (fn: any, options: any) => fn(tx));
+    const repo = new OrganizationRepository(
+      {} as any,
+      {} as any,
+      {} as any,
+      { model: { $transaction } } as any
+    );
+    return { repo, tx, $transaction };
+  };
+
+  it('counts and updates in one serializable transaction', async () => {
+    const { repo, $transaction } = makeRoleRepo('SUPERADMIN', 2);
+    await expect(repo.changeTeamMemberRole('org-A', 'me', 'ADMIN' as any)).resolves.toEqual({
+      role: 'ADMIN',
+    });
+    expect($transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' });
+  });
+
+  it('never leaves a workspace without a Super Admin', async () => {
+    const { repo, tx } = makeRoleRepo('SUPERADMIN', 1);
+    await expect(repo.changeTeamMemberRole('org-A', 'me', 'ADMIN' as any)).resolves.toBeNull();
+    expect(tx.userOrganization.update).not.toHaveBeenCalled();
+  });
+});

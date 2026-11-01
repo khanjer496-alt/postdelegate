@@ -268,21 +268,32 @@ export class OrganizationService {
       return { role: member.role };
     }
 
-    if (
-      member.role === 'SUPERADMIN' &&
-      (await this._organizationRepository.countSuperAdmins(org.id)) <= 1
-    ) {
+    let changed: { role: string } | null;
+    try {
+      changed = await this._organizationRepository.changeTeamMemberRole(
+        org.id,
+        userId,
+        body.role
+      );
+    } catch (err) {
+      // another role change in the workspace ran at the same moment
+      if ((err as { code?: string })?.code === 'P2034') {
+        throw new HttpException(
+          'The team changed at the same time. Refresh and try again.',
+          409
+        );
+      }
+      throw err;
+    }
+
+    if (!changed) {
       throw new HttpException(
         'A workspace needs at least one Super Admin. Make another member the owner first.',
         400
       );
     }
 
-    return this._organizationRepository.changeTeamMemberRole(
-      org.id,
-      userId,
-      body.role
-    );
+    return changed;
   }
 
   disableOrEnableNonSuperAdminUsers(orgId: string, disable: boolean) {

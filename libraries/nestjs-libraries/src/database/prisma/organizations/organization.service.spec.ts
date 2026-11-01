@@ -69,8 +69,12 @@ describe('OrganizationService.changeTeamMemberRole', () => {
             }
           : null
       ),
-      countSuperAdmins: jest.fn(async () => superAdmins),
-      changeTeamMemberRole: jest.fn(async (_o: string, _u: string, role: Role) => ({ role })),
+      // the repository refuses to leave no Super Admin (null)
+      changeTeamMemberRole: jest.fn(async (_o: string, _u: string, role: Role) =>
+        member?.role === 'SUPERADMIN' && role !== 'SUPERADMIN' && superAdmins <= 1
+          ? null
+          : { role }
+      ),
     };
     const service = new OrganizationService(repository as any, {} as any);
     const org = { id: 'org-A', users: [{ role: myRole }] } as any;
@@ -108,11 +112,20 @@ describe('OrganizationService.changeTeamMemberRole', () => {
   });
 
   it('never demotes the last Super Admin', async () => {
-    const { service, repository, org } = makeTransfer('SUPERADMIN', { role: 'SUPERADMIN' }, 1);
+    const { service, org } = makeTransfer('SUPERADMIN', { role: 'SUPERADMIN' }, 1);
     await expect(
       service.changeTeamMemberRole(org, 'me', { role: 'ADMIN' })
     ).rejects.toThrow('at least one Super Admin');
-    expect(repository.changeTeamMemberRole).not.toHaveBeenCalled();
+  });
+
+  it('answers 409 when another role change ran at the same moment', async () => {
+    const { service, repository, org } = makeTransfer('SUPERADMIN', { role: 'SUPERADMIN' }, 2);
+    repository.changeTeamMemberRole.mockRejectedValueOnce(
+      Object.assign(new Error('serialization'), { code: 'P2034' })
+    );
+    await expect(
+      service.changeTeamMemberRole(org, 'me', { role: 'ADMIN' })
+    ).rejects.toMatchObject({ status: 409 });
   });
 
   it('lets the old owner step down once another Super Admin exists', async () => {

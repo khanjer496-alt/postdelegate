@@ -1,5 +1,5 @@
 import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Role, ShortLinkPreference } from '@prisma/client';
+import { Prisma, Role, ShortLinkPreference } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -661,35 +661,52 @@ export class OrganizationRepository {
     });
   }
 
-  // the active Super Admins, a workspace always keeps at least one
-  countSuperAdmins(orgId: string) {
-    return this._userOrg.model.userOrganization.count({
-      where: {
-        organizationId: orgId,
-        role: Role.SUPERADMIN,
-        disabled: false,
-        user: {
-          deletedAt: null,
-        },
-      },
-    });
-  }
-
+  // Changes a member's role, but never leaves the workspace without an active
+  // Super Admin (null then). The count and the update run in one serializable
+  // transaction, so two owners demoting each other at once can't both pass:
+  // one of them fails with a serialization error instead
   changeTeamMemberRole(orgId: string, userId: string, role: Role) {
-    return this._userOrg.model.userOrganization.update({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId: orgId,
-        },
+    return this._transaction.model.$transaction(
+      async (tx) => {
+        const member = await tx.userOrganization.findFirst({
+          where: { organizationId: orgId, userId },
+          select: { role: true },
+        });
+        if (!member) {
+          return null;
+        }
+        if (member.role === Role.SUPERADMIN && role !== Role.SUPERADMIN) {
+          const owners = await tx.userOrganization.count({
+            where: {
+              organizationId: orgId,
+              role: Role.SUPERADMIN,
+              disabled: false,
+              user: {
+                deletedAt: null,
+              },
+            },
+          });
+          if (owners <= 1) {
+            return null;
+          }
+        }
+        return tx.userOrganization.update({
+          where: {
+            userId_organizationId: {
+              userId,
+              organizationId: orgId,
+            },
+          },
+          data: {
+            role,
+          },
+          select: {
+            role: true,
+          },
+        });
       },
-      data: {
-        role,
-      },
-      select: {
-        role: true,
-      },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   }
 
   // the members who still get the workspace's emails (digest, streak):
