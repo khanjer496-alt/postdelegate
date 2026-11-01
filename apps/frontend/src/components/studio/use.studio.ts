@@ -165,6 +165,8 @@ export type StudioProjectSummary = {
   id: string;
   name: string;
   template: string;
+  // "api" when an assistant or the public API made it
+  source: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -240,14 +242,19 @@ export const useStudioAi = () => {
   });
 };
 
-export const useStudioProjects = () => {
+// Projects of assistants and the public API only when "api" is on
+export const useStudioProjects = (api: boolean) => {
   const fetch = useFetch();
   const load = useCallback(async () => {
-    return json(await fetch('/studio/projects'));
-  }, []);
-  return useSWR<StudioProjectSummary[]>('studio-projects', load, {
-    revalidateOnFocus: false,
-  });
+    return json(await fetch(`/studio/projects${api ? '?api=true' : ''}`));
+  }, [api]);
+  return useSWR<StudioProjectSummary[]>(
+    `studio-projects-${api ? 'all' : 'app'}`,
+    load,
+    {
+      revalidateOnFocus: false,
+    }
+  );
 };
 
 export const useStudioProject = (id?: string) => {

@@ -157,3 +157,37 @@ describe('StudioController AI routes', () => {
     expect(ai.voiceover).toHaveBeenCalledWith('org-1', 'project-1');
   });
 });
+
+// The list hides projects of assistants and the public API unless asked
+describe('StudioController.getProjects', () => {
+  const { ValidationPipe } = jest.requireActual('@nestjs/common');
+  const { GetStudioProjectsDto } = jest.requireActual(
+    '@gitroom/nestjs-libraries/dtos/studio/studio.project.dto'
+  );
+  const query = (value: Record<string, string>) =>
+    new ValidationPipe({ transform: true }).transform(value, {
+      type: 'query',
+      metatype: GetStudioProjectsDto,
+    });
+
+  it('asks for the app projects only by default', async () => {
+    const getProjects = jest.fn().mockResolvedValue([]);
+    const controller = new StudioController(
+      { getProjects } as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    const org = { id: 'org-1' } as any;
+
+    await controller.getProjects(org, await query({}));
+    await controller.getProjects(org, await query({ api: 'false' }));
+    await controller.getProjects(org, await query({ api: 'true' }));
+
+    expect(getProjects.mock.calls).toEqual([
+      ['org-1', false],
+      ['org-1', false],
+      ['org-1', true],
+    ]);
+  });
+});

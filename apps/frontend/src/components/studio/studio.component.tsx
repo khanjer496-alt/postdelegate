@@ -39,7 +39,8 @@ export const StudioComponent = () => {
   const toaster = useToaster();
   const modals = useModals();
   const { data: templates } = useStudioTemplates();
-  const { data: projects, mutate: mutateProjects } = useStudioProjects();
+  const [showApi, setShowApi] = useState(false);
+  const { data: projects, mutate: mutateProjects } = useStudioProjects(showApi);
   const [selected, setSelected] = useState<string>();
   const { data: project, mutate: mutateProject } = useStudioProject(selected);
 
@@ -150,6 +151,11 @@ export const StudioComponent = () => {
                   {item.name}
                 </div>
                 <div className="text-[12px] text-textItemBlur truncate">
+                  {item.source === 'api' && (
+                    <span className="me-[6px] px-[5px] rounded-[4px] bg-newBgLineColor text-[11px] font-[600]">
+                      {t('studio_project_api', 'API')}
+                    </span>
+                  )}
                   {templates?.find((p) => p.identifier === item.template)
                     ?.title || item.template}
                 </div>
@@ -179,6 +185,28 @@ export const StudioComponent = () => {
             </li>
           ))}
         </ul>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showApi}
+          onClick={() => setShowApi((value) => !value)}
+          className="flex items-center gap-[8px] px-[12px] text-start text-[12px] text-textItemBlur hover:text-textColor"
+        >
+          <span
+            className={clsx(
+              'w-[28px] h-[16px] p-[2px] rounded-full shrink-0 transition-colors',
+              showApi ? 'bg-btnCta' : 'bg-newBgLineColor'
+            )}
+          >
+            <span
+              className={clsx(
+                'block w-[12px] h-[12px] rounded-full bg-white transition-transform',
+                showApi && 'translate-x-[12px] rtl:-translate-x-[12px]'
+              )}
+            />
+          </span>
+          {t('studio_show_api_projects', 'Show projects made by assistants and the API')}
+        </button>
         <div className="mt-auto mobile:mt-0">
           <StudioUsageNote />
         </div>
@@ -222,7 +250,7 @@ export const StudioComponent = () => {
         ) : (
           <div className="flex flex-col gap-[16px] max-w-[1080px]">
             <div>
-              <h1 className="text-[22px] font-[600]">
+              <h1 className="text-[22px] leading-[1.4] font-[600]">
                 {t('studio_title', 'Studio')}
               </h1>
               <div className="text-[14px] text-textItemBlur">

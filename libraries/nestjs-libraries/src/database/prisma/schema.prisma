@@ -354,6 +354,8 @@ model StudioProject {
   name           String
   template       String
   spec           String
+  // "api" for a project an assistant or the public API made, null for the app
+  source         String?
   deletedAt      DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt

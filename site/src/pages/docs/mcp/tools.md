@@ -37,6 +37,21 @@ Your assistant discovers these tools by itself when it connects. You do not call
 
 Local files cannot be fetched by an assistant. Upload them through the app, the widget, or the [upload API](/docs/api/uploads).
 
+## Studio
+
+[Studio](/docs/studio) renders vertical 1080×1920 videos from the videos in your media library, with the same templates and fair use limits as the app.
+
+| Tool | What it does | Changes data? |
+| --- | --- | --- |
+| `studioTemplatesTool` | Lists the Studio templates, each with a plain description and a JSON schema of its inputs. New templates appear by themselves. | No |
+| `studioRenderTool` | Renders a video from a template, a spec and the ids of media in your media library. It never accepts links. It only saves a new video to your media library and never creates, schedules or publishes a post. Returns a `renderId`, or the reason it could not start, such as Studio being busy, the daily limit or a missing plan. | Yes |
+| `studioRenderStatusTool` | Waits up to 25 seconds for a render to finish, then returns its status. When it is done, it returns the `mediaId` and `path` of the video, ready to attach to a post with `integrationSchedulePostTool`. | No |
+| `studioCancelTool` | Stops a render that is still waiting or rendering. A cancelled render still counts toward the daily and trial limits. | Yes |
+
+All seven templates work from an assistant: Hook over clip, Talking head + captions, Image slideshow, Before/after, Top-N list, Quote card and AI UGC. For AI UGC the assistant writes the script itself, and by default it renders without an AI voice, so no AI key is needed. An AI voice needs your workspace's own OpenAI key, and AI stills only come with the AI voice. Music must already be uploaded in Studio and not used by another project.
+
+To post a Studio video, the assistant still goes through `integrationSchedulePostTool`, so drafts by default and your workspace's [approvals](/docs/approvals) apply as usual.
+
 ## AI media tools
 
 The server also defines tools for generating images and video and for turning long YouTube videos into short clips: `generateImageTool`, `generateVideoOptions`, `videoFunctionTool`, `generateVideoTool`, `videoStatusTool`, `clippingTool`, `clippingStatusTool` and `clippingWidgetTicketTool`.

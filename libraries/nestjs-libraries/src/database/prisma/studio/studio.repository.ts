@@ -34,11 +34,14 @@ export class StudioRepository {
     private _studioAsset: PrismaRepository<'studioAsset'>
   ) {}
 
-  getProjects(org: string) {
+  // Projects of assistants and the public API are left out unless asked
+  // for, so they never push the workspace's own projects off the list
+  getProjects(org: string, includeApi = false) {
     return this._studioProject.model.studioProject.findMany({
       where: {
         organizationId: org,
         deletedAt: null,
+        ...(includeApi ? {} : { source: null }),
       },
       orderBy: {
         updatedAt: 'desc',
@@ -48,6 +51,7 @@ export class StudioRepository {
         id: true,
         name: true,
         template: true,
+        source: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -79,13 +83,20 @@ export class StudioRepository {
     });
   }
 
-  createProject(org: string, name: string, template: string, spec: string) {
+  createProject(
+    org: string,
+    name: string,
+    template: string,
+    spec: string,
+    source?: string
+  ) {
     return this._studioProject.model.studioProject.create({
       data: {
         organizationId: org,
         name,
         template,
         spec,
+        ...(source ? { source } : {}),
       },
       select: {
         id: true,
@@ -125,6 +136,20 @@ export class StudioRepository {
         id: true,
       },
     });
+  }
+
+  // A project that never got a render (its start failed) leaves no row
+  // behind. Returns false when it has renders, those keep their project
+  async removeUnrenderedProject(org: string, id: string) {
+    const { count } =
+      await this._studioProject.model.studioProject.deleteMany({
+        where: {
+          id,
+          organizationId: org,
+          renders: { none: {} },
+        },
+      });
+    return count > 0;
   }
 
   createRender(

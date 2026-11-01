@@ -49,6 +49,9 @@ import {
   studioAiAssetFromRow,
   studioAiAssetKey,
 } from '@gitroom/nestjs-libraries/studio/ai/studio.ai.interface';
+import { CreateStudioRenderDto } from '@gitroom/nestjs-libraries/dtos/studio/studio.render.dto';
+import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
+import { timer } from '@gitroom/helpers/utils/timer';
 
 // A reason retrying can't change (a deleted video, a broken file): the
 // workflow stops and the message is what the customer reads
@@ -194,6 +197,14 @@ export interface StudioRenderHooks {
 @Injectable()
 export class StudioService {
   private storage = UploadFactory.createStorage();
+  private templateSchemas?: {
+    identifier: string;
+    title: string;
+    description: string;
+    captions: boolean;
+    ai: boolean;
+    schema: any;
+  }[];
 
   constructor(
     private _studioRepository: StudioRepository,
@@ -275,8 +286,8 @@ export class StudioService {
     };
   }
 
-  getProjects(org: string) {
-    return this._studioRepository.getProjects(org);
+  getProjects(org: string, includeApi = false) {
+    return this._studioRepository.getProjects(org, includeApi);
   }
 
   async getProject(org: string, id: string) {
@@ -288,7 +299,12 @@ export class StudioService {
     return { ...project, spec: this.parseSpec(project.spec) };
   }
 
-  async createProject(org: string, body: CreateStudioProjectDto) {
+  // "source" marks a project an assistant or the public API made
+  async createProject(
+    org: string,
+    body: CreateStudioProjectDto,
+    source?: 'api'
+  ) {
     if (!this._templateManager.getTemplate(body.template)) {
       throw new BadRequestException('Unknown template');
     }
@@ -297,7 +313,8 @@ export class StudioService {
       org,
       body.name,
       body.template,
-      '{}'
+      '{}',
+      source
     );
   }
 
@@ -734,19 +751,7 @@ export class StudioService {
       project.spec,
       false
     );
-    const problem = template.instance.check(spec);
-    if (problem) {
-      throw new BadRequestException(problem);
-    }
-
-    const seconds = template.instance.duration(spec);
-    if (seconds > STUDIO_MAX_SECONDS) {
-      throw new BadRequestException(
-        `Videos are ${STUDIO_MAX_SECONDS} seconds at most, this one would be ${Math.ceil(
-          seconds
-        )}. Trim it or speed it up.`
-      );
-    }
+    const seconds = this.renderableSeconds(template, spec);
 
     // a voice or stills need the workspace's own key, before anything waits
     if (
@@ -936,6 +941,357 @@ export class StudioService {
     }
 
     return this.getRender(org, id);
+  }
+
+  // Templates as assistants and the public API read them, each with a JSON
+  // schema of its inputs generated from its DTO, so a new template shows up
+  // by itself. A media is only ever its id: the "path" next to it is left
+  // out. Templates are registered at boot, so the list is built once
+  getTemplateSchemas() {
+    if (this.templateSchemas) {
+      return this.templateSchemas;
+    }
+
+    const schemas = getValidationSchemas() as Record<string, any>;
+    this.templateSchemas = this._templateManager
+      .getAllTemplates()
+      .map((template) => {
+        const schema = this.agentSchema(
+          schemas[template.dto.name] || { type: 'object' }
+        );
+
+        // renderFromSpec times a typed script over the clip, like the
+        // editor's typed script, so the words can be left out
+        const captions = template.captions
+          ? schema.properties?.captions
+          : undefined;
+        if (captions?.properties?.script && captions?.properties?.words) {
+          const required = (captions.required || []).filter(
+            (p: string) => p !== 'words'
+          );
+          if (required.length) {
+            captions.required = required;
+          } else {
+            delete captions.required;
+          }
+          captions.properties.script.description =
+            'What is said in the clip. Without words, Studio spreads it over the clip and longer words get more time';
+        }
+
+        // what renderFromSpec fills in when the spec leaves it out
+        for (const [key, value] of Object.entries(
+          template.agentDefaults || {}
+        )) {
+          if (schema.properties?.[key]) {
+            schema.properties[key].default = value;
+          }
+        }
+
+        return {
+          identifier: template.identifier,
+          title: template.title,
+          description: template.agentDescription || template.description,
+          captions: template.captions,
+          ai: !!template.ai,
+          schema,
+        };
+      });
+
+    return this.templateSchemas;
+  }
+
+  private agentSchema(schema: any): any {
+    if (Array.isArray(schema)) {
+      return schema.map((item) => this.agentSchema(item));
+    }
+    if (!schema || typeof schema !== 'object') {
+      return schema;
+    }
+
+    const copy: Record<string, any> = Object.fromEntries(
+      Object.entries(schema).map(([key, value]) => [
+        key,
+        this.agentSchema(value),
+      ])
+    );
+    if (copy.properties?.path) {
+      delete copy.properties.path;
+      if (Array.isArray(copy.required)) {
+        copy.required = copy.required.filter((p: string) => p !== 'path');
+      }
+    }
+    if (copy.properties?.mediaId || copy.properties?.assetId) {
+      const properties = copy.properties;
+      copy.properties = {
+        ...properties,
+        ...(properties.mediaId
+          ? {
+              mediaId: {
+                ...properties.mediaId,
+                description:
+                  'The id of a media in the media library of this workspace. Urls are not accepted',
+              },
+            }
+          : {
+              assetId: {
+                ...properties.assetId,
+                description:
+                  'The id of a music uploaded to Studio in this workspace that no other project uses. Urls are not accepted',
+              },
+            }),
+      };
+    }
+
+    return copy;
+  }
+
+  // The checks a spec passes before a render may start, whoever starts it:
+  // the template's own check and length. "transcribing": a typed script is
+  // timed over the trim of the clip first, so it must fit a transcription
+  // too. Returns the length of the video
+  private renderableSeconds(
+    template: NonNullable<ReturnType<StudioTemplateManager['getTemplate']>>,
+    spec: any,
+    transcribing = false
+  ) {
+    const problem = template.instance.check(spec);
+    if (problem) {
+      throw new BadRequestException(problem);
+    }
+
+    const seconds = template.instance.duration(spec);
+    if (seconds > STUDIO_MAX_SECONDS) {
+      throw new BadRequestException(
+        `Videos are ${STUDIO_MAX_SECONDS} seconds at most, this one would be ${Math.ceil(
+          seconds
+        )}. Trim it or speed it up.`
+      );
+    }
+
+    const trim = spec?.trim;
+    if (transcribing && trim && trim.end - trim.start > MAX_TRANSCRIBE_SECONDS) {
+      throw new BadRequestException(
+        `Trim the clip to ${MAX_TRANSCRIBE_SECONDS} seconds or less first`
+      );
+    }
+
+    return seconds;
+  }
+
+  // Every media the template reads (its mediaIds) must be a ready media of
+  // this workspace, of a kind its place takes, and its music a Studio music
+  // of the workspace. Each object of the spec pointing at a media gets its
+  // path in our own storage: a path sent by the caller is dropped, the
+  // editor plays the stored one and the render reads the media by its id
+  private async withWorkspaceMedia(
+    org: string,
+    template: NonNullable<ReturnType<StudioTemplateManager['getTemplate']>>,
+    spec: any
+  ) {
+    const paths = new Map<string, string>();
+    for (const [index, mediaId] of template.instance
+      .mediaIds(spec)
+      .entries()) {
+      const media = await this._mediaService.getOrgMediaById(org, mediaId);
+      if (!media || media.deletedAt) {
+        throw new BadRequestException(
+          `Media ${mediaId} is not in the media library of this workspace`
+        );
+      }
+      if (media.status !== 'ready') {
+        throw new BadRequestException(
+          `Media ${mediaId} is still processing, try again once it is ready`
+        );
+      }
+      const problem = this.inputKindProblem(
+        template.instance,
+        spec,
+        index,
+        media.name
+      );
+      if (problem) {
+        throw new BadRequestException(`Media ${mediaId}: ${problem}`);
+      }
+      paths.set(mediaId, media.path);
+    }
+
+    // a music belongs to one project (it goes with the project), and this
+    // project does not exist yet
+    const musicId = template.instance.musicAssetId(spec);
+    if (musicId) {
+      const music = await this._studioRepository.getAsset(org, musicId);
+      if (!music) {
+        throw new BadRequestException(
+          `Music ${musicId} is not a Studio music of this workspace`
+        );
+      }
+      if (music.projectId) {
+        throw new BadRequestException(
+          'That music belongs to another Studio project; upload it again in Studio'
+        );
+      }
+      paths.set(musicId, music.path);
+    }
+
+    const withPaths = (value: any): any => {
+      if (Array.isArray(value)) {
+        return value.map(withPaths);
+      }
+      if (!value || typeof value !== 'object') {
+        return value;
+      }
+
+      const result = Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, withPaths(item)])
+      );
+      // a path is only ever the stored one of a media or music
+      const id =
+        typeof value.mediaId === 'string'
+          ? value.mediaId
+          : typeof value.assetId === 'string'
+          ? value.assetId
+          : undefined;
+      const { path, ...rest } = result;
+      return id && paths.has(id) ? { ...rest, path: paths.get(id) } : rest;
+    };
+
+    return withPaths(spec);
+  }
+
+  private withoutNulls(value: any): any {
+    if (Array.isArray(value)) {
+      return value
+        .filter((item) => item !== null)
+        .map((item) => this.withoutNulls(item));
+    }
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, item]) => item !== null)
+        .map(([key, item]) => [key, this.withoutNulls(item)])
+    );
+  }
+
+  // A render in one call, for assistants and the public API: a project of the
+  // template with the spec, rendered on the same path as the editor (the same
+  // validation, media checks, fair use and billing). It only makes a video in
+  // the media library, never a post. Everything that can be checked is
+  // checked before the project is made, and a project whose render could
+  // still not start is removed again
+  async renderFromSpec(org: Organization, body: CreateStudioRenderDto) {
+    const template = this._templateManager.getTemplate(body.template);
+    if (!template) {
+      throw new BadRequestException(
+        `Unknown template, use one of: ${this._templateManager
+          .getAllTemplates()
+          .map((p) => p.identifier)
+          .join(', ')}`
+      );
+    }
+
+    // Captions of the shared StudioCaptionsDto may come as a typed script,
+    // its words are timed once the project exists, so they may be missing
+    const captions = (body.spec as any)?.captions;
+    const timeScript =
+      template.captions &&
+      typeof captions?.script === 'string' &&
+      !!captions.script.trim() &&
+      !captions?.words?.length;
+    // what the template gives assistants by default, like the AI UGC path
+    // without a voice that needs no key. A null counts as left out, and a
+    // switch that is off by default is on only when it is true
+    const defaults = template.agentDefaults || {};
+    const given = this.withoutNulls(body.spec) || {};
+    const filled = {
+      ...defaults,
+      ...given,
+      ...Object.fromEntries(
+        Object.entries(defaults)
+          .filter(([, value]) => value === false)
+          .map(([key]) => [key, given[key] === true])
+      ),
+    };
+    const validated = await this._templateManager.validateSpec(
+      body.template,
+      timeScript
+        ? { ...filled, captions: { ...captions, words: [] } }
+        : filled,
+      false
+    );
+    this.renderableSeconds(template, validated, timeScript);
+    const agentProblem = template.instance.agentCheck(validated);
+    if (agentProblem) {
+      throw new BadRequestException(agentProblem);
+    }
+    const spec = await this.withWorkspaceMedia(
+      org.id,
+      template,
+      JSON.parse(JSON.stringify(validated))
+    );
+
+    // a voice or stills need the workspace's own key, the same check as
+    // startRender, before a project is made
+    if (
+      template.instance.aiAssets(spec).length &&
+      !(await this._aiCredentialService.hasCredential(org.id))
+    ) {
+      throw new BadRequestException(
+        `${MISSING_AI_KEY}. Without a key, render it without the AI voice and stills.`
+      );
+    }
+
+    // the limits are checked again when the render starts; checking them
+    // first answers a busy or capped workspace without making a project
+    await this.checkFairUse(org);
+
+    const project = await this.createProject(
+      org.id,
+      {
+        name: body.name || template.title,
+        template: body.template,
+      },
+      'api'
+    );
+
+    try {
+      await this.updateProject(org.id, project.id, { spec });
+      if (timeScript) {
+        await this.transcribe(org.id, project.id, {
+          script: spec.captions.script,
+        });
+      }
+
+      const render = await this.startRender(org, project.id);
+      return { id: render.id, projectId: project.id };
+    } catch (err) {
+      // a render that failed to start keeps its project, soft deleted
+      const removed = await this._studioRepository
+        .removeUnrenderedProject(org.id, project.id)
+        .catch(() => false);
+      if (!removed) {
+        await this.deleteProject(org.id, project.id).catch(() => undefined);
+      }
+      throw err;
+    }
+  }
+
+  // For assistants: waits up to "seconds" for the render to end, so a status
+  // call answers as soon as the video is in the media library
+  async waitForRender(org: string, id: string, seconds: number) {
+    let render = await this.getRender(org, id);
+    for (
+      let waited = 0;
+      waited < seconds && !STUDIO_FINAL_STATUSES.includes(render.status);
+      waited += 3
+    ) {
+      await timer(3000);
+      render = await this.getRender(org, id);
+    }
+
+    return render;
   }
 
   // "ready" when this is the oldest render the workspace has waiting or
