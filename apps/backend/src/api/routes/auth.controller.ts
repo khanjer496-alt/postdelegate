@@ -85,6 +85,21 @@ export class AuthController {
     }
   }
 
+  // An invite cookie is spent by the first sign up or sign in that tries it,
+  // whatever the outcome, so it can't keep warning that it was used, and a
+  // copy-link invite on a shared browser can't add the next person
+  private clearInviteCookie(req: Request, response: Response) {
+    if (!req?.cookies?.org) {
+      return;
+    }
+    response.clearCookie('org', {
+      path: '/',
+      ...(!process.env.NOT_SECURED
+        ? { domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!) }
+        : {}),
+    });
+  }
+
   @Get('/can-register')
   async canRegister() {
     return {
@@ -115,6 +130,8 @@ export class AuthController {
         getOrgFromCookie,
         req?.cookies?.[AFFILIATE_COOKIE_NAME]
       );
+
+      this.clearInviteCookie(req, response);
 
       const activationRequired =
         body.provider === 'LOCAL' && this._emailService.hasProvider();
@@ -169,6 +186,8 @@ export class AuthController {
         getOrgFromCookie,
         req?.cookies?.[AFFILIATE_COOKIE_NAME]
       );
+
+      this.clearInviteCookie(req, response);
 
       response.cookie('auth', jwt, {
         ...getAuthCookieOptions(),
@@ -362,6 +381,7 @@ export class AuthController {
       return response.json({ token });
     }
 
+    this.clearInviteCookie(req, response);
     this.applyInvite(response, addedOrg || false);
 
     response.cookie('auth', jwt, {

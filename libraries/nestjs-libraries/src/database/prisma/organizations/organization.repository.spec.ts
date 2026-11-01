@@ -82,6 +82,17 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
     expect($transaction).not.toHaveBeenCalled();
   });
 
+  it('tells a member who already accepted the invite nothing went wrong', async () => {
+    const { repo, user, userOrganization } = makeRepo();
+    // the invite was used, by this very member
+    user.findFirst.mockResolvedValue({ id: 'user-1' });
+    userOrganization.findFirst.mockResolvedValue({ id: 'm-1' });
+
+    await expect(
+      repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+    ).resolves.toEqual({ failed: 'already_member' });
+  });
+
   it('keeps admin-initiated adds (no invite email) working', async () => {
     const { repo, user, $transaction } = makeRepo();
 

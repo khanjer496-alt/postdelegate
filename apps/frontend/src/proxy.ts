@@ -107,11 +107,15 @@ export async function proxy(request: NextRequest) {
       ? providers.find((p) => nextUrl.href.indexOf(p) > -1)
       : undefined;
     if (!findIndex && !org && nextUrl.pathname !== '/') {
+      // a provider callback without a code (a cancelled sign-in) is not a
+      // page to come back to
       return NextResponse.redirect(
         new URL(
-          `/auth/login?returnUrl=${encodeURIComponent(
-            `${nextUrl.pathname}${url}`
-          )}`,
+          nextUrl.pathname.startsWith('/integrations/social/')
+            ? '/auth/login'
+            : `/auth/login?returnUrl=${encodeURIComponent(
+                `${nextUrl.pathname}${url}`
+              )}`,
           nextUrl.href
         )
       );
@@ -166,6 +170,14 @@ export async function proxy(request: NextRequest) {
       const redirect = NextResponse.redirect(
         new URL(`/?added=true`, nextUrl.href)
       );
+      // the invite is spent by this attempt, whatever the outcome
+      redirect.cookies.set('org', '', {
+        path: '/',
+        ...(!process.env.NOT_SECURED
+          ? { domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!) }
+          : {}),
+        maxAge: 0,
+      });
       // the app says why the invite could not be accepted
       if (error && error !== 'already_member') {
         redirect.cookies.set('invite_error', error, {

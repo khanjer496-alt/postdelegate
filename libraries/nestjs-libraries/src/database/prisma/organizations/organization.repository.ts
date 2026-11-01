@@ -425,6 +425,22 @@ export class OrganizationRepository {
     // invited person can accept (admin-initiated adds have no invite email)
     invitedEmail?: string
   ) {
+    // first: someone who already joined (with this very invite or another
+    // way) is not told the invite failed
+    const alreadyMember = await this._userOrg.model.userOrganization.findFirst({
+      where: {
+        userId,
+        organizationId: orgId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (alreadyMember) {
+      return { failed: 'already_member' as InviteFailure };
+    }
+
     if (invitedEmail !== undefined) {
       const accepting = await this._user.model.user.findUnique({
         where: {
@@ -453,20 +469,6 @@ export class OrganizationRepository {
 
     if (checkIfInviteExists) {
       return { failed: 'already_used' as InviteFailure };
-    }
-
-    const alreadyMember = await this._userOrg.model.userOrganization.findFirst({
-      where: {
-        userId,
-        organizationId: orgId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (alreadyMember) {
-      return { failed: 'already_member' as InviteFailure };
     }
 
     const checkForSubscription =
