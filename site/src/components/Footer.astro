@@ -14,19 +14,19 @@ const columns: { title: string; links: readonly (readonly [string, string])[] }[
   { title: 'Product', links: [['Features', '/#features'], ['Pricing', '/pricing'], ['Channels', '/platforms'], [CTA_SHORT, SITE.signup], ['Sign in', SITE.login]] },
   { title: 'AI & developers', links: [['Documentation', '/docs'], ['AI workflows', '/agents'], ['Claude', '/claude-cowork'], ['Codex & coding agents', '/codex'], ['MCP', '/mcp'], ['REST API', '/api'], ['API reference', '/docs/api'], ['MCP setup', '/docs/mcp']] },
   { title: 'Social schedulers', links: schedulers },
-  { title: 'Resources', links: [['Guides', '/guides'], ['Free tools', '/tools'], ['Caption checker', '/tools/caption-checker'], ['Compare', '/compare'], ['Alternatives', '/alternatives'], ['About', '/about'], ['Support', '/support'], ['Status', '/status']] },
-  { title: 'Legal', links: [['Privacy policy', SITE.legal.privacy], ['Terms of service', SITE.legal.terms], ['Data deletion', SITE.legal.dataDeletion], ['Licenses', SITE.legal.licenses]] },
+  { title: 'Resources', links: [['Guides', '/guides'], ['Free tools', '/tools'], ['Caption checker', '/tools/caption-checker'], ['Compare', '/compare'], ['Alternatives', '/alternatives'], ['Changelog', '/changelog'], ['Roadmap', '/roadmap'], ['About', '/about'], ['Brand', '/brand'], ['Support', '/support'], ['Status', '/status']] },
+  { title: 'Legal', links: [['Privacy policy', SITE.legal.privacy], ['Terms of service', SITE.legal.terms], ['Data deletion', SITE.legal.dataDeletion], ['Subprocessors', '/subprocessors'], ['Licenses', SITE.legal.licenses]] },
 ];
 ---
 <footer class="site-footer">
   <div class="footer-inner">
-    <div class="footer-intro"><a href="/" aria-label="PostDelegate home"><Logo /></a><p>A little planning.<br />A lot more presence.</p><a class="footer-email" href={`mailto:${SITE.email}`}>{SITE.email}</a></div>
+    <div class="footer-intro"><a href="/" aria-label="PostDelegate home"><Logo /></a><p>Plan it once.<br />Publish everywhere you’re live.</p><a class="footer-email" href={`mailto:${SITE.email}`}>{SITE.email}</a></div>
     <div class="footer-columns">{columns.map((column) => <div><h2>{column.title}</h2><ul>{column.links.map(([label, href]) => <li><a href={href}>{label}</a></li>)}</ul></div>)}</div>
     <div class="footer-extra">
       <div class="footer-social"><h2>Follow PostDelegate</h2><ul>{SOCIAL_PROFILES.map((profile) => <li><a href={profile.href} rel="me noopener" target="_blank">{profile.name}</a></li>)}</ul></div>
       {FEATURED_ON.length > 0 && <div class="footer-featured"><h2>Featured on</h2><ul>{FEATURED_ON.map((badge) => <li class="featured-badge" set:html={badge.html} />)}</ul></div>}
     </div>
-    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. All rights reserved.</p><p><a href={SITE.source}>Source code (AGPL-3.0)</a></p><p>Network names and logos belong to their respective owners.</p></div>
+    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. PostDelegate is operated by {SITE.operator}. All rights reserved.</p><p><a href={SITE.source}>Source code (AGPL-3.0)</a></p><p>Network names and logos belong to their respective owners.</p></div>
   </div>
 </footer>
 <style>
