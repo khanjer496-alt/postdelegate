@@ -1,12 +1,8 @@
 ---
 import Logo from './Logo.astro';
 import { SITE, CTA_SHORT } from '../data/site';
-import { NETWORKS } from '../data/networks';
-// Channels menu: whether a network is live comes from networks.ts, so a network
-// loses its "Coming soon" tag (and moves up with the live ones) once it is available.
-const menuNetworks = ['youtube', 'bluesky', 'wordpress', 'medium', 'devto', 'slack', 'instagram', 'linkedin', 'tiktok', 'facebook', 'threads']
-  .map((key) => NETWORKS.find((network) => network.key === key)!)
-  .sort((a, b) => Number(!a.available) - Number(!b.available))
+import { menuNetworks } from '../data/networks';
+const channelLinks = menuNetworks(['youtube', 'bluesky', 'wordpress', 'medium', 'devto', 'slack', 'instagram', 'linkedin', 'tiktok', 'facebook', 'threads'])
   .map((network) => ({ label: network.name, href: `/${network.scheduler}`, soon: !network.available }));
 const groups: { label: string; links: { label: string; href: string; description?: string; soon?: boolean }[] }[] = [
   { label: 'AI & workflows', links: [
@@ -17,7 +13,7 @@ const groups: { label: string; links: { label: string; href: string; description
   ] },
   { label: 'Channels', links: [
     { label: 'All channels', href: '/platforms' },
-    ...menuNetworks,
+    ...channelLinks,
   ] },
   { label: 'Resources', links: [
     { label: 'Free tools', href: '/tools', description: 'Small tools for your next post.' },
