@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import dayjs from 'dayjs';
 
 // the service pulls in heavy provider / upload modules that are not under test
 jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
@@ -32,6 +33,7 @@ const makeService = (integrationManager: any = {}) => {
     integrationManager,
     {} as any,
     mediaService as any,
+    {} as any,
     {} as any,
     {} as any,
     {} as any,
@@ -209,7 +211,8 @@ describe('PostsService approvals on save', () => {
       {} as any,
       {} as any,
       policy as any,
-      { recordPublished: jest.fn() } as any
+      { recordPublished: jest.fn() } as any,
+      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
     );
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
@@ -358,5 +361,212 @@ describe('PostsService approvals on save', () => {
     expect(postRepository.changeState).not.toHaveBeenCalled();
     expect(policy.afterSave).toHaveBeenCalled();
     expect(result).toMatchObject({ state: 'DRAFT', approvalStatus: 'IN_REVIEW' });
+  });
+});
+
+describe('PostsService monthly cap on one network', () => {
+  const monthStart = dayjs().startOf('month').toDate();
+  const makeLimitService = (
+    limits: Record<string, number> | null = { x: 30 },
+    used = 0
+  ) => {
+    const postRepository = {
+      countProviderPosts: jest.fn().mockResolvedValue(used),
+    };
+    const subscriptionService = {
+      getProviderPostsLimits: jest.fn().mockResolvedValue(
+        limits
+          ? { plan: 'Starter', limits, from: monthStart }
+          : null
+      ),
+    };
+    const integrationService = {
+      getIntegrationsList: jest.fn().mockResolvedValue([
+        { id: 'i-x', providerIdentifier: 'x' },
+        { id: 'i-own', providerIdentifier: 'x-own-key' },
+        { id: 'i-li', providerIdentifier: 'linkedin' },
+      ]),
+    };
+    const integrationManager = {
+      getSocialIntegration: (identifier: string) =>
+        identifier === 'x'
+          ? { name: 'X', planLimitHint: 'Or bring your own key.' }
+          : undefined,
+    };
+    const service = new PostsService(
+      postRepository as any,
+      integrationManager as any,
+      integrationService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      subscriptionService as any
+    );
+    return { service, postRepository, subscriptionService };
+  };
+
+  const post = (integration: string, values: number, ids = false) => ({
+    integration: { id: integration },
+    // the client can claim any network, the channel's own one is counted
+    settings: { __type: 'linkedin' },
+    value: [...new Array(values)].map((_, i) => ({
+      ...(ids ? { id: `${integration}-${i}` } : {}),
+      content: 'hi',
+    })),
+  });
+
+  it('lets a post through while the month has room', async () => {
+    const { service, postRepository } = makeLimitService({ x: 30 }, 27);
+    await service.checkProviderPostsLimit('org-1', {
+      type: 'schedule',
+      posts: [post('i-x', 3)],
+    });
+    expect(postRepository.countProviderPosts).toHaveBeenCalledWith(
+      'org-1',
+      'x',
+      monthStart,
+      dayjs(monthStart).add(1, 'month').toDate(),
+      []
+    );
+  });
+
+  it('counts every post of a thread and stops the save at the cap', async () => {
+    const { service } = makeLimitService({ x: 30 }, 28);
+    await expect(
+      service.checkProviderPostsLimit('org-1', {
+        type: 'schedule',
+        posts: [post('i-x', 3)],
+      })
+    ).rejects.toMatchObject({
+      status: 402,
+      message:
+        'Only 2 of your 30 X posts for this month on the Starter plan are left, and this needs 3 (every post of a thread counts). Or bring your own key.',
+    });
+  });
+
+  it('says the month is used up when nothing is left', async () => {
+    const { service } = makeLimitService({ x: 30 }, 30);
+    await expect(
+      service.checkProviderPostsLimit('org-1', {
+        type: 'now',
+        posts: [post('i-x', 1)],
+      })
+    ).rejects.toMatchObject({
+      message:
+        "You've used your 30 X posts for this month on the Starter plan. Or bring your own key.",
+    });
+  });
+
+  it('adds up the channels of the same network in one save', async () => {
+    const { service, postRepository } = makeLimitService({ x: 30 }, 28);
+    await expect(
+      service.checkProviderPostsLimit('org-1', {
+        type: 'schedule',
+        posts: [post('i-x', 1), post('i-x', 2)],
+      })
+    ).rejects.toMatchObject({ status: 402 });
+    expect(postRepository.countProviderPosts).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the posts saved again in place out of the count', async () => {
+    const { service, postRepository } = makeLimitService({ x: 30 }, 29);
+    await service.checkProviderPostsLimit('org-1', {
+      type: 'schedule',
+      posts: [post('i-x', 1, true)],
+    });
+    expect(postRepository.countProviderPosts).toHaveBeenCalledWith(
+      'org-1',
+      'x',
+      expect.any(Date),
+      expect.any(Date),
+      ['i-x-0']
+    );
+  });
+
+  it('does not cap networks the plan does not list, nor the own key variant', async () => {
+    const { service, postRepository } = makeLimitService({ x: 0 }, 0);
+    await service.checkProviderPostsLimit('org-1', {
+      type: 'schedule',
+      posts: [post('i-own', 5), post('i-li', 5)],
+    });
+    expect(postRepository.countProviderPosts).not.toHaveBeenCalled();
+  });
+
+  it('takes nothing for drafts and in-place updates', async () => {
+    for (const type of ['draft', 'update'] as const) {
+      const { service, subscriptionService } = makeLimitService({ x: 0 });
+      await service.checkProviderPostsLimit('org-1', {
+        type,
+        posts: [post('i-x', 1)],
+      });
+      expect(subscriptionService.getProviderPostsLimits).not.toHaveBeenCalled();
+    }
+  });
+
+  it('caps nothing without billing', async () => {
+    const { service, postRepository } = makeLimitService(null);
+    await service.checkProviderPostsLimit('org-1', {
+      type: 'schedule',
+      posts: [post('i-x', 100)],
+    });
+    expect(postRepository.countProviderPosts).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a plain upgrade message for a network without a hint', async () => {
+    const { service } = makeLimitService({ linkedin: 1 }, 1);
+    await expect(
+      service.checkProviderPostsLimit('org-1', {
+        type: 'schedule',
+        posts: [post('i-li', 1)],
+      })
+    ).rejects.toMatchObject({
+      message:
+        "You've used your 1 linkedin posts for this month on the Starter plan. Upgrade your plan to post more.",
+    });
+  });
+
+  it('counts a post in the plan month it publishes in', async () => {
+    const { service, postRepository } = makeLimitService({ x: 30 }, 30);
+    const nextMonth = dayjs(monthStart).add(1, 'month');
+    await expect(
+      service.checkProviderPostsLimit('org-1', {
+        type: 'schedule',
+        date: nextMonth.add(3, 'day').format('YYYY-MM-DDTHH:mm:ss'),
+        posts: [post('i-x', 1)],
+      })
+    ).rejects.toMatchObject({
+      message: `You've used your 30 X posts for the plan month starting ${nextMonth.format(
+        'MMMM D'
+      )} on the Starter plan. Or bring your own key.`,
+    });
+    expect(postRepository.countProviderPosts).toHaveBeenCalledWith(
+      'org-1',
+      'x',
+      nextMonth.toDate(),
+      nextMonth.add(1, 'month').toDate(),
+      []
+    );
+  });
+
+  it('checks every post of a stored thread before it is scheduled', async () => {
+    const { service, postRepository } = makeLimitService({ x: 30 }, 29);
+    jest.spyOn(service, 'getPostsRecursively').mockResolvedValue([
+      { id: 'p-1', integrationId: 'i-x', publishDate: new Date() },
+      { id: 'p-2', integrationId: 'i-x', publishDate: new Date() },
+    ] as any);
+    await expect(
+      service.checkStoredPostLimit('org-1', 'p-1')
+    ).rejects.toMatchObject({ status: 402 });
+    expect(postRepository.countProviderPosts).toHaveBeenCalledWith(
+      'org-1',
+      'x',
+      expect.any(Date),
+      expect.any(Date),
+      ['p-1', 'p-2']
+    );
   });
 });

@@ -64,6 +64,12 @@ import {
   actorName,
 } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
 import { ActivityLogService } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import {
+  AuthorizationActions,
+  Sections,
+  SubscriptionException,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 type PostWithConditionals = Post & {
   integration?: Integration;
@@ -83,7 +89,8 @@ export class PostsService {
     private _temporalService: TemporalService,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _approvalPolicyService: ApprovalPolicyService,
-    private _activityLogService: ActivityLogService
+    private _activityLogService: ActivityLogService,
+    private _subscriptionService: SubscriptionService
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -1312,6 +1319,8 @@ export class PostsService {
       );
     }
 
+    await this.checkProviderPostsLimit(orgId, body);
+
     const postList = [];
     // posts sent for review in this save, the approvers hear about them once
     const submitted: { id: string; content: string; integrationName?: string; provider?: string }[] = [];
@@ -1435,6 +1444,121 @@ export class PostsService {
     }
 
     return postList;
+  }
+
+  // A plan can cap the posts of a network a month (provider_posts_per_month),
+  // for networks whose API is paid per post. Checked for the whole save before
+  // anything is stored, on the channel's real network and in the plan month
+  // each post publishes in, counting each entry of a thread like
+  // countPostsFromDay does. A draft takes nothing until it is scheduled, an
+  // in-place update keeps the state its posts already have
+  async checkProviderPostsLimit(
+    orgId: string,
+    body: {
+      type: CreatePostDto['type'];
+      date?: string | Date;
+      posts: {
+        integration: { id: string };
+        date?: string | Date;
+        value?: { id?: string }[];
+      }[];
+    }
+  ) {
+    if (body.type === 'draft' || body.type === 'update') {
+      return;
+    }
+
+    const plan = await this._subscriptionService.getProviderPostsLimits(orgId);
+    if (!plan || !Object.keys(plan.limits).length) {
+      return;
+    }
+
+    const providers = new Map(
+      (await this._integrationService.getIntegrationsList(orgId)).map((p) => [
+        p.id,
+        p.providerIdentifier,
+      ])
+    );
+
+    // the plan month a post publishes in, a passed date publishes now
+    const monthOf = (date?: string | Date) => {
+      const at = body.type === 'now' || !date ? dayjs() : dayjs(date);
+      return dayjs(plan.from).add(
+        Math.max(0, at.diff(plan.from, 'month')),
+        'month'
+      );
+    };
+
+    const saving = groupBy(
+      body.posts
+        .map((post) => ({
+          post,
+          provider: providers.get(post.integration?.id) || '',
+          month: monthOf(post.date || body.date),
+        }))
+        .filter(({ provider }) => plan.limits[provider] !== undefined),
+      ({ provider, month }) => `${provider} ${month.valueOf()}`
+    );
+
+    for (const group of Object.values(saving)) {
+      const { provider, month } = group[0];
+      const values = group.flatMap(({ post }) => post.value || []);
+      const limit = plan.limits[provider];
+      const used = await this._postRepository.countProviderPosts(
+        orgId,
+        provider,
+        month.toDate(),
+        month.add(1, 'month').toDate(),
+        // saved again in place, already part of the count
+        values.map((value) => value.id!).filter(Boolean)
+      );
+
+      if (used + values.length <= limit) {
+        continue;
+      }
+
+      const social = this._integrationManager.getSocialIntegration(provider);
+      const name = social?.name || provider;
+      const period = month.isAfter(dayjs())
+        ? `the plan month starting ${month.format('MMMM D')}`
+        : 'this month';
+      const left = Math.max(0, limit - used);
+      throw new SubscriptionException({
+        action: AuthorizationActions.Create,
+        section: Sections.PROVIDER_POSTS_PER_MONTH,
+        message: `${
+          left
+            ? `Only ${left} of your ${limit} ${name} posts for ${period} on the ${plan.plan} plan are left, and this needs ${values.length} (every post of a thread counts).`
+            : `You've used your ${limit} ${name} posts for ${period} on the ${plan.plan} plan.`
+        } ${social?.planLimitHint || 'Upgrade your plan to post more.'}`,
+      });
+    }
+  }
+
+  // The same check for a stored post that is about to be scheduled (a draft
+  // scheduled through the API, or approved), with every post of its thread
+  async checkStoredPostLimit(orgId: string, postId: string) {
+    // without billing nothing is capped, the thread isn't loaded
+    if (!(await this._subscriptionService.getProviderPostsLimits(orgId))) {
+      return;
+    }
+
+    const ordered = await this.getPostsRecursively(postId, false, orgId, true);
+    const [root] = ordered;
+    if (!root) {
+      return;
+    }
+
+    await this.checkProviderPostsLimit(orgId, {
+      type: 'schedule',
+      posts: [
+        {
+          integration: { id: root.integrationId },
+          date: root.publishDate,
+          value: ordered.map((post) => ({ id: post.id })),
+        },
+      ],
+    });
   }
 
   // Update ONLY the provider settings of a not-yet-published post (scheduled or
@@ -1608,6 +1732,11 @@ export class PostsService {
     const getPostById = await this._postRepository.getPostById(id, orgId);
     if (!getPostById) {
       throw new BadRequestException('Post not found');
+    }
+
+    // a draft held for review is scheduled once approved, the check can't wait
+    if (status === 'schedule' && getPostById.state === 'DRAFT') {
+      await this.checkStoredPostLimit(orgId, id);
     }
 
     if (status === 'schedule' && actor?.type === 'agent') {

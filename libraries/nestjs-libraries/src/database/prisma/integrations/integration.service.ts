@@ -31,6 +31,7 @@ import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/au
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { TemporalService } from 'nestjs-temporal-core';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 dayjs.extend(utc);
 
@@ -102,6 +103,33 @@ export class IntegrationService {
 
   checkPreviousConnections(org: string, id: string) {
     return this._integrationRepository.checkPreviousConnections(org, id);
+  }
+
+  // Two providers for the same account (a network and its own API key variant)
+  // share the channel, so connecting one over the other would move the
+  // channel's scheduled posts across a plan's monthly cap on that network
+  // (provider_posts_per_month). The channel has to be deleted first
+  async checkCappedProviderSwitch(org: string, id: string, provider: string) {
+    const existing = await this._integrationRepository.getIntegrationByInternalId(
+      org,
+      id
+    );
+    if (!existing || existing.providerIdentifier === provider) {
+      return;
+    }
+
+    const capped = (identifier: string) =>
+      Object.values(pricing).some(
+        (plan) => plan.provider_posts_per_month?.[identifier] !== undefined
+      );
+    if (!capped(existing.providerIdentifier) && !capped(provider)) {
+      return;
+    }
+
+    throw new HttpException(
+      `This account is already connected as the channel "${existing.name}". Delete that channel first, then connect the account again.`,
+      HttpStatus.BAD_REQUEST
+    );
   }
 
   async createOrUpdateIntegration(

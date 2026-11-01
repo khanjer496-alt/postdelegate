@@ -668,6 +668,41 @@ export class PostsRepository {
     });
   }
 
+  // The same posts countPostsFromDay counts, for the channels of one network
+  // in one period, leaving out the posts that are being saved again
+  countProviderPosts(
+    orgId: string,
+    providerIdentifier: string,
+    from: Date,
+    until: Date,
+    excludeIds: string[] = []
+  ) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        integration: {
+          providerIdentifier,
+        },
+        publishDate: {
+          gte: from,
+          lt: until,
+        },
+        ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+        OR: [
+          {
+            deletedAt: null,
+            state: {
+              in: ['QUEUE'],
+            },
+          },
+          {
+            state: 'PUBLISHED',
+          },
+        ],
+      },
+    });
+  }
+
   async createOrUpdatePost(
     state: 'draft' | 'schedule' | 'now' | 'update',
     orgId: string,

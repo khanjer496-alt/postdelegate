@@ -397,6 +397,29 @@ export class SubscriptionService {
     return { deleted: count };
   }
 
+  // The plan's monthly caps on single networks (provider_posts_per_month) and
+  // the start of the plan's current month, the billing month the credits use.
+  // Without billing there are no plans to cap
+  async getProviderPostsLimits(organizationId: string) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return null;
+    }
+
+    const subscription =
+      await this._subscriptionRepository.getSubscriptionByOrganizationId(
+        organizationId
+      );
+    const tier = subscription?.subscriptionTier || 'FREE';
+
+    return {
+      plan: pricing[tier].label || tier,
+      limits: pricing[tier].provider_posts_per_month || {},
+      from: this.currentPeriodStart(
+        subscription?.createdAt || new Date()
+      ).toDate(),
+    };
+  }
+
   async checkCredits(organization: Organization, checkType = 'ai_images') {
     // @ts-ignore
     const type = organization?.subscription?.subscriptionTier || 'FREE';

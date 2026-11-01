@@ -289,6 +289,9 @@ export interface SocialProvider
   publishedLabel?(settings: any): string | undefined;
   // the label of the link to such a post, e.g. in the digest email
   publishedLinkLabel?(settings: any): string | undefined;
+  // what lifts the plan's monthly cap on this network
+  // (provider_posts_per_month), the end of the message shown at the cap
+  planLimitHint?: string;
   dto?: any;
   maxLength: (additionalSettings?: any, settings?: any) => number;
   checkValidity(
