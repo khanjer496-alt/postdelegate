@@ -7,6 +7,10 @@ jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/studio/studio.schedule.service',
   () => ({ StudioScheduleService: class {} })
 );
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/studio/studio.ai.service',
+  () => ({ StudioAiService: class {} })
+);
 jest.mock('@gitroom/backend/services/auth/permissions/permissions.service', () => ({
   PermissionsService: class {},
 }));
@@ -19,6 +23,7 @@ jest.mock('@gitroom/nestjs-libraries/upload/multer.stream.engine', () => ({
 
 import { BadRequestException } from '@nestjs/common';
 import { SubscriptionException } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { StudioController } from './studio.controller';
 
 describe('StudioController', () => {
@@ -50,7 +55,8 @@ describe('StudioController', () => {
       controller: new StudioController(
         studio as any,
         schedule as any,
-        permissions as any
+        permissions as any,
+        {} as any
       ),
       studio,
       schedule,
@@ -97,5 +103,57 @@ describe('StudioController', () => {
     expect(() => controller.uploadAsset(org, undefined as any)).toThrow(
       BadRequestException
     );
+  });
+});
+
+describe('StudioController AI routes', () => {
+  const proto: any = StudioController.prototype;
+
+  // every one of them spends the workspace's own OpenAI credit
+  it.each(['transcribe', 'writeScript', 'voiceover'])(
+    '%s is limited to 30 an hour per client address',
+    (name) => {
+      expect(Reflect.getMetadata('__guards__', proto[name])).toContain(
+        ThrottlerRealIpGuard
+      );
+      expect(Reflect.getMetadata('THROTTLER:LIMITdefault', proto[name])).toBe(
+        30
+      );
+      expect(Reflect.getMetadata('THROTTLER:TTLdefault', proto[name])).toBe(
+        60 * 60 * 1000
+      );
+    }
+  );
+
+  it('routes the script and the voice of a project', () => {
+    expect(Reflect.getMetadata('path', proto.writeScript)).toBe(
+      '/projects/:id/ai-script'
+    );
+    expect(Reflect.getMetadata('path', proto.voiceover)).toBe(
+      '/projects/:id/voiceover'
+    );
+    expect(Reflect.getMetadata('path', proto.getAi)).toBe('/ai');
+  });
+
+  it('hands the organization of the request to the AI service', async () => {
+    const ai = {
+      getCapabilities: jest.fn().mockResolvedValue({ connected: false }),
+      writeScript: jest.fn().mockResolvedValue({ script: {} }),
+      voiceover: jest.fn().mockResolvedValue({ path: 'p', seconds: 3 }),
+    };
+    const controller = new StudioController(
+      {} as any,
+      {} as any,
+      {} as any,
+      ai as any
+    );
+    const org = { id: 'org-1' } as any;
+
+    await controller.getAi(org);
+    await controller.writeScript(org, 'project-1');
+    await controller.voiceover(org, 'project-1');
+    expect(ai.getCapabilities).toHaveBeenCalledWith('org-1');
+    expect(ai.writeScript).toHaveBeenCalledWith('org-1', 'project-1');
+    expect(ai.voiceover).toHaveBeenCalledWith('org-1', 'project-1');
   });
 });

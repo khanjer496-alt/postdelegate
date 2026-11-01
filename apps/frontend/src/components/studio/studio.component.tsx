@@ -16,6 +16,7 @@ import {
   useStudioTemplates,
 } from '@gitroom/frontend/components/studio/use.studio';
 import { StudioEditor } from '@gitroom/frontend/components/studio/studio.editor';
+import { StudioAiUgcEditor } from '@gitroom/frontend/components/studio/studio.ai.ugc';
 import { StudioFonts } from '@gitroom/frontend/components/studio/studio.preview';
 import { StudioUsageNote } from '@gitroom/frontend/components/studio/studio.render.panel';
 import { StudioTemplateGallery } from '@gitroom/frontend/components/studio/studio.gallery';
@@ -24,6 +25,11 @@ import {
   studioMediaTemplates,
 } from '@gitroom/frontend/components/studio/studio.media.editor';
 import { StudioFinishedVideos } from '@gitroom/frontend/components/studio/studio.schedule';
+
+// Templates that bring an editor of their own
+const studioTemplateEditors: Record<string, typeof StudioEditor> = {
+  'ai-ugc': StudioAiUgcEditor,
+};
 
 // Studio: vertical videos made from the media library, rendered on our
 // servers and saved back to it, ready for the composer
@@ -99,6 +105,7 @@ export const StudioComponent = () => {
   );
 
   const template = templates?.find((p) => p.identifier === project?.template);
+  const OwnEditor = project && studioTemplateEditors[project.template];
 
   return (
     <div className="bg-newBgColorInner p-[20px] mobile:p-[16px] flex flex-1 gap-[20px] mobile:flex-col text-textColor min-w-0">
@@ -178,9 +185,19 @@ export const StudioComponent = () => {
       </div>
 
       <div className="flex flex-1 flex-col min-w-0">
-        {selected &&
-        project?.id === selected &&
-        studioMediaTemplates[project.template] ? (
+        {selected && project?.id === selected && OwnEditor ? (
+          <OwnEditor
+            key={project.id}
+            project={project}
+            template={template}
+            onChanged={() => {
+              mutateProjects();
+              mutateProject();
+            }}
+          />
+        ) : selected &&
+          project?.id === selected &&
+          studioMediaTemplates[project.template] ? (
           <StudioMediaEditor
             key={project.id}
             project={project}

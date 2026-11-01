@@ -286,3 +286,27 @@ describe('ErasureRepository.runOrganizationAiMemory', () => {
     expect(result.mastra_resources).toBe(1);
   });
 });
+
+describe('ErasureRepository.getOrganizationObjectSources', () => {
+  it('lists every Studio asset, music and the voices and stills of AI', async () => {
+    const { repo, calls } = makeDb({
+      'studioAsset.findMany': [
+        { id: 'a-1', path: 'https://media.example/music.mp3' },
+        { id: 'a-2', path: 'https://media.example/voice.mp3' },
+        { id: 'a-3', path: 'https://media.example/still.jpg' },
+      ],
+    });
+    const sources = await repo.getOrganizationObjectSources('org-1');
+    expect(sources).toEqual(
+      expect.arrayContaining([
+        'https://media.example/voice.mp3',
+        'https://media.example/still.jpg',
+      ])
+    );
+    const call = calls.find(
+      (p) => p.model === 'studioAsset' && p.op === 'findMany'
+    );
+    // every kind of the workspace, not only music
+    expect(call?.args.where).toEqual({ organizationId: 'org-1' });
+  });
+});

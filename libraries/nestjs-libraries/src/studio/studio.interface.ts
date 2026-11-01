@@ -1,5 +1,6 @@
 import { Injectable, Type } from '@nestjs/common';
 import {
+  StudioCaptionStyleDto,
   StudioClipDto,
   StudioPosition,
   StudioTextStyle,
@@ -9,6 +10,15 @@ import {
   STUDIO_MUSIC_VOLUME,
   StudioMusicDto,
 } from '@gitroom/nestjs-libraries/dtos/studio/studio.music.dto';
+import {
+  StudioWord,
+  groupCaptionLines,
+} from '@gitroom/helpers/utils/studio.captions';
+import type {
+  StudioAiAssetRequest,
+  StudioAiScript,
+  StudioAiScriptRequest,
+} from '@gitroom/nestjs-libraries/studio/ai/studio.ai.interface';
 
 // Every template renders the same frame: vertical 1080x1920 at 30 fps
 export const STUDIO_WIDTH = 1080;
@@ -22,6 +32,8 @@ export interface StudioTemplateParams {
   dto: Type<any>;
   // the template burns captions in, so the editor offers to transcribe
   captions: boolean;
+  // the template runs on the workspace's own AI key (a script, a voice)
+  ai?: boolean;
 }
 
 // What the render knows about an input once it is downloaded and probed.
@@ -40,6 +52,9 @@ export interface StudioPlanContext {
   fontsDir: string;
   // the music of the workspace the spec picked, downloaded and probed
   music?: { file: string };
+  // what the AI made for the template's aiAssets(), in the same order: a
+  // file in the render's folder, and for a voice its length and word times
+  ai?: { file: string; seconds?: number; words?: StudioWord[] }[];
 }
 
 // The ffmpeg command of a render, without the encoder settings every template
@@ -153,6 +168,54 @@ export const assDialogue = (
   text: string
 ) => `Dialogue: 0,${assTime(start)},${assTime(end)},${style},,0,0,0,,${text}`;
 
+// Captions lighting up word by word, as a whole ASS file: one event per word,
+// the whole line with the spoken word in the highlight colour until the next
+// word starts. Words are on the output timeline
+export const assKaraoke = (
+  words: StudioWord[],
+  style: StudioCaptionStyleDto = {}
+) => {
+  const color = style.color || '#FFFFFF';
+  const highlight = assColor(style.highlight || '#FFD400');
+  const lines = groupCaptionLines(
+    words,
+    style.maxWords || 3,
+    style.maxChars || 22
+  );
+
+  const events = lines.flatMap((line) => {
+    const text = line.map((word) => escapeAssText(word.text));
+    return line.map((word, index) =>
+      assDialogue(
+        index === 0 ? line[0].start : word.start,
+        index === line.length - 1 ? word.end : line[index + 1].start,
+        'Captions',
+        text
+          .map((value, at) =>
+            at === index
+              ? `{\\1c${highlight}}${value}{\\1c${assColor(color)}}`
+              : value
+          )
+          .join(' ')
+      )
+    );
+  });
+
+  return [
+    assHeader([
+      {
+        name: 'Captions',
+        font: style.font || 'bold',
+        size: style.font === 'impact' ? 96 : 80,
+        color,
+        position: style.position || 'bottom',
+      },
+    ]),
+    ...events,
+    '',
+  ].join('\n');
+};
+
 export function StudioTemplate(params: StudioTemplateParams) {
   return function (target: any) {
     Injectable()(target);
@@ -218,6 +281,23 @@ export abstract class StudioTemplateAbstract<
     return trim && trim.start >= (inputs[0]?.duration ?? Infinity)
       ? 'The clip starts after the end of the video.'
       : undefined;
+  }
+
+  // What the workspace's AI is asked to write for the project, null when the
+  // template has no AI script or misses what it is written from
+  aiScript(spec: T): StudioAiScriptRequest | null {
+    return null;
+  }
+
+  // The spec with a script the AI wrote, for the customer to edit
+  applyAiScript(spec: T, script: StudioAiScript): T {
+    return spec;
+  }
+
+  // What the AI makes before the render (a voiceover, stills); the render
+  // reads the files from StudioPlanContext.ai
+  aiAssets(spec: T): StudioAiAssetRequest[] {
+    return [];
   }
 
   speed(spec: T) {

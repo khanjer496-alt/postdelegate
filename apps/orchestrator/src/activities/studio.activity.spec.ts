@@ -7,13 +7,20 @@ jest.mock('nestjs-temporal-core', () => ({
 jest.mock('@gitroom/nestjs-libraries/database/prisma/studio/studio.service', () => ({
   StudioService: class {},
 }));
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/studio/studio.ai.service',
+  () => ({ StudioAiService: class {} })
+);
 jest.mock('@gitroom/nestjs-libraries/temporal/temporal.heartbeat', () => ({
   setHeartbeatDetails: jest.fn(),
   withHeartbeat: (fn: () => Promise<unknown>) => fn(),
 }));
 const heartbeat = jest.fn();
+const cancellation = new AbortController();
 jest.mock('@temporalio/activity', () => ({
-  Context: { current: () => ({ heartbeat }) },
+  Context: {
+    current: () => ({ heartbeat, cancellationSignal: cancellation.signal }),
+  },
 }));
 
 import { StudioActivity } from './studio.activity';
@@ -26,7 +33,7 @@ describe('StudioActivity cleanup', () => {
         return { assets: 2, renders: 3 };
       }),
     };
-    return { activity: new StudioActivity(service as any), service };
+    return { activity: new StudioActivity(service as any, {} as any), service };
   };
 
   afterEach(() => {
@@ -53,5 +60,17 @@ describe('StudioActivity cleanup', () => {
       renders: 0,
     });
     expect(service.cleanup).not.toHaveBeenCalled();
+  });
+});
+
+describe('StudioActivity AI step', () => {
+  it('makes what the render needs with the cancel signal of the activity', async () => {
+    const ai = { generateForRender: jest.fn().mockResolvedValue(undefined) };
+    const activity = new StudioActivity({} as any, ai as any);
+    await activity.prepareStudioAiV1({ renderId: 'render-1' });
+    expect(ai.generateForRender).toHaveBeenCalledWith(
+      'render-1',
+      cancellation.signal
+    );
   });
 });

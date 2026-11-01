@@ -370,7 +370,7 @@ model StudioRender {
   id             String        @id @default(uuid())
   organizationId String
   projectId      String
-  // queued | rendering | uploading | completed | failed | cancelled
+  // queued | generating | rendering | uploading | completed | failed | cancelled
   status         String        @default("queued")
   progress       Int           @default(0)
   seconds        Int
@@ -389,8 +389,9 @@ model StudioRender {
   @@index([status])
 }
 
-// A file a workspace uploaded for Studio, music for now. It is not a Media
-// row, so the media library and the composer never show it. "projectId" is
+// A file of a Studio project that is not a Media row, so the media library
+// and the composer never show it: music the workspace uploaded, and the
+// voices and stills its own AI key made (kind voice or image). "projectId" is
 // the project whose settings use it; one no project uses is removed with its
 // stored file after 7 days, and with the project when that is deleted
 model StudioAsset {
@@ -401,6 +402,10 @@ model StudioAsset {
   name           String
   path           String
   originalName   String?
+  // a voice or still Studio's AI made on the workspace's key (kind voice or
+  // image): the hash of what it was made from, and for a voice its length
+  // and word times, as JSON
+  data           String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   organization   Organization   @relation(fields: [organizationId], references: [id])

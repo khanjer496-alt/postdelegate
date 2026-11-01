@@ -67,7 +67,7 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
   },
   StudioAsset: {
     scope: 'org',
-    note: 'uploaded Studio music, deleted before the projects; the R2 objects named by path are deleted after the commit',
+    note: 'uploaded Studio music and the voices and stills Studio AI made on the workspace key, deleted before the projects; the R2 objects named by path are deleted after the commit',
   },
   Subscription: {
     scope: 'org',
