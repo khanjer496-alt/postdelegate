@@ -208,7 +208,6 @@ describe('IntegrationService.checkAnalytics on a channel without analytics', () 
     ['disabled', channel({ disabled: true })],
     ['half-connected', channel({ inBetweenSteps: true })],
     ['deleted', channel({ deletedAt: new Date() })],
-    ['missing', null],
   ])('answers [] for a %s channel, as the API documents', async (_, row) => {
     const analytics = jest.fn();
     const { service } = makeService({ analytics }, row as any);
@@ -216,5 +215,16 @@ describe('IntegrationService.checkAnalytics on a channel without analytics', () 
       []
     );
     expect(analytics).not.toHaveBeenCalled();
+  });
+});
+
+describe('IntegrationService.checkAnalytics on an unknown channel', () => {
+  // getIntegrationById is scoped to the workspace: another workspace's id
+  // comes back empty too
+  it('answers 404 for an id that is not a channel of the workspace', async () => {
+    const { service } = makeService({ analytics: jest.fn() }, null);
+    await expect(service.checkAnalytics(org, 'other-org-id', '7')).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });
