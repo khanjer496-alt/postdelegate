@@ -40,10 +40,11 @@ const makeService = (
     getIntegrationByInternalIdWithDeleted: jest
       .fn()
       .mockResolvedValue(
-        existing && { name: 'Brand', deletedAt: null, ...existing }
+        existing && { id: 'int-old', name: 'Brand', deletedAt: null, ...existing }
       ),
+    retireDeletedIntegration: jest.fn().mockResolvedValue({ count: 1 }),
   };
-  return new IntegrationService(
+  const service = new IntegrationService(
     repository as any,
     {} as any,
     {} as any,
@@ -52,6 +53,7 @@ const makeService = (
     {} as any,
     {} as any
   );
+  return Object.assign(service, { repository });
 };
 
 describe('IntegrationService.checkCappedProviderSwitch', () => {
@@ -79,22 +81,27 @@ describe('IntegrationService.checkCappedProviderSwitch', () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 
-  it('stops a deleted channel coming back under the other provider', async () => {
+  it('retires a deleted channel instead of reviving it under the other provider', async () => {
     for (const [before, after] of [
       ['x', 'x-own-key'],
       ['x-own-key', 'x'],
     ]) {
-      await expect(
-        makeService({
-          providerIdentifier: before,
-          deletedAt: new Date(),
-        }).checkCappedProviderSwitch('org-1', '42', after)
-      ).rejects.toMatchObject({
-        status: 400,
-        message:
-          'This account was connected before through a different connection type. Connect it the same way as before.',
+      const service = makeService({
+        providerIdentifier: before,
+        deletedAt: new Date(),
       });
+      await service.checkCappedProviderSwitch('org-1', '42', after);
+      expect(service.repository.retireDeletedIntegration).toHaveBeenCalledWith(
+        'org-1',
+        'int-old'
+      );
     }
+  });
+
+  it('leaves a deleted channel of the same provider to be revived', async () => {
+    const service = makeService({ providerIdentifier: 'x', deletedAt: new Date() });
+    await service.checkCappedProviderSwitch('org-1', '42', 'x');
+    expect(service.repository.retireDeletedIntegration).not.toHaveBeenCalled();
   });
 
   it('lets a reconnect on the same provider and uncapped providers through', async () => {

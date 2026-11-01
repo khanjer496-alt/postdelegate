@@ -422,9 +422,25 @@ export class IntegrationRepository {
         },
       },
       select: {
+        id: true,
         name: true,
         providerIdentifier: true,
         deletedAt: true,
+      },
+    });
+  }
+
+  // frees the account's internalId of a deleted channel row, which keeps its
+  // posts and history, so a connection starts a new row
+  retireDeletedIntegration(org: string, id: string) {
+    return this._integration.model.integration.updateMany({
+      where: {
+        id,
+        organizationId: org,
+        deletedAt: { not: null },
+      },
+      data: {
+        internalId: `retired_${id}_${makeId(10)}`,
       },
     });
   }

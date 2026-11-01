@@ -39,4 +39,4 @@ If the connection fails you will see one of these messages:
 
 To replace the keys later, use **Update Credentials** in the channel's menu.
 
-An account is connected one way at a time, and stays on the way it was first connected in a workspace.
+An account is connected one way at a time. To move an account from one way to the other, delete its channel first, then connect it again. Posts already published still count toward that plan month.

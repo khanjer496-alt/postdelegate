@@ -106,9 +106,12 @@ export class IntegrationService {
   }
 
   // Two providers for the same account (a network and its own API key variant)
-  // share the channel row, also once it is deleted (a reconnect revives it), so
-  // connecting one over the other would move the channel's posts and usage
-  // across a plan's monthly cap on that network (provider_posts_per_month)
+  // share the channel row, so connecting one over the other would move the
+  // channel's posts across a plan's monthly cap on that network
+  // (provider_posts_per_month). A live channel has to be deleted first; a
+  // deleted one is retired under another internalId, like writeIntegration
+  // does, so the new connection starts a fresh row and the old history stays
+  // where it is (the cap counts ProviderPostUsage, which doesn't move)
   async checkCappedProviderSwitch(org: string, id: string, provider: string) {
     const existing =
       await this._integrationRepository.getIntegrationByInternalIdWithDeleted(
@@ -126,10 +129,16 @@ export class IntegrationService {
       return;
     }
 
+    if (existing.deletedAt) {
+      await this._integrationRepository.retireDeletedIntegration(
+        org,
+        existing.id
+      );
+      return;
+    }
+
     throw new HttpException(
-      existing.deletedAt
-        ? 'This account was connected before through a different connection type. Connect it the same way as before.'
-        : `This account is already connected as the channel "${existing.name}". Delete that channel first, then connect the account again.`,
+      `This account is already connected as the channel "${existing.name}". Delete that channel first, then connect the account again.`,
       HttpStatus.BAD_REQUEST
     );
   }
