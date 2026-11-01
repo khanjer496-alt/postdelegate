@@ -1,0 +1,124 @@
+---
+import DocsLayout from '../../../layouts/DocsLayout.astro';
+import { SITE } from '../../../data/site';
+import { AGENT_FILES, MCP_OAUTH_URL } from '../../../data/agent-files';
+const frontmatter = {
+  title: 'Agent files for Claude, ChatGPT and Cursor',
+  description: 'Hosted instruction files that teach Claude, ChatGPT, Cursor and Codex to use PostDelegate: a Claude skill, AGENTS.md, ChatGPT instructions and a Cursor rule.',
+};
+const headings = [
+  { depth: 2, slug: 'the-files', text: 'The files' },
+  { depth: 2, slug: 'claude-skill', text: 'Claude skill' },
+  { depth: 3, slug: 'claude-ai', text: 'Claude apps (claude.ai)' },
+  { depth: 3, slug: 'claude-code', text: 'Claude Code' },
+  { depth: 2, slug: 'agents-md', text: 'AGENTS.md for coding agents' },
+  { depth: 2, slug: 'chatgpt', text: 'ChatGPT custom GPT or Project' },
+  { depth: 2, slug: 'cursor', text: 'Cursor rule' },
+  { depth: 2, slug: 'keeping-them-current', text: 'Keeping them current' },
+];
+const url = (path: string) => `${SITE.url}${path}`;
+---
+<DocsLayout frontmatter={frontmatter} headings={headings}>
+  <p>An assistant does better with PostDelegate when it knows the workflow before it starts: list channels, read the channel's rules, upload media, create a draft and wait for your OK. These files hold that knowledge, in the format each assistant reads. Point your assistant at one URL, or save the file where your tool looks for it.</p>
+
+  <div class="callout">
+    <p><strong>The files teach, MCP connects.</strong> An instruction file does not give an assistant access to your workspace. Connect it to the MCP server at <code>{MCP_OAUTH_URL}</code> first. See <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> or <a href="/docs/mcp/clients">Claude Code, Cursor and others</a>. PostDelegate does not provide or charge for AI. These files are for the assistant you already use.</p>
+  </div>
+
+  <h2 id="the-files">The files</h2>
+  <p>Each file stands on its own and tells the assistant to draft by default, never schedule or publish without your OK, confirm deletes and respect <a href="/docs/approvals">approvals</a>.</p>
+  <div class="agent-files">
+    {AGENT_FILES.map((file) => (
+      <div class="agent-file">
+        <div>
+          <strong>{file.title}</strong>
+          <span class="agent-file-for">For {file.audience}</span>
+          <p>{file.description}</p>
+          <code>{url(file.path)}</code>
+        </div>
+        <div class="agent-file-actions">
+          {file.body
+            ? <><button type="button" class="agent-file-copy" data-copy-url={file.path}>Copy file</button><a href={file.path}>Open</a></>
+            : <a href={file.path} download>Download</a>}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <h2 id="claude-skill">Claude skill</h2>
+  <p>The skill is a <code>SKILL.md</code> file named <code>postdelegate</code>. Claude reads its description and loads the rest when you ask for something it covers, such as drafting or scheduling a post.</p>
+
+  <h3 id="claude-ai">Claude apps (claude.ai)</h3>
+  <ol>
+    <li>Download <a href={'/agents/postdelegate-skill.zip'} download>postdelegate-skill.zip</a>. It holds a <code>postdelegate</code> folder with <code>SKILL.md</code> inside.</li>
+    <li>Make sure code execution is turned on. On personal plans it is under <strong>Settings &gt; Capabilities</strong>. On Team and Enterprise plans an owner controls it.</li>
+    <li>Open <strong>Customize &gt; Skills</strong>, choose <strong>+</strong>, then <strong>Create skill</strong> and <strong>Upload a skill</strong>, and pick the zip.</li>
+    <li>Turn the skill on, and make sure the PostDelegate connector is connected.</li>
+  </ol>
+  <p>These menus belong to Anthropic and they get renamed from time to time. If yours look different, follow Anthropic's help article on using skills in Claude.</p>
+
+  <h3 id="claude-code">Claude Code</h3>
+  <p>Save the skill in your personal skills folder so every project can use it:</p>
+  <pre><code>{`mkdir -p ~/.claude/skills/postdelegate
+curl -fsSL ${url('/agents/postdelegate/SKILL.md')} \\
+  -o ~/.claude/skills/postdelegate/SKILL.md`}</code></pre>
+  <p>For one repository only, save it to <code>.claude/skills/postdelegate/SKILL.md</code> in that repository instead. Then connect the server once:</p>
+  <pre><code>{`claude mcp add postdelegate --transport http "${MCP_OAUTH_URL}"`}</code></pre>
+  <p>Run <code>/mcp</code> inside Claude Code to sign in. You can call the skill directly with <code>/postdelegate</code>, or just ask for a post.</p>
+
+  <h2 id="agents-md">AGENTS.md for coding agents</h2>
+  <p>Codex, Cursor and many other coding agents read an <code>AGENTS.md</code> file at the root of a repository. This one covers the <a href="/docs/api">REST API</a> and MCP from code: authentication, endpoints, the post body, rate limits, errors and the safety rules.</p>
+  <pre><code>{`curl -fsSL ${url('/agents/AGENTS.md')} -o AGENTS.md`}</code></pre>
+  <p>If the repository already has an <code>AGENTS.md</code>, append the file to it instead (<code>&gt;&gt; AGENTS.md</code>), or save it as <code>docs/postdelegate-agents.md</code> and link to it. To connect Codex to MCP, see <a href="/docs/mcp/clients#codex">Codex setup</a>.</p>
+
+  <h2 id="chatgpt">ChatGPT custom GPT or Project</h2>
+  <ol>
+    <li>Add the PostDelegate connector in ChatGPT. See <a href="/docs/mcp/chatgpt">Connect ChatGPT</a>.</li>
+    <li>Choose <strong>Copy file</strong> next to ChatGPT instructions above, or open <a href="/agents/chatgpt-instructions.md">chatgpt-instructions.md</a>.</li>
+    <li>Paste it into the <strong>Instructions</strong> of a custom GPT, or a Project's instructions, and enable the PostDelegate connector there.</li>
+  </ol>
+  <p>The file is kept short enough for ChatGPT's instructions field. Custom GPTs and Projects depend on your ChatGPT plan and workspace settings, which belong to OpenAI.</p>
+
+  <h2 id="cursor">Cursor rule</h2>
+  <p>Save the rule in your project's rules folder. Cursor applies it when a request or file is about PostDelegate.</p>
+  <pre><code>{`mkdir -p .cursor/rules
+curl -fsSL ${url('/agents/postdelegate.mdc')} -o .cursor/rules/postdelegate.mdc`}</code></pre>
+  <p>To let Cursor use the tools as well, add the MCP server to <code>.cursor/mcp.json</code>. See <a href="/docs/mcp/clients#cursor">Cursor setup</a>.</p>
+
+  <h2 id="keeping-them-current">Keeping them current</h2>
+  <p>The files are built from the same data as these docs. When a network opens or a rule changes, the hosted files change with it. Download them again from time to time, or have your assistant read the URL directly when it starts a task. For the full list of what the server can do, see <a href="/docs/mcp/tools">MCP tools</a>. Assistants that read <a href="/llms.txt">llms.txt</a> find these files listed there too.</p>
+</DocsLayout>
+<style>
+  .agent-files { display: grid; gap: 12px; margin: 22px 0; }
+  .agent-file { display: flex; gap: 18px; justify-content: space-between; align-items: flex-start; padding: 18px 20px; border: 1px solid #363636; border-radius: 16px; background: #171717; }
+  .agent-file > div:first-child { min-width: 0; }
+  .agent-file strong { display: block; color: #fff; font-size: 16px; }
+  .agent-file-for { display: block; color: #bca9ff; font-size: 12px; font-weight: 650; letter-spacing: .04em; }
+  .agent-file p { margin: 8px 0 10px; font-size: 14.5px; line-height: 1.6; }
+  .agent-file code { font-size: 12.5px; }
+  .agent-file-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .agent-file-actions a, .agent-file-copy { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 14px; border: 1px solid #3b3b3b; border-radius: 999px; background: #1d1d1d; color: #e5e5e5 !important; font-size: 13px; font-weight: 650; text-decoration: none !important; cursor: pointer; }
+  .agent-file-actions a:hover, .agent-file-copy:hover { border-color: #888; color: #fff !important; }
+  .agent-file-actions a:focus-visible, .agent-file-copy:focus-visible { outline: 2px solid var(--accent, #7357ff); outline-offset: 3px; }
+  @media (max-width: 640px) {
+    .agent-file { flex-direction: column; }
+    .agent-file-actions { flex-direction: row; }
+  }
+</style>
+<script>
+  // Copy a hosted file's text, fetched from this site, to the clipboard.
+  document.querySelectorAll<HTMLButtonElement>('.agent-file-copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const label = button.textContent;
+      try {
+        const response = await fetch(button.dataset.copyUrl!);
+        if (!response.ok) throw new Error(String(response.status));
+        await navigator.clipboard.writeText(await response.text());
+        button.textContent = 'Copied';
+      } catch {
+        button.textContent = 'Open it instead';
+      }
+      setTimeout(() => { button.textContent = label; }, 1800);
+    });
+  });
+</script>

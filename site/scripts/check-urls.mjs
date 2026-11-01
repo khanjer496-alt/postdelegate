@@ -19,7 +19,9 @@ const legacyPaths = [
   '/threads-scheduler', '/pinterest-scheduler', '/google-business-scheduler',
   '/mastodon-scheduler', '/devto-scheduler', '/tools', '/tools/caption-checker',
   '/tools/utm-builder', '/compare', '/compare/postiz', '/compare/post-bridge',
-  '/sitemap.xml', '/llms.txt', '/llms-full.txt',
+  '/sitemap.xml', '/llms.txt', '/llms-full.txt', '/docs/mcp/agent-files',
+  '/agents/postdelegate/SKILL.md', '/agents/postdelegate-skill.zip', '/agents/AGENTS.md',
+  '/agents/chatgpt-instructions.md', '/agents/postdelegate.mdc',
 ];
 
 const queue = new Map();

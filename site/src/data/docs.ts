@@ -54,6 +54,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'ChatGPT', href: '/docs/mcp/chatgpt', description: 'Add PostDelegate as a custom connector in ChatGPT.' },
     { title: 'Claude Code, Cursor and others', href: '/docs/mcp/clients', description: 'Configuration for terminal and editor MCP clients.' },
     { title: 'MCP tools', href: '/docs/mcp/tools', description: 'Every tool the server offers and what it does.' },
+    { title: 'Agent files', href: '/docs/mcp/agent-files', description: 'A Claude skill, AGENTS.md, ChatGPT instructions and a Cursor rule to load by URL.' },
   ] },
   { title: 'Automation', items: [
     { title: 'Webhooks', href: '/docs/webhooks', description: 'Get an HTTP request when a post is published.' },

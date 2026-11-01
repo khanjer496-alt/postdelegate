@@ -21,6 +21,10 @@ MCP, the Model Context Protocol, is a standard way for an AI assistant to use to
 <a href="/docs/mcp/tools"><strong>Tools reference</strong><span>What the server lets an assistant do.</span></a>
 </div>
 
+## Teach your assistant the workflow
+
+PostDelegate hosts ready-made instruction files: a [Claude skill](/agents/postdelegate/SKILL.md), an [AGENTS.md](/agents/AGENTS.md) for coding agents, [ChatGPT instructions](/agents/chatgpt-instructions.md) and a [Cursor rule](/agents/postdelegate.mdc). Each one teaches an assistant the channel, rules, media and draft workflow and the safety rules. See [Agent files](/docs/mcp/agent-files) for how to install each one.
+
 ## Server addresses
 
 The MCP server lives under the API origin, `https://app.postdelegate.com/api`. It uses the streamable HTTP transport.
