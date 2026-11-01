@@ -155,7 +155,7 @@ export async function proxy(request: NextRequest) {
   }
   try {
     if (org) {
-      const { id } = await (
+      const { id, error } = await (
         await internalFetch('/user/join-org', {
           body: JSON.stringify({
             org,
@@ -166,6 +166,14 @@ export async function proxy(request: NextRequest) {
       const redirect = NextResponse.redirect(
         new URL(`/?added=true`, nextUrl.href)
       );
+      // the app says why the invite could not be accepted
+      if (error && error !== 'already_member') {
+        redirect.cookies.set('invite_error', error, {
+          path: '/',
+          domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+          maxAge: 60 * 5,
+        });
+      }
       if (id) {
         redirect.cookies.set('showorg', id, {
           ...(!process.env.NOT_SECURED

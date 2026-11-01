@@ -186,7 +186,7 @@ export class OrganizationService {
       body.role as 'USER' | 'ADMIN'
     );
 
-    if (!added) {
+    if ('failed' in added) {
       throw new HttpException(
         'Could not add the user to the organization',
         400

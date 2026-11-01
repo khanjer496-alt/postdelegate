@@ -64,9 +64,13 @@ export function Register() {
     if (response.ok && body?.login) {
       return;
     }
-    const message = Array.isArray(body?.message)
-      ? body.message[0]
-      : body?.message;
+    // only a 400 carries a message meant for people
+    const message =
+      response.status !== 400
+        ? undefined
+        : Array.isArray(body?.message)
+        ? body.message[0]
+        : body?.message;
     setError(
       typeof message === 'string' && message
         ? message

@@ -20,7 +20,7 @@ const makeRepo = () => {
     { model: { user } } as any,
     { model: { $transaction } } as any
   );
-  return { repo, user, userOrganization, $transaction };
+  return { repo, user, userOrganization, organization, $transaction };
 };
 
 describe('OrganizationRepository.addUserToOrg invites', () => {
@@ -47,7 +47,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'other@example.com')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'wrong_email' });
 
     expect(userOrganization.create).not.toHaveBeenCalled();
     expect($transaction).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', '')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'wrong_email' });
     expect($transaction).not.toHaveBeenCalled();
   });
 
@@ -68,7 +68,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'already_used' });
     expect($transaction).not.toHaveBeenCalled();
   });
 
@@ -78,7 +78,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ failed: 'already_member' });
     expect($transaction).not.toHaveBeenCalled();
   });
 
@@ -89,5 +89,43 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
 
     expect(user.findUnique).not.toHaveBeenCalled();
     expect($transaction).toHaveBeenCalledTimes(1);
+  });
+
+  describe('with billing on', () => {
+    const key = process.env.STRIPE_PUBLISHABLE_KEY;
+    beforeEach(() => {
+      process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    });
+    afterEach(() => {
+      if (key === undefined) {
+        delete process.env.STRIPE_PUBLISHABLE_KEY;
+      } else {
+        process.env.STRIPE_PUBLISHABLE_KEY = key;
+      }
+    });
+
+    it.each([
+      ['a FREE or lapsed workspace', null],
+      ['a plan without team members', { subscriptionTier: 'STANDARD' }],
+    ])('does not add a member to %s', async (_, subscription) => {
+      const { repo, organization, $transaction } = makeRepo();
+      organization.findFirst.mockResolvedValue({ subscription });
+
+      await expect(
+        repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+      ).resolves.toEqual({ failed: 'plan' });
+      expect($transaction).not.toHaveBeenCalled();
+    });
+
+    it('adds a member to a plan with team members', async () => {
+      const { repo, organization, $transaction } = makeRepo();
+      organization.findFirst.mockResolvedValue({
+        subscription: { subscriptionTier: 'TEAM' },
+      });
+
+      await expect(
+        repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+      ).resolves.toEqual({ id: 'membership' });
+    });
   });
 });

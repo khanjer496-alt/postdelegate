@@ -288,9 +288,11 @@ export class UsersController {
       getOrgFromCookie.email || undefined
     );
 
-    response.status(200).json({
-      id: typeof addedOrg !== 'boolean' ? addedOrg.organizationId : null,
-    });
+    response.status(200).json(
+      'failed' in addedOrg
+        ? { id: null, error: addedOrg.failed }
+        : { id: addedOrg.organizationId }
+    );
   }
 
   @Get('/organizations')
