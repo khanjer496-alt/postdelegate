@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { createReadStream, createWriteStream } from 'fs';
 import { mkdir, readdir, rm, stat, statfs, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
+import { randomBytes } from 'crypto';
 import { extname, join, resolve, sep } from 'path';
 import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -17,6 +18,7 @@ import {
 import { StudioTemplateManager } from '@gitroom/nestjs-libraries/studio/studio.manager';
 import { wordsFromScript } from '@gitroom/helpers/utils/studio.captions';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import {
   AiCredentialService,
   MISSING_AI_KEY,
@@ -71,6 +73,12 @@ const VIDEO_CODECS = ['h264', 'hevc', 'vp8', 'vp9', 'av1', 'mpeg4'];
 // The longest piece of a clip sent to Whisper: 90 seconds at double speed
 const MAX_TRANSCRIBE_SECONDS = STUDIO_MAX_SECONDS * 2;
 const MAX_SPEC_BYTES = 200 * 1024;
+// A proxy in front of the API gives up on a request after 60 seconds, so a
+// transcription has 55: at most 20 to cut the audio, the rest for Whisper
+const TRANSCRIBE_BUDGET = 55 * 1000;
+const TRANSCRIBE_EXTRACT_TIMEOUT = 20 * 1000;
+// transcriptions running ffmpeg on the API servers at once
+const MAX_TRANSCRIPTIONS = 3;
 const RENDER_TIMEOUT = 25 * 60 * 1000;
 // What the customer reads when the real reason is not theirs to fix
 const SOMETHING_WENT_WRONG =
@@ -91,7 +99,8 @@ export class StudioService {
     private _templateManager: StudioTemplateManager,
     private _mediaService: MediaService,
     private _aiCredentialService: AiCredentialService,
-    private _temporalService: TemporalService
+    private _temporalService: TemporalService,
+    private _organizationService: OrganizationService
   ) {}
 
   private tmpRoot() {
@@ -107,8 +116,21 @@ export class StudioService {
     );
   }
 
-  private isTrial(org: Organization) {
-    return !!process.env.STRIPE_PUBLISHABLE_KEY && org.isTrailing;
+  // Read fresh, not from the caller: the organization of an MCP request has
+  // no subscription on it. Without billing (self-hosted) everyone may render.
+  // A workspace that stopped paying has no subscription row anymore, and a
+  // trial is a subscription still marked as trialing
+  private async billing(org: string) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return { subscribed: true, trial: false };
+    }
+    const full = await this._organizationService.getOrgByIdWithSubscription(
+      org
+    );
+    return {
+      subscribed: !!full?.subscription,
+      trial: !!full?.subscription && !!full?.isTrailing,
+    };
   }
 
   private isStale(render: { status: string; updatedAt: Date }) {
@@ -136,9 +158,10 @@ export class StudioService {
   }
 
   async getUsage(org: Organization) {
-    const trial = this.isTrial(org);
+    const { subscribed, trial } = await this.billing(org.id);
     return {
       ...STUDIO_LIMITS,
+      subscribed,
       trial,
       usedToday: await this._studioRepository.countRendersSince(
         org.id,
@@ -273,15 +296,18 @@ export class StudioService {
     } else {
       // one transcription at a time per workspace: each runs ffmpeg here
       // and spends the workspace's own OpenAI credit
-      if (
-        !(await ioRedis.set(`studioTranscribe:${org}`, '1', 'EX', 180, 'NX'))
-      ) {
+      const lock = `studioTranscribe:${org}`;
+      const token = randomBytes(16).toString('hex');
+      if (!(await ioRedis.set(lock, token, 'EX', 120, 'NX'))) {
         throw new HttpException('A transcription is already running', 429);
       }
       try {
         words = await this.whisper(org, spec.input.mediaId, trim);
       } finally {
-        await ioRedis.del(`studioTranscribe:${org}`);
+        // only our own lock: one that expired may belong to a newer request
+        if ((await ioRedis.get(lock)) === token) {
+          await ioRedis.del(lock);
+        }
       }
     }
 
@@ -305,6 +331,7 @@ export class StudioService {
     mediaId: string,
     trim: { start: number; end: number }
   ): Promise<ClippingWord[]> {
+    const startedAt = Date.now();
     if (!(await this._aiCredentialService.hasCredential(org))) {
       throw new BadRequestException(MISSING_AI_KEY);
     }
@@ -314,7 +341,21 @@ export class StudioService {
       throw new BadRequestException('This video is not in the media library');
     }
 
-    const dir = join(this.tmpRoot(), `transcribe-${mediaId}-${Date.now()}`);
+    // a server-wide cap: every transcription runs ffmpeg in the API process
+    const slot = await ioRedis.incr('studioTranscribeRunning');
+    await ioRedis.expire('studioTranscribeRunning', 120);
+    if (slot > MAX_TRANSCRIPTIONS) {
+      await ioRedis.decr('studioTranscribeRunning');
+      throw new HttpException(
+        'Studio is busy right now, try again in a minute',
+        429
+      );
+    }
+
+    const dir = join(
+      this.tmpRoot(),
+      `transcribe-${source.media.id}-${Date.now()}`
+    );
     await mkdir(dir, { recursive: true });
     try {
       // mono 16 kHz at 32 kbps: 180 seconds stay far below Whisper's 25 MB
@@ -344,18 +385,28 @@ export class StudioService {
           '32k',
           'audio.mp3',
         ],
-        { cwd: dir, timeout: 120000 }
+        { cwd: dir, timeout: TRANSCRIBE_EXTRACT_TIMEOUT }
       );
 
       const client = await this._aiCredentialService.getOpenAiClient(org);
       let result: { words?: { word: string; start: number; end: number }[] };
       try {
-        result = await client.audio.transcriptions.create({
-          file: createReadStream(join(dir, 'audio.mp3')),
-          model: 'whisper-1',
-          response_format: 'verbose_json',
-          timestamp_granularities: ['word'],
-        });
+        result = await client.audio.transcriptions.create(
+          {
+            file: createReadStream(join(dir, 'audio.mp3')),
+            model: 'whisper-1',
+            response_format: 'verbose_json',
+            timestamp_granularities: ['word'],
+          },
+          {
+            // what is left of the 55 seconds the request may take
+            timeout: Math.max(
+              5000,
+              TRANSCRIBE_BUDGET - (Date.now() - startedAt)
+            ),
+            maxRetries: 1,
+          }
+        );
       } catch (err) {
         const keyMessage = openAiKeyErrorMessage(err);
         if (keyMessage) {
@@ -380,9 +431,17 @@ export class StudioService {
       if (err instanceof HttpException) {
         throw err;
       }
-      console.error('Studio audio extraction failed:', (err as Error)?.message);
+      // ffmpeg's stderr can carry the presigned url of the video
+      console.error(
+        'Studio audio extraction failed:',
+        String((err as Error)?.message || err).replace(
+          /https?:\/\/[^\s"'\\]+/g,
+          '[url]'
+        )
+      );
       throw new HttpException('The sound of this clip could not be read', 400);
     } finally {
+      await ioRedis.decr('studioTranscribeRunning');
       await rm(dir, { recursive: true, force: true });
     }
   }
@@ -476,7 +535,15 @@ export class StudioService {
       await this.failRender(render.id, 'The render never finished', true);
     }
 
-    if (this.isTrial(org)) {
+    const { subscribed, trial } = await this.billing(org.id);
+    if (!subscribed) {
+      throw new HttpException(
+        'Studio needs an active plan. Pick one in Billing to render videos.',
+        406
+      );
+    }
+
+    if (trial) {
       const used = await this._studioRepository.countRendersSince(org.id);
       if (used >= STUDIO_LIMITS.trialRenders) {
         throw new HttpException(
@@ -908,6 +975,15 @@ export class StudioService {
         { cwd: dir, signal: hooks.signal, timeout: 60000 }
       );
 
+      // nothing is uploaded for a render that was cancelled or whose project
+      // was deleted while ffmpeg ran
+      if (
+        hooks.signal?.aborted ||
+        !(await this._studioRepository.isRenderLive(renderId))
+      ) {
+        throw new StudioStop('The render was cancelled.');
+      }
+
       await this._studioRepository.updateRender(renderId, {
         status: 'uploading',
         progress: 99,
@@ -925,26 +1001,29 @@ export class StudioService {
         'jpg'
       );
 
-      // the media id is stored before anything else can fail, so a retry
-      // finds it and never saves the video a second time
+      // the media and the render's link to it are saved together, and only
+      // by a render still live: a retry, a cancel or a deleted project that
+      // got there first leaves no second media, and its files are removed
       const name = render.project.name.slice(0, 90);
-      const media = await this._mediaService.saveFile(
-        org,
-        video.filename,
-        video.path,
-        `${name}.mp4`
-      );
-      await this._studioRepository.updateRender(renderId, {
-        mediaId: media.id,
-        path: video.path,
-        thumbnail: thumbnail.path,
-      });
-      await this._mediaService.saveMediaInformation(org, {
-        id: media.id,
-        alt: name,
-        thumbnail: thumbnail.path,
-        thumbnailTimestamp: 0,
-      });
+      const media = hooks.signal?.aborted
+        ? null
+        : await this._studioRepository.saveRenderMedia(renderId, org, {
+            name: video.filename,
+            path: video.path,
+            originalName: `${name}.mp4`,
+            thumbnail: thumbnail.path,
+            alt: name,
+          });
+      if (!media) {
+        for (const file of [video.path, thumbnail.path]) {
+          await this.storage
+            .removeFile(file)
+            .catch((err) =>
+              console.error(`Could not remove studio file ${file}:`, err)
+            );
+        }
+        throw new StudioStop('The render was cancelled.');
+      }
     } catch (err: any) {
       if (err instanceof StudioStop || hooks.signal?.aborted) {
         throw err;

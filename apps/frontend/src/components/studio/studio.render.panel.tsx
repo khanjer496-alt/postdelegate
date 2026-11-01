@@ -60,7 +60,15 @@ const useOpenComposer = () => {
             onlyValues={[
               {
                 content: '',
-                image: [{ id: render.mediaId!, path: render.path! }],
+                image: [
+                  {
+                    id: render.mediaId!,
+                    path: render.path!,
+                    ...(render.thumbnail
+                      ? { thumbnail: render.thumbnail, thumbnailTimestamp: 0 }
+                      : {}),
+                  },
+                ],
               },
             ]}
           />
@@ -98,6 +106,14 @@ export const StudioUsageNote: FC = () => {
 
   return (
     <div className="text-[12px] text-textItemBlur leading-[1.5]">
+      {!usage.subscribed && (
+        <div className="text-textColor font-[600] mb-[2px]">
+          {t(
+            'studio_needs_plan',
+            'Studio needs an active plan. Pick one in Billing to render videos.'
+          )}
+        </div>
+      )}
       {usage.trial && (
         <div className="text-textColor font-[600] mb-[2px]">
           {t('studio_trial_left', '{{left}} of {{total}} trial videos left', {

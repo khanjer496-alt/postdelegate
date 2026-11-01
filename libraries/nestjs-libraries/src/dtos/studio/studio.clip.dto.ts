@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -54,9 +55,7 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 // Only media of the workspace, by id: a url would let a render fetch anything
 export class StudioInputDto {
   @IsDefined()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsUUID()
   mediaId: string;
 
   // what the editor plays; the render never reads it, it finds the file of

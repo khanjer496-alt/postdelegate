@@ -16,6 +16,10 @@ jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service',
   () => ({ AiCredentialService: class {}, MISSING_AI_KEY: '' })
 );
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service',
+  () => ({ OrganizationService: class {} })
+);
 jest.mock('nestjs-temporal-core', () => ({ TemporalService: class {} }));
 
 import 'reflect-metadata';
@@ -138,7 +142,7 @@ maybe('Studio render with ffmpeg', () => {
 
   it('renders "Hook over clip" at 1080x1920 H.264 with AAC audio', async () => {
     const { probe, ticks } = await render(new HookOverClipTemplate(), {
-      input: { mediaId: 'media-1' },
+      input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
       trim: { start: 0.2, end: 1.7 },
       focus: { x: 0.2, y: 0.5 },
       hook: { text: 'Wait {\\fs300} for it \\N', style: 'impact' },
@@ -162,7 +166,7 @@ maybe('Studio render with ffmpeg', () => {
     const { probe } = await render(
       new TalkingHeadCaptionsTemplate(),
       {
-        input: { mediaId: 'media-1' },
+        input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
         trim: { start: 0, end: 2 },
         speed: 2,
         mute: true,
@@ -191,7 +195,7 @@ maybe('Studio render with ffmpeg', () => {
     const { probe, plan } = await render(
       new HookOverClipTemplate(),
       {
-        input: { mediaId: 'media-1' },
+        input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
         trim: { start: 0, end: 1 },
         hook: { text: 'No sound here' },
       },

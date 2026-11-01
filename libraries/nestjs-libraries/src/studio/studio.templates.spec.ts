@@ -11,7 +11,7 @@ const context: StudioPlanContext = {
 };
 
 const hookSpec = {
-  input: { mediaId: 'media-1' },
+  input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
   trim: { start: 2.5, end: 17.5 },
   speed: 1.5,
   focus: { x: 0.3, y: 0.5 },
@@ -19,7 +19,7 @@ const hookSpec = {
 } as any;
 
 const captionsSpec = {
-  input: { mediaId: 'media-1' },
+  input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
   trim: { start: 10, end: 20 },
   fit: 'crop',
   captions: {

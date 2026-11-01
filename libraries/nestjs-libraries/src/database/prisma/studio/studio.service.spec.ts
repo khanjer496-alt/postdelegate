@@ -9,10 +9,15 @@ jest.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
 }));
 const redisSet = jest.fn();
 const redisDel = jest.fn();
+const redisGet = jest.fn();
 jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
   ioRedis: {
     set: (...args: unknown[]) => redisSet(...args),
     del: (...args: unknown[]) => redisDel(...args),
+    get: (...args: unknown[]) => redisGet(...args),
+    incr: jest.fn().mockResolvedValue(1),
+    decr: jest.fn(),
+    expire: jest.fn(),
   },
 }));
 jest.mock(
@@ -25,6 +30,10 @@ jest.mock(
     AiCredentialService: class {},
     MISSING_AI_KEY: 'Add your OpenAI key in Settings → AI',
   })
+);
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service',
+  () => ({ OrganizationService: class {} })
 );
 jest.mock('nestjs-temporal-core', () => ({ TemporalService: class {} }));
 
@@ -42,7 +51,7 @@ import { TalkingHeadCaptionsTemplate } from '@gitroom/nestjs-libraries/studio/te
 const MISSING = 'Add your OpenAI key in Settings → AI';
 
 const spec = {
-  input: { mediaId: 'media-1' },
+  input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
   trim: { start: 0, end: 20 },
   hook: { text: 'Watch this' },
 };
@@ -62,14 +71,30 @@ describe('StudioService fair use', () => {
   let aiCredentialService: { hasCredential: jest.Mock };
   let workflowStart: jest.Mock;
   let workflowCancel: jest.Mock;
+  let organizationService: { getOrgByIdWithSubscription: jest.Mock };
   let service: StudioService;
+  // the request organization: billing is always read again from the database
   const paid = { id: 'org-1', isTrailing: false } as any;
-  const trial = { id: 'org-1', isTrailing: true } as any;
+  const trial = paid;
+  const subscription = { subscriptionTier: 'STANDARD' };
+  const asTrial = () =>
+    organizationService.getOrgByIdWithSubscription.mockResolvedValue({
+      id: 'org-1',
+      isTrailing: true,
+      subscription,
+    });
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
     redisSet.mockResolvedValue('OK');
+    organizationService = {
+      getOrgByIdWithSubscription: jest.fn().mockResolvedValue({
+        id: 'org-1',
+        isTrailing: false,
+        subscription,
+      }),
+    };
     repository = {
       getProject: jest.fn().mockResolvedValue({
         id: 'project-1',
@@ -89,7 +114,7 @@ describe('StudioService fair use', () => {
     };
     mediaService = {
       getOrgMediaById: jest.fn().mockResolvedValue({
-        id: 'media-1',
+        id: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f',
         name: 'abc.mp4',
         path: 'https://media.example/abc.mp4',
         status: 'ready',
@@ -119,7 +144,8 @@ describe('StudioService fair use', () => {
             },
           }),
         },
-      } as any
+      } as any,
+      organizationService as any
     );
   });
 
@@ -166,6 +192,7 @@ describe('StudioService fair use', () => {
       async (_org: string, since?: Date) =>
         since ? 0 : STUDIO_LIMITS.trialRenders
     );
+    asTrial();
     expect(await status(service.startRender(trial, 'project-1'))).toBe(406);
     expect(repository.createRender).not.toHaveBeenCalled();
     // the lock is given back either way
@@ -176,6 +203,7 @@ describe('StudioService fair use', () => {
     repository.countRendersSince.mockResolvedValue(
       STUDIO_LIMITS.trialRenders - 1
     );
+    asTrial();
     expect(await status(service.startRender(trial, 'project-1'))).toBe(
       'resolved'
     );
@@ -189,9 +217,44 @@ describe('StudioService fair use', () => {
       'resolved'
     );
     delete process.env.STRIPE_PUBLISHABLE_KEY;
+    asTrial();
     expect(await status(service.startRender(trial, 'project-1'))).toBe(
       'resolved'
     );
+  });
+
+  it('refuses a workspace that stopped paying while billing is on', async () => {
+    organizationService.getOrgByIdWithSubscription.mockResolvedValue({
+      id: 'org-1',
+      isTrailing: false,
+      subscription: null,
+    });
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(406);
+    expect(repository.createRender).not.toHaveBeenCalled();
+    expect(redisDel).toHaveBeenCalledWith('studioStart:org-1');
+  });
+
+  it('never reads a trial flag left without a subscription as a trial', async () => {
+    organizationService.getOrgByIdWithSubscription.mockResolvedValue({
+      id: 'org-1',
+      isTrailing: true,
+      subscription: null,
+    });
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(406);
+    await expect(service.getUsage(paid)).resolves.toEqual(
+      expect.objectContaining({ subscribed: false, trial: false })
+    );
+  });
+
+  it('lets anyone render without billing (self-hosted)', async () => {
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+    organizationService.getOrgByIdWithSubscription.mockResolvedValue(null);
+    expect(await status(service.startRender(paid, 'project-1'))).toBe(
+      'resolved'
+    );
+    expect(
+      organizationService.getOrgByIdWithSubscription
+    ).not.toHaveBeenCalled();
   });
 
   it(`refuses after ${STUDIO_LIMITS.maxPerDay} renders in 24 hours`, async () => {
@@ -277,7 +340,7 @@ describe('StudioService fair use', () => {
     expect(await status(service.startRender(paid, 'project-1'))).toBe(400);
     expect(mediaService.getOrgMediaById).toHaveBeenCalledWith(
       'org-1',
-      'media-1'
+      '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f'
     );
   });
 
@@ -363,6 +426,7 @@ describe('StudioService fair use', () => {
     repository.countRendersSince.mockImplementation(
       async (_org: string, since?: Date) => (since ? 2 : 4)
     );
+    asTrial();
     await expect(service.getUsage(trial)).resolves.toEqual(
       expect.objectContaining({
         trial: true,
@@ -460,12 +524,13 @@ describe('StudioService transcribe', () => {
   let service: StudioService;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     repository = {
       getProject: jest.fn().mockResolvedValue({
         id: 'project-1',
         template: 'talking-head-captions',
         spec: JSON.stringify({
-          input: { mediaId: 'media-1' },
+          input: { mediaId: '3f1c2a9e-8b4d-4f6a-9c2e-1a2b3c4d5e6f' },
           trim: { start: 5, end: 9 },
         }),
       }),
@@ -505,6 +570,21 @@ describe('StudioService transcribe', () => {
       429
     );
     expect(aiCredentialService.hasCredential).not.toHaveBeenCalled();
+  });
+
+  it('releases only its own transcription lock', async () => {
+    redisSet.mockResolvedValue('OK');
+    redisGet.mockResolvedValue('someone-else');
+    await expect(
+      service.transcribe('org-1', 'project-1', {})
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(redisDel).not.toHaveBeenCalled();
+
+    redisGet.mockImplementation(async () => redisSet.mock.calls.at(-1)[1]);
+    await expect(
+      service.transcribe('org-1', 'project-1', {})
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(redisDel).toHaveBeenCalledWith('studioTranscribe:org-1');
   });
 
   it('asks for a key when there is no script and no key', async () => {

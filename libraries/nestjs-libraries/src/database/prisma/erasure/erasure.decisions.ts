@@ -109,7 +109,10 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     note: 'deleted, which trial emails were sent',
   },
   ThirdParty: { scope: 'org', note: 'deleted, holds a third party API key' },
-  AiCredential: { scope: 'org', note: 'deleted, holds the workspace OpenAI key' },
+  AiCredential: {
+    scope: 'org',
+    note: 'deleted, holds the workspace OpenAI key',
+  },
   Errors: { scope: 'org', note: 'deleted, bodies can hold post content' },
   Mentions: { scope: 'none', note: 'global cache of public social handles' },
   mastra_messages: { scope: 'org', note: AI_MEMORY },
@@ -198,12 +201,18 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     scope: 'org+user',
     note: 'deleted with the organization; in shared organizations the rows the person acted on keep the action but lose actorUserId and actorName. Client names and emails typed on a share link go with the organization',
   },
-  AnalyticsAccountSnapshot: { scope: 'org', note: 'deleted, daily channel counts' },
+  AnalyticsAccountSnapshot: {
+    scope: 'org',
+    note: 'deleted, daily channel counts',
+  },
   ProviderPostUsage: {
     scope: 'org',
     note: 'deleted, which posts went to a network the plan caps a month',
   },
-  AnalyticsPost: { scope: 'org', note: 'deleted, post titles, links and metrics' },
+  AnalyticsPost: {
+    scope: 'org',
+    note: 'deleted, post titles, links and metrics',
+  },
   AnalyticsPostSnapshot: { scope: 'org', note: 'deleted, daily post metrics' },
   AnalyticsReportSettings: {
     scope: 'org',

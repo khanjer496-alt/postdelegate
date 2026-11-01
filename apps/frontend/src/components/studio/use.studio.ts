@@ -21,6 +21,7 @@ export type StudioUsage = {
   maxQueuedGlobal: number;
   maxPerDay: number;
   trialRenders: number;
+  subscribed: boolean;
   trial: boolean;
   usedToday: number;
   trialUsed: number;

@@ -179,6 +179,9 @@ export abstract class StudioTemplateAbstract<
       'file',
       '-format_whitelist',
       'mov,mp4,m4a,3gp,3g2,mj2',
+      // decoding takes 2 threads too, not one per core
+      '-threads',
+      '2',
       '-ss',
       ffNumber(spec.trim.start),
       '-t',
