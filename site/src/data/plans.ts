@@ -27,12 +27,12 @@ export const PLANS: Plan[] = [
     monthly: 19, yearly: 180, channels: 5, teamMembers: false, webhooks: 2,
   },
   {
-    slug: 'team', name: 'Team', tagline: 'For working together.', popular: true,
+    slug: 'team', name: 'Team', tagline: 'For working together.',
     description: 'A shared place for the people behind your content.',
     monthly: 29, yearly: 276, channels: 10, teamMembers: true, webhooks: 10,
   },
   {
-    slug: 'pro', name: 'Pro', tagline: 'For more than one brand.',
+    slug: 'pro', name: 'Pro', tagline: 'For more than one brand.', popular: true,
     description: 'Room for client channels and content across several brands.',
     monthly: 39, yearly: 372, channels: 30, teamMembers: true, webhooks: 30,
   },

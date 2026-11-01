@@ -1,0 +1,30 @@
+---
+import Doc from '../layouts/Doc.astro';
+import { AVAILABLE_NETWORKS } from '../data/networks';
+import { SITE } from '../data/site';
+// Network status mirrors /docs/channels/coming-soon. No dates: approval timelines belong to each network.
+const review = [
+  { name: 'Facebook', status: 'Waiting for platform approval' },
+  { name: 'Instagram', status: 'Waiting for platform approval' },
+  { name: 'Threads', status: 'Waiting for platform approval' },
+  { name: 'TikTok', status: 'Waiting for platform approval' },
+  { name: 'LinkedIn', status: 'Waiting for platform approval' },
+  { name: 'Pinterest', status: 'Waiting for platform approval' },
+  { name: 'X', status: 'Not yet available' },
+  { name: 'Google Business Profile, Mastodon, Reddit and others', status: 'Not yet available' },
+];
+---
+<Doc title="Roadmap — networks in review at PostDelegate" description="Which social networks PostDelegate is waiting on for platform approval, what connects today, and why we don't publish dates for networks still in review." h1="Roadmap." eyebrow="What's next" lead="Where each network stands. A network joins the app once its review is done, never before.">
+  <a slot="actions" href="/changelog" class="button button-outline">See the changelog</a>
+  <h2>Networks in review</h2>
+  <p>Each network reviews an app before it lets a service publish for its users. None of these can be connected today.</p>
+  <table>
+    <thead><tr><th>Network</th><th>Status</th></tr></thead>
+    <tbody>{review.map((row) => <tr><td>{row.name}</td><td>{row.status}</td></tr>)}</tbody>
+  </table>
+  <p>We do not publish dates, because approval timelines belong to each network. When a connection opens it appears under <strong>Add Channel</strong> in the app, gets a guide in the docs and an entry in the <a href="/changelog">changelog</a>.</p>
+  <h2>Live today</h2>
+  <p>{AVAILABLE_NETWORKS.length} networks connect now: {AVAILABLE_NETWORKS.map((n) => n.name).join(', ')}. See <a href="/platforms">platform status</a>.</p>
+  <h2>Tell us what you need</h2>
+  <p>Requests help us decide what to prepare next. Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
+</Doc>

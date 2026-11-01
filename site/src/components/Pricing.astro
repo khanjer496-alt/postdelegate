@@ -3,6 +3,11 @@ import { PLANS, TRIAL_DAYS, planFeatures } from '../data/plans';
 import { SITE } from '../data/site';
 interface Props { heading?: boolean }
 const { heading = true } = Astro.props;
+// The yearly saving, worked out from plans.ts rather than typed in.
+const savings = PLANS.map((plan) => (plan.monthly * 12 - plan.yearly) / (plan.monthly * 12));
+const bestSaving = Math.round(Math.max(...savings) * 100);
+const perMonth = (yearly: number) => { const value = yearly / 12; return Number.isInteger(value) ? String(value) : value.toFixed(2); };
+const maxChannels = Math.max(...PLANS.map((plan) => plan.maxChannels || plan.channels)).toLocaleString('en-US');
 ---
 <div class="pricing">
   {heading && (
@@ -12,16 +17,25 @@ const { heading = true } = Astro.props;
       <p class="muted">Every plan starts with a {TRIAL_DAYS}-day free trial. No credit card needed: add one any time before the trial ends to keep your plan.</p>
     </div>
   )}
+  <fieldset class="billing-toggle">
+    <legend class="sr-only">Billing period</legend>
+    <input type="radio" name="billing-period" id="billing-monthly" value="monthly" checked />
+    <label for="billing-monthly">Monthly</label>
+    <input type="radio" name="billing-period" id="billing-yearly" value="yearly" />
+    <label for="billing-yearly">Yearly <span>save up to {bestSaving}%</span></label>
+  </fieldset>
   <div class="plan-grid">
     {PLANS.map((plan) => (
       <article class:list={['plan-card', { 'plan-featured': plan.popular }]}>
         <div class="plan-topline">
           <h3>{plan.name}</h3>
-          {plan.popular && <span class="plan-badge">Built for collaboration</span>}
+          {plan.popular && <span class="plan-badge">Recommended</span>}
         </div>
         <p class="plan-tagline">{plan.tagline}</p>
-        <p class="plan-price"><strong>${plan.monthly}</strong><span>/month</span></p>
-        <p class="plan-yearly">or ${plan.yearly.toLocaleString('en-US')} a year, save ${plan.monthly * 12 - plan.yearly}</p>
+        <p class="plan-price price-monthly"><strong>${plan.monthly}</strong><span>/month</span></p>
+        <p class="plan-yearly price-monthly">or ${plan.yearly.toLocaleString('en-US')} a year, save ${plan.monthly * 12 - plan.yearly}</p>
+        <p class="plan-price price-yearly"><strong>${perMonth(plan.yearly)}</strong><span>/month</span></p>
+        <p class="plan-yearly price-yearly">billed ${plan.yearly.toLocaleString('en-US')} a year, save ${plan.monthly * 12 - plan.yearly}</p>
         <p class="plan-description muted">{plan.description}</p>
         <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>Start free trial</a>
         <ul>
@@ -30,6 +44,10 @@ const { heading = true } = Astro.props;
       </article>
     ))}
   </div>
+  <div class="plan-custom">
+    <div><h3>Custom</h3><p>Need more than {maxChannels} channels? Talk to us.</p></div>
+    <a href={`mailto:${SITE.email}?subject=Custom%20plan`} class="button button-outline">Talk to us</a>
+  </div>
   <p class="pricing-note muted"><strong>Why no AI credits?</strong> You bring your own OpenAI key, or the assistant you already pay for, so you pay OpenAI's own rates with no markup from us and no monthly credit cap.</p>
   <p class="pricing-note muted">Prices in US dollars. AI writing, the Agent and AI images run on your workspace's own OpenAI API key, which you pay OpenAI for directly; PostDelegate never charges for AI, and AI video is not available. You can also bring your own assistant through <a href="/docs/mcp">MCP</a>. More networks, including Facebook, Instagram, TikTok, LinkedIn and X, open as platform approvals come through. One free trial per email address. See <a href="/docs/billing">plans and billing</a> for the details.</p>
 </div>
@@ -37,6 +55,21 @@ const { heading = true } = Astro.props;
   .pricing-heading { text-align: center; max-width: 730px; margin: 0 auto 48px; }
   .pricing-heading h2 { font-size: clamp(34px, 5vw, 58px); line-height: 1.07; font-weight: 800; letter-spacing: -.045em; margin: 16px 0 20px; text-wrap: balance; }
   .pricing-heading > p:last-child { line-height: 1.75; font-size: 17px; }
+  .billing-toggle { display: flex; justify-content: center; gap: 4px; width: fit-content; margin: 0 auto 28px; padding: 4px; border: 1px solid #383838; border-radius: 999px; background: #151515; }
+  .billing-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .billing-toggle label { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 18px; border-radius: 999px; color: #b9b9b9; font-size: 14px; font-weight: 650; cursor: pointer; }
+  .billing-toggle label span { color: #c8ff4d; font-size: 12px; font-weight: 700; }
+  .billing-toggle input:checked + label { background: #f3f3f3; color: #151515; }
+  .billing-toggle input:checked + label span { color: #3d6b00; }
+  .billing-toggle input:focus-visible + label { outline: 2px solid var(--accent, #7357ff); outline-offset: 2px; }
+  .plan-card .price-yearly { display: none; }
+  .pricing:has(#billing-yearly:checked) .plan-card .plan-price.price-yearly { display: flex; }
+  .pricing:has(#billing-yearly:checked) .plan-card .plan-yearly.price-yearly { display: block; }
+  .pricing:has(#billing-yearly:checked) .plan-card .price-monthly { display: none; }
+  .plan-custom { display: flex; align-items: center; justify-content: space-between; gap: 18px 28px; margin-top: 16px; padding: 22px 26px; border: 1px dashed #4a4a4a; border-radius: 22px; background: #121212; color: #fff; }
+  .plan-custom h3 { font-size: 20px; font-weight: 800; letter-spacing: -.03em; }
+  .plan-custom p { margin-top: 6px; color: #b9b9b9; font-size: 14px; line-height: 1.7; }
+  .plan-custom .button { flex: none; }
   .plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .plan-card { display: flex; flex-direction: column; padding: 28px 23px; border: 1px solid #383838; border-radius: 22px; background: #171717; color: #fff; }
   .plan-featured { border: 2px solid #f3f3f3; padding: 27px 22px; background: #f3f3f3; color: #151515; }
@@ -64,5 +97,5 @@ const { heading = true } = Astro.props;
   .pricing-note strong { color: #fff; font-weight: 700; }
   .pricing-note + .pricing-note { margin-top: 12px; }
   @media (max-width: 1000px) { .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 560px) { .plan-grid { grid-template-columns: 1fr; } .plan-topline { min-height: auto; } .plan-description { min-height: auto; } }
+  @media (max-width: 560px) { .plan-custom { flex-direction: column; align-items: flex-start; } .billing-toggle label { padding: 0 14px; font-size: 13px; } .plan-grid { grid-template-columns: 1fr; } .plan-topline { min-height: auto; } .plan-description { min-height: auto; } }
 </style>
