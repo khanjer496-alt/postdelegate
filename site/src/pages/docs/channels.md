@@ -42,6 +42,28 @@ There are two kinds of connection.
 
 Whichever kind it is, you start from **Add Channel** on the calendar page.
 
+## Connecting more than one account
+
+You can connect several accounts from the same network, such as two YouTube channels, three Bluesky profiles or a Slack workspace for each client. Each account is its own channel, with its own settings, time slots and posts. To add another one, choose **Add Channel** and pick the network again.
+
+**Every connected account counts as one channel on your plan.** There is no separate limit per network, so you can mix networks however you like up to your plan's total. See [pricing](/pricing) for how many channels each plan includes. A disabled channel still uses a slot. Delete a channel you no longer need to free its slot.
+
+**Connecting the same account twice updates it.** If you connect an account that is already in the workspace, PostDelegate refreshes the existing channel instead of adding a copy.
+
+**Networks you sign in to remember who you are.** YouTube, Kick, Twitch, Tumblr, Dribbble and Slack send you to the network's own page. If you are already signed in there, the network usually approves the account you are signed in to, without asking. To add a different account:
+
+1. Open the network's website in the same browser and sign out, or switch to the other account.
+2. Back in PostDelegate, choose **Add Channel** and the network again.
+3. Sign in with the account you want to add.
+
+A private or incognito window also works, as long as you sign in to PostDelegate in that window too.
+
+Some networks let one login hold several destinations. On YouTube, choose the channel after you sign in; to connect another channel from the same Google account, add YouTube again and choose the other one. On Tumblr, each blog is its own channel. On Slack, each workspace is one channel and you pick the Slack channel for each post. On Telegram, add @PostDelegateBot to each channel or group you want to post to.
+
+**Networks where you paste a credential** take whatever you enter, so use the app password, API key or site address of the account you want to add.
+
+To keep many accounts organised, file them under a [customer](/docs/team#customers), for example one per client.
+
 ## Managing a channel
 
 Open a channel's menu on the calendar page to:
