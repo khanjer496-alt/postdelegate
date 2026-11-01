@@ -76,6 +76,15 @@ async function start() {
     json({ limit: '4mb' })(req, res, next);
   });
 
+  // a CSV import and a public API post carry up to 1 MB of content (what the
+  // docs and the DTOs promise), with room for the JSON around it
+  app.use(
+    ['/posts-import', '/public/v1/posts'],
+    (req: any, res: any, next: any) => {
+      json({ limit: '2mb' })(req, res, next);
+    }
+  );
+
   app.use(cookieParser());
   app.use(compression());
   app.useGlobalFilters(new SubscriptionExceptionFilter());
