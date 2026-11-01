@@ -24,6 +24,7 @@ import {
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -32,7 +33,8 @@ export class NoAuthIntegrationsController {
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _organizationService: OrganizationService
+    private _organizationService: OrganizationService,
+    private _permissionsService: PermissionsService
   ) {}
 
   @Get('/')
@@ -221,6 +223,22 @@ export class NoAuthIntegrationsController {
       String(id),
       integration
     );
+
+    // This route runs without a session, so the guard never checked the plan's
+    // channel limit. A channel the workspace already has (a reconnect) never
+    // counts as a new one
+    if (
+      !(await this._integrationService.getIntegrationByInternalId(
+        org.id,
+        refresh || String(id)
+      )) &&
+      !(await this._permissionsService.canAddChannel(org.id, org.createdAt))
+    ) {
+      throw new HttpException(
+        'You have reached the maximum number of channels on your plan. Upgrade, or remove a channel, then connect again.',
+        400
+      );
+    }
 
     if (refresh && String(id) !== String(refresh)) {
       // A reconnect that returns a different id is either the wrong account or

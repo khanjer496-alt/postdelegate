@@ -106,6 +106,15 @@ export class PermissionsService {
     );
   }
 
+  // whether one more channel fits the plan (always with billing off)
+  async canAddChannel(orgId: string, created_at: Date) {
+    return (
+      await this.check(orgId, created_at, 'SUPERADMIN', [
+        [AuthorizationActions.Create, Sections.CHANNEL],
+      ])
+    ).can(AuthorizationActions.Create, Sections.CHANNEL);
+  }
+
   async check(
     orgId: string,
     created_at: Date,
@@ -168,9 +177,11 @@ export class PermissionsService {
           }
         }
 
+        // every channel the workspace keeps counts, also one that waits to
+        // be reconnected or is turned off
         const totalChannels = (
           await this._integrationService.getIntegrationsList(orgId)
-        ).filter((f) => !f.refreshNeeded).length;
+        ).length;
 
         if (
           (options.channel && options.channel > totalChannels) ||

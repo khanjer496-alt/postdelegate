@@ -154,3 +154,41 @@ describe('PermissionsService extraChannelsOffer', () => {
     expect(await offerFor(subscription, org)).toBeNull();
   });
 });
+
+describe('PermissionsService channel limit', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it('counts channels that need a reconnect or are turned off', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    const service = new PermissionsService(
+      {
+        getSubscriptionByOrganizationId: jest.fn().mockResolvedValue({
+          subscriptionTier: 'STANDARD',
+          totalChannels: 2,
+        }),
+        getSubscription: jest.fn().mockResolvedValue({
+          subscriptionTier: 'STANDARD',
+          totalChannels: 2,
+        }),
+      } as any,
+      {} as any,
+      {
+        getIntegrationsList: jest.fn().mockResolvedValue([
+          { id: 'a', refreshNeeded: true },
+          { id: 'b', disabled: true },
+        ]),
+      } as any,
+      {} as any,
+      { hasCredential: jest.fn() } as any
+    );
+    (service as any).getPackageOptions = jest.fn().mockResolvedValue({
+      subscription: { totalChannels: 2 },
+      options: { channel: 2 },
+    });
+
+    expect(await service.canAddChannel('org', new Date())).toBe(false);
+  });
+});

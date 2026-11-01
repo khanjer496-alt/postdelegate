@@ -447,7 +447,10 @@ export class IntegrationService {
       !!process.env.STRIPE_PUBLISHABLE_KEY &&
       integrations.length >= totalChannels
     ) {
-      throw new Error('You have reached the maximum number of channels');
+      throw new HttpException(
+        'You have reached the maximum number of channels on your plan. Turn off or remove another channel, or upgrade, to enable this one.',
+        400
+      );
     }
 
     return this._integrationRepository.enableChannel(org, id);
