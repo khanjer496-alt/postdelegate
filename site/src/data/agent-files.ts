@@ -26,7 +26,7 @@ const NETWORK_AGENT_NOTES: Record<string, NetworkAgentNotes> = {
   bluesky: { settings: 'None.', media: 'Up to 4 images or 1 video per post, or no media.', followUps: true },
   telegram: { settings: 'None.', media: 'No extra media rules.', followUps: true },
   discord: { settings: 'Required `channel`: a channel id from helper `channels`.', media: 'No extra media rules.', followUps: true },
-  slack: { settings: 'Required `channel`: a channel id from helper `channels`.', media: 'Images (PNG, JPG, GIF, WebP). No MP4.', followUps: true },
+  slack: { settings: 'Required `channel`: a channel id from helper `channels`.', media: 'Images (PNG, JPG, GIF). No WebP or MP4.', followUps: true },
   tumblr: { settings: 'Optional `title`, `link`, `sourceUrl`, and `tags` as one comma-separated string.', media: 'Up to 30 images and 1 video per post.' },
   lemmy: { settings: 'Required `subreddit`: a list of `{ value: { subreddit, id, title, url? } }` (title at least 2 characters). Find communities with helper `subreddits` and `dataSchema` `word`.', media: 'Optional single picture (PNG, JPG or GIF), used as the cover.', followUps: true },
   nostr: { settings: 'None.', media: 'No extra media rules.', followUps: true },
