@@ -100,8 +100,22 @@ export async function proxy(request: NextRequest) {
   const org = nextUrl.searchParams.get('org');
   const url = new URL(nextUrl).search;
   if (!nextUrl.pathname.startsWith('/auth') && !authCookie) {
+    // only a sign-in provider's callback carries a code, any other page
+    // (a link from an email) is signed in to first, then opened
     const providers = ['google', 'settings'];
-    const findIndex = providers.find((p) => nextUrl.href.indexOf(p) > -1);
+    const findIndex = nextUrl.searchParams.get('code')
+      ? providers.find((p) => nextUrl.href.indexOf(p) > -1)
+      : undefined;
+    if (!findIndex && !org && nextUrl.pathname !== '/') {
+      return NextResponse.redirect(
+        new URL(
+          `/auth/login?returnUrl=${encodeURIComponent(
+            `${nextUrl.pathname}${url}`
+          )}`,
+          nextUrl.href
+        )
+      );
+    }
     const additional = !findIndex
       ? ''
       : (url.indexOf('?') > -1 ? '&' : '?') +
