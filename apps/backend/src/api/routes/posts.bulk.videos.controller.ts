@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -47,6 +47,12 @@ export class PostsBulkVideosController {
     @Body() body: BulkVideoPostsDto
   ) {
     return this._bulkVideosService.status(org.id, body);
+  }
+
+  // the same, by the key the first status call returned
+  @Get('/status/:key')
+  statusOf(@GetOrgFromRequest() org: Organization, @Param('key') key: string) {
+    return this._bulkVideosService.statusOf(org.id, key);
   }
 
   @Post('/')

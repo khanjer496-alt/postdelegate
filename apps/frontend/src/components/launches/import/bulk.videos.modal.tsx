@@ -692,6 +692,35 @@ export const BulkVideosModal: FC<{
     [onCreated]
   );
 
+  // Where a request stands on the server. The first call sends the body and
+  // gets its key back, the next ones only send the key
+  const statusKey = useRef('');
+  const readStatus = useCallback(
+    async (
+      payload: string
+    ): Promise<{ status: string; result?: CreateResult } | null> => {
+      try {
+        const response = statusKey.current
+          ? await fetch(`/posts-bulk-videos/status/${statusKey.current}`)
+          : await fetch('/posts-bulk-videos/status', {
+              method: 'POST',
+              body: payload,
+            });
+        if (!response.ok) {
+          return null;
+        }
+        const data = await response.json();
+        if (data?.key) {
+          statusKey.current = data.key;
+        }
+        return data;
+      } catch (err) {
+        return null;
+      }
+    },
+    []
+  );
+
   // The create request. A timeout, a gateway error or a 409 may leave it
   // running on the server: 'running' then follows it through the status
   const send = useCallback(
@@ -717,6 +746,16 @@ export const BulkVideosModal: FC<{
         if (!body?.message) {
           return 'running';
         }
+        // the posts may have gone in before the error
+        const status = await readStatus(payload);
+        if (status?.status === 'done' && status.result) {
+          pending.current = '';
+          showResult(status.result);
+          return 'done';
+        }
+        if (status?.status === 'running') {
+          return 'running';
+        }
       }
       if (!response.ok) {
         // a 402 (plan limit) is handled by the app already
@@ -738,18 +777,22 @@ export const BulkVideosModal: FC<{
       showResult(await response.json());
       return 'done';
     },
-    [showResult]
+    [showResult, readStatus]
   );
 
   // Follows a request that may still be running, now and then every 5
-  // seconds for up to 10 minutes. The status is read without the plan checks, so it never
-  // opens the payment dialog.
+  // seconds. "none" is only final once the create request itself answered
+  // (or after a minute: "Move to billing" never answers it). Still running
+  // after 15 minutes, past the time a stopped run is taken over, the create
+  // is sent once more so a crashed run resumes. It gives up at 20 minutes.
   const follow = useCallback(
-    async (payload: string) => {
+    async (payload: string, answered: () => boolean) => {
       setRunning(true);
-      const until = Date.now() + 10 * 60 * 1000;
+      const started = Date.now();
+      let resent = false;
       while (pending.current === payload) {
-        if (Date.now() > until) {
+        const waited = Date.now() - started;
+        if (waited > 20 * 60 * 1000) {
           setError(
             t(
               'bulk_videos_too_long',
@@ -759,21 +802,18 @@ export const BulkVideosModal: FC<{
           setPreviewKey('');
           return;
         }
-        let status: { status: string; result?: CreateResult } | null = null;
-        try {
-          const response = await fetch('/posts-bulk-videos/status', {
-            method: 'POST',
-            body: payload,
-          });
-          status = response.ok ? await response.json() : null;
-        } catch (err) {
-          status = null;
+        const status = await readStatus(payload);
+        if (pending.current !== payload) {
+          return;
         }
         if (status?.status === 'done' && status.result) {
           showResult(status.result);
           return;
         }
-        if (status?.status === 'none') {
+        if (
+          status?.status === 'none' &&
+          (answered() || waited > 60 * 1000)
+        ) {
           setError(
             t(
               'bulk_videos_not_created',
@@ -783,10 +823,15 @@ export const BulkVideosModal: FC<{
           setPreviewKey('');
           return;
         }
+        if (status?.status === 'running' && !resent && waited > 15.5 * 60 * 1000) {
+          resent = true;
+          // answers with the result when it resumes, or 409 while it runs
+          send(payload);
+        }
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     },
-    [showResult]
+    [showResult, readStatus, send]
   );
 
   const create = useCallback(async () => {
@@ -797,6 +842,7 @@ export const BulkVideosModal: FC<{
     setError('');
     sentKeys.current = ready.map((video) => video.key);
     pending.current = createKey;
+    statusKey.current = '';
     // "Move to billing" in the payment dialog never answers the request:
     // coming back to the page while it is still waiting follows the status
     let hidden = false;
@@ -811,10 +857,14 @@ export const BulkVideosModal: FC<{
       };
       document.addEventListener('visibilitychange', onVisible);
     });
-    const outcome = await Promise.race([send(createKey), back]);
+    let answered = false;
+    const request = send(createKey).finally(() => {
+      answered = true;
+    });
+    const outcome = await Promise.race([request, back]);
     document.removeEventListener('visibilitychange', onVisible);
     if (outcome === 'running') {
-      await follow(createKey);
+      await follow(createKey, () => answered);
     }
     pending.current = '';
     setRunning(false);

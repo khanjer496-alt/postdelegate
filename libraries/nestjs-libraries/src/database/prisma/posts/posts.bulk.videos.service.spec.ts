@@ -761,15 +761,27 @@ describe('PostsBulkVideosService', () => {
 
   it('tells where a request stands, keyed like create', async () => {
     const { service, repo } = make();
-    expect(await service.status('org-1', body())).toEqual({ status: 'none' });
-    expect(repo.get).toHaveBeenCalledWith('org-1', bulkVideosHash(body()));
+    const key = bulkVideosHash(body());
+    expect(await service.status('org-1', body())).toEqual({ key, status: 'none' });
+    expect(repo.get).toHaveBeenCalledWith('org-1', key);
     repo.get.mockResolvedValueOnce({ status: 'processing', result: null });
-    expect(await service.status('org-1', body())).toEqual({ status: 'running' });
+    expect(await service.statusOf('org-1', key)).toEqual({ status: 'running' });
     repo.get.mockResolvedValueOnce({ status: 'done', result: JSON.stringify({ created: 2 }) });
-    expect(await service.status('org-1', body())).toEqual({
+    expect(await service.statusOf('org-1', key)).toEqual({
       status: 'done',
       result: { created: 2 },
     });
+  });
+
+  it('reads a status by key only within the organization, and only a real key', async () => {
+    const { service, repo } = make();
+    const key = bulkVideosHash(body());
+    await service.statusOf('org-2', key);
+    expect(repo.get).toHaveBeenCalledWith('org-2', key);
+    await expect(service.statusOf('org-1', '../x')).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+    expect(repo.get).toHaveBeenCalledTimes(1);
   });
 
   it('lists the channels that take a video, with their settings', async () => {

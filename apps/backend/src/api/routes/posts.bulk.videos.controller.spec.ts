@@ -19,7 +19,8 @@ describe('PostsBulkVideosController', () => {
 
   const make = (status: 'none' | 'running' | 'done', allowed: boolean) => {
     const service = {
-      status: jest.fn().mockResolvedValue({ status }),
+      status: jest.fn().mockResolvedValue({ key: 'k', status }),
+      statusOf: jest.fn().mockResolvedValue({ status }),
       create: jest.fn().mockResolvedValue({ created: 1 }),
     };
     const permissions = {
@@ -58,9 +59,11 @@ describe('PostsBulkVideosController', () => {
     expect(service.create).toHaveBeenCalled();
   });
 
-  it('reads the status without any plan check', async () => {
-    const { controller, permissions } = make('running', false);
-    expect(await controller.status(org, body)).toEqual({ status: 'running' });
+  it('reads the status without any plan check, by body then by key', async () => {
+    const { controller, service, permissions } = make('running', false);
+    expect(await controller.status(org, body)).toEqual({ key: 'k', status: 'running' });
+    expect(await controller.statusOf(org, 'k')).toEqual({ status: 'running' });
+    expect(service.statusOf).toHaveBeenCalledWith('org-1', 'k');
     expect(permissions.check).not.toHaveBeenCalled();
   });
 });

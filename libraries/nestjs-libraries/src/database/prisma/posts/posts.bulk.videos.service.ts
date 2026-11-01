@@ -683,8 +683,18 @@ export class PostsBulkVideosService {
   // Where a bulk request stands: never sent (or sent and freed because
   // nothing went in), still running, or done with its result. Read without
   // the plan checks, so a request that timed out can always be followed.
+  // `key` is what statusOf() reads it by after that, without the body.
   async status(orgId: string, body: BulkVideoPostsDto) {
-    const claim = await this._importRepository.get(orgId, bulkVideosHash(body));
+    const key = bulkVideosHash(body);
+    return { key, ...(await this.statusOf(orgId, key)) };
+  }
+
+  // the same by the key of a request, only ever within the organization
+  async statusOf(orgId: string, key: string) {
+    if (!/^[a-f0-9]{64}$/.test(key || '')) {
+      throw new BadRequestException('This is not the key of a request.');
+    }
+    const claim = await this._importRepository.get(orgId, key);
     if (!claim) {
       return { status: 'none' as const };
     }
