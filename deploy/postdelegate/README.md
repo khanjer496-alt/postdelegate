@@ -36,6 +36,7 @@ R2 usage is billed under the account's existing allowances/pricing; this is not 
 - Media credentials: `/etc/postiz/r2.env` (0600), loaded after the main configuration.
 - Founder credentials: `/etc/postiz/owner-credentials.json` (0600); local protected copy in this checkout's ignored `.local/owner-credentials.json`.
 - Compose wrapper: `sudo postiz-compose ps`, `sudo postiz-compose logs --tail 100 postiz`.
+- Staging copy (https://staging.postdelegate.com): `sudo postiz-staging-release release-<rev>`; see [STAGING.md](STAGING.md).
 - Daily local backups: `postiz-backup.timer`, with output under `/var/backups/postiz`.
 - Manual backup: `sudo backup-postiz`.
 - Off-site encrypted backups and health alerts: `offsite-backup-postiz`, `postiz-healthcheck`, installed with `install-ops.sh`; see [Operations: off-site backups and alerts](#operations-off-site-backups-and-alerts).
