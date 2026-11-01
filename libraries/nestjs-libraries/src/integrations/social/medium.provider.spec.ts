@@ -61,3 +61,18 @@ describe('MediumProvider.post', () => {
     expect(calls[0].body).not.toHaveProperty('subtitle');
   });
 });
+
+describe('MediumProvider on a server error', () => {
+  // a create may have gone through before the 5xx: no retry, no duplicate
+  it.each([500, 502, 503])('fails without retrying on %s', async (status) => {
+    answer(status, {});
+    await expect(new MediumProvider().post('user', 'key', post, {} as any)).rejects.toBeInstanceOf(BadBody);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still retries a 429, nothing was created', async () => {
+    answer(429, {});
+    await expect(new MediumProvider().post('user', 'key', post, {} as any)).rejects.toBeInstanceOf(BadBody);
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+  });
+});

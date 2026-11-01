@@ -80,6 +80,15 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
       };
     }
 
+    // creating a post is not idempotent: Moltbook may have created it before
+    // failing, a retry could post it twice (a 429 is still retried)
+    if (status >= 500) {
+      return {
+        type: 'bad-body',
+        value: 'Moltbook had a problem with the post, check the agent before trying again',
+      };
+    }
+
     return undefined;
   }
 

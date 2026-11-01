@@ -69,6 +69,15 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
       };
     }
 
+    // creating a post is not idempotent: Medium may have published it before
+    // failing, a retry could publish it twice (a 429 is still retried)
+    if (status >= 500) {
+      return {
+        type: 'bad-body',
+        value: 'Medium had a problem with the post, check your Medium account before trying again',
+      };
+    }
+
     return undefined;
   }
 
