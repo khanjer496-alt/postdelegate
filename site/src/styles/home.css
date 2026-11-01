@@ -42,7 +42,7 @@
 
 /* Orbit visual */
 .hero-visual{position:relative;min-width:0}
-.orbit{position:relative;container-type:inline-size;width:min(100%,600px);aspect-ratio:1;margin-inline:auto}
+.orbit{position:relative;container-type:inline-size;width:min(100%,600px);aspect-ratio:1;margin:76px auto 72px}
 .orbit-ring{position:absolute;left:50%;top:50%;width:calc(var(--r)*2);height:calc(var(--r)*2);margin:calc(var(--r)*-1) 0 0 calc(var(--r)*-1);border-radius:50%;border:1px solid #ffffff1c}
 .ring-inner{border-color:#7357ff80;background:radial-gradient(circle,#7357ff26,transparent 70%)}
 .ring-middle{border-color:#ffffff26}
@@ -65,8 +65,9 @@
 .orbit-card i{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:10px;font-style:normal;font-weight:800}
 .card-check{background:#c8ff4d;color:#0d0d0d;font-size:15px}
 .card-spark{background:#7357ff;color:#fff;font-size:16px}
-.orbit-card-scheduled{left:0;bottom:9%}
-.orbit-card-draft{right:0;top:7%}
+/* the cards sit just outside the orbit, so they never cover a channel as the rings turn */
+.orbit-card-scheduled{left:6%;top:calc(100% + 10px)}
+.orbit-card-draft{right:6%;bottom:calc(100% + 10px)}
 .orbit-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 20px;margin-top:6px;color:#b5b5b5;font-size:12px}
 .orbit-legend span{display:inline-flex;align-items:center;gap:7px}
 .orbit-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
@@ -339,8 +340,8 @@
  .orbit-card i{width:24px;height:24px;border-radius:8px;font-size:12px}
  .orbit-card b{font-size:11px}
  .orbit-card small{font-size:10px}
- .orbit-card-scheduled{bottom:3%}
- .orbit-card-draft{top:2%}
+ .orbit{margin-block:66px 72px}
+ .orbit-card-scheduled,.orbit-card-draft{left:50%;right:auto;transform:translateX(-50%)}
  .orbit-legend{font-size:11px;gap:6px 14px}
  .workspace-section{padding-top:30px}
  .workspace-section::before{top:80px;height:260px}
