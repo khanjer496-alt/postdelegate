@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Privacy and data deletion
-description: Where to read PostDelegate's policies, what disconnecting a channel does and how to ask for your data to be deleted.
+description: Where to read PostDelegate's privacy policy and terms, what disconnecting a channel does, how credentials are stored and how to have your data deleted.
 ---
 
 PostDelegate is operated by Nasida Apps LLC. These are the documents that govern the service.

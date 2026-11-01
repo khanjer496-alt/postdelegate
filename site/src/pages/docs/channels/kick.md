@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Kick
-description: Connect a Kick channel by signing in with Kick and send scheduled text messages to your channel's chat.
+description: Connect a Kick channel to PostDelegate by signing in with Kick, then send scheduled messages to your channel's chat. What gets published, settings and fixes.
 ---
 
 Kick is a live-streaming platform. Connecting it lets PostDelegate send a scheduled message to your channel's chat.

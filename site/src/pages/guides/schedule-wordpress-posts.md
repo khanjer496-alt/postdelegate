@@ -75,7 +75,7 @@ If you want to hold a post back entirely, keep it as a draft in PostDelegate. No
 
 ## Step 5: schedule it on the calendar
 
-Pick a date and time. Dates and times follow the timezone in your profile settings, not your WordPress site's timezone, so check both if they differ. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**, not your WordPress site's timezone, so check both if they differ. Then choose:
 
 | Choice | What happens |
 | --- | --- |

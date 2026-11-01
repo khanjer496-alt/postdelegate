@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Medium
-description: Connect Medium with an integration token and publish Markdown stories, optionally to a publication you can write to.
+description: Connect Medium to PostDelegate with an integration token and schedule Markdown stories, optionally to a publication you can write to. Post settings and fixes.
 ---
 
 ## What you need

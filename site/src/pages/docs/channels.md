@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Channels overview
-description: Which networks you can connect to PostDelegate today, how each connection works and what to do when a channel needs attention.
+description: Which networks you can connect to PostDelegate today, which are coming soon, how each connection works, and what to do when a channel needs to be reconnected.
 ---
 
 A channel is one connected account or destination, such as a Bluesky profile, a YouTube channel or a WordPress site. This page covers what is available now. Each network has its own guide with exact fields and post settings.

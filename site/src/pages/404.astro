@@ -2,7 +2,7 @@
 import Doc from '../layouts/Doc.astro';
 import { SITE, CTA_LABEL, CTA_NOTE } from '../data/site';
 ---
-<Doc title="Page not found — PostDelegate" description="The page you were looking for is not on the PostDelegate website." h1="This page took a day off." eyebrow="Page not found" lead="The link may be old, or the address may have a typo. Here are a few good places to pick up again, or email support@postdelegate.com and we will point you to it." cta={false} noindex>
+<Doc title="Page not found — PostDelegate" description="This page isn't on the PostDelegate website. The link may be old or mistyped. Find the docs, pricing, free tools and support from here, or email us for help." h1="This page took a day off." eyebrow="Page not found" lead="The link may be old, or the address may have a typo. Here are a few good places to pick up again, or email support@postdelegate.com and we will point you to it." cta={false} noindex>
   <a slot="actions" href="/" class="button">Back to the home page</a>
   <a slot="actions" href={SITE.signup} class="button button-outline">{CTA_LABEL}</a>
   <div class="document-grid">

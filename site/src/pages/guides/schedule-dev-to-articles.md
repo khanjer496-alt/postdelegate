@@ -71,7 +71,7 @@ The [guide to cross-posting with canonical URLs](/guides/cross-post-blog-article
 
 ## Step 6: choose when it goes out
 
-Pick a date and time. Dates and times follow the timezone in your profile settings. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**. Then choose:
 
 | Choice | What happens |
 | --- | --- |

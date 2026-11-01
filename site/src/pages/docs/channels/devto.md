@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: DEV.to
-description: Connect a DEV Community account with an API key and publish Markdown articles with tags, a cover image and a canonical URL.
+description: Connect a DEV Community account to PostDelegate with an API key and schedule Markdown articles with tags, a cover image and a canonical URL. Settings and fixes.
 ---
 
 ## What you need

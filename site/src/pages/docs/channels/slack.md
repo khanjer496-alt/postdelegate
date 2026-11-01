@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Slack
-description: Add PostDelegate to a Slack workspace, then send scheduled messages with text and images to the channel you pick.
+description: Add PostDelegate to a Slack workspace, then send scheduled messages with text and images to the channel you pick. What gets published, post settings and fixes.
 ---
 
 Slack is a workplace chat app. Connecting it lets PostDelegate send scheduled messages to a channel in your workspace.

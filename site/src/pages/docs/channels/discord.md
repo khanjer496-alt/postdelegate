@@ -26,7 +26,7 @@ Each server is one channel in PostDelegate. Use **Rename channel** in its menu t
 - Formatting is kept as Discord Markdown: bold, underline, headings, bullet lists and links all carry over.
 - Attach images or videos. They are uploaded as files with the message, and Discord takes up to 10 files per message.
 - To mention someone, open the Discord version of the post, type **@** and at least two letters. You can pick server members, **@here** and **@everyone**. The bot's permissions in your server decide whether an @here or @everyone mention notifies people.
-- Add a follow-up with **Add comment**. The first follow-up entry in a post opens a thread on your message, named "Thread", and is posted inside it. Further entries are posted in the channel itself.
+- Add a follow-up with **Add comment**. The first follow-up entry in a post opens a thread on your message, named "Thread", and every follow-up entry is posted inside that thread.
 - In an announcement channel the message is posted but not published to servers that follow the channel. Use **Publish** in Discord if you want that.
 
 To change the name the bot shows in your server, choose **Change Bot Nickname** in the channel's menu on the calendar page. This also renames the channel in PostDelegate, unless you have already renamed it with **Rename channel**.

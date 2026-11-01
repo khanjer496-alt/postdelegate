@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Evergreen posts
-description: Share a post again on a schedule, stop after a number of shares or on a date, and rotate through different wordings.
+description: Share a post again on a schedule, stop after a number of shares or on a date, rotate through different wordings, and see which posts can't become evergreen.
 ---
 
 Evergreen posts are shared again on a schedule, so good content keeps working. Each share can use a different wording.

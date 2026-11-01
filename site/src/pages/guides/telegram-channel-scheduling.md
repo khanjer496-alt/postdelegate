@@ -80,7 +80,7 @@ You can delay a follow-up so it appears later rather than immediately behind the
 
 ## Step 6: schedule it
 
-Pick a date and time. Dates and times follow the timezone in your profile settings. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**. Then choose:
 
 | Choice | What happens |
 | --- | --- |

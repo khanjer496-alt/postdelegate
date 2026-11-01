@@ -8,7 +8,7 @@ import { SITE, CTA_LABEL } from '../data/site';
 const networks = [...NETWORKS].sort((a, b) => Number(!!b.available) - Number(!!a.available));
 const href = (network: typeof NETWORKS[number]) => network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon';
 ---
-<Base title="Platform coverage and channel rollout — PostDelegate" description="See which networks you can connect to PostDelegate today and which are coming soon as platform approvals come through.">
+<Base title="Platform coverage and channel rollout — PostDelegate" description="See which networks you can connect to PostDelegate today, from YouTube and Bluesky to WordPress and Slack, and which are coming soon as platforms approve us.">
   <PageHero eyebrow="Platform coverage" title="Your content belongs in one calendar." lead="Connect the networks marked available today. The rest are coming soon, opening as each platform approves PostDelegate.">
     <a href={SITE.signup} class="button">{CTA_LABEL}</a>
     <a href="/support" class="button button-outline">Ask about a channel</a>

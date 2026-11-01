@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Media library
-description: Where your images and video live, which formats are accepted, how large they can be and how to reuse them across posts.
+description: Where your images and videos live in PostDelegate, accepted formats and sizes, how files are adjusted for each network, alt text and thumbnails, and reuse.
 ---
 
 The media library keeps everything you have uploaded in one place, so you can reuse a file across posts instead of uploading it again. Open it from **Media** in the main menu, or from the media picker in the composer.

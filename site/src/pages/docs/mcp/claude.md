@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Connect Claude
-description: Add PostDelegate to Claude as a custom connector so Claude can draft and schedule posts on your calendar.
+description: Add PostDelegate to Claude as a custom connector so Claude can draft and schedule posts on your calendar. Setup steps, how to use it and tips for good results.
 ---
 
 Claude connects to PostDelegate as a **custom connector**. You sign in with your PostDelegate account, so there is no API key to copy.

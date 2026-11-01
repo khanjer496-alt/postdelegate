@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Bluesky
-description: Connect a Bluesky account with an app password, then publish posts and threads with up to four images or one video.
+description: Connect a Bluesky account to PostDelegate with an app password, then schedule posts and threads with up to four images or one video. Settings, limits and fixes.
 ---
 
 ## What you need

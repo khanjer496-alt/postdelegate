@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Creating and scheduling posts
-description: How the composer, calendar and preview links work, and the difference between a draft, a scheduled post and a post sent now.
+description: How the composer, calendar and preview links work in PostDelegate, the difference between a draft, a scheduled post and a post sent now, and time slots.
 ---
 
 ## The composer
@@ -41,7 +41,7 @@ Your post is rejected with a readable message if it is empty, too long, or missi
 
 You can move a draft to scheduled, or a scheduled post back to draft, at any time before it publishes. Published posts stay on your calendar with a link to the live post. Publishing an already published post again has to be requested explicitly, which prevents accidental duplicates. In the API that is the `republish` flag.
 
-Dates and times follow the timezone in your profile settings. The REST API and webhooks use UTC.
+Dates and times follow the timezone in **Settings > Global Settings**. The REST API and webhooks use UTC.
 
 ## Threads and comments
 

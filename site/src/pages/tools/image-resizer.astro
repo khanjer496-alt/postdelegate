@@ -51,8 +51,9 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
           </select>
         </div>
         <div id="custom" class="grid grid-cols-2 gap-3" hidden>
-          <div><label for="cw" class="mb-2 block text-sm font-bold">Width (px)</label><input id="cw" type="number" inputmode="numeric" min="16" max="4096" value="1200" class={field} /></div>
-          <div><label for="ch" class="mb-2 block text-sm font-bold">Height (px)</label><input id="ch" type="number" inputmode="numeric" min="16" max="4096" value="1200" class={field} /></div>
+          <div><label for="cw" class="mb-2 block text-sm font-bold">Width (px)</label><input id="cw" type="number" inputmode="numeric" min="16" max="4096" value="1200" aria-describedby="size-note" class={field} /></div>
+          <div><label for="ch" class="mb-2 block text-sm font-bold">Height (px)</label><input id="ch" type="number" inputmode="numeric" min="16" max="4096" value="1200" aria-describedby="size-note" class={field} /></div>
+          <p id="size-note" class="col-span-2 min-h-5 text-sm text-amber-300" aria-live="polite"></p>
         </div>
         <fieldset>
           <legend class="mb-2 text-sm font-bold">Fit</legend>
@@ -133,6 +134,20 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
 
   const value = (n: string) => (form.querySelector(`input[name="${n}"]:checked`) as HTMLInputElement).value;
   const clamp = (v: string) => Math.min(4096, Math.max(16, Math.round(Number(v)) || 16));
+  // Out-of-range custom sizes are clamped, with a note saying which size is used.
+  // Leaving the field puts the size used into it, and the note stays until the next edit.
+  const side = (input: HTMLInputElement, label: string) => {
+    const v = Math.round(Number(input.value)), use = clamp(input.value);
+    const note = !input.value.trim() || !Number.isFinite(v) ? `Enter a ${label} from 16 to 4,096 px; ${use} px is used for now.`
+      : v < 16 ? `The smallest ${label} is 16 px, so 16 px is used.`
+      : v > 4096 ? `The largest ${label} is 4,096 px, so 4,096 px is used.` : '';
+    return { use, note };
+  };
+  let adjusted = '';
+  const sizeNote = () => {
+    const note = preset.value === 'custom' ? [side(cw, 'width'), side(ch, 'height')].map((s) => s.note).filter(Boolean).join(' ') || adjusted : '';
+    if ($('size-note').textContent !== note) $('size-note').textContent = note;
+  };
   const target = () => {
     if (preset.value === 'custom') return { w: clamp(cw.value), h: clamp(ch.value) };
     const o = preset.selectedOptions[0];
@@ -176,6 +191,7 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
     const jpeg = value('format') === 'image/jpeg';
     $('q-wrap').hidden = !jpeg; $('transparent-wrap').hidden = jpeg;
     $('q-out').textContent = quality.value;
+    sizeNote();
     if (!source) return;
     const { w, h } = target();
     const sw = source.width, sh = source.height;
@@ -231,8 +247,12 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
   ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('border-brand-300')));
   drop.addEventListener('drop', (e) => { e.preventDefault(); load((e as DragEvent).dataTransfer?.files[0]); });
   form.addEventListener('submit', (e) => e.preventDefault());
-  form.addEventListener('change', render);
+  form.addEventListener('change', (e) => { if (e.target === preset) adjusted = ''; render(); });
   [cw, ch, quality, bg].forEach((el) => el.addEventListener('input', later));
+  [cw, ch].forEach((el) => {
+    el.addEventListener('input', () => { adjusted = ''; sizeNote(); });
+    el.addEventListener('change', () => { const label = el === cw ? 'width' : 'height'; const { use, note } = side(el, label); if (note) { el.value = String(use); adjusted = `The ${label} must be 16 to 4,096 px, so it was set to ${use} px.`; } });
+  });
   save.addEventListener('click', () => {
     if (!blob) return;
     const { w, h } = target();

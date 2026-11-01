@@ -64,7 +64,7 @@ Pick a date and time, then choose one of:
 | **Add to Calendar** | The post is scheduled for the date and time you picked and publishes automatically. |
 | **Post now** | The upload starts right away. |
 
-Dates and times follow the timezone in your profile settings. You can move a draft to scheduled, or a scheduled post back to draft, at any time before it publishes.
+Dates and times follow the timezone in **Settings > Global Settings**. You can move a draft to scheduled, or a scheduled post back to draft, at any time before it publishes.
 
 Use a draft while you are still finishing the video, then schedule it once the file and title are final. Drafts skip most settings checks, so you can save half-finished work. A scheduled post gets the full checks, and the composer tells you what is missing, such as a video or a title that is too short.
 

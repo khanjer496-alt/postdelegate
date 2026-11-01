@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Coming soon
-description: The networks we are preparing to connect, and why each one needs platform approval first.
+description: Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and X are coming soon to PostDelegate. Why each needs platform approval first, and what to do now.
 ---
 
 These networks are in preparation. **None of them can be connected on PostDelegate today.** Each network reviews apps before it lets a service publish on someone's behalf, and PostDelegate will only offer a connection once that review is done.

@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Bulk import from CSV
-description: Schedule many posts at once from a spreadsheet, or many videos at once from your computer. The columns the importer reads, date and channel formats, how videos are spread over your time slots, limits, and how imports follow approval rules.
+description: "Schedule many posts at once from a spreadsheet, or up to 50 videos from your computer: the columns, date and channel formats, time slots, limits and approvals."
 ---
 
 Schedule many posts at once from a spreadsheet. Save it as a CSV file with one post per row, upload it, check the preview, and PostDelegate schedules the rows that are ready.
@@ -89,14 +89,14 @@ Turn a folder of videos into posts in one go. Each video becomes one post on the
 
 Every video goes through the same checks as a post made in the composer, including each network's length limit, media rules and required settings. Drafts only get the checks a draft gets in the composer, the rest run when you schedule them.
 
-Some settings are picked from a list loaded from the network, like a Pinterest board, a Discord or Slack channel, or a subreddit. They can't be set here. A channel whose network requires one is marked **Drafts only**: picking it switches the videos to **Add them as drafts**, and you finish them in the composer. For TikTok direct posts, the composer checks your current TikTok account and asks for TikTok's music confirmation before posting. Use **Add them as drafts**, or TikTok's upload to inbox option, for TikTok.
+Some settings are picked from a list loaded from the network, like a Discord or Slack channel. They can't be set here. A channel whose network requires one is marked **Drafts only**: picking it switches the videos to **Add them as drafts**, and you finish them in the composer. Once Pinterest, Reddit and TikTok are available, a Pinterest board or a subreddit will work the same way, and TikTok videos will go in as drafts so the composer can check your TikTok account and ask for TikTok's music confirmation.
 
 ### Limits and partial results
 
 - Up to 50 videos at a time, up to 1 GB each.
 - Each channel of a video counts as one post. Five videos on two channels are ten posts.
-- If your plan's monthly post limit is reached part way, PostDelegate stops there and tells you how many videos were created. The rest are listed, and **Try the rest again** goes back to them once you have room.
-- If one network's monthly cap on your plan is reached, such as X, only that network's posts are skipped. The other channels still get every video, and the result lists the skipped ones.
+- Paid plans have no practical monthly post limit, see [Plans and billing](/docs/billing). In the rare case that the workspace still reaches its monthly post limit part way, PostDelegate stops there and tells you how many videos were created. The rest are listed, and **Try the rest again** goes back to them once you have room.
+- If one network's monthly cap on your plan is reached (X will have one once it is available), only that network's posts are skipped. The other channels still get every video, and the result lists the skipped ones.
 - A large batch can take a while. If the connection drops or times out, the window says "This may still be running" and keeps checking for up to 20 minutes. It shows the result when the run is done, so nothing is created twice. A run that stopped on the server is picked up again after 15 minutes. Sending the same videos again while they run, or after they are done, never asks you to upgrade: it waits for, or shows, the first result.
 - A video that fails for another reason is listed with the reason, and the others are still created.
 - Sending the same videos with the same settings twice doesn't create them twice. The second time says "These videos were already scheduled, nothing new was added."

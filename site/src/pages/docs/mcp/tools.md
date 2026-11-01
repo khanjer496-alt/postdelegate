@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: MCP tools
-description: Every tool the PostDelegate MCP server offers, what it does and whether it changes anything.
+description: "Every tool the PostDelegate MCP server offers for channels, posts, media and AI media: what each does, whether it changes anything and what an assistant sees."
 ---
 
 Your assistant discovers these tools by itself when it connects. You do not call them directly. This page explains what each one does so you know what an assistant can and cannot do. Tool names are shown exactly as the server reports them. To teach an assistant how to use them well, give it one of the [agent files](/docs/mcp/agent-files).

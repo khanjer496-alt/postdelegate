@@ -37,7 +37,7 @@ ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.titl
 - [Agents and automation](${SITE.url}/agents)
 - [REST API](${SITE.url}/api)
 - [MCP](${SITE.url}/mcp)
-- [Compare PostDelegate and Postiz](${SITE.url}/compare/postiz)
+- [Compare PostDelegate with other schedulers](${SITE.url}/compare)
 - [Browser-based tools](${SITE.url}/tools)
 - [Support](${SITE.url}/support)
 - [Privacy](${SITE.legal.privacy})

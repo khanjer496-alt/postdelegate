@@ -61,13 +61,13 @@ To send the same announcement to two Discord channels in one server, create a se
 
 ## Step 5: add a follow-up in a thread
 
-Use **Add comment** to add another entry. On Discord, the first follow-up entry opens a thread on your announcement, named "Thread", and is posted inside it. That keeps the details and the discussion under the announcement rather than in the main channel.
+Use **Add comment** to add another entry. On Discord, the first follow-up entry opens a thread on your announcement, named "Thread", and every follow-up entry is posted inside that thread. That keeps the details and the discussion under the announcement rather than in the main channel.
 
-Further entries after the first follow-up are posted in the channel itself, so keep thread content to one follow-up. You can delay a follow-up so it appears later rather than immediately.
+You can delay a follow-up so it appears later rather than immediately.
 
 ## Step 6: schedule it
 
-Pick a date and time. Dates and times follow the timezone in your profile settings. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**. Then choose:
 
 | Choice | What happens |
 | --- | --- |

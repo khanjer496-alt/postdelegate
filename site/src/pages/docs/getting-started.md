@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Getting started
-description: Start your free trial, connect a channel and schedule your first post. About ten minutes from sign-up to a post on your calendar.
+description: Start your free trial, connect a channel and schedule your first post. About ten minutes from sign-up to a post on your PostDelegate calendar, no card needed.
 ---
 
 PostDelegate is a hosted social media scheduler. You write a post once, pick the channels it belongs on, and PostDelegate publishes it at the right time. This page walks through the first session. The rest of the docs go deeper on each part.
@@ -55,7 +55,7 @@ The calendar has **Day**, **Week**, **Month** and **List** views. A scheduled po
 | **Analytics** | Per-channel statistics for the networks that provide them. |
 | **Media** | Your media library. See [Media library](/docs/media). |
 | **Billing** | Plan and payment details. See [Plans and billing](/docs/billing). |
-| **Settings** | Profile, [team](/docs/team), [webhooks](/docs/webhooks), the **Agents / Dev** tab with your API key and MCP setup, sets, signatures and OAuth apps. Some tabs depend on your plan. |
+| **Settings** | **Global Settings** (your timezone, sign-in method, email notifications and account deletion), [team](/docs/team), [webhooks](/docs/webhooks), the **Agents / Dev** tab with your API key and MCP setup, sets, signatures and OAuth apps. Some tabs depend on your plan. |
 
 ## Next steps
 

@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Team and customers
-description: Invite people to your workspace, and group channels by customer so each client's channels stay together.
+description: Invite team members to your PostDelegate workspace as a User or Admin, and group channels by customer so each client's channels and posts stay together.
 ---
 
 ## Team members

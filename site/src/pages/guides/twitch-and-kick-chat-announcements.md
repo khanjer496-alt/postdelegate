@@ -66,7 +66,7 @@ You can delay a follow-up so it appears after the first message rather than imme
 
 ## Step 6: schedule it
 
-Pick a date and time. Dates and times follow the timezone in your profile settings, so check it if you stream for an audience in another timezone. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**, so check it if you stream for an audience in another timezone. Then choose:
 
 | Choice | What happens |
 | --- | --- |

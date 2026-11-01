@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: YouTube
-description: Connect a YouTube channel with Google sign-in and schedule video uploads with a title, visibility, thumbnail, tags, a later YouTube publish time and the AI content label.
+description: Connect a YouTube channel with Google sign-in and schedule uploads with a title, visibility, thumbnail, tags, a later publish time and the AI content label.
 ---
 
 ## What you need

@@ -43,3 +43,9 @@ export const NETWORKS: Network[] = [
 ];
 export const NETWORK_COUNT = NETWORKS.length;
 export const AVAILABLE_NETWORKS = NETWORKS.filter((network) => network.available);
+// Scheduler pages for a menu, in the order given with the available networks first.
+// A network loses its "Coming soon" tag in every menu once it is marked available above.
+export const menuNetworks = (keys: string[]) => keys
+  .map((key) => NETWORKS.find((network) => network.key === key))
+  .filter((network): network is Network => Boolean(network?.scheduler))
+  .sort((a, b) => Number(!a.available) - Number(!b.available));
