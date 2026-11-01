@@ -333,7 +333,10 @@ export interface SocialProvider
   checkValidity(
     posts: Array<{ path: string; thumbnail?: string }[]>,
     settings: any,
-    additionalSettings: any[]
+    additionalSettings: any[],
+    // each entry's text as the provider receives it when it publishes, in
+    // the same order as `posts`
+    texts?: string[]
   ): Promise<string | true>;
   checkPostStatus(
     accessToken: string,
