@@ -252,6 +252,9 @@ export const MediaBox: FC<{
         ? 'image/jpeg,image/png'
         : type == 'video'
         ? 'video/mp4'
+        : standalone
+        ? // the library stores AVIF, BMP and TIFF too, posts can't attach them
+          'image/*,image/avif,image/bmp,image/tiff,video/mp4'
         : 'image/*,video/mp4',
     onUploadSuccess: async (arr) => {
       await mutate();
@@ -508,6 +511,10 @@ export const MediaBox: FC<{
               {t(
                 'select_or_upload_pictures_max_1gb',
                 'Select or upload pictures (maximum 1 GB per upload).'
+              )}{' '}
+              {t(
+                'media_size_limits',
+                'Pictures up to 10 MB, videos up to 1 GB.'
               )}
             </div>
           )}
@@ -577,6 +584,10 @@ export const MediaBox: FC<{
                   {t(
                     'select_or_upload_pictures_max_1gb',
                     'Select or upload pictures (maximum 1 GB per upload).'
+                  )}{' '}
+                  {t(
+                    'media_size_limits',
+                    'Pictures up to 10 MB, videos up to 1 GB.'
                   )}{' '}
                   {'\n'}
                   {t(

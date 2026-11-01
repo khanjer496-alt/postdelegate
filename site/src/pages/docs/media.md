@@ -15,6 +15,8 @@ The media library keeps everything you have uploaded in one place, so you can re
 
 These limits apply to uploads from the app, uploads from a URL and uploads through the [API](/docs/api/uploads). Other file types, including audio, are rejected.
 
+GIF, AVIF, BMP and TIFF files are never compressed before upload, so the file itself must be under 10 MB. A larger GIF is refused when you add it.
+
 <div class="callout">
 
 Posts only accept files that end in `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` or `.mp4`. AVIF, BMP and TIFF files can be stored in the library, but they cannot be attached to a post.
