@@ -25,6 +25,7 @@ import { ResendActivationDto } from '@gitroom/nestjs-libraries/dtos/auth/resend-
 import { ApiTags } from '@nestjs/swagger';
 import {
   getAuthCookieOptions,
+  getCookieSameSite,
   getCookieUrlFromDomain,
 } from '@gitroom/helpers/subdomain/subdomain.management';
 import { InviteFailure } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
@@ -65,7 +66,9 @@ export class AuthController {
       if (addedOrg.failed !== 'already_member') {
         response.cookie('invite_error', addedOrg.failed, {
           domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-          ...(!process.env.NOT_SECURED ? { secure: true } : {}),
+          ...(!process.env.NOT_SECURED
+            ? { secure: true, sameSite: getCookieSameSite() }
+            : {}),
           expires: new Date(Date.now() + 1000 * 60 * 5),
         });
       }

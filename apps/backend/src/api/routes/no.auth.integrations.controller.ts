@@ -20,6 +20,7 @@ import { NotEnoughScopes } from '@gitroom/nestjs-libraries/integrations/social.a
 import {
   AuthorizationActions,
   Sections,
+  SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
@@ -234,10 +235,10 @@ export class NoAuthIntegrationsController {
       )) &&
       !(await this._permissionsService.canAddChannel(org.id, org.createdAt))
     ) {
-      throw new HttpException(
-        'You have reached the maximum number of channels on your plan. Upgrade, or remove a channel, then connect again.',
-        400
-      );
+      throw new SubscriptionException({
+        section: Sections.CHANNEL,
+        action: AuthorizationActions.Create,
+      });
     }
 
     if (refresh && String(id) !== String(refresh)) {

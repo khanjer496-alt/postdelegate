@@ -328,9 +328,6 @@ export class AuthService {
       }
       return false;
     }
-    if (user.providerName !== Provider.LOCAL) {
-      return false;
-    }
 
     // the fingerprint ties the link to the current password, so it works once
     const resetValues = AuthChecker.signTypedJWT('reset', {

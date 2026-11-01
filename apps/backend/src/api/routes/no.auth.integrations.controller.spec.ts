@@ -124,7 +124,7 @@ describe('NoAuthIntegrationsController channel limit', () => {
     );
     await expect(
       controller.connectSocialMedia('demo', { state: 's1', code: 'c', timezone: 0 } as any)
-    ).rejects.toThrow('maximum number of channels');
+    ).rejects.toMatchObject({ response: { section: 'channel' } });
     expect(integrationService.createOrUpdateIntegration).not.toHaveBeenCalled();
   });
 
