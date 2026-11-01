@@ -12,6 +12,7 @@ import {
   AuthTokenDetails,
   RecentPostStat,
   SocialProvider,
+  ViewedPost,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Integration, Organization } from '@prisma/client';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -47,6 +48,11 @@ export type RecentPostsResponse =
       emptyHint?: string;
       posts: RecentPostStat[];
     };
+
+// the live top posts by views of a channel, `unavailable` like above
+export type TopViewedPostsResponse =
+  | { supported: false; posts: [] }
+  | { supported: true; unavailable?: true; posts: ViewedPost[] };
 
 @Injectable()
 export class IntegrationService {
@@ -697,6 +703,77 @@ export class IntegrationService {
       if (e instanceof RefreshToken && allowRefresh && !forceRefresh) {
         return this.recentPosts(org, integration, true, true);
       }
+      return unavailable;
+    }
+  }
+
+  // The live top posts by views of the Analytics > Views section, with the
+  // same lookup and hour-long cache as recentPosts. Read-only: the section
+  // loads it after the channel view gains (checkAnalytics), which already
+  // refreshed an expired token, so this never refreshes or disconnects.
+  async topViewedPosts(
+    org: Organization,
+    integration: string,
+    days: number,
+    limit: number
+  ): Promise<TopViewedPostsResponse> {
+    const getIntegration = await this.getIntegrationById(org.id, integration);
+
+    if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
+      throw new Error('Invalid integration');
+    }
+
+    const integrationProvider =
+      getIntegration.type === 'social'
+        ? this._integrationManager.getSocialIntegration(
+            getIntegration.providerIdentifier
+          )
+        : undefined;
+
+    if (!integrationProvider?.topViewedPosts) {
+      return { supported: false, posts: [] };
+    }
+
+    const unavailable = {
+      supported: true as const,
+      unavailable: true as const,
+      posts: [] as ViewedPost[],
+    };
+
+    if (
+      getIntegration.refreshNeeded ||
+      dayjs(getIntegration.tokenExpiration).isBefore(dayjs())
+    ) {
+      return unavailable;
+    }
+
+    const cacheKey = `integration:${org.id}:${integration}:top-viewed:${days}:${limit}`;
+    const bypassCache = integrationProvider.authorizationPolicy?.bypassAnalyticsCache;
+    const cached = bypassCache ? undefined : await ioRedis.get(cacheKey);
+    if (cached) {
+      return { supported: true, posts: JSON.parse(cached) };
+    }
+
+    try {
+      const posts = await integrationProvider.topViewedPosts(
+        getIntegration.internalId,
+        getIntegration.token,
+        days,
+        limit
+      );
+      if (bypassCache) {
+        const current = await this.getActiveIntegrationById(org.id, integration);
+        if (!current || current.token !== getIntegration.token) return unavailable;
+      } else await ioRedis.set(
+        cacheKey,
+        JSON.stringify(posts),
+        'EX',
+        !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+          ? 1
+          : 3600
+      );
+      return { supported: true, posts };
+    } catch (e) {
       return unavailable;
     }
   }
