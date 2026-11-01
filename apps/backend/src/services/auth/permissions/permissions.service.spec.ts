@@ -143,6 +143,8 @@ describe('PermissionsService extraChannelsOffer', () => {
 
   it.each([
     ['a trial', ultimate, { isTrailing: true, paymentId: 'cus_1' }],
+    // the webhooks store isTrailing for every status but active
+    ['a past_due subscription', ultimate, { isTrailing: true, paymentId: 'cus_1' }],
     ['an admin-granted plan', ultimate, { paymentId: 'user_1' }],
     ['a store subscription', { ...ultimate, provider: 'revenuecat' }, undefined],
     ['a lifetime deal', { ...ultimate, isLifetime: true }, undefined],

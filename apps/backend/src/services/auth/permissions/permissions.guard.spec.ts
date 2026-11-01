@@ -10,7 +10,10 @@ describe('isUnderPrefix', () => {
     expect(isUnderPrefix('/auth', '/auth')).toBe(true);
     expect(isUnderPrefix('/auth/login', '/auth')).toBe(true);
     expect(
-      isUnderPrefix('/integrations/social-connect/x', '/integrations/social-connect')
+      isUnderPrefix(
+        '/integrations/social-connect/x',
+        '/integrations/social-connect'
+      )
     ).toBe(true);
   });
 
@@ -70,7 +73,10 @@ describe('PoliciesGuard channel limit', () => {
   }
 
   const deny = async (offer: unknown) => {
-    const extraChannelsOffer = jest.fn().mockResolvedValue(offer);
+    const extraChannelsOffer =
+      offer instanceof Error
+        ? jest.fn().mockRejectedValue(offer)
+        : jest.fn().mockResolvedValue(offer);
     const guard = new PoliciesGuard(new Reflector(), {
       check: jest.fn().mockResolvedValue({ can: () => false }),
       extraChannelsOffer,
@@ -85,7 +91,11 @@ describe('PoliciesGuard channel limit', () => {
       .canActivate({
         getHandler: () => Handlers.prototype.channel,
         switchToHttp: () => ({
-          getRequest: () => ({ path: '/integrations/social/x', query: {}, org }),
+          getRequest: () => ({
+            path: '/integrations/social/x',
+            query: {},
+            org,
+          }),
         }),
       } as any)
       .catch((e) => e);
@@ -93,7 +103,12 @@ describe('PoliciesGuard channel limit', () => {
   };
 
   it('adds the extra channels offer to a denied channel', async () => {
-    const offer = { plan: 'Ultimate', totalChannels: 100, price: 1, period: 'MONTHLY' };
+    const offer = {
+      plan: 'Ultimate',
+      totalChannels: 100,
+      price: 1,
+      period: 'MONTHLY',
+    };
     const { response, extraChannelsOffer, org } = await deny(offer);
 
     expect(extraChannelsOffer).toHaveBeenCalledWith(org);
@@ -101,6 +116,14 @@ describe('PoliciesGuard channel limit', () => {
       section: Sections.CHANNEL,
       action: AuthorizationActions.Create,
       extraChannels: offer,
+    });
+  });
+
+  it('falls back to the plain 402 when the offer lookup fails', async () => {
+    const { response } = await deny(new Error('db down'));
+    expect(response).toEqual({
+      section: Sections.CHANNEL,
+      action: AuthorizationActions.Create,
     });
   });
 

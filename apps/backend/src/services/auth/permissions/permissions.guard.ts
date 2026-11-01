@@ -61,9 +61,12 @@ export class PoliciesGuard implements CanActivate {
     );
 
     if (item) {
+      // the offer is a nicer prompt, never a reason to fail the plain 402
       const extraChannels =
         item[1] === Sections.CHANNEL
-          ? await this._authorizationService.extraChannelsOffer(org)
+          ? await this._authorizationService
+              .extraChannelsOffer(org)
+              .catch(() => null)
           : null;
       throw new SubscriptionException({
         section: item[1],

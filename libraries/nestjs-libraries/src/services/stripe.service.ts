@@ -128,6 +128,49 @@ const billedPeriodOf = (
   ) as 'MONTHLY' | 'YEARLY';
 };
 
+// Every extra channel price id: the ones on the subscriptions and the ones
+// behind the lookup_keys now. A failed lookup keeps the subscriptions' ones
+export async function extraChannelPriceIds(
+  client: Stripe,
+  subscriptions: Stripe.Subscription[]
+) {
+  const ids = new Set(
+    subscriptions
+      .flatMap((subscription) => subscription.items?.data || [])
+      .filter(isExtraChannelItem)
+      .map((item) => item.price.id)
+  );
+  try {
+    const { data } = await client.prices.list({
+      lookup_keys: [
+        `${EXTRA_CHANNEL_LOOKUP_KEY}_month`,
+        `${EXTRA_CHANNEL_LOOKUP_KEY}_year`,
+      ],
+    });
+    data.forEach((price) => ids.add(price.id));
+  } catch (err) {
+    console.error('stripe_extra_channel_prices_failed', err);
+  }
+  return ids;
+}
+
+// An invoice whose every line is an extra channel price (adding channels
+// mid-period), so not a payment of the plan itself
+export const isExtraChannelsOnlyInvoice = (
+  invoice: Stripe.Invoice,
+  extraChannelPrices: Set<string>
+) => {
+  const lines = invoice.lines?.data || [];
+  return (
+    lines.length > 0 &&
+    lines.every((line) => {
+      const price = line.pricing?.price_details?.price;
+      const id = typeof price === 'string' ? price : price?.id;
+      return !!id && extraChannelPrices.has(id);
+    })
+  );
+};
+
 // The Stripe products of the paid plans, from their prices' lookup_keys
 // (postdelegate_<slug>_<month|year>), so a coupon can leave extra channels
 // out. Empty when no plan price has a lookup_key
@@ -464,18 +507,27 @@ export class StripeService extends PaymentProviderAbstract {
       return { ok: false };
     }
 
+    const current = await this.currentSubscription(event.data.object);
+    // ended since the event was sent, its deleted event handles it
+    if (NOT_ENTITLED_STATUSES.includes(current.status)) {
+      return { ok: true };
+    }
+    const currentPlan = (current.metadata || {}) as Partial<
+      typeof event.data.object.metadata & {
+        billing: 'STANDARD' | 'PRO';
+        period: 'MONTHLY' | 'YEARLY';
+      }
+    >;
+
     const result = await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      event.data.object.status !== 'active',
-      uniqueId,
+      current.status !== 'active',
+      currentPlan.uniqueId || uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(
-        billing,
-        await this.currentExtraChannels(billing, event.data.object)
-      ),
-      billing,
-      period,
-      event.data.object.cancel_at
+      totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
+      currentPlan.billing || billing,
+      currentPlan.period || period,
+      current.cancel_at
     );
 
     if (isCardlessTrial(event.data.object)) {
@@ -518,18 +570,26 @@ export class StripeService extends PaymentProviderAbstract {
       return { ok: false };
     }
 
+    const current = await this.currentSubscription(event.data.object);
+    if (NOT_ENTITLED_STATUSES.includes(current.status)) {
+      return this.deleteSubscription(event);
+    }
+    const currentPlan = (current.metadata || {}) as Partial<
+      typeof event.data.object.metadata & {
+        billing: 'STANDARD' | 'PRO';
+        period: 'MONTHLY' | 'YEARLY';
+      }
+    >;
+
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      event.data.object.status !== 'active',
-      uniqueId,
+      current.status !== 'active',
+      currentPlan.uniqueId || uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(
-        billing,
-        await this.currentExtraChannels(billing, event.data.object)
-      ),
-      billing,
-      period,
-      event.data.object.cancel_at
+      totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
+      currentPlan.billing || billing,
+      currentPlan.period || period,
+      current.cancel_at
     );
   }
 
@@ -581,10 +641,8 @@ export class StripeService extends PaymentProviderAbstract {
       survivor.status !== 'active',
       uniqueId,
       customer,
-      totalChannelsOf(
-        billing,
-        await this.currentExtraChannels(billing, survivor)
-      ),
+      // the survivor comes from a fresh list, not from the event
+      totalChannelsOf(billing, extraChannelsOf(survivor)),
       billing,
       period,
       survivor.cancel_at
@@ -1681,26 +1739,23 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
-  // Webhooks can arrive late or be replayed, so the extra channels are counted
-  // on the subscription as it is now, not as the event shows it. Never
-  // throws: a failed read keeps the event's own count
-  private async currentExtraChannels(
-    billing: string,
-    subscription: Stripe.Subscription
-  ) {
-    if (!allowsExtraChannels(billing)) {
-      return 0;
+  // Webhooks can arrive late or be replayed: on a tier that sells extra
+  // channels the subscription is read again, and the stored plan (tier,
+  // period, status, cancel date, extra channels) follows it as it is now.
+  // Never throws: a failed read keeps the event's subscription
+  private async currentSubscription(subscription: Stripe.Subscription) {
+    if (!allowsExtraChannels(subscription.metadata?.billing)) {
+      return subscription;
     }
     try {
-      return extraChannelsOf(
-        await stripe.subscriptions.retrieve(subscription.id)
-      );
+      const fresh = await stripe.subscriptions.retrieve(subscription.id);
+      return fresh?.id ? fresh : subscription;
     } catch (err) {
-      console.error('stripe_extra_channels_refetch_failed', {
+      console.error('stripe_subscription_refetch_failed', {
         stripe_subscription_id: subscription.id,
         err,
       });
-      return extraChannelsOf(subscription);
+      return subscription;
     }
   }
 
@@ -1836,22 +1891,33 @@ export class StripeService extends PaymentProviderAbstract {
     const item = subscription.items.data.find(isExtraChannelItem);
     const currentExtra = extraChannelsOf(subscription);
 
-    // an earlier change still waits for its payment, finish that one first
-    // instead of stacking a second invoice on it. A declined one is voided,
-    // then this request is a fresh attempt
+    // an earlier change still waits for its payment. The same quantity
+    // finishes that one instead of stacking a second invoice; a declined one,
+    // or one for another quantity, is voided and this request starts fresh
     if (subscription.pending_update) {
-      const pending = await this.pendingExtraChannels(
-        subscription.id,
-        currentExtra
-      );
-      if (pending) {
-        return pending;
+      const pendingExtra = (
+        subscription.pending_update.subscription_items || []
+      ).find(isExtraChannelItem)?.quantity;
+      if (pendingExtra === extraChannels) {
+        const pending = await this.pendingExtraChannels(
+          subscription.id,
+          currentExtra
+        );
+        if (pending) {
+          return pending;
+        }
+      } else {
+        await this.voidPendingInvoice(subscription.id, false);
       }
       subscription = await stripe.subscriptions.retrieve(subscription.id, {
         expand: ['latest_invoice'],
       });
       if (subscription.pending_update) {
-        throw new BadRequestException(DECLINED_EXTRA_CHANNELS);
+        throw new BadRequestException(
+          pendingExtra === extraChannels
+            ? DECLINED_EXTRA_CHANNELS
+            : `Finish the pending payment for ${pendingExtra} extra channels first, then change the number again.`
+        );
       }
     }
 
@@ -1955,14 +2021,18 @@ export class StripeService extends PaymentProviderAbstract {
       );
       return { extraChannels, pending: true, ...action };
     } catch (err) {
-      await this.voidDeclinedInvoice(subscriptionId);
+      await this.voidPendingInvoice(subscriptionId, true);
       return null;
     }
   }
 
-  // Voids the open invoice of a pending update whose payment needs a new
-  // payment method, which discards the pending update with it
-  private async voidDeclinedInvoice(subscriptionId: string) {
+  // Voids the open invoice of a pending update, which discards the pending
+  // update with it: only when its payment needs a new payment method, or
+  // (onlyDeclined false) also when it waits for 3D Secure
+  private async voidPendingInvoice(
+    subscriptionId: string,
+    onlyDeclined: boolean
+  ) {
     try {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
         expand: ['latest_invoice'],
@@ -1974,12 +2044,15 @@ export class StripeService extends PaymentProviderAbstract {
       const { payments } = await stripe.invoices.retrieve(invoice.id!, {
         expand: ['payments.data.payment.payment_intent'],
       });
-      const declined = payments?.data.some(
+      const voidable = payments?.data.some(
         (p) =>
           typeof p.payment.payment_intent === 'object' &&
-          p.payment.payment_intent?.status === 'requires_payment_method'
+          (p.payment.payment_intent?.status === 'requires_payment_method' ||
+            (!onlyDeclined &&
+              (p.payment.payment_intent?.status === 'requires_action' ||
+                p.payment.payment_intent?.status === 'requires_confirmation')))
       );
-      if (declined) {
+      if (voidable) {
         await stripe.invoices.voidInvoice(invoice.id!);
       }
     } catch (err) {
@@ -2426,7 +2499,15 @@ export class StripeService extends PaymentProviderAbstract {
     }
 
     // the plans only, extra channels keep their price
-    const planProducts = await planProductIds(stripe);
+    const ownProduct = planItemOf(stripeSubscription)?.price?.product;
+    const planProducts = [
+      ...new Set([
+        ...(await planProductIds(stripe)),
+        ...(ownProduct
+          ? [typeof ownProduct === 'string' ? ownProduct : ownProduct.id]
+          : []),
+      ]),
+    ];
     const coupon = await stripe.coupons.create({
       name: `Admin coupon for ${org!.name}`,
       ...(body.type === 'percentage'
@@ -2518,6 +2599,10 @@ export class StripeService extends PaymentProviderAbstract {
 
     // only refund a charge that was created by the active subscription,
     // never a one-off payment
+    const extraChannelPrices = await extraChannelPriceIds(
+      stripe,
+      subscriptions
+    );
     let lastCharge: (typeof charges)[number] | undefined = undefined;
     let chargeSubscription: (typeof subscriptions)[number] | undefined =
       undefined;
@@ -2530,11 +2615,8 @@ export class StripeService extends PaymentProviderAbstract {
 
       try {
         const invoice = await stripe.invoices.retrieve(invoiceId);
-        // the plan's own payments, not a prorated extra channels charge
-        if (
-          invoice.billing_reason !== 'subscription_create' &&
-          invoice.billing_reason !== 'subscription_cycle'
-        ) {
+        // a charge for extra channels only is not a plan payment
+        if (isExtraChannelsOnlyInvoice(invoice, extraChannelPrices)) {
           continue;
         }
         const invoiceSubscription =
