@@ -192,3 +192,23 @@ describe('PermissionsService channel limit', () => {
     expect(await service.canAddChannel('org', new Date())).toBe(false);
   });
 });
+
+describe('PermissionsService AutoPost', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it.each([
+    ['STANDARD', false],
+    ['PRO', true],
+  ])('a %s plan can use AutoPost: %s', async (tier, allowed) => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    expect(await canDo('ADMIN', Sections.AUTO_POST, tier)).toBe(allowed);
+  });
+
+  it('is open with billing off', async () => {
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+    expect(await canDo('USER', Sections.AUTO_POST)).toBe(true);
+  });
+});

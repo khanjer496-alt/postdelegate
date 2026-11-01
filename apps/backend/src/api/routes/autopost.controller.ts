@@ -27,10 +27,12 @@ export class AutopostController {
     return this._autopostsService.getAutoposts(org.id);
   }
 
+  // AutoPost is a plan feature, not only a frontend switch
   @Post('/')
   @CheckPolicies(
     [AuthorizationActions.Create, Sections.WEBHOOKS],
-    [AuthorizationActions.Create, Sections.AI]
+    [AuthorizationActions.Create, Sections.AI],
+    [AuthorizationActions.Create, Sections.AUTO_POST]
   )
   async createAutopost(
     @GetOrgFromRequest() org: Organization,
@@ -40,7 +42,10 @@ export class AutopostController {
   }
 
   @Put('/:id')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.AI],
+    [AuthorizationActions.Create, Sections.AUTO_POST]
+  )
   async updateAutopost(
     @GetOrgFromRequest() org: Organization,
     @Body() body: AutopostDto,
@@ -58,7 +63,10 @@ export class AutopostController {
   }
 
   @Post('/:id/active')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.AI],
+    [AuthorizationActions.Create, Sections.AUTO_POST]
+  )
   async changeActive(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,

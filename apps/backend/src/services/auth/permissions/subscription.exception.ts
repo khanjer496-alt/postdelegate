@@ -121,6 +121,11 @@ const getErrorMessage = (
         default:
           return isMember ? ASK_ADMIN_FOR_AI_KEY : MISSING_AI_KEY;
       }
+    case Sections.AUTO_POST:
+      switch (error.action) {
+        default:
+          return 'AutoPost is not included in your plan. Please upgrade your subscription to use AutoPost.';
+      }
     case Sections.CLIPPING_MINUTES:
       switch (error.action) {
         default:
