@@ -8,6 +8,7 @@ import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/bill
 import { escape, groupBy } from 'lodash';
 import {
   allowsExtraChannels,
+  isBiggerPlan,
   MAX_EXTRA_CHANNELS,
   pricing,
   totalChannelsOf,
@@ -1681,6 +1682,23 @@ export class StripeService extends PaymentProviderAbstract {
         })
       ).data.filter((f) => f.status === 'active' || f.status === 'trialing'),
     };
+
+    // A trial without a card moves to a bigger plan once a card is added:
+    // the plan change keeps the trial, so the bigger plan's limits would come
+    // free until the trial ends and Stripe cancels it. With a card the first
+    // payment, at the end of the trial, is the bigger plan's price
+    const trialing = currentUserSubscription.data[0];
+    if (
+      trialing &&
+      isCardlessTrial(trialing) &&
+      isBiggerPlan(
+        trialing.metadata?.billing || getCurrentSubscriptions.subscriptionTier,
+        body.billing
+      ) &&
+      !(await this.hasPaymentMethod(trialing))
+    ) {
+      return { needsPaymentMethod: true };
+    }
 
     // outside the try: a missing extra channel price is not a card problem
     const extraChannelItems = await this.extraChannelItemsForPlan(

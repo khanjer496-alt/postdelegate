@@ -68,7 +68,11 @@ import {
   planMonth,
   SubscriptionService,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
-import { isCappedProvider } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  isCappedProvider,
+  pricing,
+  TRIAL_POSTS_CAP_TIER,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import {
   AuthorizationActions,
   Sections,
@@ -1637,7 +1641,7 @@ export class PostsService {
           left
             ? `Only ${left} of your ${limit} ${name} posts for ${period} on the ${caps.plan.plan} plan are left, and this needs ${queued.length} (every post of a thread counts).`
             : `You've used your ${limit} ${name} posts for ${period} on the ${caps.plan.plan} plan.`
-        } ${social?.planLimitHint || 'Upgrade your plan to post more.'}`,
+        } ${this.limitHint(caps.plan.trial, social?.planLimitHint)}`,
       });
     }
 
@@ -1725,9 +1729,22 @@ export class PostsService {
 
     const social =
       this._integrationManager.getSocialIntegration(providerIdentifier);
-    return `Monthly ${social?.name || providerIdentifier} post limit reached on the ${plan.plan} plan (${limit}). ${
-      social?.planLimitHint || 'Upgrade your plan to post more.'
-    }`;
+    return `Monthly ${
+      social?.name || providerIdentifier
+    } post limit reached on the ${plan.plan} plan (${limit}). ${this.limitHint(
+      plan.trial,
+      social?.planLimitHint
+    )}`;
+  }
+
+  // What to do at a network's monthly cap. A trial has the trial cap whatever
+  // plan it tries, so a bigger plan only helps once the trial is finished
+  private limitHint(trial: boolean | undefined, planLimitHint?: string) {
+    return `${
+      trial
+        ? `A free trial posts here as much as the ${pricing[TRIAL_POSTS_CAP_TIER].label} plan. Finish your trial on the Billing page to get your plan's full limit. `
+        : ''
+    }${planLimitHint || 'Upgrade your plan to post more.'}`;
   }
 
   // the posts that went out to a capped network, what the cap counts

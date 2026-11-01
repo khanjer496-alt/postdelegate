@@ -939,6 +939,26 @@ describe('PostsService monthly cap on one network', () => {
       );
     });
 
+    it('tells a trial that finishing it is what raises the cap', async () => {
+      const { service, subscriptionService } = makeLimitService({ x: 30 }, 30);
+      subscriptionService.getProviderPostsLimits.mockResolvedValue({
+        plan: 'Ultimate trial',
+        limits: { x: 30 },
+        trial: true,
+        anchor,
+      });
+      jest
+        .spyOn(service, 'getPostsRecursively')
+        .mockResolvedValue([{ id: 'p-1' }] as any);
+      expect(
+        await service.providerPublishProblem('org-1', 'x', [
+          { id: 'p-1', parentPostId: null },
+        ])
+      ).toBe(
+        "Monthly X post limit reached on the Ultimate trial plan (30). A free trial posts here as much as the Starter plan. Finish your trial on the Billing page to get your plan's full limit. Or bring your own key."
+      );
+    });
+
     it('never looks at the plan for a network no plan caps', async () => {
       const { service, subscriptionService } = makeLimitService({ x: 0 });
       expect(

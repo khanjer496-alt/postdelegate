@@ -242,7 +242,7 @@ const PlanCard: FC<{
   const { name, price, yearly, current, action, loading, disabled, note } =
     props;
   const t = useT();
-  const features = useBillingFeatures(name);
+  const features = useBillingFeatures(name, yearly);
 
   return (
     <div
@@ -508,7 +508,7 @@ export const MainBillingComponent: FC<{
       toast.show(
         t(
           'billing_card_added',
-          'Your card was added. Your plan continues when the trial ends.'
+          'Your card was added. Your plan continues when the trial ends, and you can now move to a bigger plan.'
         )
       );
       mutate('/billing/renewal');
@@ -787,6 +787,7 @@ export const MainBillingComponent: FC<{
           requiresAction,
           clientSecret,
           error,
+          needsPaymentMethod,
         } = await (
           await fetch('/billing/subscribe', {
             method: 'POST',
@@ -803,6 +804,23 @@ export const MainBillingComponent: FC<{
         if (error) {
           setLoading(false);
           toast.show(error, 'warning');
+          return;
+        }
+        // a bigger plan during a trial without a card needs the card first
+        if (needsPaymentMethod) {
+          setLoading(false);
+          if (
+            await deleteDialog(
+              t(
+                'billing_trial_upgrade_add_card_first',
+                "Add a card to move to a bigger plan during your free trial. You are not charged until the trial ends, then the first payment is the new plan's price."
+              ),
+              t('add_a_card', 'Add a card'),
+              t('trial', 'Trial')
+            )
+          ) {
+            addPaymentMethod();
+          }
           return;
         }
         if (blocked) {
@@ -874,7 +892,15 @@ export const MainBillingComponent: FC<{
         }
         setLoading(false);
       },
-    [monthlyOrYearly, subscription, user, utm, paymentAction, startTrial]
+    [
+      monthlyOrYearly,
+      subscription,
+      user,
+      utm,
+      paymentAction,
+      startTrial,
+      addPaymentMethod,
+    ]
   );
   if (user?.isLifetime) {
     router.replace('/');

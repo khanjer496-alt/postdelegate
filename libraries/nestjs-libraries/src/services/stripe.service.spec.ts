@@ -2176,6 +2176,86 @@ describe('extra channels', () => {
       expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
     });
 
+    describe('during a trial', () => {
+      const cardless = {
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+      };
+      const trial = (billing: string, over: Record<string, any> = {}) =>
+        stripeSubscription({
+          status: 'trialing',
+          trial_end: 1793664000,
+          metadata: {
+            service: 'gitroom',
+            billing,
+            period: 'MONTHLY',
+            uniqueId: 'u1',
+          },
+          ...over,
+        });
+      const noCard = () =>
+        mockStripe.customers.retrieve.mockResolvedValue({
+          invoice_settings: { default_payment_method: null },
+        });
+      const ultimatePrice = () =>
+        mockStripe.prices.list.mockResolvedValueOnce({
+          data: [{ id: 'price_ultimate_month', unit_amount: 7900 }],
+        });
+
+      it('asks a trial without a card for one before a bigger plan', async () => {
+        live(trial('STANDARD', cardless));
+        noCard();
+        ultimatePrice();
+
+        expect(await subscribe('ULTIMATE', 'MONTHLY')).toEqual({
+          needsPaymentMethod: true,
+        });
+        expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
+      });
+
+      it('moves a trial with a card to the bigger plan, keeping its end date', async () => {
+        live(trial('STANDARD', cardless));
+        mockStripe.customers.retrieve.mockResolvedValue({
+          invoice_settings: { default_payment_method: 'pm_1' },
+        });
+        ultimatePrice();
+
+        await subscribe('ULTIMATE', 'MONTHLY');
+
+        const update = mockStripe.subscriptions.update.mock.calls[0][1];
+        expect(update.items).toEqual([
+          { id: 'si_plan', price: 'price_ultimate_month', quantity: 1 },
+        ]);
+        // the trial is neither ended nor extended, the first charge is the
+        // new plan's price on the same day
+        expect(update.trial_end).toBeUndefined();
+        expect(update.trial_settings).toBeUndefined();
+      });
+
+      it('lets a trial without a card move to a smaller plan', async () => {
+        live(trial('ULTIMATE', cardless));
+        noCard();
+        mockStripe.prices.list.mockResolvedValueOnce({
+          data: [{ id: 'price_starter_month', unit_amount: 1900 }],
+        });
+
+        await subscribe('STANDARD', 'MONTHLY');
+
+        expect(mockStripe.subscriptions.update.mock.calls[0][1].items).toEqual([
+          { id: 'si_plan', price: 'price_starter_month', quantity: 1 },
+        ]);
+      });
+
+      it('lets a trial that came with a card from checkout move up', async () => {
+        live(trial('STANDARD'));
+        noCard();
+        ultimatePrice();
+
+        await subscribe('ULTIMATE', 'MONTHLY');
+
+        expect(mockStripe.subscriptions.update).toHaveBeenCalled();
+      });
+    });
+
     it('leaves a subscription without extra channels as it was', async () => {
       live(stripeSubscription());
       mockStripe.prices.list.mockResolvedValueOnce({
