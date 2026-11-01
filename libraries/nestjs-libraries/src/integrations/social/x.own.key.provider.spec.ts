@@ -10,6 +10,7 @@ jest.mock('twitter-api-v2', () => ({
 }));
 
 import { XOwnKeyProvider } from '@gitroom/nestjs-libraries/integrations/social/x.own.key.provider';
+import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
 
 const code = (fields: Record<string, string>) =>
   Buffer.from(JSON.stringify(fields)).toString('base64');
@@ -79,6 +80,22 @@ describe('XOwnKeyProvider', () => {
     expect(
       provider.appCredentials('123-user-token:user-secret:app-key:app-secret')
     ).toEqual({ appKey: 'app-key', appSecret: 'app-secret' });
+  });
+
+  it('keeps the shared X app on the env keys, whatever the token holds', () => {
+    const shared = new XProvider() as any;
+    expect(shared.appCredentials('token:secret')).toEqual({
+      appKey: 'shared-key',
+      appSecret: 'shared-secret',
+    });
+    expect(shared.appCredentials('a:b:other-key:other-secret')).toEqual({
+      appKey: 'shared-key',
+      appSecret: 'shared-secret',
+    });
+    expect(shared.appCredentials()).toEqual({
+      appKey: 'shared-key',
+      appSecret: 'shared-secret',
+    });
   });
 
   it('explains wrong keys in plain words', async () => {

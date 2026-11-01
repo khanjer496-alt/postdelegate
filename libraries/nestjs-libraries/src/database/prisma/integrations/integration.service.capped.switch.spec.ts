@@ -33,11 +33,15 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
 
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 
-const makeService = (existing: { providerIdentifier: string } | null) => {
+const makeService = (
+  existing: { providerIdentifier: string; deletedAt?: Date } | null
+) => {
   const repository = {
-    getIntegrationByInternalId: jest
+    getIntegrationByInternalIdWithDeleted: jest
       .fn()
-      .mockResolvedValue(existing && { name: 'Brand', ...existing }),
+      .mockResolvedValue(
+        existing && { name: 'Brand', deletedAt: null, ...existing }
+      ),
   };
   return new IntegrationService(
     repository as any,
@@ -73,6 +77,24 @@ describe('IntegrationService.checkCappedProviderSwitch', () => {
         'x-own-key'
       )
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('stops a deleted channel coming back under the other provider', async () => {
+    for (const [before, after] of [
+      ['x', 'x-own-key'],
+      ['x-own-key', 'x'],
+    ]) {
+      await expect(
+        makeService({
+          providerIdentifier: before,
+          deletedAt: new Date(),
+        }).checkCappedProviderSwitch('org-1', '42', after)
+      ).rejects.toMatchObject({
+        status: 400,
+        message:
+          'This account was connected before through a different connection type. Connect it the same way as before.',
+      });
+    }
   });
 
   it('lets a reconnect on the same provider and uncapped providers through', async () => {

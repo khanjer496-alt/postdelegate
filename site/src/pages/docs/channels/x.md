@@ -13,11 +13,12 @@ X charges for its API, so there will be two ways to connect an X account.
 You sign in to X and PostDelegate posts through its own X app. Each paid plan includes a number of X posts a month, counted separately from your other networks:
 
 - Every post of a thread counts as one X post.
-- A draft does not count until it is scheduled.
-- Deleting a post that was already published does not give the post back.
-- A post counts in the plan month it is scheduled to publish in, and the count starts again at the start of each plan month.
+- A post counts when it is published. Deleting or moving it afterwards does not give it back.
+- A draft does not count. Scheduled posts are checked against the plan month they publish in.
+- The count starts again at the start of each plan month.
+- Repeating and evergreen posts need your own X API key.
 
-When the month's X posts are used up, scheduling another X post shows a message. Upgrade your plan, or connect the account with your own X API key.
+When the month's X posts are used up, scheduling another X post shows a message, and a post that reaches its publish time after that fails with the same message instead of going out. Upgrade your plan, or connect the account with your own X API key.
 
 ## Using your own X API key
 
@@ -38,4 +39,4 @@ If the connection fails you will see one of these messages:
 
 To replace the keys later, use **Update Credentials** in the channel's menu.
 
-An account is connected one way at a time. To move an account from one way to the other, delete its channel first, then connect it again.
+An account is connected one way at a time, and stays on the way it was first connected in a workspace.

@@ -145,3 +145,9 @@ export const pricing: PricingInterface = {
     analytics_reports: true,
   },
 };
+
+// networks some plan caps a month, their published posts are counted
+export const isCappedProvider = (providerIdentifier: string) =>
+  Object.values(pricing).some(
+    (plan) => plan.provider_posts_per_month?.[providerIdentifier] !== undefined
+  );

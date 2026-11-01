@@ -412,6 +412,23 @@ export class IntegrationRepository {
     );
   }
 
+  // the channel row of an account, deleted or not, as connect upserts it
+  getIntegrationByInternalIdWithDeleted(org: string, internalId: string) {
+    return this._integration.model.integration.findUnique({
+      where: {
+        organizationId_internalId: {
+          organizationId: org,
+          internalId,
+        },
+      },
+      select: {
+        name: true,
+        providerIdentifier: true,
+        deletedAt: true,
+      },
+    });
+  }
+
   async getIntegrationByInternalId(org: string, internalId: string) {
     return this.decryptRow(
       await this._integration.model.integration.findFirst({

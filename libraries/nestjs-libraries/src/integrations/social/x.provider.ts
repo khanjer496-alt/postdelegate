@@ -90,6 +90,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     'You will be logged in into your current account, if you would like a different account, change it first on X';
   planLimitHint =
     'Upgrade your plan, or connect X with your own API key for unlimited X posts.';
+  planRepeatHint =
+    'Repeating and evergreen posts on X need your own API key. Connect X with your own API key to repeat this post.';
 
   // The provider receives the rich HTML so articles keep their formatting;
   // regular tweets are stripped to plain text inside the provider.

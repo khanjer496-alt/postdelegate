@@ -35,7 +35,8 @@ export class PostsRepository {
     private _tags: PrismaRepository<'tags'>,
     private _tagsPosts: PrismaRepository<'tagsPosts'>,
     private _errors: PrismaRepository<'errors'>,
-    private _transaction: PrismaTransaction
+    private _transaction: PrismaTransaction,
+    private _providerPostUsage: PrismaRepository<'providerPostUsage'>
   ) {}
 
   private async updateActivePost(
@@ -668,9 +669,42 @@ export class PostsRepository {
     });
   }
 
-  // The same posts countPostsFromDay counts, for the channels of one network
-  // in one period, leaving out the posts that are being saved again
-  countProviderPosts(
+  // Posts published to one network in a plan month, what its cap counts
+  countProviderUsage(
+    orgId: string,
+    providerIdentifier: string,
+    from: Date,
+    until: Date
+  ) {
+    return this._providerPostUsage.model.providerPostUsage.count({
+      where: {
+        organizationId: orgId,
+        providerIdentifier,
+        createdAt: {
+          gte: from,
+          lt: until,
+        },
+      },
+    });
+  }
+
+  recordProviderUsage(
+    orgId: string,
+    providerIdentifier: string,
+    postIds: string[]
+  ) {
+    return this._providerPostUsage.model.providerPostUsage.createMany({
+      data: postIds.map((postId) => ({
+        organizationId: orgId,
+        providerIdentifier,
+        postId,
+      })),
+    });
+  }
+
+  // Posts waiting to publish to one network in a plan month, leaving out the
+  // posts that are being saved again
+  countQueuedProviderPosts(
     orgId: string,
     providerIdentifier: string,
     from: Date,
@@ -680,25 +714,35 @@ export class PostsRepository {
     return this._post.model.post.count({
       where: {
         organizationId: orgId,
+        deletedAt: null,
+        state: 'QUEUE',
         integration: {
           providerIdentifier,
+          deletedAt: null,
         },
         publishDate: {
           gte: from,
           lt: until,
         },
         ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
-        OR: [
-          {
-            deletedAt: null,
-            state: {
-              in: ['QUEUE'],
-            },
-          },
-          {
-            state: 'PUBLISHED',
-          },
-        ],
+      },
+    });
+  }
+
+  getPostsState(orgId: string, ids: string[]) {
+    if (!ids.length) {
+      return Promise.resolve([]);
+    }
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        id: { in: ids },
+      },
+      select: {
+        id: true,
+        state: true,
+        publishDate: true,
+        deletedAt: true,
       },
     });
   }
