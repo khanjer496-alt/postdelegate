@@ -1,7 +1,7 @@
 ---
 import Doc from '../layouts/Doc.astro';
 import { SITE } from '../data/site';
-// Changes that are live in the app, newest first. Dates are the day each change was released.
+// Changes that are live in the app, newest first. Dates are the release day in Dubai time (UTC+4).
 // Add an entry only once the release that contains it is live on app.postdelegate.com.
 const releases: { date: string; items: { title: string; text: string; href?: string }[] }[] = [
   { date: '2026-11-01', items: [
@@ -11,10 +11,11 @@ const releases: { date: string; items: { title: string; text: string; href?: str
     { title: 'YouTube: publish later and the AI content label', text: 'Upload a video as private and let YouTube make it public at the time you set, and mark realistic altered or AI-made content.', href: '/docs/channels/youtube#publish-later-on-youtube' },
     { title: 'Extra channels on Ultimate', text: 'Ultimate includes 100 channels; add more at $1 a month each, up to 1,000 channels in total.', href: '/docs/billing#extra-channels' },
     { title: 'Agent files', text: 'Hosted instruction files for assistants: a Claude skill, AGENTS.md for coding agents, ChatGPT instructions and a Cursor rule.', href: '/docs/mcp/agent-files' },
+    { title: 'Telegram is live', text: 'Add @PostDelegateBot to a channel or group and schedule text, photos, videos and albums.', href: '/docs/channels/telegram' },
     { title: 'Discord is live', text: 'Connect a Discord server and schedule announcements. Posts only go to channels in the connected server, with role mentions and follow-ups in a thread.', href: '/docs/channels/discord' },
+    { title: 'Fixes', text: 'Kick posts publish again; opening /studio directly no longer fails; the trim bar finds the length of every clip; Studio explains what is missing in plain words; and moving to a bigger plan during the no-card trial now asks for a card.' },
   ] },
   { date: '2026-10-31', items: [
-    { title: 'Telegram is live', text: 'Add @PostDelegateBot to a channel or group and schedule text, photos, videos and albums.', href: '/docs/channels/telegram' },
     { title: 'Approvals and the AI review inbox', text: 'Post statuses, client approval links that need no account, and an inbox where drafts from AI assistants wait for a person.', href: '/docs/approvals' },
     { title: 'Bring your own OpenAI key', text: 'AI writing, the Agent and AI images run on your workspace’s own OpenAI key. PostDelegate never charges for AI.', href: '/docs/ai' },
     { title: 'Analytics history and reports', text: 'Daily history, trends, top posts, best times, CSV export, PDF and scheduled reports, and a weekly summary email.', href: '/docs/analytics' },
@@ -24,7 +25,7 @@ const releases: { date: string; items: { title: string; text: string; href?: str
 ];
 const fmt = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 ---
-<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Content Studio, bulk video scheduling, views analytics, YouTube publish later, extra channels, Discord and Telegram." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first. Network approvals are tracked on the roadmap.">
+<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Content Studio, bulk video scheduling, views analytics, YouTube publish later, extra channels, Discord and Telegram." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
   <a slot="actions" href="/roadmap" class="button button-outline">See the roadmap</a>
   {releases.map((release) => (
     <section class="release">
