@@ -203,17 +203,19 @@ export abstract class StudioTemplateAbstract<
     return (spec as { music?: StudioMusicDto }).music?.assetId;
   }
 
-  // What stops a whole spec from rendering, in words for the customer
+  // What stops a whole spec from rendering, in words for the customer. A
+  // template without a trim has nothing to check here
   check(spec: T): string | undefined {
     const trim = this.clip(spec).trim;
-    return trim.end <= trim.start
+    return trim && trim.end <= trim.start
       ? 'The end of the clip must be after its start'
       : undefined;
   }
 
   // The same, once the inputs are downloaded and probed
   checkInputs(spec: T, inputs: StudioPlanInput[]): string | undefined {
-    return this.clip(spec).trim.start >= (inputs[0]?.duration ?? Infinity)
+    const trim = this.clip(spec).trim;
+    return trim && trim.start >= (inputs[0]?.duration ?? Infinity)
       ? 'The clip starts after the end of the video.'
       : undefined;
   }
@@ -255,7 +257,7 @@ export abstract class StudioTemplateAbstract<
   }
 
   // A still picture, read once by the image demuxer and nothing else: the
-  // file name is ours, so it never holds a pattern that reads other files
+  // name is read as it is, never as a pattern that could match other files
   protected imageInput(file: string) {
     return [
       '-protocol_whitelist',
@@ -266,6 +268,8 @@ export abstract class StudioTemplateAbstract<
       '2',
       '-f',
       'image2',
+      '-pattern_type',
+      'none',
       '-framerate',
       String(STUDIO_FPS),
       '-i',

@@ -35,6 +35,7 @@ import {
   SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
+import { StudioAssetGuard } from '@gitroom/backend/services/auth/studio.asset.guard';
 
 // Every transcription spends the workspace's own OpenAI credit
 const HOUR = 60 * 60 * 1000;
@@ -105,8 +106,9 @@ export class StudioController {
   }
 
   // Music for the templates that take it: mp3, m4a or wav up to 30 MB,
-  // stored for Studio only and never shown in the media library
-  @UseGuards(ThrottlerRealIpGuard)
+  // stored for Studio only and never shown in the media library. The plan
+  // and the room left are checked before anything is stored
+  @UseGuards(ThrottlerRealIpGuard, StudioAssetGuard)
   @Throttle({ default: { limit: 60, ttl: HOUR } })
   @Post('/assets')
   @UseInterceptors(FileInterceptor('file', streamUploadOptions(STUDIO_MUSIC_UPLOAD)))

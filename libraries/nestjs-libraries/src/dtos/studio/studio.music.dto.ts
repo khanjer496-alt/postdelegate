@@ -18,11 +18,14 @@ export const STUDIO_MUSIC_MAX_BYTES = 30 * 1024 * 1024;
 export const STUDIO_MUSIC_VOLUME = 0.25;
 
 // What POST /studio/assets takes, sniffed from the first bytes: mp3, m4a and
-// wav, 30 MB at most. A video is never taken, even in an mp4
+// wav, 30 MB at most. A video is never taken, so an m4a some app wrote with
+// an mp4 brand reads as a video and is refused too
 export const STUDIO_MUSIC_UPLOAD: UploadRules = {
   allowed: new Set(['audio/mpeg', 'audio/x-m4a', 'audio/mp4', 'audio/wav']),
   maxSize: () => STUDIO_MUSIC_MAX_BYTES,
   fileSize: STUDIO_MUSIC_MAX_BYTES,
+  unsupported:
+    'Music must be an MP3, M4A or WAV file. An M4A saved as an MP4 video is refused, export it again as M4A or MP3.',
 };
 
 export class StudioMusicDto {

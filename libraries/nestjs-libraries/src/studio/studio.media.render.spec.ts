@@ -25,7 +25,7 @@ jest.mock('nestjs-temporal-core', () => ({ TemporalService: class {} }));
 
 import 'reflect-metadata';
 import { spawnSync } from 'child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
@@ -124,6 +124,35 @@ maybe('Studio pictures, clips and music with ffmpeg', () => {
       'aac',
       'music.m4a',
     ]);
+    make([
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc2=size=640x360',
+      '-frames:v',
+      '1',
+      'wide.jpg',
+    ]);
+    // the same picture taken with the phone turned: EXIF Orientation 6
+    // (turn 90 degrees clockwise to show it), an APP1 segment after the start
+    const jpeg = readFileSync(join(dir, 'wide.jpg'));
+    const tiff = Buffer.from([
+      0x4d, 0x4d, 0, 42, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6,
+      0, 0, 0, 0, 0, 0,
+    ]);
+    const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+    const length = Buffer.alloc(2);
+    length.writeUInt16BE(body.length + 2);
+    writeFileSync(
+      join(dir, 'rotated.jpg'),
+      Buffer.concat([
+        jpeg.subarray(0, 2),
+        Buffer.from([0xff, 0xe1]),
+        length,
+        body,
+        jpeg.subarray(2),
+      ])
+    );
     // not a picture: a text file named like one
     writeFileSync(join(dir, 'fake.png'), '#EXTM3U\nhttp://169.254.169.254/\n');
     // larger than the 6000 pixels a side a picture may have
@@ -352,6 +381,52 @@ maybe('Studio pictures, clips and music with ffmpeg', () => {
       { inputs: [clip], music: { file: 'music.m4a' } }
     );
     expectVertical(probe, 2);
+  }, 120000);
+
+  const size = (file: string) =>
+    JSON.parse(
+      spawnSync(
+        ffprobe,
+        ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', file],
+        { cwd: dir }
+      ).stdout.toString()
+    ).streams[0];
+
+  it('scales pictures down to just cover the panned frame, at most twice it', async () => {
+    const wide = await service.prescaleImage(dir, 'wide.png', 0);
+    expect(wide).toBe('picture-0.jpg');
+    // 640x360 covers 1242x2208 at 3925x2208, cut to twice the width
+    expect(size(wide)).toEqual({ width: 2484, height: 2208 });
+    const tall = await service.prescaleImage(dir, 'tall.jpg', 1);
+    expect(size(tall)).toEqual({ width: 1242, height: 2208 });
+  }, 60000);
+
+  it('turns a rotated JPEG upright before scaling it', async () => {
+    expect(await service.imageOrientation(join(dir, 'rotated.jpg'))).toBe(6);
+    expect(await service.imageOrientation(join(dir, 'wide.jpg'))).toBe(1);
+    const upright = await service.prescaleImage(dir, 'rotated.jpg', 2);
+    // 640x360 turned is 360x640, the 9:16 frame exactly
+    expect(size(upright)).toEqual({ width: 1242, height: 2208 });
+    const unturned = await service.prescaleImage(dir, 'wide.jpg', 3);
+    expect(size(unturned)).toEqual({ width: 2484, height: 2208 });
+  }, 60000);
+
+  it('renders a slideshow from the scaled down pictures', async () => {
+    const files = [
+      await service.prescaleImage(dir, 'rotated.jpg', 4),
+      await service.prescaleImage(dir, 'wide.png', 5),
+    ];
+    const probe = await render(
+      new ImageSlideshowTemplate(),
+      {
+        slides: [
+          { mediaId: id, seconds: 2 },
+          { mediaId: id, seconds: 2 },
+        ],
+      },
+      { inputs: files.map(picture) }
+    );
+    expectVertical(probe, 3.5);
   }, 120000);
 
   it('accepts real pictures and refuses what is not one or is too large', async () => {

@@ -205,7 +205,7 @@ export const StudioMusicPicker: FC<{
       <div className="text-[12px] text-textItemBlur leading-[1.5]">
         {t(
           'studio_music_hint',
-          'MP3, M4A or WAV up to 30 MB. Use music you have the rights to. It loops if it is shorter than the video and fades out at the end.'
+          'MP3, M4A or WAV up to 30 MB. An M4A saved as an MP4 video is refused, export it as M4A or MP3. Use music you have the rights to. It loops if it is shorter than the video and fades out at the end.'
         )}
       </div>
     </div>

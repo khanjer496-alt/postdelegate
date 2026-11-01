@@ -24,6 +24,8 @@ export interface UploadRules {
   maxSize: (mimeType: string) => number;
   // the largest file of any allowed type
   fileSize: number;
+  // what a refused type is told, "Unsupported file type." when missing
+  unsupported?: string;
 }
 
 export function getMaxSize(mimeType: string): number {
@@ -61,7 +63,7 @@ export async function uploadStreamToStorage(
   storage: IUploadProvider,
   webStream: ReadableStream,
   declaredSize = 0,
-  rules: Omit<UploadRules, 'fileSize'> = {
+  rules: Omit<UploadRules, 'fileSize'> & { unsupported?: string } = {
     allowed: UPLOAD_ALLOWED_MIME,
     maxSize: getMaxSize,
   }
@@ -75,7 +77,7 @@ export async function uploadStreamToStorage(
   const detected = sniffed.fileType;
   if (!detected || !rules.allowed.has(detected.mime)) {
     await sniffed.cancel();
-    throw new BadRequestException('Unsupported file type.');
+    throw new BadRequestException(rules.unsupported || 'Unsupported file type.');
   }
 
   const maxSize = rules.maxSize(detected.mime);

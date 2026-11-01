@@ -11,6 +11,8 @@ jest.mock('file-type', () => ({
       ? { mime: 'audio/wav', ext: 'wav' }
       : head[1] === 0x50 && head[2] === 0x4e
       ? { mime: 'image/png', ext: 'png' }
+      : head.subarray(4, 11).toString() === 'ftypM4A'
+      ? { mime: 'audio/x-m4a', ext: 'm4a' }
       : head.subarray(4, 8).toString() === 'ftyp'
       ? { mime: 'video/mp4', ext: 'mp4' }
       : undefined;
@@ -47,6 +49,13 @@ const PNG = Buffer.concat([
   Buffer.from('IHDR'),
   Buffer.alloc(4096, 0),
 ]);
+const M4A = Buffer.concat([
+  Buffer.from([0, 0, 0, 0x18]),
+  Buffer.from('ftypM4A '),
+  Buffer.from([0, 0, 0, 0]),
+  Buffer.from('M4A mp42'),
+  Buffer.alloc(4096, 0),
+]);
 const MP4 = Buffer.concat([
   Buffer.from([0, 0, 0, 0x18]),
   Buffer.from('ftypmp42'),
@@ -70,6 +79,7 @@ describe('uploadStreamToStorage rules', () => {
   it.each([
     ['mp3', MP3, 'audio/mpeg'],
     ['wav', WAV, 'audio/wav'],
+    ['m4a', M4A, 'audio/x-m4a'],
   ])('takes %s as Studio music', async (_name, buffer, mime) => {
     const provider = storage();
     const uploaded = await uploadStreamToStorage(
@@ -90,6 +100,12 @@ describe('uploadStreamToStorage rules', () => {
       uploadStreamToStorage(provider as any, web(buffer), 0, STUDIO_MUSIC_UPLOAD)
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(provider.uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('tells why an m4a with an mp4 brand is refused', async () => {
+    await expect(
+      uploadStreamToStorage(storage() as any, web(MP4), 0, STUDIO_MUSIC_UPLOAD)
+    ).rejects.toThrow('An M4A saved as an MP4 video is refused');
   });
 
   it('refuses music over 30 MB as soon as the size says so', async () => {

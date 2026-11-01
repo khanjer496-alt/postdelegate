@@ -394,6 +394,7 @@ export class StudioRepository {
         id: true,
         name: true,
         path: true,
+        originalName: true,
         projectId: true,
       },
     });
@@ -474,10 +475,17 @@ export class StudioRepository {
     });
   }
 
-  deleteAsset(id: string) {
+  // Deletes the asset only while nothing uses it: unused since
+  // "unusedSince", or its project deleted. A project that took it in the
+  // meantime keeps it (count 0)
+  deleteRemovableAsset(id: string, unusedSince: Date) {
     return this._studioAsset.model.studioAsset.deleteMany({
       where: {
         id,
+        OR: [
+          { projectId: null, updatedAt: { lt: unusedSince } },
+          { project: { deletedAt: { not: null } } },
+        ],
       },
     });
   }

@@ -73,15 +73,20 @@ export class StudioActivity implements OnModuleInit {
 
   // The daily cleanup of studioCleanupWorkflowV1: stored music of deleted
   // projects and music unused for a week, and render records older than 90
-  // days. Takes an empty object so fields can be added later
+  // days. STUDIO_CLEANUP_DISABLED=true switches it off, and the workflow then
+  // ends. Takes an empty object so fields can be added later
   @ActivityMethod()
   async cleanupStudioV1(_args: Record<string, never> = {}) {
+    if (process.env.STUDIO_CLEANUP_DISABLED === 'true') {
+      return { enabled: false, assets: 0, renders: 0 };
+    }
     const context = Context.current();
-    return withHeartbeat(() =>
+    const removed = await withHeartbeat(() =>
       this._studioService.cleanup((details) => {
         setHeartbeatDetails(`cleanupStudioV1: ${details}`);
         context.heartbeat(details);
       })
     );
+    return { enabled: true, ...removed };
   }
 }

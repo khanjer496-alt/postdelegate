@@ -5,7 +5,7 @@ import { ApplicationFailure, TypedSearchAttributes } from '@temporalio/common';
 import { TemporalService } from 'nestjs-temporal-core';
 import { spawn } from 'child_process';
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, readdir, rm, stat, statfs, writeFile } from 'fs/promises';
+import { mkdir, open, readdir, rm, stat, statfs, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
 import { extname, join, resolve, sep } from 'path';
@@ -40,7 +40,10 @@ import {
   STUDIO_MAX_SOURCE_SECONDS,
 } from '@gitroom/nestjs-libraries/dtos/studio/studio.clip.dto';
 import { STUDIO_MUSIC_MAX_BYTES } from '@gitroom/nestjs-libraries/dtos/studio/studio.music.dto';
-import { StudioPlanInput } from '@gitroom/nestjs-libraries/studio/studio.interface';
+import {
+  StudioPlanInput,
+  StudioTemplateAbstract,
+} from '@gitroom/nestjs-libraries/studio/studio.interface';
 
 // A reason retrying can't change (a deleted video, a broken file): the
 // workflow stops and the message is what the customer reads
@@ -82,6 +85,69 @@ const IMAGE_CODECS = ['png', 'mjpeg', 'webp'];
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_IMAGE_SIDE = 6000;
 const MAX_IMAGE_PIXELS = 25 * 1000 * 1000;
+// picture types the media library holds that Studio does not read
+const OTHER_IMAGE_EXTENSIONS = ['.gif', '.avif', '.bmp', '.tif', '.tiff', '.heic'];
+// what a picture is scaled to before the render: the panned frame
+const PRESCALE_WIDTH = 1242;
+const PRESCALE_HEIGHT = 2208;
+// the filters that turn a picture upright for each EXIF Orientation
+const ORIENTATION_FILTERS: Record<number, string> = {
+  2: 'hflip,',
+  3: 'hflip,vflip,',
+  4: 'vflip,',
+  5: 'transpose=0,',
+  6: 'transpose=1,',
+  7: 'transpose=3,',
+  8: 'transpose=2,',
+};
+
+// The EXIF Orientation of a JPEG (1 when it has none): the 0x0112 tag of the
+// first image directory of its APP1 Exif segment
+export const jpegOrientation = (data: Buffer) => {
+  if (data.length < 4 || data.readUInt16BE(0) !== 0xffd8) {
+    return 1;
+  }
+  let offset = 2;
+  while (offset + 4 <= data.length) {
+    const marker = data.readUInt16BE(offset);
+    const length = data.readUInt16BE(offset + 2);
+    if ((marker & 0xff00) !== 0xff00 || marker === 0xffda || length < 2) {
+      return 1;
+    }
+    const start = offset + 4;
+    if (
+      marker === 0xffe1 &&
+      start + 14 <= data.length &&
+      data.toString('latin1', start, start + 6) === 'Exif\0\0'
+    ) {
+      const tiff = start + 6;
+      const little = data.toString('latin1', tiff, tiff + 2) === 'II';
+      const u16 = (at: number) =>
+        little ? data.readUInt16LE(at) : data.readUInt16BE(at);
+      const u32 = (at: number) =>
+        little ? data.readUInt32LE(at) : data.readUInt32BE(at);
+      const directory = tiff + u32(tiff + 4);
+      if (directory + 2 > data.length) {
+        return 1;
+      }
+      const entries = u16(directory);
+      for (let i = 0; i < entries; i++) {
+        const entry = directory + 2 + i * 12;
+        if (entry + 12 > data.length) {
+          return 1;
+        }
+        if (u16(entry) === 0x0112) {
+          const value = u16(entry + 8);
+          return value >= 1 && value <= 8 ? value : 1;
+        }
+      }
+      return 1;
+    }
+    offset = start + length - 2;
+  }
+  return 1;
+};
+
 // Music: the containers and codecs POST /studio/assets lets in
 const MUSIC_FORMATS = ['-format_whitelist', 'mp3,mov,mp4,m4a,3gp,3g2,mj2,wav'];
 const AUDIO_CODECS = [
@@ -231,29 +297,42 @@ export class StudioService {
 
   async updateProject(org: string, id: string, body: UpdateStudioProjectDto) {
     const project = await this.getProject(org, id);
-    const spec = body.spec
-      ? JSON.stringify(
-          await this._templateManager.validateSpec(
-            project.template,
-            body.spec,
-            true
-          )
+    const template = this._templateManager.getTemplate(project.template);
+    const validated = body.spec
+      ? await this._templateManager.validateSpec(
+          project.template,
+          body.spec,
+          true
         )
       : undefined;
 
-    if (spec && Buffer.byteLength(spec) > MAX_SPEC_BYTES) {
-      throw new BadRequestException('The project is too large');
+    // The music is read from the validated settings. Most saves keep it as
+    // it was; a new one must be an asset of the workspace no other project
+    // took. Its name and address always come from the asset, never the client
+    const before = template?.instance.musicAssetId(project.spec || {});
+    const assetId = validated
+      ? template?.instance.musicAssetId(validated)
+      : undefined;
+    const changed = !!validated && assetId !== before;
+    if (validated?.music) {
+      if (changed) {
+        const asset = await this._studioRepository.getAsset(org, assetId!);
+        if (!asset || (asset.projectId && asset.projectId !== id)) {
+          throw new BadRequestException(
+            'This music is not available anymore, add it again'
+          );
+        }
+        validated.music.name = asset.originalName || undefined;
+        validated.music.path = asset.path;
+      } else {
+        validated.music.name = project.spec.music?.name;
+        validated.music.path = project.spec.music?.path;
+      }
     }
 
-    // most saves keep the music as it was and skip this
-    const music = this.musicChange(project.spec?.music, body.spec?.music);
-    if (spec && music.changed && music.assetId) {
-      const asset = await this._studioRepository.getAsset(org, music.assetId);
-      if (!asset || (asset.projectId && asset.projectId !== id)) {
-        throw new BadRequestException(
-          'This music is not available anymore, add it again'
-        );
-      }
+    const spec = validated ? JSON.stringify(validated) : undefined;
+    if (spec && Buffer.byteLength(spec) > MAX_SPEC_BYTES) {
+      throw new BadRequestException('The project is too large');
     }
 
     await this._studioRepository.updateProject(org, id, {
@@ -262,8 +341,8 @@ export class StudioService {
     });
 
     // only once the settings that name it are saved
-    if (spec && music.changed) {
-      await this.useMusic(org, id, music.assetId);
+    if (changed) {
+      await this.useMusic(org, id, assetId);
     }
     return this.getProject(org, id);
   }
@@ -326,60 +405,62 @@ export class StudioService {
   // Music uploaded for Studio: stored like a media but kept out of the media
   // library. A workspace keeps a few at a time; the ones no project uses go
   // after a week
+  // Throws when the workspace can't add music: no active plan, or as many
+  // files as it may keep. Checked before an upload is stored, and again when
+  // it is saved
+  async checkAssetAllowed(org: string) {
+    if (!(await this.billing(org)).subscribed) {
+      throw new HttpException(
+        'Studio needs an active plan. Pick one in Billing to add music.',
+        406
+      );
+    }
+    if ((await this._studioRepository.countAssets(org)) >= MAX_ASSETS) {
+      throw new BadRequestException(
+        `A workspace keeps up to ${MAX_ASSETS} music files. Delete a project that uses one, or wait for unused ones to be removed after ${ORPHAN_ASSET_DAYS} days.`
+      );
+    }
+  }
+
   async saveAsset(
     org: string,
     file: { filename: string; path: string; originalname?: string }
   ) {
-    const refuse = async (error: HttpException) => {
+    // the count and the new row under one lock, so two uploads at once never
+    // both pass the last free place
+    const lock = `studioAsset:${org}`;
+    const token = randomBytes(16).toString('hex');
+    try {
+      if (!(await ioRedis.set(lock, token, 'EX', 15, 'NX'))) {
+        throw new HttpException('Another music file is being saved', 429);
+      }
+      try {
+        await this.checkAssetAllowed(org);
+        const asset = await this._studioRepository.createAsset(org, {
+          kind: 'music',
+          name: file.filename,
+          path: file.path,
+          originalName: (file.originalname || 'music').slice(0, 100),
+        });
+        return {
+          id: asset.id,
+          name: asset.originalName,
+          path: asset.path,
+        };
+      } finally {
+        if ((await ioRedis.get(lock)) === token) {
+          await ioRedis.del(lock);
+        }
+      }
+    } catch (err) {
+      // a refused upload leaves nothing in storage
       await this.storage
         .removeFile(file.path)
-        .catch((err) =>
-          console.error(`Could not remove studio upload ${file.path}:`, err)
+        .catch((error) =>
+          console.error(`Could not remove studio upload ${file.path}:`, error)
         );
-      throw error;
-    };
-
-    if (!(await this.billing(org)).subscribed) {
-      return refuse(
-        new HttpException(
-          'Studio needs an active plan. Pick one in Billing to add music.',
-          406
-        )
-      );
+      throw err;
     }
-    if ((await this._studioRepository.countAssets(org)) >= MAX_ASSETS) {
-      return refuse(
-        new BadRequestException(
-          `A workspace keeps up to ${MAX_ASSETS} music files. Delete a project that uses one, or wait for unused ones to be removed after ${ORPHAN_ASSET_DAYS} days.`
-        )
-      );
-    }
-
-    const asset = await this._studioRepository.createAsset(org, {
-      kind: 'music',
-      name: file.filename,
-      path: file.path,
-      originalName: (file.originalname || 'music').slice(0, 100),
-    });
-    return {
-      id: asset.id,
-      name: asset.originalName,
-      path: asset.path,
-    };
-  }
-
-  // The music asset the new settings name, and whether it is another one
-  // than the saved settings named
-  private musicChange(before: unknown, after: unknown) {
-    const idOf = (value: unknown) => {
-      const id =
-        value && typeof value === 'object'
-          ? (value as { assetId?: unknown }).assetId
-          : undefined;
-      return typeof id === 'string' ? id : undefined;
-    };
-    const assetId = idOf(after);
-    return { assetId, changed: assetId !== idOf(before) };
   }
 
   // The project keeps the music its settings name and lets go of any other:
@@ -396,14 +477,29 @@ export class StudioService {
     await this._studioRepository.detachAssets(org, projectId, assetId);
   }
 
-  private async removeAsset(asset: { id: string; path: string }) {
-    try {
-      await this.storage.removeFile(asset.path);
-    } catch (err) {
-      console.error(`Could not remove studio asset ${asset.id}:`, err);
+  // The row goes first and only while nothing uses the asset (a project
+  // that took it in the meantime keeps it), then its file. A file already
+  // gone counts as removed
+  private async removeAsset(
+    asset: { id: string; path: string },
+    unusedSince = dayjs().subtract(ORPHAN_ASSET_DAYS, 'day').toDate()
+  ) {
+    if (
+      !(await this._studioRepository.deleteRemovableAsset(asset.id, unusedSince))
+        .count
+    ) {
       return false;
     }
-    await this._studioRepository.deleteAsset(asset.id);
+    try {
+      await this.storage.removeFile(asset.path);
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        console.error(
+          `Could not remove the file of studio asset ${asset.id}:`,
+          err
+        );
+      }
+    }
     return true;
   }
 
@@ -633,11 +729,27 @@ export class StudioService {
       );
     }
 
+    const names = new Map<string, string>();
     for (const mediaId of uniq(template.instance.mediaIds(spec))) {
-      if (!(await this.mediaSource(org.id, mediaId))) {
+      const source = await this.mediaSource(org.id, mediaId);
+      if (!source) {
         throw new BadRequestException(
           'A video or picture of this project is not in the media library anymore'
         );
+      }
+      names.set(mediaId, source.media.name);
+    }
+
+    // each place takes what its template expects
+    for (const [index, mediaId] of template.instance.mediaIds(spec).entries()) {
+      const problem = this.inputKindProblem(
+        template.instance,
+        spec,
+        index,
+        names.get(mediaId)!
+      );
+      if (problem) {
+        throw new BadRequestException(problem);
       }
     }
 
@@ -953,6 +1065,8 @@ export class StudioService {
             ...IMAGE_FORMATS,
             '-f',
             'image2',
+            '-pattern_type',
+            'none',
             '-show_entries',
             'stream=codec_type,codec_name,width,height',
             '-of',
@@ -984,6 +1098,95 @@ export class StudioService {
         'Pictures up to 25 megapixels (6000 pixels a side) are supported.'
       );
     }
+  }
+
+  // What is wrong with the media at this place of the template, by its file
+  // type, in words for the customer
+  private inputKindProblem(
+    template: StudioTemplateAbstract<any>,
+    spec: unknown,
+    index: number,
+    name: string
+  ) {
+    const ext = extname(name).toLowerCase();
+    if (OTHER_IMAGE_EXTENSIONS.includes(ext)) {
+      return 'Pictures in PNG, JPG or WebP are supported';
+    }
+    const image = IMAGE_EXTENSIONS.includes(ext);
+    if (image && !template.allowsImage(spec, index)) {
+      return 'This template needs a video, not a picture';
+    }
+    if (!image && !template.allowsVideo(spec, index)) {
+      return 'This template takes pictures, not videos';
+    }
+    return undefined;
+  }
+
+  // The rotation a JPEG asks for in its EXIF Orientation (1 to 8), read from
+  // the file itself so it is the same whatever ffmpeg version renders it
+  async imageOrientation(path: string) {
+    const handle = await open(path, 'r');
+    try {
+      const { buffer, bytesRead } = await handle.read(
+        Buffer.alloc(128 * 1024),
+        0,
+        128 * 1024,
+        0
+      );
+      return jpegOrientation(buffer.subarray(0, bytesRead));
+    } finally {
+      await handle.close();
+    }
+  }
+
+  // Every picture is turned upright and scaled down on its own before the
+  // render, one at a time: the render then holds small 8-bit frames instead
+  // of every full size picture at once. The result just covers the panned
+  // frame (1242x2208), at most twice that on its long side, so the focus
+  // point still has room. Returns the file the render reads
+  async prescaleImage(
+    dir: string,
+    file: string,
+    index: number,
+    signal?: AbortSignal
+  ) {
+    const output = `picture-${index}.jpg`;
+    const turn =
+      ORIENTATION_FILTERS[await this.imageOrientation(join(dir, file))] || '';
+    await this.run(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-nostdin',
+        '-loglevel',
+        'error',
+        '-y',
+        '-protocol_whitelist',
+        'file',
+        ...IMAGE_FORMATS,
+        '-threads',
+        '2',
+        // the rotation is ours, read from the file, never applied twice
+        '-noautorotate',
+        '-f',
+        'image2',
+        '-pattern_type',
+        'none',
+        '-i',
+        file,
+        '-frames:v',
+        '1',
+        '-vf',
+        `${turn}scale=${PRESCALE_WIDTH}:${PRESCALE_HEIGHT}:force_original_aspect_ratio=increase:force_divisible_by=2,crop=w=min(iw\\,${
+          PRESCALE_WIDTH * 2
+        }):h=min(ih\\,${PRESCALE_HEIGHT * 2}),format=yuvj420p`,
+        '-q:v',
+        '2',
+        output,
+      ],
+      { cwd: dir, signal, timeout: 60000 }
+    );
+    return output;
   }
 
   // Music: an audio stream in a supported codec, 10 minutes at most
@@ -1165,11 +1368,14 @@ export class StudioService {
             .toLowerCase()
             .replace(/[^.a-z0-9]/g, '') || '.mp4';
         const image = IMAGE_EXTENSIONS.includes(ext);
-        if (image && !template.instance.allowsImage(spec, index)) {
-          throw new StudioStop('This template needs a video, not a picture.');
-        }
-        if (!image && !template.instance.allowsVideo(spec, index)) {
-          throw new StudioStop('This template takes pictures, not videos.');
+        const problem = this.inputKindProblem(
+          template.instance,
+          spec,
+          index,
+          source.media.name
+        );
+        if (problem) {
+          throw new StudioStop(`${problem}.`);
         }
 
         const file = `source-${index}${ext}`;
@@ -1179,7 +1385,11 @@ export class StudioService {
             message: 'This picture is larger than 20 MB.',
           });
           await this.probeImage(dir, file);
-          inputs.push({ file, hasAudio: false, image: true });
+          inputs.push({
+            file: await this.prescaleImage(dir, file, index, hooks.signal),
+            hasAudio: false,
+            image: true,
+          });
           continue;
         }
 
@@ -1469,7 +1679,7 @@ export class StudioService {
   async cleanup(heartbeat: (details: string) => void = () => undefined) {
     const removed = { assets: 0, renders: 0 };
     const unusedSince = dayjs().subtract(ORPHAN_ASSET_DAYS, 'day').toDate();
-    // ids that could not be removed this time, so a page never repeats them
+    // ids a project took back in the meantime, so a page never repeats them
     const failed: string[] = [];
     for (;;) {
       const assets = await this._studioRepository.getAssetsToRemove(
@@ -1478,7 +1688,7 @@ export class StudioService {
         CLEANUP_PAGE
       );
       for (const asset of assets) {
-        if (await this.removeAsset(asset)) {
+        if (await this.removeAsset(asset, unusedSince)) {
           removed.assets++;
         } else {
           failed.push(asset.id);

@@ -9,9 +9,10 @@ const storage = {
 jest.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
   UploadFactory: { createStorage: () => storage },
 }));
+const redisSet = jest.fn();
 jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
   ioRedis: {
-    set: jest.fn().mockResolvedValue('OK'),
+    set: (...args: unknown[]) => redisSet(...args),
     del: jest.fn(),
     get: jest.fn(),
   },
@@ -35,7 +36,10 @@ import { HttpException } from '@nestjs/common';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
+import {
+  StudioService,
+  jpegOrientation,
+} from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
 import { StudioTemplateManager } from '@gitroom/nestjs-libraries/studio/studio.manager';
 import { HookOverClipTemplate } from '@gitroom/nestjs-libraries/studio/templates/hook.over.clip.template';
 import { ImageSlideshowTemplate } from '@gitroom/nestjs-libraries/studio/templates/image.slideshow.template';
@@ -69,6 +73,7 @@ describe('StudioService music, pictures and cleanup', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    redisSet.mockResolvedValue('OK');
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
     dir = mkdtempSync(join(tmpdir(), 'studio-assets-'));
     process.env.STUDIO_TMP_DIR = dir;
@@ -100,11 +105,13 @@ describe('StudioService music, pictures and cleanup', () => {
         id: assetId,
         name: 'abc.mp3',
         path: 'https://media.example/abc.mp3',
+        originalName: 'song.mp3',
+        projectId: null,
       }),
       attachAsset: jest.fn().mockResolvedValue(true),
       detachAssets: jest.fn().mockResolvedValue({ count: 0 }),
       getProjectAssets: jest.fn().mockResolvedValue([]),
-      deleteAsset: jest.fn().mockResolvedValue({ count: 1 }),
+      deleteRemovableAsset: jest.fn().mockResolvedValue({ count: 1 }),
       getAssetsToRemove: jest.fn().mockResolvedValue([]),
       pruneRenders: jest.fn().mockResolvedValue({ count: 0 }),
       getRenderById: jest.fn(),
@@ -181,12 +188,52 @@ describe('StudioService music, pictures and cleanup', () => {
       expect(await status(service.saveAsset('org-1', file))).toBe(400);
       expect(storage.removeFile).toHaveBeenCalledWith(file.path);
     });
+
+    it('counts and saves under one lock per workspace', async () => {
+      await service.saveAsset('org-1', file);
+      expect(redisSet).toHaveBeenCalledWith(
+        'studioAsset:org-1',
+        expect.any(String),
+        'EX',
+        15,
+        'NX'
+      );
+      redisSet.mockResolvedValue(null);
+      expect(await status(service.saveAsset('org-1', file))).toBe(429);
+      expect(repository.createAsset).toHaveBeenCalledTimes(1);
+      expect(storage.removeFile).toHaveBeenCalledWith(file.path);
+    });
+
+    it('checks the plan and the room left before an upload is stored', async () => {
+      await expect(service.checkAssetAllowed('org-1')).resolves.toBeUndefined();
+      repository.countAssets.mockResolvedValue(50);
+      expect(await status(service.checkAssetAllowed('org-1'))).toBe(400);
+      organizationService.getOrgByIdWithSubscription.mockResolvedValue({
+        id: 'org-1',
+      });
+      expect(await status(service.checkAssetAllowed('org-1'))).toBe(406);
+      expect(storage.removeFile).not.toHaveBeenCalled();
+    });
   });
 
   describe('the music of a project', () => {
     it('takes the picked music and lets go of the rest', async () => {
       await service.updateProject('org-1', 'project-1', {
-        spec: slideshow(true),
+        spec: {
+          ...slideshow(true),
+          music: {
+            assetId,
+            name: 'not mine',
+            path: 'https://evil.example/x.mp3',
+          },
+        },
+      });
+      // the name and address come from the asset, never from the client
+      const saved = JSON.parse(repository.updateProject.mock.calls[0][2].spec);
+      expect(saved.music).toEqual({
+        assetId,
+        name: 'song.mp3',
+        path: 'https://media.example/abc.mp3',
       });
       expect(repository.attachAsset).toHaveBeenCalledWith(
         'org-1',
@@ -211,6 +258,7 @@ describe('StudioService music, pictures and cleanup', () => {
         id: assetId,
         name: 'abc.mp3',
         path: 'https://media.example/abc.mp3',
+        originalName: 'song.mp3',
         projectId: 'project-2',
       });
       expect(
@@ -245,17 +293,32 @@ describe('StudioService music, pictures and cleanup', () => {
       );
     });
 
-    it('does no music bookkeeping on a save that keeps it', async () => {
+    it('does no music bookkeeping on a save that keeps it, and keeps the saved name', async () => {
       repository.getProject.mockResolvedValue({
         id: 'project-1',
         template: 'image-slideshow',
-        spec: JSON.stringify(slideshow(true)),
+        spec: JSON.stringify({
+          ...slideshow(),
+          music: { assetId, name: 'song.mp3', path: 'https://media.example/abc.mp3' },
+        }),
       });
       await service.updateProject('org-1', 'project-1', {
-        spec: { ...slideshow(true), transition: 'none' },
+        spec: {
+          ...slideshow(),
+          transition: 'none',
+          music: { assetId, name: 'renamed', path: 'https://evil.example/x.mp3', volume: 0.5 },
+        },
       });
+      expect(repository.getAsset).not.toHaveBeenCalled();
       expect(repository.attachAsset).not.toHaveBeenCalled();
       expect(repository.detachAssets).not.toHaveBeenCalled();
+      const saved = JSON.parse(repository.updateProject.mock.calls[0][2].spec);
+      expect(saved.music).toEqual({
+        assetId,
+        name: 'song.mp3',
+        path: 'https://media.example/abc.mp3',
+        volume: 0.5,
+      });
     });
 
     it('removes the stored music with the project', async () => {
@@ -263,26 +326,76 @@ describe('StudioService music, pictures and cleanup', () => {
         { id: assetId, path: 'https://media.example/abc.mp3' },
       ]);
       await service.deleteProject('org-1', 'project-1');
+      expect(repository.deleteRemovableAsset).toHaveBeenCalledWith(
+        assetId,
+        expect.any(Date)
+      );
       expect(storage.removeFile).toHaveBeenCalledWith(
         'https://media.example/abc.mp3'
       );
-      expect(repository.deleteAsset).toHaveBeenCalledWith(assetId);
     });
 
-    it('keeps the asset row for the cleanup when its file cannot be removed', async () => {
+    it('treats a file already gone as removed', async () => {
       repository.getProjectAssets.mockResolvedValue([
         { id: assetId, path: 'https://media.example/abc.mp3' },
       ]);
-      storage.removeFile.mockRejectedValueOnce(new Error('R2 down'));
-      jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      storage.removeFile.mockRejectedValueOnce(
+        Object.assign(new Error('gone'), { code: 'ENOENT' })
+      );
       await expect(
         service.deleteProject('org-1', 'project-1')
       ).resolves.toEqual({ success: true });
-      expect(repository.deleteAsset).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
     });
   });
 
   describe('starting a render', () => {
+    it('refuses a video where the template takes pictures, before anything starts', async () => {
+      mediaService.getOrgMediaById.mockResolvedValue({
+        id: mediaId,
+        name: 'abc.mp4',
+        path: 'https://media.example/abc.mp4',
+        status: 'ready',
+        deletedAt: null,
+      });
+      const error = await service
+        .startRender({ id: 'org-1' } as any, 'project-1')
+        .catch((err) => err);
+      expect(error.getStatus()).toBe(400);
+      expect(error.message).toBe('This template takes pictures, not videos');
+    });
+
+    it('refuses a picture type Studio does not read', async () => {
+      mediaService.getOrgMediaById.mockResolvedValue({
+        id: mediaId,
+        name: 'abc.gif',
+        path: 'https://media.example/abc.gif',
+        status: 'ready',
+        deletedAt: null,
+      });
+      const error = await service
+        .startRender({ id: 'org-1' } as any, 'project-1')
+        .catch((err) => err);
+      expect(error.message).toBe('Pictures in PNG, JPG or WebP are supported');
+    });
+
+    it('refuses a picture where the template needs a video', async () => {
+      repository.getProject.mockResolvedValue({
+        id: 'project-1',
+        template: 'hook-over-clip',
+        spec: JSON.stringify({
+          input: { mediaId },
+          trim: { start: 0, end: 5 },
+          hook: { text: 'x' },
+        }),
+      });
+      const error = await service
+        .startRender({ id: 'org-1' } as any, 'project-1')
+        .catch((err) => err);
+      expect(error.message).toBe('This template needs a video, not a picture');
+    });
+
     it('checks the spec with its own template', async () => {
       repository.getProject.mockResolvedValue({
         id: 'project-1',
@@ -330,6 +443,9 @@ describe('StudioService music, pictures and cleanup', () => {
       probeImage = jest
         .spyOn(service, 'probeImage')
         .mockResolvedValue(undefined);
+      jest
+        .spyOn(service, 'prescaleImage')
+        .mockImplementation(async (_dir, _file, index) => `picture-${index}.jpg`);
       jest.spyOn(service, 'probeAudio').mockResolvedValue(undefined);
       jest
         .spyOn(service as any, 'probe')
@@ -361,9 +477,10 @@ describe('StudioService music, pictures and cleanup', () => {
       expect(download.mock.calls[2][3].bytes).toBe(30 * 1024 * 1024);
       expect(probeImage).toHaveBeenCalledTimes(2);
       expect(plan.mock.calls[0][1]).toMatchObject({
+        // the render reads the scaled down copies
         inputs: [
-          { file: 'source-0.png', image: true, hasAudio: false },
-          { file: 'source-1.png', image: true, hasAudio: false },
+          { file: 'picture-0.jpg', image: true, hasAudio: false },
+          { file: 'picture-1.jpg', image: true, hasAudio: false },
         ],
         music: { file: 'music.mp3' },
       });
@@ -425,7 +542,7 @@ describe('StudioService music, pictures and cleanup', () => {
         renders: 7,
       });
       expect(storage.removeFile).toHaveBeenCalledTimes(101);
-      expect(repository.deleteAsset).toHaveBeenCalledTimes(101);
+      expect(repository.deleteRemovableAsset).toHaveBeenCalledTimes(101);
       expect(heartbeat).toHaveBeenCalled();
 
       // unused for 7 days, and renders older than 90 days
@@ -436,16 +553,70 @@ describe('StudioService music, pictures and cleanup', () => {
       expect(Math.round((Date.now() - before.getTime()) / 86400000)).toBe(90);
     });
 
-    it('skips a file it could not remove instead of looping on it', async () => {
-      jest.spyOn(console, 'error').mockImplementation(() => undefined);
-      storage.removeFile.mockRejectedValueOnce(new Error('R2 down'));
+    it('leaves an asset a project took in the meantime, file and all', async () => {
       repository.getAssetsToRemove.mockResolvedValueOnce([
         { id: 'a-1', path: 'https://media.example/1.mp3' },
         { id: 'a-2', path: 'https://media.example/2.mp3' },
       ]);
+      repository.deleteRemovableAsset.mockImplementation(async (id: string) => ({
+        count: id === 'a-1' ? 0 : 1,
+      }));
       expect(await service.cleanup()).toEqual({ assets: 1, renders: 0 });
-      expect(repository.deleteAsset).toHaveBeenCalledWith('a-2');
-      expect(repository.deleteAsset).not.toHaveBeenCalledWith('a-1');
+      expect(storage.removeFile).toHaveBeenCalledTimes(1);
+      expect(storage.removeFile).toHaveBeenCalledWith('https://media.example/2.mp3');
+      // the row is deleted only while still unused at the same cutoff
+      const cutoff = repository.getAssetsToRemove.mock.calls[0][0];
+      expect(repository.deleteRemovableAsset).toHaveBeenCalledWith('a-1', cutoff);
     });
+
+    it('counts an asset whose file is already gone as removed', async () => {
+      storage.removeFile.mockRejectedValueOnce(
+        Object.assign(new Error('gone'), { code: 'ENOENT' })
+      );
+      repository.getAssetsToRemove.mockResolvedValueOnce([
+        { id: 'a-1', path: 'https://media.example/1.mp3' },
+      ]);
+      expect(await service.cleanup()).toEqual({ assets: 1, renders: 0 });
+    });
+  });
+});
+
+describe('jpegOrientation', () => {
+  // a JPEG start with an APP1 Exif segment holding only the Orientation tag
+  const exif = (orientation: number, little: boolean) => {
+    const tiff = Buffer.alloc(26);
+    tiff.write(little ? 'II' : 'MM', 0, 'latin1');
+    const u16 = (value: number, at: number) =>
+      little ? tiff.writeUInt16LE(value, at) : tiff.writeUInt16BE(value, at);
+    const u32 = (value: number, at: number) =>
+      little ? tiff.writeUInt32LE(value, at) : tiff.writeUInt32BE(value, at);
+    u16(42, 2);
+    u32(8, 4);
+    u16(1, 8);
+    u16(0x0112, 10);
+    u16(3, 12);
+    u32(1, 14);
+    u16(orientation, 18);
+    const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+    const length = Buffer.alloc(2);
+    length.writeUInt16BE(body.length + 2);
+    return Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe1]),
+      length,
+      body,
+      Buffer.from([0xff, 0xda, 0, 2]),
+    ]);
+  };
+
+  it.each([1, 3, 6, 8])('reads orientation %s in either byte order', (value) => {
+    expect(jpegOrientation(exif(value, true))).toBe(value);
+    expect(jpegOrientation(exif(value, false))).toBe(value);
+  });
+
+  it('reads 1 from anything else', () => {
+    expect(jpegOrientation(Buffer.from('not a jpeg'))).toBe(1);
+    expect(jpegOrientation(Buffer.from([0xff, 0xd8, 0xff, 0xda, 0, 2]))).toBe(1);
+    expect(jpegOrientation(exif(42, true))).toBe(1);
+    expect(jpegOrientation(exif(6, true).subarray(0, 20))).toBe(1);
   });
 });

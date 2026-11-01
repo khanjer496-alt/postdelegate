@@ -20,11 +20,13 @@ const { cleanupStudioV1 } = proxyActivities<StudioActivity>({
 
 // Once a day: removes the stored music of deleted Studio projects and the
 // music no project has used for a week, and forgets render records older
-// than 90 days (the videos stay in the media library). A failed run waits
-// for the next day; what it missed is still there then
+// than 90 days (the videos stay in the media library). Ends when the
+// cleanup is switched off. A failed run waits for the next day; what it
+// missed is still there then
 export async function studioCleanupWorkflowV1(): Promise<void> {
   try {
-    await cleanupStudioV1({});
+    const result = await cleanupStudioV1({});
+    if (!result.enabled) return;
   } catch (error) {
     if (isCancellation(error)) throw error;
   }
