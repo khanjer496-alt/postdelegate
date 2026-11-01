@@ -22,7 +22,8 @@
 .hero-proof a::before{content:'';width:6px;height:6px;border-radius:50%;background:#c8ff4d}
 .hero-proof a:hover{border-color:#777;background:#1d1d1d}
 .hero-proof span{color:#a3a3a3;font-weight:500}
-.home-hero h1{margin:30px 0 0;font-size:clamp(46px,5.9vw,86px);line-height:1.02;letter-spacing:-.055em;font-weight:800;max-width:11ch;text-wrap:balance}
+.hero-eyebrow{margin:28px 0 0}
+.home-hero h1{margin:14px 0 0;font-size:clamp(44px,5vw,74px);line-height:1.03;letter-spacing:-.055em;font-weight:800;max-width:14ch;text-wrap:balance}
 .hero-mark{position:relative;white-space:nowrap;color:#c8ff4d;isolation:isolate}
 .hero-mark .pd-arc{left:0;right:.12em;bottom:-.1em;height:.16em;color:#7357ff;z-index:-1}
 .hero-description{margin:30px 0 0;color:#cfcfcf;font-size:20px;line-height:1.55;max-width:520px;letter-spacing:-.015em;text-wrap:pretty}
@@ -337,6 +338,21 @@
 .channel-pill.is-soon b{color:#cfcfcf}
 .channel-pill.is-soon:hover{border-color:#555;background:#181818}
 .channels-foot{text-align:center}
+.channel-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:56px 0 0;padding:0;list-style:none}
+.channel-grid .channel-pill{width:100%;height:100%;padding-right:14px;white-space:normal}
+.channels-pending{margin:28px 0 0;color:#a3a3a3;font-size:15px;line-height:1.7;text-align:center}
+.channels-pending .text-link{margin-left:6px;white-space:nowrap}
+.compare-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:48px 0 0;padding:0;list-style:none}
+.compare-row a{position:relative;display:block;height:100%;padding:24px 46px 24px 24px;border:1px solid #303030;border-radius:20px;background:#151515;transition:border-color .2s,transform .2s}
+.compare-row a:hover{border-color:#7357ff;transform:translateY(-3px)}
+.compare-row h3{font-size:18px;font-weight:750;letter-spacing:-.02em;color:#fff}
+.compare-row p{margin-top:8px;color:#acacac;font-size:14px;line-height:1.65}
+.compare-row a>span{position:absolute;top:22px;right:22px;color:#c8ff4d}
+.compare-section .eyebrow{margin-bottom:22px}.compare-section{padding-top:40px}
+.compare-more{margin-top:26px;text-align:center}.compare-more .text-link,.channels-pending .text-link{color:#d1bfff}
+.home-pricing-trial{max-width:640px;margin:22px auto 0;color:#a3a3a3;font-size:13px;line-height:1.75;text-align:center}
+@media(max-width:1000px){.channel-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.compare-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.channel-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:36px}.channel-grid .channel-pill{gap:10px;padding:8px 10px 8px 8px}.channel-grid .channel-pill>span:first-child{width:40px;height:40px}.channel-grid .channel-pill b{font-size:14px}.compare-row{grid-template-columns:1fr}}
 
 /* ---------- Proof ---------- */
 .proof-section{text-align:center;padding-top:130px}
