@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Nostr
-description: Connect a Nostr identity with its hex private key and publish notes to a set of public relays.
+description: Connect a Nostr identity to PostDelegate with its hex private key and publish scheduled notes to public relays. How publishing works, settings and fixes.
 ---
 
 ## What you need

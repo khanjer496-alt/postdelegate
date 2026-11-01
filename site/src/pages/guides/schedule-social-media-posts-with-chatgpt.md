@@ -61,7 +61,7 @@ Open the link or your calendar and read the post as it will appear. Posts create
 
 ## Step 4: tighten the draft
 
-Drafts are cheap, so iterate. Ask ChatGPT to shorten the text, change the tone or move the time. For networks with a length limit it helps to say the number, for example "under 300 characters for Bluesky". Dates and times in the app follow the timezone in your profile settings, so mention your timezone if the time matters.
+Drafts are cheap, so iterate. Ask ChatGPT to shorten the text, change the tone or move the time. For networks with a length limit it helps to say the number, for example "under 300 characters for Bluesky". Dates and times in the app follow the timezone in **Settings > Global Settings**, so mention your timezone if the time matters.
 
 Some networks need more than text. A WordPress post needs a title and a status, a Hashnode article needs a publication and a tag, and a YouTube video needs a video file and a visibility choice. ChatGPT reads these requirements from the channel's schema. Check them in the calendar anyway; the [channel guides](/docs/channels) list the fields.
 

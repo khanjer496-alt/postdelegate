@@ -17,7 +17,7 @@ const rows: [string, (plan: typeof PLANS[number]) => string][] = [
   ['Free trial', () => `${TRIAL_DAYS} days`],
 ];
 ---
-<Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month. Every plan starts with a ${TRIAL_DAYS}-day free trial, no credit card needed.`}>
+<Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month, with channels, team members and webhooks compared by plan. Every plan has a ${TRIAL_DAYS}-day free trial, no credit card needed.`}>
   <PageHero eyebrow="Plans" title={`Pick a plan. Try it free for ${TRIAL_DAYS} days.`} lead="The plans differ in how many channels you connect, whether your team joins you and how many webhooks you run. Everything else comes with every plan.">
     <a href={SITE.signup} class="button">{CTA_LABEL}</a>
     <a href="/docs/billing" class="button button-outline">Read the billing guide</a>

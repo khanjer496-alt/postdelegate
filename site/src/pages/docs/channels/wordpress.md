@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: WordPress
-description: Connect a WordPress site with an application password and publish posts or pages with categories, tags and a featured image.
+description: Connect a WordPress site with an application password and schedule posts or pages with categories, tags and a featured image. Post settings and fixes.
 ---
 
 ## What you need

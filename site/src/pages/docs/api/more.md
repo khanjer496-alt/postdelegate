@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Analytics and other endpoints
-description: Channel and post analytics, notifications, free-slot suggestions and account information.
+description: PostDelegate API reference for channel and post analytics, notifications, free time slot suggestions, connection checks and the account behind your API key.
 ---
 
 All paths are relative to `https://app.postdelegate.com/api/public/v1`.

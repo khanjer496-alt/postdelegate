@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Plans and billing
-description: What each PostDelegate plan includes, how the 7-day trial works and how to cancel.
+description: "PostDelegate plans from $19 to $79 a month: channels, team members and API access on each plan, extra channels, the 7-day trial with no card, and how to cancel."
 ---
 
 ## Plans

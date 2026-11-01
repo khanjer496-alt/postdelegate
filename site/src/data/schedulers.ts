@@ -365,13 +365,13 @@ export const SCHEDULERS: Scheduler[] = [
     intro: "Add the PostDelegate bot to a Discord server you manage, then schedule messages with Markdown, images and videos to the channel you pick.",
     about: [
       "Discord servers run on announcements: patch notes, event reminders, stream alerts and the weekly community call. PostDelegate sends each scheduled post as a message from its bot to the channel you choose, so the announcement goes out on time without anyone online to press send.",
-      "Text can run to 1,980 characters, and bold, underline, headings, bullet lists and links are kept as Discord Markdown. Images and videos are uploaded as files with the message, up to Discord's 10 per message. You can mention members, @here and @everyone. The first follow-up entry opens a thread on your message.",
+      "Text can run to 1,980 characters, and bold, underline, headings, bullet lists and links are kept as Discord Markdown. Images and videos are uploaded as files with the message, up to Discord's 10 per message. You can mention members, @here and @everyone. Follow-up entries go into one thread on your message.",
     ],
     steps: [
       { name: "Add the bot to your server", text: "On the calendar page choose Add Channel, then Discord. Choose the server and approve. You need the Manage Server permission there. The bot is allowed to send messages, create threads and send messages in threads." },
       { name: "Write the message", text: "Choose Create Post and select the Discord server. Write the message with bold, headings, lists and links, and attach images or videos if you like." },
       { name: "Pick the Discord channel", text: "Choose the channel to post to in the post settings. Pick a text or announcement channel. For a private channel, give the bot access to it in Discord first." },
-      { name: "Schedule it", text: "Pick a date and time and choose Add to Calendar. Use Add comment to post a follow-up in a thread under the first message." },
+      { name: "Schedule it", text: "Pick a date and time and choose Add to Calendar. Use Add comment to post follow-ups in a thread under the first message." },
     ],
     plan: ["Add the PostDelegate bot to a server from Add Channel.", "Write a message with Markdown, media and mentions.", "Choose the Discord channel each post goes to."],
     settings: [

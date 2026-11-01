@@ -75,7 +75,7 @@ Two details about the format:
 - A date with an offset, such as `2026-11-03T09:30:00+01:00` or ending in `Z`, uses that offset and ignores the `timezone` column.
 - A date that does not exist, such as `2026-02-31`, is rejected rather than moved to the next month.
 
-If you plan posts for audiences in several regions, the `timezone` column lets each row use its own. Leave it empty to use the timezone in your profile settings.
+If you plan posts for audiences in several regions, the `timezone` column lets each row use its own. Leave it empty to use the timezone in **Settings > Global Settings**.
 
 ## Step 5: find the settings a channel needs
 

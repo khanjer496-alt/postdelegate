@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Hashnode
-description: Connect a Hashnode account with an API key and publish Markdown articles to one of your publications.
+description: Connect a Hashnode account to PostDelegate with an API key and schedule Markdown articles to one of your publications. What you need, post settings and fixes.
 ---
 
 ## What you need

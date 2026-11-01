@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Uploads and media API
-description: Upload an image or video, fetch one from a public URL, list your media library and check whether an adjusted file is ready.
+description: "PostDelegate API reference for media: upload an image or video, fetch one from a public URL, list your media library and check if an adjusted file is ready."
 ---
 
 Media in a post must already be in your media library. Upload first, then pass the returned `id` and `path` in a post's `value[].image`. See [Media library](/docs/media) for supported formats and size limits: images up to 10 MB, MP4 video up to 1 GB.

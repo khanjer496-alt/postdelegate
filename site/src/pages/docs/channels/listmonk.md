@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Listmonk
-description: Send an email campaign through your own self-hosted Listmonk when a post goes out.
+description: Connect your self-hosted Listmonk to PostDelegate and send an email campaign when a post goes out. What you need, campaign settings, content and fixes.
 ---
 
 Listmonk is open-source newsletter software you host yourself. Connecting it lets PostDelegate create a campaign in your Listmonk and start it on a schedule.

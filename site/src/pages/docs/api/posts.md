@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Posts API
-description: Create, list, update and delete posts. Request bodies and response shapes come straight from the PostDelegate API.
+description: "PostDelegate API reference for posts: create, list, update and delete posts and post groups, and change their status and settings, with full request bodies."
 ---
 
 All paths are relative to `https://app.postdelegate.com/api/public/v1` and need the `Authorization` header described in the [API overview](/docs/api).

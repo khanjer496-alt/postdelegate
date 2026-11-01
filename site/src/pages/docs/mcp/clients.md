@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Claude Code, Cursor and other MCP clients
-description: Copy-paste configuration for terminal and editor clients, using sign-in with PostDelegate or an API key.
+description: Copy-paste MCP configuration for Claude Code, Cursor, VS Code, Codex, Windsurf, Gemini CLI and other clients, using sign-in with PostDelegate or an API key.
 ---
 
 The snippets below are the ones PostDelegate shows under **Settings > Agents / Dev** in the app, with the address filled in. The configuration formats belong to each client and may change, so if a client rejects a snippet, check its own MCP documentation and use the address and header from this page.

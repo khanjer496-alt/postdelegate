@@ -70,7 +70,7 @@ Open that link, or open your calendar, and read the post as it will appear. Post
 A few things worth asking for in the prompt:
 
 - **The exact channel.** If you have two Bluesky accounts, name the one you mean.
-- **The time and your timezone.** Dates and times in the app follow the timezone in your profile settings. The API and webhooks use UTC.
+- **The time and your timezone.** Dates and times in the app follow the timezone in **Settings > Global Settings**. The API and webhooks use UTC.
 
 ## Step 4: review it in the calendar
 

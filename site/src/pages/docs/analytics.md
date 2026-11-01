@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Analytics and reports
-description: Workspace analytics with daily history, trends, daily view gains, top posts, best times and insights, CSV exports, PDF and scheduled reports, and the weekly summary email.
+description: Workspace analytics with daily history, view gains, top posts and best times, plus CSV exports, PDF and scheduled reports, and a weekly summary email.
 ---
 
 Open **Analytics** from the main menu. The top of the page is **Workspace analytics**, which covers every channel in the workspace. Below it, each channel on a network that shares statistics has its own view.

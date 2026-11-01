@@ -74,7 +74,7 @@ You can delay a follow-up so it appears after the first note rather than immedia
 
 ## Step 5: schedule it
 
-Pick a date and time. Dates and times follow the timezone in your profile settings. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**. Then choose:
 
 | Choice | What happens |
 | --- | --- |

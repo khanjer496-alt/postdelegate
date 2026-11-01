@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Webhooks
-description: Receive an HTTP request at your own address each time a post is published, and learn exactly what the request contains.
+description: "Receive an HTTP request each time PostDelegate publishes a post: how to create a webhook, what the request contains, how delivery works and a sample receiver."
 ---
 
 A webhook is an address on your server that PostDelegate calls when something happens. Use one to log published posts, update a spreadsheet, tell your team in chat, or trigger the next step in your own workflow, without polling the API.

@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Connect ChatGPT
-description: Add PostDelegate to ChatGPT as a custom connector so ChatGPT can draft and schedule posts on your calendar.
+description: Add PostDelegate to ChatGPT as a custom connector so ChatGPT can draft and schedule posts on your calendar. Setup steps, how to use it and good habits to keep.
 ---
 
 ChatGPT connects to PostDelegate as a **custom connector**. You sign in with your PostDelegate account, so there is no API key to copy.

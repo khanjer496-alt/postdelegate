@@ -78,7 +78,7 @@ Edit the post and send it for review again, with **Submit for review** or a new 
 
 When the client or an approver approves, the post is scheduled for its planned time and shows **Approved** on the calendar. If that time passed while the post waited, approving publishes it right away. In the app, an approver is asked to confirm with **Approve and publish now**.
 
-Before you share a link, check the channels, the date and time (in your profile's timezone) and any network-specific fields, such as a video's title.
+Before you share a link, check the channels, the date and time (in the timezone set in **Settings > Global Settings**) and any network-specific fields, such as a video's title.
 
 ## Step 8: confirm and keep the record
 

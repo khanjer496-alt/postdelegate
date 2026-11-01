@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Lemmy
-description: Connect to a Lemmy instance with your username and password, then publish posts to one or more communities.
+description: Connect to a Lemmy instance from PostDelegate with your username and password, then schedule posts to one or more communities. Post settings, limits and fixes.
 ---
 
 ## What you need

@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Studio
-description: Turn videos and pictures from your media library into vertical 1080×1920 videos (hooks, captions, slideshows, before/after, top lists and quote cards, with your own music), rendered by PostDelegate and saved back to your library.
+description: Make vertical 1080×1920 videos from your videos and pictures, with hooks, captions, slideshows, before/after, top lists, quote cards and your own music.
 ---
 
 Studio makes short vertical videos from the videos and pictures you already have. Pick them from your [media library](/docs/media), trim, choose what stays in the vertical frame, add text and, if you like, your own music. PostDelegate renders the video on its own servers and saves it to your media library, so it is ready for the composer. Open it from **Studio** in the main menu.

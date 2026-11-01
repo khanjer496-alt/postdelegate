@@ -61,7 +61,7 @@ People who only need the headline see the headline. People who need the detail f
 
 ## Step 5: schedule it
 
-Pick a date and time. Dates and times follow the timezone in your profile settings, which matters if your team is spread across timezones. Then choose:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**, which matters if your team is spread across timezones. Then choose:
 
 | Choice | What happens |
 | --- | --- |

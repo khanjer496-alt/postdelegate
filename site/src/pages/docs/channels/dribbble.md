@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Dribbble
-description: Connect Dribbble by signing in with Dribbble and publish scheduled shots, each with a title and one image.
+description: Connect Dribbble to PostDelegate by signing in with Dribbble, then schedule shots, each with a title and one image. What gets published, settings and fixes.
 ---
 
 Dribbble is a showcase for designers. Connecting it lets PostDelegate publish scheduled shots to your profile.

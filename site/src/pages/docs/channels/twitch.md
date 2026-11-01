@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Twitch
-description: Connect a Twitch channel by signing in with Twitch and send scheduled chat messages or announcements to your channel's chat.
+description: Connect a Twitch channel to PostDelegate by signing in with Twitch, then send scheduled chat messages or announcements to your chat. Settings and fixes.
 ---
 
 Twitch is a live-streaming platform. Connecting it lets PostDelegate send a scheduled message or announcement to your channel's chat.

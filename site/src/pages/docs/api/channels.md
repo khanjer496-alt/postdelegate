@@ -1,12 +1,12 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Channels and customers API
-description: List your channels and customer groups, read the settings a network needs, call helper lookups and start a connection.
+description: "PostDelegate API reference for channels: list channels and customer groups, read the settings each network needs, call helper lookups and start a connection."
 ---
 
 All paths are relative to `https://app.postdelegate.com/api/public/v1`.
 
-Each channel has an `identifier` that names its network. For the networks you can connect today the identifiers are `youtube`, `bluesky`, `devto`, `hashnode`, `lemmy`, `listmonk`, `medium`, `nostr` and `wordpress`.
+Each channel has an `identifier` that names its network. For the networks you can connect today the identifiers are `youtube`, `bluesky`, `telegram`, `discord`, `slack`, `tumblr`, `lemmy`, `nostr`, `twitch`, `kick`, `dribbble`, `devto`, `medium`, `wordpress`, `hashnode` and `listmonk`.
 
 ### `GET /integrations`
 

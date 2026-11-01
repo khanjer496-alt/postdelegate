@@ -57,7 +57,7 @@ Two details help:
 
 ## Step 5: choose when it goes out
 
-Pick a date and time. Dates and times follow the timezone in your profile settings. Then choose one of three options:
+Pick a date and time. Dates and times follow the timezone in **Settings > Global Settings**. Then choose one of three options:
 
 | Choice | What happens |
 | --- | --- |
