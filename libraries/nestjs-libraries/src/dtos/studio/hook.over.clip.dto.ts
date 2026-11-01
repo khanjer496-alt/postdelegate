@@ -17,6 +17,6 @@ export class HookOverClipDto extends StudioClipDto {
 
   @IsOptional()
   @Type(() => StudioMusicDto)
-  @ValidateNested()
+  @ValidateNested({ message: 'Add the music again' })
   music?: StudioMusicDto;
 }

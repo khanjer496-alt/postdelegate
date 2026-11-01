@@ -28,34 +28,44 @@ export const STUDIO_MUSIC_UPLOAD: UploadRules = {
     'Music must be an MP3, M4A or WAV file. An M4A saved as an MP4 video is refused, export it again as M4A or MP3.',
 };
 
+// shown to the customer as they are, like studio.clip.dto.ts
+const MUSIC = { message: 'Add the music again' };
+const MUSIC_START = {
+  message: `Start the music within its first ${
+    STUDIO_MAX_SOURCE_SECONDS / 60
+  } minutes`,
+};
+const MUSIC_VOLUME = { message: 'Pick a music level between 0 and 100%' };
+
 export class StudioMusicDto {
-  @IsDefined()
-  @IsUUID()
+  @IsDefined(MUSIC)
+  @IsUUID(undefined, MUSIC)
   assetId: string;
 
-  // what the editor shows and plays; never read by the render
+  // what the editor shows and plays; never read by the render, and always
+  // replaced by the server with the asset's own
   @IsOptional()
-  @IsString()
-  @MaxLength(100)
+  @IsString(MUSIC)
+  @MaxLength(100, MUSIC)
   name?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(2000)
+  @IsString(MUSIC)
+  @MaxLength(2000, MUSIC)
   path?: string;
 
   // where the track starts, in seconds
   @IsOptional()
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(0)
-  @Max(STUDIO_MAX_SOURCE_SECONDS)
+  @IsNumber({ allowNaN: false, allowInfinity: false }, MUSIC_START)
+  @Min(0, MUSIC_START)
+  @Max(STUDIO_MAX_SOURCE_SECONDS, MUSIC_START)
   start?: number;
 
   // the level of the music under the sound of the clip, 0 to 1. Music on its
   // own is brought to the same loudness as every other video
   @IsOptional()
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @Min(0)
-  @Max(1)
+  @IsNumber({ allowNaN: false, allowInfinity: false }, MUSIC_VOLUME)
+  @Min(0, MUSIC_VOLUME)
+  @Max(1, MUSIC_VOLUME)
   volume?: number;
 }

@@ -833,13 +833,17 @@ const slideshowLength = (spec: StudioSpec) => {
 };
 
 // The templates made of pictures and clips: what a new project starts with,
-// how long the video is, when it can render, and its editor and settings.
-// A new template of this kind adds an entry
+// how long the video is, what it still needs before it can render (shown by
+// the render button, nothing when it can), and its editor and settings. A
+// new template of this kind adds an entry
 export const studioMediaTemplates: Record<
   string,
   {
     defaults: Partial<StudioSpec>;
-    ready: (spec: StudioSpec) => boolean;
+    missing: (
+      spec: StudioSpec,
+      t: ReturnType<typeof useT>
+    ) => string | undefined;
     duration: (spec: StudioSpec) => number;
     Editor: FC<StudioMediaEditorProps>;
     Settings: FC<StudioSettingsProps>;
@@ -847,26 +851,54 @@ export const studioMediaTemplates: Record<
 > = {
   'image-slideshow': {
     defaults: { slides: [], transition: 'fade', style: 'bold', position: 'bottom' },
-    ready: (spec) => (spec.slides || []).length >= MIN_SLIDES,
+    missing: (spec, t) =>
+      (spec.slides || []).length < MIN_SLIDES
+        ? t('studio_slides_missing', 'Add at least {{count}} pictures', {
+            count: MIN_SLIDES,
+          })
+        : undefined,
     duration: slideshowLength,
     Editor: SlideshowEditor,
     Settings: SlideshowSettings,
   },
   'before-after': {
     defaults: { layout: 'stack', seconds: 6, style: 'bold' },
-    ready: (spec) => !!spec.before?.mediaId && !!spec.after?.mediaId,
+    missing: (spec, t) =>
+      !spec.before?.mediaId
+        ? t('studio_before_missing', 'Pick the before picture or video')
+        : !spec.after?.mediaId
+        ? t('studio_after_missing', 'Pick the after picture or video')
+        : undefined,
     duration: (spec) => spec.seconds || 6,
     Editor: BeforeAfterEditor,
     Settings: BeforeAfterSettings,
   },
   'top-n-list': {
     defaults: { title: '', items: [], style: 'bold' },
-    ready: (spec) =>
-      !!spec.title?.trim() &&
-      (spec.items || []).length >= MIN_ITEMS &&
-      (spec.items || []).every(
-        (item) => !!item.label.trim() && (!item.trim || item.trim.end > item.trim.start)
-      ),
+    missing: (spec, t) => {
+      const items = spec.items || [];
+      const unlabelled = items.findIndex((item) => !item.label.trim());
+      const untrimmed = items.findIndex(
+        (item) => !!item.trim && item.trim.end <= item.trim.start
+      );
+      return !spec.title?.trim()
+        ? t('studio_list_title_missing', 'Add a title')
+        : items.length < MIN_ITEMS
+        ? t('studio_items_missing', 'Add at least {{count}} pictures or clips', {
+            count: MIN_ITEMS,
+          })
+        : unlabelled !== -1
+        ? t('studio_item_label_missing', 'Item {{n}}: Add a label', {
+            n: unlabelled + 1,
+          })
+        : untrimmed !== -1
+        ? t(
+            'studio_item_trim_missing',
+            'Item {{n}}: The end must be after the start',
+            { n: untrimmed + 1 }
+          )
+        : undefined;
+    },
     duration: (spec) =>
       (spec.items || []).reduce(
         (all, item) => all + studioListItemLength(item),
@@ -882,7 +914,10 @@ export const studioMediaTemplates: Record<
       seconds: 8,
       style: 'bold',
     },
-    ready: (spec) => !!spec.quote?.trim(),
+    missing: (spec, t) =>
+      !spec.quote?.trim()
+        ? t('studio_quote_missing', 'Write the quote')
+        : undefined,
     duration: (spec) => spec.seconds || 8,
     Editor: QuoteEditor,
     Settings: QuoteSettings,
@@ -925,7 +960,7 @@ export const StudioMediaEditor: FC<{
       const data = await response.json().catch(() => ({}));
       toaster.show(
         Array.isArray(data?.message)
-          ? data.message.join(', ')
+          ? data.message.join('. ')
           : data?.message || t('studio_save_failed', 'Could not save'),
         'warning'
       );
@@ -1001,7 +1036,7 @@ export const StudioMediaEditor: FC<{
           <StudioRenderPanel
             projectId={project.id}
             latest={project.renders?.[0]}
-            ready={kind.ready(spec)}
+            missing={kind.missing(spec, t)}
             tooLong={duration > STUDIO_MAX_SECONDS}
             save={save}
             onRendered={onChanged}

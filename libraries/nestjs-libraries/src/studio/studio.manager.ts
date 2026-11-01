@@ -13,13 +13,32 @@ import {
 // (a hook being typed, a caption word being fixed) counting as missing, and
 // a list still being filled (a slideshow with one picture so far)
 const DRAFT_SKIPS = ['isDefined', 'minLength', 'arrayMinSize'];
-const messages = (errors: ValidationError[], partial: boolean): string[] => [
+
+// A part a spec holds several of (a slide, an item) or two alike (before and
+// after) names itself with a static "studioLabel", so its messages say which
+// one is wrong: "Slide 2: Pick a picture"
+const label = (error: ValidationError) => {
+  const name = (error.value?.constructor as { studioLabel?: string })
+    ?.studioLabel;
+  if (!name) {
+    return '';
+  }
+  return /^\d+$/.test(error.property)
+    ? `${name} ${Number(error.property) + 1}: `
+    : `${name}: `;
+};
+
+const messages = (
+  errors: ValidationError[],
+  partial: boolean,
+  prefix = ''
+): string[] => [
   ...new Set(
     errors.flatMap((error) => [
       ...Object.entries(error.constraints || {})
         .filter(([key]) => !partial || !DRAFT_SKIPS.includes(key))
-        .map(([, message]) => message),
-      ...messages(error.children || [], partial),
+        .map(([, message]) => prefix + message),
+      ...messages(error.children || [], partial, prefix + label(error)),
     ])
   ),
 ];

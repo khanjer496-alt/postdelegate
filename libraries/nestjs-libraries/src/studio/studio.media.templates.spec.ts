@@ -449,6 +449,48 @@ describe('Studio picture and clip spec validation', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('says which slide, item or side is wrong, in words for the customer', async () => {
+    const reasons = async (template: string, spec: unknown) =>
+      (
+        (await manager()
+          .validateSpec(template, spec, false)
+          .catch((err) => err)) as BadRequestException
+      ).getResponse() as { message: string[] };
+
+    expect(
+      (
+        await reasons('image-slideshow', {
+          ...slideshowSpec,
+          slides: [slideshowSpec.slides[0], { mediaId: id, seconds: 9 }],
+        })
+      ).message
+    ).toEqual(['Slide 2: Show each picture for 1.5 to 5 seconds']);
+    expect(
+      (
+        await reasons('top-n-list', {
+          ...listSpec,
+          items: [...listSpec.items.slice(0, 2), { mediaId: 'x', label: '' }],
+        })
+      ).message
+    ).toEqual(
+      expect.arrayContaining([
+        'Item 3: Pick a picture or video from your media library',
+        'Item 3: Add a label',
+      ])
+    );
+    expect(
+      (
+        await reasons('before-after', {
+          ...beforeAfterSpec,
+          before: { mediaId: id, label: 'x'.repeat(41) },
+        })
+      ).message
+    ).toEqual(['Before: A label is 40 characters at most']);
+    expect(
+      (await reasons('quote-card', { ...quoteSpec, seconds: 30 })).message
+    ).toEqual(['Make the video 5 to 15 seconds long']);
+  });
+
   it('lets a draft hold fewer items than a render needs, never more', async () => {
     await expect(
       manager().validateSpec(
