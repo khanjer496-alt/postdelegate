@@ -17,6 +17,7 @@ import { ApprovalStatusBadge } from '@gitroom/frontend/components/approvals/appr
 import { useApprovalActions } from '@gitroom/frontend/components/approvals/approval.actions';
 import { ActivityRow } from '@gitroom/frontend/components/approvals/activity.item';
 import { ShareApprovalModal } from '@gitroom/frontend/components/approvals/share.approval.modal';
+import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 
 const actionClass =
   'h-[36px] px-[14px] rounded-[8px] text-[13px] font-[600] outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary disabled:opacity-50 disabled:cursor-not-allowed';
@@ -154,7 +155,18 @@ export const PostReviewPanel: FC<{
                   disabled={busy}
                   onClick={() =>
                     run(
-                      () =>
+                      async () =>
+                        // approving here publishes the saved version, the
+                        // editor's unsaved edits are dropped with the modal
+                        (await deleteDialog(
+                          t(
+                            'approval_approve_saved_confirm',
+                            'Approving publishes the saved version. Unsaved edits in the editor will be lost. To keep them, save with "Approve and schedule" instead.'
+                          ),
+                          t('approval_approve', 'Approve'),
+                          t('approval_approve_saved_title', 'Approve the saved version?'),
+                          t('approval_cancel', 'Cancel')
+                        )) &&
                         actions.approve(
                           { id: postId, publishDate },
                           false,
