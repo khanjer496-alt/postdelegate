@@ -72,7 +72,7 @@ Media comes from your device or the [media library](/docs/media). If Telegram ca
 
 ## Step 5: add follow-up messages
 
-Use **Add post in a thread** to add more entries to the same post. On Telegram, follow-up entries are sent as replies to the first message.
+Use **Add comment** to add more entries to the same post. On Telegram, follow-up entries are sent as replies to the first message.
 
 That solves the caption limit neatly: a photo with a short caption first, then the full text as a reply. It also suits a long announcement split into readable parts.
 
@@ -115,6 +115,6 @@ If you use Claude or ChatGPT, connect PostDelegate over MCP and ask for **drafts
 
 ## Next steps
 
-The [Telegram scheduler page](/telegram-scheduler) is the short version of this guide, and the [Telegram channel guide](/docs/channels/telegram) is the reference. For other community chats, read [how to schedule Slack announcements](/guides/slack-scheduled-announcements) and [Discord announcement scheduling](/guides/discord-announcement-scheduling), which is coming soon.
+The [Telegram scheduler page](/telegram-scheduler) is the short version of this guide, and the [Telegram channel guide](/docs/channels/telegram) is the reference. For other community chats, read [how to schedule Slack announcements](/guides/slack-scheduled-announcements) and [how to schedule Discord announcements](/guides/discord-announcement-scheduling).
 
 Ready? [Start your 7-day free trial](https://app.postdelegate.com/auth). No credit card is required.

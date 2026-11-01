@@ -38,6 +38,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Dribbble', href: '/docs/channels/dribbble', description: 'Publish shots with Dribbble sign-in.' },
     { title: 'Slack', href: '/docs/channels/slack', description: 'Add PostDelegate to a Slack workspace.' },
     { title: 'Telegram', href: '/docs/channels/telegram', description: 'Add @PostDelegateBot to a channel or group.' },
+    { title: 'Discord', href: '/docs/channels/discord', description: 'Add the PostDelegate bot to a Discord server.' },
     { title: 'Coming soon', href: '/docs/channels/coming-soon', description: 'Networks waiting on platform approval.' },
   ] },
   { title: 'REST API', items: [

@@ -97,7 +97,7 @@ If you plan a whole month at once, a spreadsheet can be faster than the composer
 
 ## Tell the rest of your audience too
 
-Chat only reaches people who are already watching. On the same calendar you can schedule the announcement to the places your audience follows you between streams, such as a Bluesky post before you go live, or a message in a community Slack. See [how to schedule Bluesky posts](/guides/schedule-bluesky-posts) and [Slack announcements](/guides/slack-scheduled-announcements). If your community lives on Discord, read [how Discord announcement scheduling will work](/guides/discord-announcement-scheduling). Discord is coming soon.
+Chat only reaches people who are already watching. On the same calendar you can schedule the announcement to the places your audience follows you between streams, such as a Bluesky post before you go live, or a message in your Discord server or a community Slack. See [how to schedule Bluesky posts](/guides/schedule-bluesky-posts), [Discord announcements](/guides/discord-announcement-scheduling) and [Slack announcements](/guides/slack-scheduled-announcements).
 
 ## Troubleshooting
 
