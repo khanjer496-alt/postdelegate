@@ -3,10 +3,12 @@ import {
   ActivityFailure,
   ApplicationFailure,
   CancellationScope,
+  TimeoutFailure,
   isCancellation,
   proxyActivities,
   sleep,
 } from '@temporalio/workflow';
+import { TimeoutType } from '@temporalio/common';
 import { StudioActivity } from '@gitroom/orchestrator/activities/studio.activity';
 
 // Bookkeeping is idempotent: ride out an outage of a few minutes
@@ -25,8 +27,10 @@ const { prepareStudioRenderV1, finishStudioRenderV1, failStudioRenderV1 } =
 // The render runs on its own queue, so the number of ffmpeg processes is the
 // concurrency of that queue (STUDIO_RENDER_CONCURRENCY) and never competes
 // with publishing. A retry downloads and renders again, which only costs
-// time. A cancel waits for ffmpeg to stop and the folder to be removed
+// time. A cancel waits for ffmpeg to stop and the folder to be removed. A
+// render no worker picked up within the hour gives up (Studio is busy)
 const { renderStudioV1 } = proxyActivities<StudioActivity>({
+  scheduleToStartTimeout: '1 hour',
   startToCloseTimeout: '30 minute',
   heartbeatTimeout: '2 minute',
   taskQueue: 'studio',
@@ -41,6 +45,15 @@ const { renderStudioV1 } = proxyActivities<StudioActivity>({
 // Only a "studio_stop" was written for the customer, anything else is logged
 const reason = (err: any) => {
   const cause = err instanceof ActivityFailure ? err.cause : err;
+  if (
+    cause instanceof TimeoutFailure &&
+    cause.timeoutType === TimeoutType.SCHEDULE_TO_START
+  ) {
+    return {
+      error: 'Studio is busy, try again in a few minutes',
+      customer: true,
+    };
+  }
   return {
     error: cause?.message || 'Render failed',
     customer:

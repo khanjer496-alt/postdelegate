@@ -5,7 +5,11 @@ import { TalkingHeadCaptionsTemplate } from '@gitroom/nestjs-libraries/studio/te
 
 @Global()
 @Module({
-  providers: [HookOverClipTemplate, TalkingHeadCaptionsTemplate, StudioTemplateManager],
+  providers: [
+    HookOverClipTemplate,
+    TalkingHeadCaptionsTemplate,
+    StudioTemplateManager,
+  ],
   get exports() {
     return this.providers;
   },

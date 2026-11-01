@@ -85,10 +85,7 @@ export class StudioController {
   }
 
   @Post('/projects/:id/render')
-  startRender(
-    @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string
-  ) {
+  startRender(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
     return this._studioService.startRender(org, id);
   }
 

@@ -201,16 +201,23 @@ export class StudioRepository {
       },
       select: {
         id: true,
+        projectId: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
   }
 
-  countQueuedRenders() {
+  // Only renders touched lately: one whose workflow died must not hold the
+  // queue of every workspace until its own workspace comes back
+  countQueuedRenders(since: Date) {
     return this._studioRender.model.studioRender.count({
       where: {
         status: 'queued',
+        updatedAt: {
+          gte: since,
+        },
       },
     });
   }

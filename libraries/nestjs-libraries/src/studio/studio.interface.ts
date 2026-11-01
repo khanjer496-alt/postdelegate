@@ -170,9 +170,15 @@ export abstract class StudioTemplateAbstract<
     return Math.max(0, (spec.trim.end - spec.trim.start) / this.speed(spec));
   }
 
-  // TRIM: an accurate seek on the input, so only the window is decoded
+  // TRIM: an accurate seek on the input, so only the window is decoded. The
+  // input is a local mp4 and nothing else: no protocol or container that
+  // could make ffmpeg read another file or address
   protected trimmedInput(spec: T, file: string) {
     return [
+      '-protocol_whitelist',
+      'file',
+      '-format_whitelist',
+      'mov,mp4,m4a,3gp,3g2,mj2',
       '-ss',
       ffNumber(spec.trim.start),
       '-t',

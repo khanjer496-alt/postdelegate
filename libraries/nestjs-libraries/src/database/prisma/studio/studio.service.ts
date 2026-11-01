@@ -56,9 +56,15 @@ export const STUDIO_LIMITS = {
   maxPerDay: 30,
   trialRenders: 10,
 };
-// A workflow that died leaves its render running forever; after this long it
-// is closed so the next one can go
+// A workflow that died leaves its render running forever. A live render is
+// touched every 10 seconds while it waits and every 2 while it renders, and
+// waits at most an hour for a worker, so one untouched this long is closed
+// and the next one can go
 const STALE_HOURS = 2;
+// The only containers a render or a transcription opens: what the media
+// library stores. Nothing else (a playlist, a concat list) can make ffmpeg
+// read another file or address
+const INPUT_FORMATS = ['-format_whitelist', 'mov,mp4,m4a,3gp,3g2,mj2'];
 const MAX_INPUT_BYTES = 500 * 1024 * 1024;
 const MAX_INPUT_PIXELS = 4096;
 const VIDEO_CODECS = ['h264', 'hevc', 'vp8', 'vp9', 'av1', 'mpeg4'];
@@ -105,10 +111,10 @@ export class StudioService {
     return !!process.env.STRIPE_PUBLISHABLE_KEY && org.isTrailing;
   }
 
-  private isStale(render: { status: string; createdAt: Date }) {
+  private isStale(render: { status: string; updatedAt: Date }) {
     return (
       !STUDIO_FINAL_STATUSES.includes(render.status) &&
-      dayjs(render.createdAt).isBefore(dayjs().subtract(STALE_HOURS, 'hour'))
+      dayjs(render.updatedAt).isBefore(dayjs().subtract(STALE_HOURS, 'hour'))
     );
   }
 
@@ -193,8 +199,15 @@ export class StudioService {
     return this.getProject(org, id);
   }
 
+  // A render of the project that is still waiting or running is cancelled,
+  // nothing should land in the media library from a deleted project
   async deleteProject(org: string, id: string) {
     await this.getProject(org, id);
+    for (const render of (
+      await this._studioRepository.getActiveRenders(org)
+    ).filter((p) => p.projectId === id)) {
+      await this.cancelRender(org, render.id);
+    }
     await this._studioRepository.deleteProject(org, id);
     return { success: true };
   }
@@ -254,9 +267,23 @@ export class StudioService {
       );
     }
 
-    const words = body.script
-      ? wordsFromScript(body.script, trim.start, trim.end)
-      : await this.whisper(org, spec.input.mediaId, trim);
+    let words: ClippingWord[];
+    if (body.script) {
+      words = wordsFromScript(body.script, trim.start, trim.end);
+    } else {
+      // one transcription at a time per workspace: each runs ffmpeg here
+      // and spends the workspace's own OpenAI credit
+      if (
+        !(await ioRedis.set(`studioTranscribe:${org}`, '1', 'EX', 180, 'NX'))
+      ) {
+        throw new HttpException('A transcription is already running', 429);
+      }
+      try {
+        words = await this.whisper(org, spec.input.mediaId, trim);
+      } finally {
+        await ioRedis.del(`studioTranscribe:${org}`);
+      }
+    }
 
     await this.updateProject(org, id, {
       spec: {
@@ -301,6 +328,7 @@ export class StudioService {
           '-y',
           '-protocol_whitelist',
           'file,http,https,tcp,tls,crypto',
+          ...INPUT_FORMATS,
           '-ss',
           String(trim.start),
           '-t',
@@ -372,7 +400,9 @@ export class StudioService {
       false
     );
     if (spec.trim.end <= spec.trim.start) {
-      throw new BadRequestException('The end of the clip must be after its start');
+      throw new BadRequestException(
+        'The end of the clip must be after its start'
+      );
     }
 
     const seconds = template.instance.duration(spec);
@@ -479,8 +509,9 @@ export class StudioService {
     }
 
     if (
-      (await this._studioRepository.countQueuedRenders()) >=
-      STUDIO_LIMITS.maxQueuedGlobal
+      (await this._studioRepository.countQueuedRenders(
+        dayjs().subtract(STALE_HOURS, 'hour').toDate()
+      )) >= STUDIO_LIMITS.maxQueuedGlobal
     ) {
       throw new HttpException(
         'Studio is busy right now, try again in a few minutes',
@@ -511,10 +542,23 @@ export class StudioService {
       return render;
     }
 
+    const client = this._temporalService.client.getRawClient();
+    if (!client) {
+      throw new HttpException('Studio is not available', 503);
+    }
+
     try {
-      const client = this._temporalService.client.getRawClient();
-      await client!.workflow.getHandle(`studio_${id}`).cancel();
-    } catch (err) {
+      await client.workflow.getHandle(`studio_${id}`).cancel();
+    } catch (err: any) {
+      // Temporal could not be reached: the render may still be running, so
+      // it is not marked as cancelled
+      if (err?.name !== 'WorkflowNotFoundError') {
+        console.error(`Could not cancel studio render ${id}:`, err?.message);
+        throw new HttpException(
+          'The render could not be cancelled, try again',
+          503
+        );
+      }
       await this.failRender(id, 'Cancelled', true, true);
     }
 
@@ -539,6 +583,11 @@ export class StudioService {
     if (this.isStale(render)) {
       return 'gone';
     }
+
+    // every poll touches the render, so waiting never reads as stale
+    await this._studioRepository.updateRender(renderId, {
+      status: render.status,
+    });
 
     return active.find((p) => !this.isStale(p))?.id === renderId
       ? 'ready'
@@ -576,9 +625,14 @@ export class StudioService {
     });
 
     if (source.file) {
-      await pipeline(createReadStream(source.file), limit, createWriteStream(target), {
-        signal,
-      });
+      await pipeline(
+        createReadStream(source.file),
+        limit,
+        createWriteStream(target),
+        {
+          signal,
+        }
+      );
       return;
     }
 
@@ -611,6 +665,9 @@ export class StudioService {
           [
             '-v',
             'error',
+            '-protocol_whitelist',
+            'file',
+            ...INPUT_FORMATS,
             '-show_entries',
             'stream=codec_type,codec_name,width,height:format=duration',
             '-of',
@@ -782,8 +839,9 @@ export class StudioService {
 
         hooks.heartbeat?.(`downloading input ${index}`);
         const ext =
-          extname(source.media.name).toLowerCase().replace(/[^.a-z0-9]/g, '') ||
-          '.mp4';
+          extname(source.media.name)
+            .toLowerCase()
+            .replace(/[^.a-z0-9]/g, '') || '.mp4';
         const file = `source-${index}${ext}`;
         await this.download(source, join(dir, file), hooks.signal);
         const probed = await this.probe(dir, file);
@@ -805,10 +863,7 @@ export class StudioService {
       let saved = Date.now();
       await this.run(
         'ffmpeg',
-        [
-          ...this.ffmpegArgs(plan, duration),
-          'output.mp4',
-        ],
+        [...this.ffmpegArgs(plan, duration), 'output.mp4'],
         {
           cwd: dir,
           signal: hooks.signal,
@@ -870,6 +925,8 @@ export class StudioService {
         'jpg'
       );
 
+      // the media id is stored before anything else can fail, so a retry
+      // finds it and never saves the video a second time
       const name = render.project.name.slice(0, 90);
       const media = await this._mediaService.saveFile(
         org,
@@ -877,17 +934,16 @@ export class StudioService {
         video.path,
         `${name}.mp4`
       );
+      await this._studioRepository.updateRender(renderId, {
+        mediaId: media.id,
+        path: video.path,
+        thumbnail: thumbnail.path,
+      });
       await this._mediaService.saveMediaInformation(org, {
         id: media.id,
         alt: name,
         thumbnail: thumbnail.path,
         thumbnailTimestamp: 0,
-      });
-
-      await this._studioRepository.updateRender(renderId, {
-        mediaId: media.id,
-        path: video.path,
-        thumbnail: thumbnail.path,
       });
     } catch (err: any) {
       if (err instanceof StudioStop || hooks.signal?.aborted) {

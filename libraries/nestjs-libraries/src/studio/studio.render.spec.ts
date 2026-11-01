@@ -181,9 +181,7 @@ maybe('Studio render with ffmpeg', () => {
 
     const video = probe.streams.find((p: any) => p.codec_type === 'video');
     expect(video).toMatchObject({ width: 1080, height: 1920 });
-    expect(
-      probe.streams.some((p: any) => p.codec_type === 'audio')
-    ).toBe(true);
+    expect(probe.streams.some((p: any) => p.codec_type === 'audio')).toBe(true);
     // 2 seconds at double speed
     expect(Number(probe.format.duration)).toBeGreaterThan(0.9);
     expect(Number(probe.format.duration)).toBeLessThan(1.15);
@@ -200,8 +198,6 @@ maybe('Studio render with ffmpeg', () => {
       false
     );
     expect(plan.inputs).toHaveLength(2);
-    expect(
-      probe.streams.some((p: any) => p.codec_type === 'audio')
-    ).toBe(true);
+    expect(probe.streams.some((p: any) => p.codec_type === 'audio')).toBe(true);
   }, 60000);
 });

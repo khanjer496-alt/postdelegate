@@ -211,7 +211,7 @@ describe('StudioService fair use', () => {
       [1, 2, 3].map((i) => ({
         id: `r-${i}`,
         status: 'queued',
-        createdAt: new Date(),
+        updatedAt: new Date(),
       }))
     );
     expect(await status(service.startRender(paid, 'project-1'))).toBe(429);
@@ -219,8 +219,8 @@ describe('StudioService fair use', () => {
 
   it('allows a render to wait behind the running one', async () => {
     repository.getActiveRenders.mockResolvedValue([
-      { id: 'r-1', status: 'rendering', createdAt: new Date() },
-      { id: 'r-2', status: 'queued', createdAt: new Date() },
+      { id: 'r-1', status: 'rendering', updatedAt: new Date() },
+      { id: 'r-2', status: 'queued', updatedAt: new Date() },
     ]);
     expect(await status(service.startRender(paid, 'project-1'))).toBe(
       'resolved'
@@ -237,7 +237,7 @@ describe('StudioService fair use', () => {
   it('closes renders whose workflow died before counting the queue', async () => {
     const old = dayjs().subtract(3, 'hour').toDate();
     repository.getActiveRenders.mockResolvedValue(
-      [1, 2, 3].map((i) => ({ id: `r-${i}`, status: 'queued', createdAt: old }))
+      [1, 2, 3].map((i) => ({ id: `r-${i}`, status: 'queued', updatedAt: old }))
     );
     repository.getRenderById.mockResolvedValue({
       id: 'r-1',
@@ -290,6 +290,75 @@ describe('StudioService fair use', () => {
     });
   });
 
+  it('only counts queued renders touched lately against the server limit', async () => {
+    await service.startRender(paid, 'project-1');
+    const since = repository.countQueuedRenders.mock.calls[0][0] as Date;
+    expect(dayjs().diff(since, 'hour')).toBe(2);
+  });
+
+  it('cancels through the workflow and keeps the render when Temporal is down', async () => {
+    repository.getRender.mockResolvedValue({
+      id: 'render-1',
+      status: 'rendering',
+      updatedAt: new Date(),
+    });
+    await service.cancelRender('org-1', 'render-1');
+    expect(workflowCancel).toHaveBeenCalled();
+    expect(repository.updateRender).not.toHaveBeenCalled();
+
+    workflowCancel.mockRejectedValue(new Error('unavailable'));
+    expect(await status(service.cancelRender('org-1', 'render-1'))).toBe(503);
+    expect(repository.updateRender).not.toHaveBeenCalled();
+  });
+
+  it('closes a render whose workflow is gone when it is cancelled', async () => {
+    repository.getRender.mockResolvedValue({
+      id: 'render-1',
+      status: 'queued',
+      updatedAt: new Date(),
+    });
+    repository.getRenderById.mockResolvedValue({
+      id: 'render-1',
+      status: 'queued',
+      mediaId: null,
+    });
+    workflowCancel.mockRejectedValue(
+      Object.assign(new Error('gone'), { name: 'WorkflowNotFoundError' })
+    );
+    await service.cancelRender('org-1', 'render-1');
+    expect(repository.updateRender).toHaveBeenCalledWith('render-1', {
+      status: 'cancelled',
+      error: null,
+    });
+  });
+
+  it('cancels the waiting renders of a project it deletes', async () => {
+    repository.deleteProject = jest.fn();
+    repository.getActiveRenders.mockResolvedValue([
+      {
+        id: 'r-1',
+        projectId: 'project-1',
+        status: 'queued',
+        updatedAt: new Date(),
+      },
+      {
+        id: 'r-2',
+        projectId: 'project-2',
+        status: 'queued',
+        updatedAt: new Date(),
+      },
+    ]);
+    repository.getRender.mockResolvedValue({
+      id: 'r-1',
+      status: 'queued',
+      updatedAt: new Date(),
+    });
+    await service.deleteProject('org-1', 'project-1');
+    expect(workflowCancel).toHaveBeenCalledTimes(1);
+    expect(repository.getRender).toHaveBeenCalledWith('org-1', 'r-1');
+    expect(repository.deleteProject).toHaveBeenCalledWith('org-1', 'project-1');
+  });
+
   it('reports usage with the trial renders left', async () => {
     repository.countRendersSince.mockImplementation(
       async (_org: string, since?: Date) => (since ? 2 : 4)
@@ -331,18 +400,22 @@ describe('StudioService render turn', () => {
       id: 'r-2',
       organizationId: 'org-1',
       status: 'queued',
-      createdAt: new Date(),
+      updatedAt: new Date(),
     });
     repository.getActiveRenders.mockResolvedValue([
-      { id: 'r-1', status: 'rendering', createdAt: new Date() },
-      { id: 'r-2', status: 'queued', createdAt: new Date() },
+      { id: 'r-1', status: 'rendering', updatedAt: new Date() },
+      { id: 'r-2', status: 'queued', updatedAt: new Date() },
     ]);
     await expect(service.prepareRender('r-2')).resolves.toBe('wait');
 
     repository.getActiveRenders.mockResolvedValue([
-      { id: 'r-2', status: 'queued', createdAt: new Date() },
+      { id: 'r-2', status: 'queued', updatedAt: new Date() },
     ]);
     await expect(service.prepareRender('r-2')).resolves.toBe('ready');
+    // waiting touches the render so it never reads as stale
+    expect(repository.updateRender).toHaveBeenCalledWith('r-2', {
+      status: 'queued',
+    });
   });
 
   it('stops a render that was cancelled while it waited', async () => {
@@ -426,7 +499,16 @@ describe('StudioService transcribe', () => {
     ).toEqual(expect.objectContaining({ source: 'script', words }));
   });
 
+  it('runs one transcription at a time per workspace', async () => {
+    redisSet.mockResolvedValue(null);
+    expect(await status(service.transcribe('org-1', 'project-1', {}))).toBe(
+      429
+    );
+    expect(aiCredentialService.hasCredential).not.toHaveBeenCalled();
+  });
+
   it('asks for a key when there is no script and no key', async () => {
+    redisSet.mockResolvedValue('OK');
     const result = service.transcribe('org-1', 'project-1', {});
     await expect(result).rejects.toBeInstanceOf(BadRequestException);
     await expect(

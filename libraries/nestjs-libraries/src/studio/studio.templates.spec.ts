@@ -156,11 +156,7 @@ describe('Studio spec validation', () => {
 
   it('refuses a speed that is not offered and a focus off the picture', async () => {
     await expect(
-      manager().validateSpec(
-        'hook-over-clip',
-        { ...hookSpec, speed: 3 },
-        false
-      )
+      manager().validateSpec('hook-over-clip', { ...hookSpec, speed: 3 }, false)
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
       manager().validateSpec(

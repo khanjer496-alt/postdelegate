@@ -73,7 +73,11 @@ describe('groupCaptionLines', () => {
   it('ends a line at a pause', () => {
     expect(
       groupCaptionLines(
-        [word('Hello', 0, 0.4), word('there', 2, 2.4), word('friend', 2.4, 2.8)],
+        [
+          word('Hello', 0, 0.4),
+          word('there', 2, 2.4),
+          word('friend', 2.4, 2.8),
+        ],
         8,
         40
       ).map((line) => line.length)
@@ -83,7 +87,11 @@ describe('groupCaptionLines', () => {
   it('keeps a single long word on its own line and skips blanks', () => {
     expect(
       groupCaptionLines(
-        [word('Supercalifragilistic', 0, 1), word('  ', 1, 1.1), word('ok', 1.1, 1.3)],
+        [
+          word('Supercalifragilistic', 0, 1),
+          word('  ', 1, 1.1),
+          word('ok', 1.1, 1.3),
+        ],
         3,
         10
       ).map((line) => line.map((p) => p.text))

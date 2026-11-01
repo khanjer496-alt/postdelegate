@@ -51,7 +51,10 @@ export class HookOverClipTemplate extends StudioTemplateAbstract<HookOverClipDto
   plan(spec: HookOverClipDto, context: StudioPlanContext): StudioPlan {
     const audio = this.audio(spec, context, 1);
     return {
-      inputs: [this.trimmedInput(spec, context.inputs[0].file), ...audio.inputs],
+      inputs: [
+        this.trimmedInput(spec, context.inputs[0].file),
+        ...audio.inputs,
+      ],
       filterComplex: [
         `${this.videoIn(spec)},${this.cover(spec)},${this.subtitles(
           HOOK_FILE,

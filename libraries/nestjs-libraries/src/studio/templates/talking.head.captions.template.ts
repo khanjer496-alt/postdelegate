@@ -52,7 +52,9 @@ export class TalkingHeadCaptionsTemplate extends StudioTemplateAbstract<TalkingH
           'Captions',
           text
             .map((value, at) =>
-              at === index ? `{\\1c${highlight}}${value}{\\1c${assColor(color)}}` : value
+              at === index
+                ? `{\\1c${highlight}}${value}{\\1c${assColor(color)}}`
+                : value
             )
             .join(' ')
         )
@@ -76,14 +78,23 @@ export class TalkingHeadCaptionsTemplate extends StudioTemplateAbstract<TalkingH
 
   plan(spec: TalkingHeadCaptionsDto, context: StudioPlanContext): StudioPlan {
     const audio = this.audio(spec, context, 1);
-    const subtitles = `${this.subtitles(CAPTIONS_FILE, context)},format=yuv420p[vout]`;
+    const subtitles = `${this.subtitles(
+      CAPTIONS_FILE,
+      context
+    )},format=yuv420p[vout]`;
     const video =
       spec.fit === 'blur'
-        ? `${this.blur(this.videoIn(spec) + ',', '[framed]')};[framed]${subtitles}`
+        ? `${this.blur(
+            this.videoIn(spec) + ',',
+            '[framed]'
+          )};[framed]${subtitles}`
         : `${this.videoIn(spec)},${this.cover(spec)},${subtitles}`;
 
     return {
-      inputs: [this.trimmedInput(spec, context.inputs[0].file), ...audio.inputs],
+      inputs: [
+        this.trimmedInput(spec, context.inputs[0].file),
+        ...audio.inputs,
+      ],
       filterComplex: [video, audio.filter].join(';'),
       maps: ['-map', '[vout]', '-map', '[aout]'],
       files: [{ name: CAPTIONS_FILE, content: this.captionsAss(spec) }],
