@@ -19,6 +19,7 @@ import {
   newDayjs,
 } from '@gitroom/frontend/components/layout/set.timezone';
 import clsx from 'clsx';
+import { TimezoneHint } from '@gitroom/frontend/components/launches/helpers/date.picker';
 import {
   TrashIcon,
   PlusIcon,
@@ -176,6 +177,7 @@ export const TimeTable: FC<{
             {t('add', 'Add')}
           </button>
         </div>
+        <TimezoneHint newTab={true} className="mt-[12px]" />
       </div>
 
       {/* Time Slots List */}
