@@ -1,11 +1,12 @@
 // Spanish strings for the translated pages. Same shape as en.ts (Dict); the rules are at the top of en.ts.
 import type { Dict } from './en';
+import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
 
 const dict: Dict = {
   numberLocale: 'es-ES',
   common: {
-    ctaLabel: 'Empieza tu prueba gratuita de 7 días',
+    ctaLabel: `Empieza tu prueba gratuita de ${TRIAL_DAYS} días`,
     ctaShort: 'Prueba gratis',
     ctaNote: 'Sin tarjeta de crédito',
     skipToContent: 'Ir al contenido',
@@ -43,8 +44,8 @@ const dict: Dict = {
     taglineB: 'Publícalo en todas tus redes activas.',
     product: 'Producto', features: 'Funciones', pricing: 'Precios', channels: 'Canales', signIn: 'Iniciar sesión',
     aiDevelopers: 'IA y desarrolladores', documentation: 'Documentación', aiWorkflows: 'Flujos con IA', claude: 'Claude',
-    codex: 'Codex y agentes de código', mcp: 'MCP', restApi: 'REST API', apiReference: 'Referencia de la API', mcpSetup: 'Configurar MCP',
-    schedulers: 'Programadores de redes', moreNetworks: 'Más redes en camino: ver todas las plataformas',
+    codex: 'Codex y agentes de código', mcp: 'MCP', restApi: 'API REST', apiReference: 'Referencia de la API', mcpSetup: 'Configurar MCP',
+    schedulers: 'Planificadores de redes', moreNetworks: 'Más redes en camino: ver todas las plataformas',
     resources: 'Recursos', guides: 'Guías', tools: 'Herramientas gratis', captionChecker: 'Verificador de textos', compare: 'Comparar',
     alternatives: 'Alternativas', changelog: 'Novedades', roadmap: 'Hoja de ruta', about: 'Acerca de', brand: 'Marca', support: 'Soporte', status: 'Estado',
     legal: 'Legal', privacy: 'Política de privacidad', terms: 'Términos del servicio', dataDeletion: 'Eliminación de datos', dpa: 'DPA',
@@ -90,7 +91,7 @@ const dict: Dict = {
   },
   networkGrid: {
     label: 'Redes que puedes conectar hoy',
-    scheduler: ' (programador)',
+    scheduler: ' (planificador)',
     pendingTitle: '<b>Aún no disponibles.</b> Ninguna de estas redes se puede conectar hoy. Cada una se abrirá cuando su plataforma apruebe PostDelegate o su conexión esté lista.',
     pendingLabel: 'Redes que aún no están disponibles',
     pendingApproval: 'Pendiente de aprobación',
@@ -125,7 +126,7 @@ const dict: Dict = {
     team: 'Invita a los miembros de tu equipo',
     solo: 'Solo tú', soloNote: 'Este plan no incluye miembros del equipo',
     posts: 'Sin límite práctico de publicaciones',
-    agent: 'Claude, ChatGPT y scripts', agentNote: 'Servidor MCP y REST API pública',
+    agent: 'Claude, ChatGPT y scripts', agentNote: 'Servidor MCP y API REST pública',
     webhooks: (count: string) => `${count} webhooks`, webhooksNote: 'Avisa a tus propias herramientas cuando sale una publicación',
     studio: 'Videos verticales con Content Studio', studioNote: 'Uso razonable',
     ai: 'IA con tu propia clave de OpenAI', aiNote: 'Sin recargo por la IA ni límite de créditos',
@@ -159,15 +160,15 @@ const dict: Dict = {
   faq: [
     {
       q: '¿Qué es PostDelegate?',
-      a: 'PostDelegate es un programador de redes sociales. Planificas, escribes y programas publicaciones desde un calendario visual, con biblioteca de medios, un estudio de video y espacio para tu equipo. Las conexiones con los canales se abren por etapas, a medida que cada red aprueba PostDelegate.',
+      a: 'PostDelegate es un planificador de redes sociales. Planificas, escribes y programas publicaciones desde un calendario visual, con biblioteca de medios, un estudio de video y espacio para tu equipo. Las conexiones con los canales se abren por etapas, a medida que cada red aprueba PostDelegate.',
     },
     {
       q: '¿Necesito una tarjeta de crédito para la prueba gratuita?',
-      a: 'No. Todos los planes empiezan con una prueba gratuita de 7 días y no necesitas tarjeta de crédito para empezarla. Agrega una tarjeta en cualquier momento antes de que termine la prueba para conservar tu plan; el primer cobro se hace cuando termina la prueba. Si termina sin tarjeta, tu espacio de trabajo queda en pausa hasta que elijas un plan. Tus publicaciones se conservan, y tus canales y miembros del equipo se reactivan cuando te suscribes a un plan que los incluya. Cada dirección de correo tiene una sola prueba gratuita.',
+      a: `No. Todos los planes empiezan con una prueba gratuita de ${TRIAL_DAYS} días y no necesitas tarjeta de crédito para empezarla. Agrega una tarjeta en cualquier momento antes de que termine la prueba para conservar tu plan; el primer cobro se hace cuando termina la prueba. Si termina sin tarjeta, tu espacio de trabajo queda en pausa hasta que elijas un plan. Tus publicaciones se conservan, y tus canales y miembros del equipo se reactivan cuando te suscribes a un plan que los incluya. Cada dirección de correo tiene una sola prueba gratuita.`,
     },
     {
       q: '¿Cómo empiezo?',
-      a: 'Empieza tu prueba gratuita de 7 días con Google o con un correo y una contraseña. No necesitas tarjeta de crédito. El calendario, el editor y la biblioteca de medios están listos al instante, y puedes conectar cualquier red marcada como disponible en el <a href="/platforms">directorio de canales</a>.',
+      a: `Empieza tu prueba gratuita de ${TRIAL_DAYS} días con Google o con un correo y una contraseña. No necesitas tarjeta de crédito. El calendario, el editor y la biblioteca de medios están listos al instante, y puedes conectar cualquier red marcada como disponible en el <a href="/platforms">directorio de canales</a>.`,
     },
     {
       q: '¿Qué redes sociales puedo conectar?',
@@ -179,7 +180,7 @@ const dict: Dict = {
     },
     {
       q: '¿Puedo usar Claude, ChatGPT o agentes de código?',
-      a: 'PostDelegate tiene una REST API y un servidor MCP, así que puedes usar tu propio asistente y agregar PostDelegate como conector personalizado. La documentación explica la configuración de cada herramienta, y el acceso depende del plan. La generación con IA alojada no se incluye como servicio de pago.',
+      a: 'PostDelegate tiene una API REST y un servidor MCP, así que puedes usar tu propio asistente y agregar PostDelegate como conector personalizado. La documentación explica la configuración de cada herramienta, y el acceso depende del plan. La generación con IA alojada no se incluye como servicio de pago.',
     },
     {
       q: '¿Puedo programar la misma idea para distintos canales?',
@@ -199,7 +200,7 @@ const dict: Dict = {
     },
     {
       q: '¿Cuánto cuesta PostDelegate?',
-      a: 'Starter cuesta $19 al mes, Team $29, Pro $39 y Ultimate $79, o $180, $276, $372 y $756 al año. Los precios están en dólares estadounidenses, y los planes se diferencian en canales, miembros del equipo y webhooks. Ultimate incluye 100 canales y luego $1 al mes por cada canal adicional, hasta 1000 canales en total. La página de precios tiene la comparativa completa.',
+      a: `Starter cuesta $${PLANS[0].monthly} al mes, Team $${PLANS[1].monthly}, Pro $${PLANS[2].monthly} y Ultimate $${PLANS[3].monthly}, o $${PLANS[0].yearly}, $${PLANS[1].yearly}, $${PLANS[2].yearly} y $${PLANS[3].yearly} al año. Los precios están en dólares estadounidenses, y los planes se diferencian en canales, miembros del equipo y webhooks. Ultimate incluye 100 canales y luego $1 al mes por cada canal adicional, hasta 1000 canales en total. La página de precios tiene la comparativa completa.`,
     },
     {
       q: '¿Mis archivos multimedia subidos son privados?',
@@ -213,7 +214,7 @@ const dict: Dict = {
   buyerFaq: [
     {
       q: '¿Las publicaciones programadas tienen menos alcance que las manuales?',
-      a: 'PostDelegate publica a través de la API o la integración de bot de cada red, la misma vía que usan otros programadores. El alcance depende de tu contenido, del momento y del algoritmo de cada red. Ningún programador puede prometer alcance, y nosotros tampoco afirmamos cambiarlo en ningún sentido.',
+      a: 'PostDelegate publica a través de la API o la integración de bot de cada red, la misma vía que usan otros planificadores. El alcance depende de tu contenido, del momento y del algoritmo de cada red. Ningún planificador puede prometer alcance, y nosotros tampoco afirmamos cambiarlo en ningún sentido.',
     },
     {
       q: '¿Puedo cancelar en cualquier momento?',
@@ -243,17 +244,17 @@ const dict: Dict = {
   home: {
     title: 'PostDelegate: programa redes sociales con tu equipo y tu IA',
     description: (days: number) => `Programa desde un calendario, convierte clips en videos verticales y deja que Claude o ChatGPT redacten para que tú apruebes. ${days} días gratis, sin tarjeta.`,
-    appDescription: (days: number) => `Un programador de redes sociales para planificar, escribir y programar publicaciones desde un calendario visual, con Content Studio para videos verticales y programación masiva de videos. Todos los planes empiezan con una prueba gratuita de ${days} días sin tarjeta de crédito. Las conexiones con los canales se activan por etapas.`,
-    appFeatures: ['Calendario visual de contenido', 'Editor de publicaciones con ajustes por canal', 'Content Studio: videos verticales de 1080×1920 con frase gancho o subtítulos palabra por palabra', 'Programación masiva de videos en tus horarios de publicación', 'Importación masiva de publicaciones desde CSV', 'Analíticas de vistas ganadas por día para canales de YouTube', 'Publicación diferida en YouTube y etiqueta de contenido con IA', 'Biblioteca de medios', 'Espacios de trabajo y miembros del equipo', 'REST API y servidor MCP', 'Archivos de agente para Claude, ChatGPT, Cursor y agentes de código'],
+    appDescription: (days: number) => `Un planificador de redes sociales para planificar, escribir y programar publicaciones desde un calendario visual, con Content Studio para videos verticales y programación masiva de videos. Todos los planes empiezan con una prueba gratuita de ${days} días sin tarjeta de crédito. Las conexiones con los canales se activan por etapas.`,
+    appFeatures: ['Calendario visual de contenido', 'Editor de publicaciones con ajustes por canal', 'Content Studio: videos verticales de 1080×1920 con frase gancho o subtítulos palabra por palabra', 'Programación masiva de videos en tus horarios de publicación', 'Importación masiva de publicaciones desde CSV', 'Analíticas de vistas ganadas por día para canales de YouTube', 'Publicación diferida en YouTube y etiqueta de contenido con IA', 'Biblioteca de medios', 'Espacios de trabajo y miembros del equipo', 'API REST y servidor MCP', 'Archivos de agente para Claude, ChatGPT, Cursor y agentes de código'],
     orbitLabel: (count: number, names: string) => `${count} redes se conectan hoy: ${names}. Instagram, LinkedIn, TikTok, X y otras redes llegarán próximamente.`,
     proofLabel: 'PostDelegate en resumen',
     proofTrial: (days: number) => `Prueba gratuita de ${days} días`, proofTrialSub: 'Sin tarjeta de crédito',
-    proofApi: 'REST API + MCP', proofApiSub: 'En todos los planes',
+    proofApi: 'API REST + MCP', proofApiSub: 'En todos los planes',
     proofNetworks: (count: number) => `${count} redes`, proofNetworksSub: 'Conéctalas hoy',
-    eyebrow: 'Programador de redes sociales para equipos y agentes de IA',
+    eyebrow: 'Planificador de redes sociales para equipos y agentes de IA',
     h1: 'Tu IA lo redacta. Tú lo apruebas. PostDelegate ',
     h1Mark: 'lo publica.',
-    lead: (count: number) => `Un programador de redes sociales con MCP y REST API en todos los planes. Claude, ChatGPT o tus scripts preparan las publicaciones, tú las revisas en un solo calendario y salen a tiempo en ${count} redes activas.`,
+    lead: (count: number) => `Un planificador de redes sociales con MCP y API REST en todos los planes. Claude, ChatGPT o tus scripts preparan las publicaciones, tú las revisas en un solo calendario y salen a tiempo en ${count} redes activas.`,
     trialNote: (days: number) => `Prueba gratuita de ${days} días · Sin tarjeta · API + MCP en todos los planes · Cancela cuando quieras`,
     fromPrice: (price: number) => `Después, desde $${price}/mes`,
     orbitCore: 'Tu calendario',
@@ -340,7 +341,7 @@ const dict: Dict = {
       { title: 'PostDelegate vs Hootsuite', text: 'Planes fijos o precio por usuario, bandeja de entrada y redes.' },
       { title: 'PostDelegate vs Publer', text: 'Precio por cuenta o fijo, acceso a la API y a MCP.' },
       { title: 'Postiz vs Buffer', text: 'Costos calculados con 3, 10 y 30 cuentas, con fuentes.' },
-      { title: 'Postiz vs Mixpost', text: 'Dos programadores autoalojados: licencias, stack y costo a 12 meses.' },
+      { title: 'Postiz vs Mixpost', text: 'Dos planificadores autoalojados: licencias, stack y costo a 12 meses.' },
       { title: 'Alternativas a Postiz', text: 'Opciones alojadas, autoalojadas y por API, y cuándo quedarse.' },
     ],
     compareMore: 'Todas las comparativas',
@@ -395,7 +396,7 @@ const dict: Dict = {
     sampleFile: 'Archivo de ejemplo',
     bulkMore: '+ 47 más en la vista previa',
     apiTag: 'Desarrolladores',
-    apiTitle: 'Automatízalo con la REST API y los webhooks.',
+    apiTitle: 'Automatízalo con la API REST y los webhooks.',
     apiText: 'La misma API y el mismo servidor MCP en todos los planes, y webhooks que avisan a tus herramientas cuando sale una publicación.',
     apiLink: 'Lee la documentación de la API',
     apiCreated: 'Creada · programada',
@@ -406,7 +407,7 @@ const dict: Dict = {
     description: (price: number, days: number) => `Los planes de PostDelegate empiezan en $${price} al mes, con canales, miembros del equipo y webhooks según el plan. Prueba gratuita de ${days} días en todos, sin tarjeta.`,
     eyebrow: 'Planes',
     h1: (price: number, days: number) => `Planes desde $${price}. Prueba cualquiera gratis durante ${days} días.`,
-    lead: 'Pagas por canales, miembros del equipo y webhooks. El calendario, el servidor MCP, la REST API y Content Studio vienen en todos los planes.',
+    lead: 'Pagas por canales, miembros del equipo y webhooks. El calendario, el servidor MCP, la API REST y Content Studio vienen en todos los planes.',
     billingGuide: 'Lee la guía de facturación',
     trialNote: (note: string) => `${note} · Una prueba por correo`,
     heroNetworks: (count: number) => `Publica en <b>${count} redes activas</b> con cualquier plan`,
@@ -433,9 +434,9 @@ const dict: Dict = {
     changeQ: '¿Puedo cambiar o cancelar mi plan?',
     changeA: 'Los administradores del espacio de trabajo pueden cambiar de plan, actualizar el método de pago o cancelar desde <strong>Facturación</strong> en la app. La cancelación se aplica al final del periodo que ya pagaste.',
     creditsQ: '¿Por qué no hay créditos de IA?',
-    creditsA: 'La mayoría de los programadores incluyen créditos de IA en el precio del plan y los limitan cada mes. PostDelegate no vende IA en absoluto. Agregas tu propia clave de API de OpenAI, o conectas el asistente que ya pagas, como Claude o ChatGPT, mediante MCP. Pagas las tarifas del propio proveedor sin recargo nuestro, y no hay un límite mensual de créditos que se pueda agotar.',
+    creditsA: 'La mayoría de los planificadores incluyen créditos de IA en el precio del plan y los limitan cada mes. PostDelegate no vende IA en absoluto. Agregas tu propia clave de API de OpenAI, o conectas el asistente que ya pagas, como Claude o ChatGPT, mediante MCP. Pagas las tarifas del propio proveedor sin recargo nuestro, y no hay un límite mensual de créditos que se pueda agotar.',
     aiQ: '¿Y la IA y la automatización?',
-    aiA: 'La escritura con IA, el Agente y las imágenes con IA funcionan con la clave de API de OpenAI de tu espacio de trabajo, que un administrador agrega en <strong>Configuración → IA</strong>. Pagas directamente a OpenAI y PostDelegate nunca cobra por la IA. El video con IA no está disponible. Todos los planes incluyen la REST API y el servidor MCP, así que también puedes usar tu propio asistente, como ChatGPT o Claude.',
+    aiA: 'La escritura con IA, el Agente y las imágenes con IA funcionan con la clave de API de OpenAI de tu espacio de trabajo, que un administrador agrega en <strong>Configuración → IA</strong>. Pagas directamente a OpenAI y PostDelegate nunca cobra por la IA. El video con IA no está disponible. Todos los planes incluyen la API REST y el servidor MCP, así que también puedes usar tu propio asistente, como ChatGPT o Claude.',
     moreTitle: 'Más preguntas',
   },
   platformsPage: {
@@ -454,19 +455,19 @@ const dict: Dict = {
   },
   agentsPage: {
     title: 'Agentes de IA y automatización — PostDelegate',
-    description: 'Conecta tu propio asistente de IA o tu software a PostDelegate mediante MCP y la REST API. Los agentes redactan y programan, y tú revisas cada publicación.',
+    description: 'Conecta tu propio asistente de IA o tu software a PostDelegate mediante MCP y la API REST. Los agentes redactan y programan, y tú revisas cada publicación.',
     eyebrow: 'Agentes de IA y automatización',
     h1: 'Trae tu flujo de trabajo. Conserva tu calendario.',
-    lead: 'Usa el asistente que ya tienes. PostDelegate ofrece un servidor MCP y una REST API para que tus herramientas preparen contenido mientras tú tienes la última palabra.',
+    lead: 'Usa el asistente que ya tienes. PostDelegate ofrece un servidor MCP y una API REST para que tus herramientas preparen contenido mientras tú tienes la última palabra.',
     readDocs: 'Lee la documentación',
     guides: [
       { title: 'Conexiones MCP', text: 'Cómo se conectan los clientes de IA compatibles a PostDelegate y qué pueden hacer.' },
-      { title: 'La REST API', text: 'La interfaz para desarrolladores detrás de los borradores, los medios y los flujos de publicación.' },
+      { title: 'La API REST', text: 'La interfaz para desarrolladores detrás de los borradores, los medios y los flujos de publicación.' },
       { title: 'Claude y Cowork', text: 'Agrega PostDelegate a Claude como conector personalizado.' },
       { title: 'Codex y agentes de código', text: 'Conecta Codex, Cursor y otras herramientas de desarrollo mediante MCP.' },
     ],
     explore: 'Descubre la integración →',
-    body: '<h2>Un buen punto de partida</h2><p>Prepara una publicación con tu herramienta de IA y luego lleva el borrador y los medios al espacio de trabajo. Revisa el destino, el contenido y la hora antes de programarla en un canal disponible.</p><h2>Cómo se conecta</h2><p>Agrega el servidor MCP de PostDelegate a tu asistente e inicia sesión con tu cuenta de PostDelegate, o usa la clave de API de tu espacio de trabajo. La <a href="/docs/mcp">documentación de MCP</a> incluye la dirección del servidor, las opciones de inicio de sesión y la configuración de cada cliente.</p><aside class="doc-note">PostDelegate no ofrece una IA propia: tú usas tu propio asistente. La disponibilidad de la conexión depende de tu plan, y hoy solo se puede publicar en los canales que figuran como disponibles en las <a href="/docs/channels">guías de canales</a>.</aside><h2>Para desarrolladores</h2><p>La <a href="/docs/api">documentación de la REST API</a> cubre la autenticación, los límites de uso y cada endpoint. Escribe al <a href="/support">soporte de PostDelegate</a> si te atascas.</p>',
+    body: '<h2>Un buen punto de partida</h2><p>Prepara una publicación con tu herramienta de IA y luego lleva el borrador y los medios al espacio de trabajo. Revisa el destino, el contenido y la hora antes de programarla en un canal disponible.</p><h2>Cómo se conecta</h2><p>Agrega el servidor MCP de PostDelegate a tu asistente e inicia sesión con tu cuenta de PostDelegate, o usa la clave de API de tu espacio de trabajo. La <a href="/docs/mcp">documentación de MCP</a> incluye la dirección del servidor, las opciones de inicio de sesión y la configuración de cada cliente.</p><aside class="doc-note">PostDelegate no ofrece una IA propia: tú usas tu propio asistente. La disponibilidad de la conexión depende de tu plan, y hoy solo se puede publicar en los canales que figuran como disponibles en las <a href="/docs/channels">guías de canales</a>.</aside><h2>Para desarrolladores</h2><p>La <a href="/docs/api">documentación de la API REST</a> cubre la autenticación, los límites de uso y cada endpoint. Escribe al <a href="/support">soporte de PostDelegate</a> si te atascas.</p>',
   },
   mcpPage: {
     title: 'Servidor MCP — PostDelegate',
@@ -475,7 +476,7 @@ const dict: Dict = {
     h1: 'Tu IA, conectada a tu contenido.',
     lead: 'MCP permite que las herramientas de IA compatibles trabajen con un espacio de publicación. Usa tu propio asistente, inicia sesión con PostDelegate y revisa cada publicación.',
     readDocs: 'Lee la documentación de MCP',
-    body: '<h2>De una conversación a un borrador</h2><p>Un cliente compatible descubre las herramientas que ofrece el servidor y las usa para listar tus canales, leer las reglas de cada red, subir medios y crear borradores. Lo más útil para empezar es un solo borrador que puedas revisar en el calendario antes de que se programe nada.</p><h2>Configúralo</h2><p>La dirección del servidor es <code>https://app.postdelegate.com/mcp-oauth-dynamic</code>. Agrégala a tu asistente e inicia sesión con tu cuenta de PostDelegate. Hay guías paso a paso para <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> y <a href="/docs/mcp/clients">Claude Code, Cursor y otros clientes</a>.</p><h2>Qué comprobar primero</h2><ol><li>El cliente está conectado al espacio de trabajo de PostDelegate correcto.</li><li>Sabes qué herramientas pueden modificar o publicar contenido. La <a href="/docs/mcp/tools">referencia de herramientas</a> las enumera.</li><li>El borrador aparece en la app y el canal de destino es el correcto.</li></ol><aside class="doc-note">PostDelegate no ofrece una IA propia y no afirma figurar en ningún directorio oficial de Claude o ChatGPT. Agregas el servidor como conector personalizado. El acceso a MCP depende de tu plan.</aside><p>Relacionado: <a href="/api">REST API</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude y Cowork</a>.</p>',
+    body: '<h2>De una conversación a un borrador</h2><p>Un cliente compatible descubre las herramientas que ofrece el servidor y las usa para listar tus canales, leer las reglas de cada red, subir medios y crear borradores. Lo más útil para empezar es un solo borrador que puedas revisar en el calendario antes de que se programe nada.</p><h2>Configúralo</h2><p>La dirección del servidor es <code>https://app.postdelegate.com/mcp-oauth-dynamic</code>. Agrégala a tu asistente e inicia sesión con tu cuenta de PostDelegate. Hay guías paso a paso para <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> y <a href="/docs/mcp/clients">Claude Code, Cursor y otros clientes</a>.</p><h2>Qué comprobar primero</h2><ol><li>El cliente está conectado al espacio de trabajo de PostDelegate correcto.</li><li>Sabes qué herramientas pueden modificar o publicar contenido. La <a href="/docs/mcp/tools">referencia de herramientas</a> las enumera.</li><li>El borrador aparece en la app y el canal de destino es el correcto.</li></ol><aside class="doc-note">PostDelegate no ofrece una IA propia y no afirma figurar en ningún directorio oficial de Claude o ChatGPT. Agregas el servidor como conector personalizado. El acceso a MCP depende de tu plan.</aside><p>Relacionado: <a href="/api">API REST</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude y Cowork</a>.</p>',
   },
   claudePage: {
     title: 'Claude y Cowork — PostDelegate',
@@ -488,26 +489,26 @@ const dict: Dict = {
   },
   codexPage: {
     title: 'Codex y agentes de código — PostDelegate',
-    description: 'Conecta Codex, Cursor, Claude Code y otros agentes de código a PostDelegate mediante MCP o la REST API, con configuración lista para copiar en la documentación.',
+    description: 'Conecta Codex, Cursor, Claude Code y otros agentes de código a PostDelegate mediante MCP o la API REST, con configuración lista para copiar en la documentación.',
     eyebrow: 'Codex y agentes de código',
     h1: 'Tu contenido, cerca de tu flujo de desarrollo.',
-    lead: 'Los agentes de código pueden usar PostDelegate mediante MCP o la REST API. Usa tu propia herramienta, inicia sesión con PostDelegate y revisa cada borrador.',
+    lead: 'Los agentes de código pueden usar PostDelegate mediante MCP o la API REST. Usa tu propia herramienta, inicia sesión con PostDelegate y revisa cada borrador.',
     setup: 'Configurar clientes MCP',
-    body: '<h2>Una publicación de lanzamiento es una buena primera tarea</h2><p>Pide a tu herramienta de desarrollo que prepare un anuncio de lanzamiento breve y los medios que lo acompañen. Revisa el texto en PostDelegate y elige tú mismo un canal disponible y la hora.</p><h2>Cuando tu agente esté conectado</h2><p>Empieza por descubrir el espacio de trabajo y las cuentas conectadas, y luego crea un borrador. Confirma que el borrador llegó antes de permitir que un flujo programe contenido.</p><h2>Usa las instrucciones de conexión correctas</h2><p>Codex, Cursor, Claude Code y otras herramientas de desarrollo se conectan a PostDelegate mediante MCP, o llaman directamente a la REST API. La <a href="/docs/mcp/clients">guía de configuración de clientes</a> tiene la configuración de cada herramienta con la dirección del servidor de PostDelegate. Las herramientas y los endpoints de otros servicios no están conectados a PostDelegate.</p><p>Consulta la <a href="/agents">descripción general de agentes</a>, <a href="/mcp">MCP</a> y la <a href="/api">REST API</a>.</p>',
+    body: '<h2>Una publicación de lanzamiento es una buena primera tarea</h2><p>Pide a tu herramienta de desarrollo que prepare un anuncio de lanzamiento breve y los medios que lo acompañen. Revisa el texto en PostDelegate y elige tú mismo un canal disponible y la hora.</p><h2>Cuando tu agente esté conectado</h2><p>Empieza por descubrir el espacio de trabajo y las cuentas conectadas, y luego crea un borrador. Confirma que el borrador llegó antes de permitir que un flujo programe contenido.</p><h2>Usa las instrucciones de conexión correctas</h2><p>Codex, Cursor, Claude Code y otras herramientas de desarrollo se conectan a PostDelegate mediante MCP, o llaman directamente a la API REST. La <a href="/docs/mcp/clients">guía de configuración de clientes</a> tiene la configuración de cada herramienta con la dirección del servidor de PostDelegate. Las herramientas y los endpoints de otros servicios no están conectados a PostDelegate.</p><p>Consulta la <a href="/agents">descripción general de agentes</a>, <a href="/mcp">MCP</a> y la <a href="/api">API REST</a>.</p>',
   },
   apiPage: {
-    title: 'REST API — PostDelegate',
-    description: 'La REST API de PostDelegate para canales, publicaciones y medios. Autentícate con una clave de API, programa desde tu código y consulta límites y ejemplos.',
-    eyebrow: 'REST API',
+    title: 'API REST — PostDelegate',
+    description: 'La API REST de PostDelegate para canales, publicaciones y medios. Autentícate con una clave de API, programa desde tu código y consulta límites y ejemplos.',
+    eyebrow: 'API REST',
     h1: 'Construye en torno a tu flujo de publicación.',
-    lead: 'Una REST API para tus canales, medios y publicaciones. Autentícate con la clave de API de tu espacio de trabajo y programa desde tu propio software.',
+    lead: 'Una API REST para tus canales, medios y publicaciones. Autentícate con la clave de API de tu espacio de trabajo y programa desde tu propio software.',
     readDocs: 'Lee la documentación de la API',
     discuss: 'Habla de una integración',
     body: '<h2>Una sola interfaz para tu contenido</h2><p>La API permite descubrir los canales conectados, subir medios, crear borradores y programar publicaciones. Cada red mantiene sus propias reglas de contenido y permisos de cuenta, y la API aplica las mismas comprobaciones que la app.</p><h2>Antes de conectar un flujo en producción</h2><ul><li>Encuentra tu clave de API en Configuración, Agentes / Dev, dentro de la app. El acceso a la API depende de tu plan.</li><li>Comprueba qué canales tiene conectados el espacio de trabajo. Hoy solo se pueden conectar las redes que figuran como disponibles en las <a href="/docs/channels">guías de canales</a>.</li><li>Empieza con un borrador, revísalo en la app y luego prueba la programación y la recuperación ante errores.</li></ul><aside class="doc-note">Dirección base: <code>https://app.postdelegate.com/api/public/v1</code>. La creación de publicaciones tiene un límite de uso por espacio de trabajo. La <a href="/docs/api">descripción general de la API</a> tiene los detalles.</aside><h2>Mantén las credenciales fuera del contenido</h2><p>Guarda tu clave de API en la configuración segura de tu aplicación o agente. No la incluyas en prompts, repositorios públicos ni capturas de pantalla. Puedes rotarla en cualquier momento desde la app.</p><h2>Explora la documentación</h2><p><a href="/docs/api/posts">Publicaciones</a> · <a href="/docs/api/uploads">Subidas</a> · <a href="/docs/api/channels">Canales</a> · <a href="/docs/webhooks">Webhooks</a> · <a href="/docs/mcp">MCP</a> · <a href="/agents">Descripción general de agentes</a></p>',
   },
   comparePage: {
     title: 'Elige tu espacio de publicación — PostDelegate',
-    description: 'Compara PostDelegate con Buffer, Hootsuite, Later, Publer, Sprout Social y otros programadores: precios, prueba gratuita, enfoque de IA y flujo de trabajo.',
+    description: 'Compara PostDelegate con Buffer, Hootsuite, Later, Publer, Sprout Social y otros planificadores: precios, prueba gratuita, enfoque de IA y flujo de trabajo.',
     eyebrow: 'Comparar',
     h1: 'PostDelegate frente a la competencia, con cada precio documentado.',
     lead: 'Precios, límites, IA y redes lado a lado. Cada precio de la competencia enlaza a la página de la que lo tomamos.',
@@ -525,7 +526,7 @@ const dict: Dict = {
     pairsIntro: 'Otras dos herramientas lado a lado, con precios tomados de la página de precios de cada proveedor y una nota aparte sobre el lugar de PostDelegate.',
     pairs: [
       { title: 'Postiz vs Buffer', text: 'Planes fijos o precio por canal, costos calculados con 3, 10 y 30 cuentas, autoalojamiento, API y MCP.' },
-      { title: 'Postiz vs Mixpost', text: 'Dos programadores autoalojados: AGPL o MIT y licencias de pago único, stack de servidor, costo a 12 meses y redes.' },
+      { title: 'Postiz vs Mixpost', text: 'Dos planificadores autoalojados: AGPL o MIT y licencias de pago único, stack de servidor, costo a 12 meses y redes.' },
       { title: 'Postiz vs Post Bridge', text: 'Planes fijos según el número de cuentas, costos calculados, miembros del equipo, redes, API y MCP, y autoalojamiento.' },
       { title: 'Postiz vs Blotato', text: 'Primero la programación o primero el contenido con IA: créditos de IA, límites de cuentas, redes y acceso a la API durante la prueba.' },
       { title: 'Postiz vs Zernio', text: 'Una app de programación o una API de redes sociales: precio por canal o por cuenta, MCP, webhooks y SDK.' },
@@ -533,13 +534,13 @@ const dict: Dict = {
       { title: 'Publer vs Metricool', text: 'Precio por cuenta o por marca, analíticas y seguimiento de la competencia, herramientas masivas y lo que cuesta agregar X.' },
       { title: 'Alternativas a Postiz', text: 'Opciones alojadas, autoalojadas y por API, con una sección justa sobre cuándo quedarse en Postiz.' },
     ],
-    body: '<p>PostDelegate se basa en el proyecto de código abierto Postiz (AGPL-3.0). Consulta <a href="/licenses">/licenses</a>.</p><p>¿Buscas una alternativa a Buffer o Hootsuite? Consulta las <a href="/alternatives">alternativas de programadores de redes sociales</a> para ver un breve resumen de cada comparativa.</p><h2>Prueba el trabajo que haces de verdad</h2><p>Elige una cuenta que gestiones, prepara una publicación representativa y comprueba la conexión, la revisión y la programación. Confirma las plataformas y funciones que necesitas antes de elegir un servicio de pago.</p>',
+    body: '<p>PostDelegate se basa en el proyecto de código abierto Postiz (AGPL-3.0). Consulta <a href="/licenses">/licenses</a>.</p><p>¿Buscas una alternativa a Buffer o Hootsuite? Consulta las <a href="/alternatives">alternativas de planificadores de redes sociales</a> para ver un breve resumen de cada comparativa.</p><h2>Prueba el trabajo que haces de verdad</h2><p>Elige una cuenta que gestiones, prepara una publicación representativa y comprueba la conexión, la revisión y la programación. Confirma las plataformas y funciones que necesitas antes de elegir un servicio de pago.</p>',
   },
   alternativesPage: {
     title: 'Alternativas para programar redes en 2026 — PostDelegate',
     description: '¿Buscas una alternativa a Buffer, Hootsuite, Later, Sprout Social o Publer? Comparativas claras de precios, pruebas, IA, API y las redes que conecta cada uno.',
     eyebrow: 'Alternativas',
-    h1: 'Alternativas de programadores de redes sociales.',
+    h1: 'Alternativas de planificadores de redes sociales.',
     lead: 'Comparamos Buffer, Hootsuite, Later, Sprout Social y Publer con PostDelegate, incluido cuándo cada uno es hoy la mejor opción.',
     seePricing: 'Ver precios',
     crumbCompare: 'Comparar',
@@ -559,11 +560,11 @@ const dict: Dict = {
     seeAlternatives: 'Ver las alternativas →',
     postizVsBuffer: 'Postiz vs Buffer',
     postizVsBufferText: 'Costos mensuales calculados con 3, 10 y 30 cuentas, con cada precio enlazado a su fuente.',
-    body: (p: { starter: number; starterChannels: number; team: number; teamChannels: number; pro: number; proChannels: number; ultimate: number; ultimateChannels: number; liveCount: number; live: string; days: number }) => `<p>PostDelegate se basa en el proyecto de código abierto Postiz (AGPL-3.0). Consulta <a href="/licenses">/licenses</a>.</p><p>Los datos de la competencia de cada página se tomaron de sus propios sitios web en octubre de 2026. Los planes cambian, así que consulta el sitio de cada servicio antes de decidir.</p><h2>Cómo elegir un programador</h2><p>Casi cualquier programador puede poner una publicación en un calendario. Las diferencias que importan aparecen en cuatro puntos. Primero, si las cuentas exactas que gestionas pueden conectarse y publicar hoy. Segundo, cómo se calcula el precio: por canal, por cuenta, por persona o por plan, y cuánto suma con tus cifras reales. Tercero, cómo se paga la IA: una cuota o créditos incluidos en el plan, o tu propia clave. Cuarto, cómo se revisan los borradores, ya sea tu equipo, tus clientes o cualquier asistente de IA que escriba por ti.</p><h2>Para quién es PostDelegate</h2><ul><li><strong>Equipos que trabajan con asistentes de IA.</strong> El <a href="/mcp">servidor MCP</a> permite que Claude, ChatGPT, Cursor, Claude Code y otros clientes MCP redacten y programen publicaciones en todos los planes. Los borradores pueden esperar en la bandeja de revisión de IA hasta que una persona los apruebe. También se incluyen una <a href="/api">REST API</a> pública y webhooks.</li><li><strong>Agencias que necesitan la aprobación del cliente.</strong> Las publicaciones tienen estados, y los clientes las aprueban desde un enlace sin crear una cuenta. Clientes mantiene juntos los canales de cada cliente.</li><li><strong>Quien vigila el presupuesto.</strong> Los planes son fijos: $${p.starter} al mes por ${p.starterChannels} canales, $${p.team} por ${p.teamChannels} con miembros del equipo, $${p.pro} por ${p.proChannels} y $${p.ultimate} por ${p.ultimateChannels}. No se cobran por persona, y la IA funciona con tu propia clave de API de OpenAI, así que PostDelegate nunca cobra por la IA.</li><li><strong>Quien publica más allá de los grandes feeds.</strong> Hoy se conectan ${p.liveCount} redes: ${p.live}.</li></ul><h2>Quién debería buscar otra opción por ahora</h2><p>Instagram, Facebook, LinkedIn, TikTok, X, Threads y Pinterest llegarán próximamente a PostDelegate, pendientes de la aprobación de cada plataforma, y todavía no se pueden conectar. Si una de ellas es tu canal principal, hoy te servirán mejor Buffer, Hootsuite, Later, Sprout Social o Publer. Lo mismo si necesitas una bandeja de entrada compartida para responder comentarios y mensajes, o escucha social, que PostDelegate no ofrece.</p><h2>Pruébalo con tu propio contenido</h2><p>Todos los planes de PostDelegate empiezan con una prueba gratuita de ${p.days} días sin tarjeta de crédito. Conecta una cuenta que gestiones, prepara una publicación representativa, envíala a aprobación y prográmala. Después compárala con la prueba de cualquiera de los servicios anteriores.</p>`,
+    body: (p: { starter: number; starterChannels: number; team: number; teamChannels: number; pro: number; proChannels: number; ultimate: number; ultimateChannels: number; liveCount: number; live: string; days: number }) => `<p>PostDelegate se basa en el proyecto de código abierto Postiz (AGPL-3.0). Consulta <a href="/licenses">/licenses</a>.</p><p>Los datos de la competencia de cada página se tomaron de sus propios sitios web en octubre de 2026. Los planes cambian, así que consulta el sitio de cada servicio antes de decidir.</p><h2>Cómo elegir un planificador</h2><p>Casi cualquier planificador puede poner una publicación en un calendario. Las diferencias que importan aparecen en cuatro puntos. Primero, si las cuentas exactas que gestionas pueden conectarse y publicar hoy. Segundo, cómo se calcula el precio: por canal, por cuenta, por persona o por plan, y cuánto suma con tus cifras reales. Tercero, cómo se paga la IA: una cuota o créditos incluidos en el plan, o tu propia clave. Cuarto, cómo se revisan los borradores, ya sea tu equipo, tus clientes o cualquier asistente de IA que escriba por ti.</p><h2>Para quién es PostDelegate</h2><ul><li><strong>Equipos que trabajan con asistentes de IA.</strong> El <a href="/mcp">servidor MCP</a> permite que Claude, ChatGPT, Cursor, Claude Code y otros clientes MCP redacten y programen publicaciones en todos los planes. Los borradores pueden esperar en la bandeja de revisión de IA hasta que una persona los apruebe. También se incluyen una <a href="/api">API REST</a> pública y webhooks.</li><li><strong>Agencias que necesitan la aprobación del cliente.</strong> Las publicaciones tienen estados, y los clientes las aprueban desde un enlace sin crear una cuenta. Clientes mantiene juntos los canales de cada cliente.</li><li><strong>Quien vigila el presupuesto.</strong> Los planes son fijos: $${p.starter} al mes por ${p.starterChannels} canales, $${p.team} por ${p.teamChannels} con miembros del equipo, $${p.pro} por ${p.proChannels} y $${p.ultimate} por ${p.ultimateChannels}. No se cobran por persona, y la IA funciona con tu propia clave de API de OpenAI, así que PostDelegate nunca cobra por la IA.</li><li><strong>Quien publica más allá de los grandes feeds.</strong> Hoy se conectan ${p.liveCount} redes: ${p.live}.</li></ul><h2>Quién debería buscar otra opción por ahora</h2><p>Instagram, Facebook, LinkedIn, TikTok, X, Threads y Pinterest llegarán próximamente a PostDelegate, pendientes de la aprobación de cada plataforma, y todavía no se pueden conectar. Si una de ellas es tu canal principal, hoy te servirán mejor Buffer, Hootsuite, Later, Sprout Social o Publer. Lo mismo si necesitas una bandeja de entrada compartida para responder comentarios y mensajes, o escucha social, que PostDelegate no ofrece.</p><h2>Pruébalo con tu propio contenido</h2><p>Todos los planes de PostDelegate empiezan con una prueba gratuita de ${p.days} días sin tarjeta de crédito. Conecta una cuenta que gestiones, prepara una publicación representativa, envíala a aprobación y prográmala. Después compárala con la prueba de cualquiera de los servicios anteriores.</p>`,
     questionsTitle: 'Preguntas',
     faqBufferQ: '¿Cuál es una alternativa más barata a Buffer?',
     faqBufferA: (p: { starter: number; starterChannels: number; team: number; teamChannels: number }) => `Con cinco canales o más, PostDelegate suele costar menos que Buffer: $${p.starter} al mes por ${p.starterChannels} canales y $${p.team} por ${p.teamChannels} canales con miembros del equipo, mientras que Buffer cobra por canal. Comprueba que las redes que necesitas se pueden conectar hoy.`,
-    faqAiQ: '¿Qué programador de redes sociales funciona con Claude o ChatGPT?',
+    faqAiQ: '¿Qué planificador de redes sociales funciona con Claude o ChatGPT?',
     faqAiA: 'Ya hay varios. PostDelegate tiene un servidor MCP en todos los planes, así que Claude, ChatGPT, Cursor, Claude Code y otros clientes MCP pueden redactar y programar publicaciones, y los borradores pueden esperar en una bandeja de revisión de IA hasta que una persona los apruebe. Buffer, Hootsuite y Publer también ofrecen conexiones MCP, en distintos planes.',
     faqMetaQ: '¿PostDelegate puede publicar en Instagram, Facebook, LinkedIn o TikTok?',
     faqMetaA: (live: string) => `Todavía no. Esas redes, junto con X, Threads y Pinterest, llegarán próximamente y se abrirán a medida que cada plataforma apruebe PostDelegate. Hoy puedes conectar ${live}.`,
@@ -571,11 +572,11 @@ const dict: Dict = {
   },
   aboutPage: {
     title: 'Acerca de PostDelegate',
-    description: 'PostDelegate es un programador de redes sociales de Nasida Apps LLC: calendario visual, editor y biblioteca de medios para creadores, equipos y marcas.',
+    description: 'PostDelegate es un planificador de redes sociales de Nasida Apps LLC: calendario visual, editor y biblioteca de medios para creadores, equipos y marcas.',
     eyebrow: 'Acerca de PostDelegate',
     h1: 'Un hogar más claro para tu contenido social.',
     lead: 'Planifica tu contenido, ve lo que viene y mantén todo el trabajo en un solo lugar.',
-    body: (site: typeof SITE) => `<h2>Qué estamos construyendo</h2><p>PostDelegate reúne un calendario visual, un editor de publicaciones y una biblioteca de medios para creadores, equipos y personas que trabajan con varias marcas. Estamos activando las conexiones con los canales y las integraciones durante el acceso anticipado.</p><h2>Cómo funciona</h2><p>Escribe una publicación una vez, adáptala a cada canal y prográmala en el calendario. Los equipos comparten un espacio de trabajo, con los canales agrupados por marca o cliente. Todos los planes empiezan con una prueba gratuita de 7 días sin tarjeta de crédito.</p><h2>Usa tu propia IA</h2><p>PostDelegate nunca cobra por la IA. La escritura con IA, el Agente y las imágenes con IA funcionan con la clave de API de OpenAI de tu espacio de trabajo, y una REST API pública y un servidor MCP permiten que Claude, ChatGPT, los agentes de código y tus propios scripts trabajen con tu calendario. Consulta la <a href="/docs">documentación</a> para configurarlo.</p><h2 id="security">Las cuentas y tu contenido</h2><p>Conecta las cuentas sociales mediante el proceso de inicio de sesión que ofrece cada canal. No envíes las contraseñas ni los tokens de acceso de tus redes al soporte ni los pegues en una conversación con una IA.</p><p>Lee nuestra <a href="${site.legal.privacy}">política de privacidad</a> y los <a href="${site.legal.terms}">términos</a> para conocer cómo trata los datos el servicio y sus condiciones. Para solicitudes sobre tu cuenta o tus datos, <a href="/support#data-requests">contacta con el soporte</a>.</p><h2>Quién gestiona PostDelegate</h2><p>PostDelegate está gestionado por ${site.operator}. Para preguntas, comentarios o propuestas de colaboración, escribe a <a href="mailto:${site.email}">${site.email}</a>.</p>`,
+    body: (site: typeof SITE) => `<h2>Qué estamos construyendo</h2><p>PostDelegate reúne un calendario visual, un editor de publicaciones y una biblioteca de medios para creadores, equipos y personas que trabajan con varias marcas. Estamos activando las conexiones con los canales y las integraciones durante el acceso anticipado.</p><h2>Cómo funciona</h2><p>Escribe una publicación una vez, adáptala a cada canal y prográmala en el calendario. Los equipos comparten un espacio de trabajo, con los canales agrupados por marca o cliente. Todos los planes empiezan con una prueba gratuita de 7 días sin tarjeta de crédito.</p><h2>Usa tu propia IA</h2><p>PostDelegate nunca cobra por la IA. La escritura con IA, el Agente y las imágenes con IA funcionan con la clave de API de OpenAI de tu espacio de trabajo, y una API REST pública y un servidor MCP permiten que Claude, ChatGPT, los agentes de código y tus propios scripts trabajen con tu calendario. Consulta la <a href="/docs">documentación</a> para configurarlo.</p><h2 id="security">Las cuentas y tu contenido</h2><p>Conecta las cuentas sociales mediante el proceso de inicio de sesión que ofrece cada canal. No envíes las contraseñas ni los tokens de acceso de tus redes al soporte ni los pegues en una conversación con una IA.</p><p>Lee nuestra <a href="${site.legal.privacy}">política de privacidad</a> y los <a href="${site.legal.terms}">términos</a> para conocer cómo trata los datos el servicio y sus condiciones. Para solicitudes sobre tu cuenta o tus datos, <a href="/support#data-requests">contacta con el soporte</a>.</p><h2>Quién gestiona PostDelegate</h2><p>PostDelegate está gestionado por ${site.operator}. Para preguntas, comentarios o propuestas de colaboración, escribe a <a href="mailto:${site.email}">${site.email}</a>.</p>`,
   },
   supportPage: {
     title: 'Soporte — PostDelegate',
@@ -618,7 +619,7 @@ const dict: Dict = {
   schedulers: {
     'youtube-scheduler': {
       action: 'Programar videos',
-      description: 'Programa subidas de videos a YouTube con título, visibilidad pública, privada u oculta, miniatura y etiquetas. Prueba gratuita de 7 días, sin tarjeta.',
+      description: `Programa subidas de videos a YouTube con título, visibilidad pública, privada u oculta, miniatura y etiquetas. Prueba gratuita de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa videos de YouTube desde un calendario.',
       intro: 'Conecta un canal de YouTube a PostDelegate iniciando sesión con Google y programa subidas de videos con título, visibilidad, miniatura y etiquetas.',
       plan: [
@@ -633,7 +634,7 @@ const dict: Dict = {
     },
     'bluesky-scheduler': {
       action: 'Programar publicaciones e hilos',
-      description: 'Programa publicaciones e hilos de Bluesky con imágenes o video desde un calendario, conectados con una contraseña de app. Prueba de 7 días, sin tarjeta.',
+      description: `Programa publicaciones e hilos de Bluesky con imágenes o video desde un calendario, conectados con una contraseña de app. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa publicaciones e hilos en Bluesky.',
       intro: 'Conecta una cuenta de Bluesky a PostDelegate con una contraseña de app y programa publicaciones e hilos junto al resto de tu planificación.',
       plan: [
@@ -648,7 +649,7 @@ const dict: Dict = {
     },
     'devto-scheduler': {
       action: 'Programar artículos',
-      description: 'Programa artículos de DEV.to en Markdown con etiquetas, imagen de portada, organización y URL canónica. Prueba gratuita de 7 días, sin tarjeta de crédito.',
+      description: `Programa artículos de DEV.to en Markdown con etiquetas, imagen de portada, organización y URL canónica. Prueba gratuita de ${TRIAL_DAYS} días, sin tarjeta de crédito.`,
       h1: 'Programa artículos de DEV.to en Markdown.',
       intro: 'Conecta una cuenta de DEV Community a PostDelegate con una clave de API y programa artículos en Markdown con etiquetas, imagen de portada y URL canónica.',
       plan: [
@@ -663,7 +664,7 @@ const dict: Dict = {
     },
     'tumblr-scheduler': {
       action: 'Programar publicaciones',
-      description: 'Programa publicaciones de Tumblr con texto, hasta 30 imágenes o un video, título, enlace y etiquetas. Inicia sesión con Tumblr. Prueba de 7 días, sin tarjeta.',
+      description: `Programa publicaciones de Tumblr con texto, hasta 30 imágenes o un video, título, enlace y etiquetas. Inicia sesión con Tumblr. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa publicaciones en tu blog de Tumblr.',
       intro: 'Conecta un blog de Tumblr a PostDelegate iniciando sesión con Tumblr y programa publicaciones con texto, imágenes o un video.',
       plan: [
@@ -678,7 +679,7 @@ const dict: Dict = {
     },
     'wordpress-scheduler': {
       action: 'Programar entradas de blog',
-      description: 'Programa entradas y páginas de WordPress con categorías, etiquetas e imagen destacada mediante la REST API de tu sitio. Prueba de 7 días, sin tarjeta.',
+      description: `Programa entradas y páginas de WordPress con categorías, etiquetas e imagen destacada mediante la API REST de tu sitio. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa entradas de WordPress desde un calendario.',
       intro: 'Conecta un sitio de WordPress a PostDelegate con una contraseña de aplicación y programa entradas o páginas con categorías, etiquetas e imagen destacada.',
       plan: [
@@ -687,13 +688,13 @@ const dict: Dict = {
         'Elige el tipo de entrada y el estado, como Publicar, Borrador, Pendiente o Privado.',
       ],
       limits: [
-        'El sitio debe ser accesible desde internet con la REST API activada, y el usuario necesita un rol que pueda crear entradas.',
-        'Si un plugin de seguridad o un ajuste del servidor bloquea la REST API o elimina la cabecera Authorization, WordPress rechaza el inicio de sesión.',
+        'El sitio debe ser accesible desde internet con la API REST activada, y el usuario necesita un rol que pueda crear entradas.',
+        'Si un plugin de seguridad o un ajuste del servidor bloquea la API REST o elimina la cabecera Authorization, WordPress rechaza el inicio de sesión.',
       ],
     },
     'medium-scheduler': {
       action: 'Programar historias',
-      description: 'Programa historias de Medium en Markdown con título, subtítulo, etiquetas, URL canónica y publicación opcional. Prueba gratuita de 7 días, sin tarjeta.',
+      description: `Programa historias de Medium en Markdown con título, subtítulo, etiquetas, URL canónica y publicación opcional. Prueba gratuita de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa historias de Medium en Markdown.',
       intro: 'Conecta Medium a PostDelegate con un token de integración y programa historias en Markdown, también en una publicación en la que puedas escribir.',
       plan: [
@@ -708,7 +709,7 @@ const dict: Dict = {
     },
     'hashnode-scheduler': {
       action: 'Programar artículos',
-      description: 'Programa artículos de Hashnode en Markdown en tu publicación, con subtítulo, imagen de portada, etiquetas y URL canónica. Prueba de 7 días, sin tarjeta.',
+      description: `Programa artículos de Hashnode en Markdown en tu publicación, con subtítulo, imagen de portada, etiquetas y URL canónica. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa artículos en tu publicación de Hashnode.',
       intro: 'Conecta una cuenta de Hashnode a PostDelegate con una clave de API y programa artículos en Markdown en una de tus publicaciones.',
       plan: [
@@ -723,7 +724,7 @@ const dict: Dict = {
     },
     'nostr-scheduler': {
       action: 'Programar notas',
-      description: 'Programa notas de Nostr en relays públicos con una clave hex, con imágenes y video como enlaces y respuestas de seguimiento. Prueba de 7 días, sin tarjeta.',
+      description: `Programa notas de Nostr en relays públicos con una clave hex, con imágenes y video como enlaces y respuestas de seguimiento. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa notas de Nostr en relays públicos.',
       intro: 'Conecta una identidad de Nostr a PostDelegate con su clave privada en formato hex y programa notas en un conjunto de relays públicos.',
       plan: [
@@ -738,7 +739,7 @@ const dict: Dict = {
     },
     'lemmy-scheduler': {
       action: 'Programar publicaciones',
-      description: 'Programa publicaciones de Lemmy en una o varias comunidades de tu instancia, con título por comunidad, enlace opcional e imagen de portada. Prueba de 7 días.',
+      description: `Programa publicaciones de Lemmy en una o varias comunidades de tu instancia, con título por comunidad, enlace opcional e imagen de portada. Prueba de ${TRIAL_DAYS} días.`,
       h1: 'Programa publicaciones en tus comunidades de Lemmy.',
       intro: 'Conéctate a una instancia de Lemmy con tu usuario y contraseña y programa publicaciones en una o varias comunidades.',
       plan: [
@@ -753,7 +754,7 @@ const dict: Dict = {
     },
     'telegram-scheduler': {
       action: 'Programar publicaciones',
-      description: 'Programa publicaciones en tu canal o grupo de Telegram con fotos, videos y álbumes. Agrega @PostDelegateBot y envía un comando. Prueba de 7 días, sin tarjeta.',
+      description: `Programa publicaciones en tu canal o grupo de Telegram con fotos, videos y álbumes. Agrega @PostDelegateBot y envía un comando. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa publicaciones en tu canal de Telegram.',
       intro: 'Agrega @PostDelegateBot a un canal o grupo de Telegram, envía un comando de conexión y programa mensajes con texto, fotos, videos y archivos.',
       plan: [
@@ -768,7 +769,7 @@ const dict: Dict = {
     },
     'slack-scheduler': {
       action: 'Programar mensajes',
-      description: 'Programa mensajes de Slack con texto e imágenes en el canal que elijas, con respuestas en hilo. Agrega PostDelegate a tu espacio de trabajo. Prueba de 7 días.',
+      description: `Programa mensajes de Slack con texto e imágenes en el canal que elijas, con respuestas en hilo. Agrega PostDelegate a tu espacio de trabajo. Prueba de ${TRIAL_DAYS} días.`,
       h1: 'Programa mensajes de Slack en cualquier canal.',
       intro: 'Agrega PostDelegate a un espacio de trabajo de Slack y envía mensajes programados con texto e imágenes al canal que elijas.',
       plan: [
@@ -783,7 +784,7 @@ const dict: Dict = {
     },
     'discord-scheduler': {
       action: 'Programar mensajes',
-      description: 'Programa mensajes de Discord en cualquier canal de tu servidor, con Markdown, imágenes, videos y menciones. Agrega el bot de PostDelegate. Prueba de 7 días.',
+      description: `Programa mensajes de Discord en cualquier canal de tu servidor, con Markdown, imágenes, videos y menciones. Agrega el bot de PostDelegate. Prueba de ${TRIAL_DAYS} días.`,
       h1: 'Programa mensajes de Discord en tu servidor.',
       intro: 'Agrega el bot de PostDelegate a un servidor de Discord que administres y programa mensajes con Markdown, imágenes y videos en el canal que elijas.',
       plan: [
@@ -798,7 +799,7 @@ const dict: Dict = {
     },
     'dribbble-scheduler': {
       action: 'Programar shots',
-      description: 'Programa shots de Dribbble con título, descripción y una imagen, que recortamos a su tamaño. Inicia sesión con Dribbble. Prueba de 7 días, sin tarjeta.',
+      description: `Programa shots de Dribbble con título, descripción y una imagen, que recortamos a su tamaño. Inicia sesión con Dribbble. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa shots en tu perfil de Dribbble.',
       intro: 'Conecta Dribbble iniciando sesión con Dribbble y publica shots programados, cada uno con un título y una imagen.',
       plan: [
@@ -813,7 +814,7 @@ const dict: Dict = {
     },
     'twitch-scheduler': {
       action: 'Programar mensajes de chat',
-      description: 'Programa mensajes y anuncios destacados en el chat de tu canal de Twitch, con el color que elijas. Prueba gratuita de 7 días, sin tarjeta de crédito.',
+      description: `Programa mensajes y anuncios destacados en el chat de tu canal de Twitch, con el color que elijas. Prueba gratuita de ${TRIAL_DAYS} días, sin tarjeta de crédito.`,
       h1: 'Programa mensajes de chat y anuncios en Twitch.',
       intro: 'Conecta un canal de Twitch iniciando sesión con Twitch y envía mensajes de chat o anuncios programados al chat de tu canal.',
       plan: [
@@ -828,7 +829,7 @@ const dict: Dict = {
     },
     'kick-scheduler': {
       action: 'Programar mensajes de chat',
-      description: 'Programa mensajes de hasta 500 caracteres en el chat de tu canal de Kick tras iniciar sesión con Kick. Prueba gratuita de 7 días, sin tarjeta de crédito.',
+      description: `Programa mensajes de hasta 500 caracteres en el chat de tu canal de Kick tras iniciar sesión con Kick. Prueba gratuita de ${TRIAL_DAYS} días, sin tarjeta de crédito.`,
       h1: 'Programa mensajes en el chat de tu canal de Kick.',
       intro: 'Conecta un canal de Kick iniciando sesión con Kick y envía mensajes de texto programados al chat de tu canal.',
       plan: [
@@ -843,7 +844,7 @@ const dict: Dict = {
     },
     'listmonk-scheduler': {
       action: 'Programar campañas de email',
-      description: 'Programa campañas de email de Listmonk a una lista desde PostDelegate, con asunto, texto de vista previa y plantilla. Prueba gratuita de 7 días, sin tarjeta.',
+      description: `Programa campañas de email de Listmonk a una lista desde PostDelegate, con asunto, texto de vista previa y plantilla. Prueba gratuita de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa campañas de email con Listmonk.',
       intro: 'Envía una campaña de email a través de tu propio Listmonk autoalojado cuando sale una publicación.',
       plan: [

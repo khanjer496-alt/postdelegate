@@ -20,7 +20,7 @@ export const DEFAULT_LANG: Lang = 'en';
 // switcher button; flag: the Flag.astro key.
 export const LANGUAGES: Record<Lang, { name: string; short: string; flag: string; dir: 'ltr' | 'rtl'; ogLocale: string }> = {
   en: { name: 'English', short: 'EN', flag: 'us', dir: 'ltr', ogLocale: 'en_US' },
-  es: { name: 'Español', short: 'ES', flag: 'es', dir: 'ltr', ogLocale: 'es_ES' },
+  es: { name: 'Español', short: 'ES', flag: 'es', dir: 'ltr', ogLocale: 'es_LA' },
   pt: { name: 'Português', short: 'PT', flag: 'br', dir: 'ltr', ogLocale: 'pt_BR' },
   de: { name: 'Deutsch', short: 'DE', flag: 'de', dir: 'ltr', ogLocale: 'de_DE' },
   fr: { name: 'Français', short: 'FR', flag: 'fr', dir: 'ltr', ogLocale: 'fr_FR' },

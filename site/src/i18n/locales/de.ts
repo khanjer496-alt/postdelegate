@@ -1,11 +1,12 @@
 // German strings for the translated pages. Same shape as en.ts (Dict); the rules are at the top of en.ts.
 import type { Dict } from './en';
+import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
 
 const dict: Dict = {
   numberLocale: 'de-DE',
   common: {
-    ctaLabel: '7 Tage kostenlos testen',
+    ctaLabel: `${TRIAL_DAYS} Tage kostenlos testen`,
     ctaShort: 'Gratis testen',
     ctaNote: 'Keine Kreditkarte erforderlich',
     skipToContent: 'Zum Inhalt springen',
@@ -58,7 +59,7 @@ const dict: Dict = {
     title: 'Cookies',
     settingsTitle: 'Cookie-Einstellungen',
     close: 'Schließen',
-    text: 'Wir verwenden wenige Cookies, damit Sie angemeldet bleiben und, wenn Sie zustimmen, um die Person zu würdigen, die Sie empfohlen hat.',
+    text: 'Wir verwenden wenige Cookies, damit Sie angemeldet bleiben und, wenn Sie zustimmen, um Ihre Anmeldung der Person zuzuordnen, die Sie empfohlen hat.',
     learnMore: 'Mehr erfahren',
     referral: 'Sie sind einem Empfehlungslink gefolgt. Wenn Sie zustimmen, können wir ihn der Person zuordnen, die ihn geteilt hat.',
     necessary: 'Unbedingt erforderlich',
@@ -154,7 +155,7 @@ const dict: Dict = {
     talkToUs: 'Kontakt aufnehmen',
     whyTitle: 'Warum keine KI-Credits?',
     whyText: 'Sie nutzen Ihren eigenen OpenAI-Schlüssel oder den Assistenten, für den Sie ohnehin bezahlen. So zahlen Sie die Preise von OpenAI, ohne Aufschlag von uns und ohne monatliches Credit-Limit.',
-    note: 'Preise in US-Dollar. KI-Texte, der Agent und KI-Bilder laufen über den eigenen OpenAI-API-Schlüssel Ihres Arbeitsbereichs, den Sie direkt bei OpenAI bezahlen; PostDelegate berechnet nie etwas für KI, und KI-Videos sind nicht verfügbar. Content Studio ist in jedem kostenpflichtigen Plan im Rahmen der Fair Use enthalten. Sie können auch Ihren eigenen Assistenten über <a href="/docs/mcp">MCP</a> einbinden. Weitere Netzwerke, darunter Facebook, Instagram, TikTok, LinkedIn und X, kommen hinzu, sobald die Plattformen sie genehmigen. Eine kostenlose Testphase pro E-Mail-Adresse. Details unter <a href="/docs/billing">Pläne und Abrechnung</a>.',
+    note: 'Preise in US-Dollar. KI-Texte, der Agent und KI-Bilder laufen über den eigenen OpenAI-API-Schlüssel Ihres Arbeitsbereichs, den Sie direkt bei OpenAI bezahlen; PostDelegate berechnet nie etwas für KI, und KI-Videos sind nicht verfügbar. Content Studio ist in jedem kostenpflichtigen Plan im Rahmen der Fair-Use-Regeln enthalten. Sie können auch Ihren eigenen Assistenten über <a href="/docs/mcp">MCP</a> einbinden. Weitere Netzwerke, darunter Facebook, Instagram, TikTok, LinkedIn und X, kommen hinzu, sobald die Plattformen sie genehmigen. Eine kostenlose Testphase pro E-Mail-Adresse. Details unter <a href="/docs/billing">Pläne und Abrechnung</a>.',
   },
   faq: [
     {
@@ -163,11 +164,11 @@ const dict: Dict = {
     },
     {
       q: 'Brauche ich für die kostenlose Testphase eine Kreditkarte?',
-      a: 'Nein. Jeder Plan beginnt mit einer 7-tägigen kostenlosen Testphase, und zum Starten ist keine Kreditkarte nötig. Hinterlegen Sie jederzeit vor Ende der Testphase eine Karte, um Ihren Plan zu behalten; die erste Zahlung erfolgt am Ende der Testphase. Endet sie ohne Karte, wird Ihr Arbeitsbereich pausiert, bis Sie einen Plan wählen. Ihre Beiträge bleiben erhalten, und Ihre Kanäle und Teammitglieder werden wieder aktiviert, sobald Sie einen Plan abonnieren, der sie umfasst. Jede E-Mail-Adresse erhält eine kostenlose Testphase.',
+      a: `Nein. Jeder Plan beginnt mit einer ${TRIAL_DAYS}-tägigen kostenlosen Testphase, und zum Starten ist keine Kreditkarte nötig. Hinterlegen Sie jederzeit vor Ende der Testphase eine Karte, um Ihren Plan zu behalten; die erste Zahlung erfolgt am Ende der Testphase. Endet sie ohne Karte, wird Ihr Arbeitsbereich pausiert, bis Sie einen Plan wählen. Ihre Beiträge bleiben erhalten, und Ihre Kanäle und Teammitglieder werden wieder aktiviert, sobald Sie einen Plan abonnieren, der sie umfasst. Jede E-Mail-Adresse erhält eine kostenlose Testphase.`,
     },
     {
       q: 'Wie fange ich an?',
-      a: 'Starten Sie Ihre 7-tägige kostenlose Testphase mit Google oder mit E-Mail und Passwort. Eine Kreditkarte ist nicht nötig. Kalender, Editor und Medienbibliothek sind sofort einsatzbereit, und Sie können jedes Netzwerk verbinden, das im <a href="/platforms">Kanalverzeichnis</a> als verfügbar markiert ist.',
+      a: `Starten Sie Ihre ${TRIAL_DAYS}-tägige kostenlose Testphase mit Google oder mit E-Mail und Passwort. Eine Kreditkarte ist nicht nötig. Kalender, Editor und Medienbibliothek sind sofort einsatzbereit, und Sie können jedes Netzwerk verbinden, das im <a href="/platforms">Kanalverzeichnis</a> als verfügbar markiert ist.`,
     },
     {
       q: 'Welche sozialen Netzwerke kann ich verbinden?',
@@ -187,7 +188,7 @@ const dict: Dict = {
     },
     {
       q: 'Kann PostDelegate Videos erstellen?',
-      a: 'Ja. Content Studio macht aus einem Video Ihrer Medienbibliothek ein Hochformatvideo in 1080×1920 mit bis zu 90 Sekunden, mit einer Hook-Zeile oder Untertiteln, die Wort für Wort aufleuchten. Die Untertitel entstehen über Ihren eigenen OpenAI-Schlüssel mit Whisper, abgerechnet direkt von OpenAI, oder aus einem Skript, das Sie eintippen. Studio ist in jedem kostenpflichtigen Plan im Rahmen der Fair Use enthalten, und die kostenlose Testphase umfasst 10 Videos. Siehe die <a href="/docs/studio">Studio-Anleitung</a>.',
+      a: 'Ja. Content Studio macht aus einem Video Ihrer Medienbibliothek ein Hochformatvideo in 1080×1920 mit bis zu 90 Sekunden, mit einer Hook-Zeile oder Untertiteln, die Wort für Wort aufleuchten. Die Untertitel entstehen über Ihren eigenen OpenAI-Schlüssel mit Whisper, abgerechnet direkt von OpenAI, oder aus einem Skript, das Sie eintippen. Studio ist in jedem kostenpflichtigen Plan im Rahmen der Fair-Use-Regeln enthalten, und die kostenlose Testphase umfasst 10 Videos. Siehe die <a href="/docs/studio">Studio-Anleitung</a>.',
     },
     {
       q: 'Kann ich mehrere Videos auf einmal planen?',
@@ -199,7 +200,7 @@ const dict: Dict = {
     },
     {
       q: 'Was kostet PostDelegate?',
-      a: 'Starter kostet $19 pro Monat, Team $29, Pro $39 und Ultimate $79, oder $180, $276, $372 und $756 pro Jahr. Die Preise sind in US-Dollar, und die Pläne unterscheiden sich nach Kanälen, Teammitgliedern und Webhooks. Ultimate enthält 100 Kanäle, danach $1 pro Monat je zusätzlichem Kanal, bis zu insgesamt 1.000 Kanälen. Die Preisseite zeigt den vollständigen Vergleich.',
+      a: `Starter kostet $${PLANS[0].monthly} pro Monat, Team $${PLANS[1].monthly}, Pro $${PLANS[2].monthly} und Ultimate $${PLANS[3].monthly}, oder $${PLANS[0].yearly}, $${PLANS[1].yearly}, $${PLANS[2].yearly} und $${PLANS[3].yearly} pro Jahr. Die Preise sind in US-Dollar, und die Pläne unterscheiden sich nach Kanälen, Teammitgliedern und Webhooks. Ultimate enthält 100 Kanäle, danach $1 pro Monat je zusätzlichem Kanal, bis zu insgesamt 1.000 Kanälen. Die Preisseite zeigt den vollständigen Vergleich.`,
     },
     {
       q: 'Sind meine hochgeladenen Mediendateien privat?',
@@ -314,7 +315,7 @@ const dict: Dict = {
     ],
     studioTry: 'Studio kostenlos testen',
     studioGuide: 'Zur Studio-Anleitung',
-    studioTerms: 'In jedem kostenpflichtigen Plan im Rahmen der Fair Use enthalten. Die kostenlose Testphase umfasst 10 Videos. Weitere Vorlagen folgen.',
+    studioTerms: 'In jedem kostenpflichtigen Plan im Rahmen der Fair-Use-Regeln enthalten. Die kostenlose Testphase umfasst 10 Videos. Weitere Vorlagen folgen.',
     studioStage: 'Illustration der beiden Studio-Vorlagen',
     studioTemplates: ['Hook über Clip', 'Talking Head + Untertitel'],
     studioHookA: '3 Dinge, die ich gern',
@@ -405,7 +406,7 @@ const dict: Dict = {
     title: 'Pläne und Preise – PostDelegate',
     description: (price: number, days: number) => `PostDelegate-Pläne ab $${price} pro Monat, mit Kanälen, Teammitgliedern und Webhooks im Vergleich. Jeder Plan: ${days} Tage kostenlos testen, ohne Kreditkarte.`,
     eyebrow: 'Pläne',
-    h1: (price: number, days: number) => `Pläne ab $${price}. Jeden ${days} Tage kostenlos testen.`,
+    h1: (price: number, days: number) => `Pläne ab $${price}. Jeden Plan ${days} Tage kostenlos testen.`,
     lead: 'Sie zahlen für Kanäle, Teamplätze und Webhooks. Kalender, MCP-Server, REST API und Content Studio sind in jedem Plan enthalten.',
     billingGuide: 'Zur Abrechnungsanleitung',
     trialNote: (note: string) => `${note} · Eine Testphase pro E-Mail-Adresse`,
@@ -618,7 +619,7 @@ const dict: Dict = {
   schedulers: {
     'youtube-scheduler': {
       action: 'YouTube-Videos planen',
-      description: 'Planen Sie YouTube-Uploads mit Titel, öffentlicher, privater oder nicht gelisteter Sichtbarkeit, Thumbnail und Tags. 7 Tage kostenlos testen, ohne Karte.',
+      description: `Planen Sie YouTube-Uploads mit Titel, öffentlicher, privater oder nicht gelisteter Sichtbarkeit, Thumbnail und Tags. ${TRIAL_DAYS} Tage kostenlos testen, ohne Karte.`,
       h1: 'YouTube-Videos in einem Kalender planen.',
       intro: 'Verbinden Sie einen YouTube-Kanal per Google-Anmeldung mit PostDelegate und planen Sie Video-Uploads mit Titel, Sichtbarkeit, Thumbnail und Tags.',
       plan: [
@@ -633,7 +634,7 @@ const dict: Dict = {
     },
     'bluesky-scheduler': {
       action: 'Bluesky-Beiträge planen',
-      description: 'Planen Sie Bluesky-Beiträge und Threads mit Bildern oder Video in einem Kalender, verbunden über ein App-Passwort. 7 Tage kostenlos testen, ohne Karte.',
+      description: `Planen Sie Bluesky-Beiträge und Threads mit Bildern oder Video in einem Kalender, verbunden über ein App-Passwort. ${TRIAL_DAYS} Tage kostenlos testen, ohne Karte.`,
       h1: 'Bluesky-Beiträge und Threads planen.',
       intro: 'Verbinden Sie ein Bluesky-Konto über ein App-Passwort mit PostDelegate und planen Sie Beiträge und Threads zusammen mit dem Rest Ihres Plans.',
       plan: [
@@ -648,7 +649,7 @@ const dict: Dict = {
     },
     'devto-scheduler': {
       action: 'DEV.to-Artikel planen',
-      description: 'Planen Sie DEV.to-Artikel in Markdown mit Tags, Titelbild, Organisation und kanonischer URL. 7 Tage kostenlos testen, keine Kreditkarte erforderlich.',
+      description: `Planen Sie DEV.to-Artikel in Markdown mit Tags, Titelbild, Organisation und kanonischer URL. ${TRIAL_DAYS} Tage kostenlos testen, keine Kreditkarte erforderlich.`,
       h1: 'DEV.to-Artikel in Markdown planen.',
       intro: 'Verbinden Sie ein DEV-Community-Konto per API-Schlüssel mit PostDelegate und planen Sie Markdown-Artikel mit Tags, Titelbild und kanonischer URL.',
       plan: [
@@ -663,7 +664,7 @@ const dict: Dict = {
     },
     'tumblr-scheduler': {
       action: 'Tumblr-Beiträge planen',
-      description: 'Planen Sie Tumblr-Beiträge mit Text, bis zu 30 Bildern oder einem Video, plus Titel, Link und Tags. Anmeldung mit Tumblr. 7 Tage kostenlos, ohne Karte.',
+      description: `Planen Sie Tumblr-Beiträge mit Text, bis zu 30 Bildern oder einem Video, plus Titel, Link und Tags. Anmeldung mit Tumblr. ${TRIAL_DAYS} Tage kostenlos, ohne Karte.`,
       h1: 'Tumblr-Beiträge für Ihren Blog planen.',
       intro: 'Verbinden Sie einen Tumblr-Blog per Tumblr-Anmeldung mit PostDelegate und planen Sie Beiträge mit Text, Bildern oder einem Video.',
       plan: [
@@ -677,8 +678,8 @@ const dict: Dict = {
       ],
     },
     'wordpress-scheduler': {
-      action: 'WordPress-Blogbeiträge planen',
-      description: 'Planen Sie WordPress-Beiträge und -Seiten mit Kategorien, Tags und Beitragsbild über die REST API Ihrer Website. 7 Tage kostenlos, keine Kreditkarte nötig.',
+      action: 'Blogbeiträge planen',
+      description: `Planen Sie WordPress-Beiträge und -Seiten mit Kategorien, Tags und Beitragsbild über die REST API Ihrer Website. ${TRIAL_DAYS} Tage kostenlos, keine Kreditkarte nötig.`,
       h1: 'WordPress-Beiträge in einem Kalender planen.',
       intro: 'Verbinden Sie eine WordPress-Website per Anwendungspasswort mit PostDelegate und planen Sie Beiträge oder Seiten mit Kategorien, Tags und Beitragsbild.',
       plan: [
@@ -693,7 +694,7 @@ const dict: Dict = {
     },
     'medium-scheduler': {
       action: 'Medium-Storys planen',
-      description: 'Planen Sie Medium-Storys in Markdown mit Titel, Untertitel, Tags, kanonischer URL und optionaler Publikation. 7 Tage kostenlos, keine Kreditkarte erforderlich.',
+      description: `Planen Sie Medium-Storys in Markdown mit Titel, Untertitel, Tags, kanonischer URL und optionaler Publikation. ${TRIAL_DAYS} Tage kostenlos, keine Kreditkarte erforderlich.`,
       h1: 'Medium-Storys in Markdown planen.',
       intro: 'Verbinden Sie Medium per Integrationstoken mit PostDelegate und planen Sie Markdown-Storys, optional für eine Publikation, in der Sie schreiben dürfen.',
       plan: [
@@ -708,7 +709,7 @@ const dict: Dict = {
     },
     'hashnode-scheduler': {
       action: 'Hashnode-Artikel planen',
-      description: 'Planen Sie Hashnode-Artikel in Markdown für Ihre Publikation, mit Untertitel, Titelbild, Tags und kanonischer URL. 7 Tage kostenlos testen, ohne Karte.',
+      description: `Planen Sie Hashnode-Artikel in Markdown für Ihre Publikation, mit Untertitel, Titelbild, Tags und kanonischer URL. ${TRIAL_DAYS} Tage kostenlos testen, ohne Karte.`,
       h1: 'Hashnode-Artikel für Ihre Publikation planen.',
       intro: 'Verbinden Sie ein Hashnode-Konto per API-Schlüssel mit PostDelegate und planen Sie Markdown-Artikel für eine Ihrer Publikationen.',
       plan: [
@@ -723,7 +724,7 @@ const dict: Dict = {
     },
     'nostr-scheduler': {
       action: 'Nostr-Notes planen',
-      description: 'Planen Sie Nostr-Notes an öffentliche Relays mit einem Hex-Schlüssel, Bilder und Videos als Links, Antworten als Follow-ups. 7 Tage kostenlos, ohne Karte.',
+      description: `Planen Sie Nostr-Notes an öffentliche Relays mit einem Hex-Schlüssel, Bilder und Videos als Links, Antworten als Follow-ups. ${TRIAL_DAYS} Tage kostenlos, ohne Karte.`,
       h1: 'Nostr-Notes an öffentliche Relays planen.',
       intro: 'Verbinden Sie eine Nostr-Identität über ihren privaten Hex-Schlüssel mit PostDelegate und planen Sie Notes an eine Reihe öffentlicher Relays.',
       plan: [
@@ -738,7 +739,7 @@ const dict: Dict = {
     },
     'lemmy-scheduler': {
       action: 'Lemmy-Beiträge planen',
-      description: 'Planen Sie Lemmy-Beiträge in Communitys Ihrer Instanz, mit eigenem Titel pro Community, optionalem Link und Titelbild. 7 Tage kostenlos, ohne Karte.',
+      description: `Planen Sie Lemmy-Beiträge in Communitys Ihrer Instanz, mit eigenem Titel pro Community, optionalem Link und Titelbild. ${TRIAL_DAYS} Tage kostenlos, ohne Karte.`,
       h1: 'Lemmy-Beiträge in Ihren Communitys planen.',
       intro: 'Verbinden Sie sich mit Benutzername und Passwort mit einer Lemmy-Instanz und planen Sie Beiträge in einer oder mehreren Communitys.',
       plan: [
@@ -753,7 +754,7 @@ const dict: Dict = {
     },
     'telegram-scheduler': {
       action: 'Telegram-Beiträge planen',
-      description: 'Planen Sie Telegram-Beiträge mit Fotos, Videos und Alben für Ihren Kanal oder Ihre Gruppe. @PostDelegateBot hinzufügen, ein Befehl. 7 Tage kostenlos.',
+      description: `Planen Sie Telegram-Beiträge mit Fotos, Videos und Alben für Ihren Kanal oder Ihre Gruppe. @PostDelegateBot hinzufügen, ein Befehl. ${TRIAL_DAYS} Tage kostenlos.`,
       h1: 'Beiträge für Ihren Telegram-Kanal planen.',
       intro: 'Fügen Sie @PostDelegateBot zu einem Telegram-Kanal oder einer Gruppe hinzu, senden Sie einen Verbindungsbefehl und planen Sie Nachrichten mit Text, Fotos, Videos und Dateien.',
       plan: [
@@ -768,7 +769,7 @@ const dict: Dict = {
     },
     'slack-scheduler': {
       action: 'Slack-Nachrichten planen',
-      description: 'Planen Sie Slack-Nachrichten mit Text und Bildern im gewählten Kanal, Antworten im Thread. Fügen Sie PostDelegate Ihrem Workspace hinzu. 7 Tage kostenlos.',
+      description: `Planen Sie Slack-Nachrichten mit Text und Bildern im gewählten Kanal, Antworten im Thread. Fügen Sie PostDelegate Ihrem Workspace hinzu. ${TRIAL_DAYS} Tage kostenlos.`,
       h1: 'Slack-Nachrichten in jeden Kanal planen.',
       intro: 'Fügen Sie PostDelegate zu einem Slack-Workspace hinzu und senden Sie geplante Nachrichten mit Text und Bildern in den gewählten Kanal.',
       plan: [
@@ -783,7 +784,7 @@ const dict: Dict = {
     },
     'discord-scheduler': {
       action: 'Discord-Nachrichten planen',
-      description: 'Planen Sie Discord-Nachrichten in jeden Kanal Ihres Servers, mit Markdown, Bildern, Videos und Erwähnungen. PostDelegate-Bot hinzufügen. 7 Tage kostenlos.',
+      description: `Planen Sie Discord-Nachrichten in jeden Kanal Ihres Servers, mit Markdown, Bildern, Videos und Erwähnungen. PostDelegate-Bot hinzufügen. ${TRIAL_DAYS} Tage kostenlos.`,
       h1: 'Discord-Nachrichten für Ihren Server planen.',
       intro: 'Fügen Sie den PostDelegate-Bot zu einem Discord-Server hinzu, den Sie verwalten, und planen Sie Nachrichten mit Markdown, Bildern und Videos in den gewählten Kanal.',
       plan: [
@@ -798,7 +799,7 @@ const dict: Dict = {
     },
     'dribbble-scheduler': {
       action: 'Dribbble-Shots planen',
-      description: 'Planen Sie Dribbble-Shots mit Titel, Beschreibung und einem Bild, automatisch auf Dribbble-Format zugeschnitten. Anmeldung mit Dribbble. 7 Tage kostenlos.',
+      description: `Planen Sie Dribbble-Shots mit Titel, Beschreibung und einem Bild, automatisch auf Dribbble-Format zugeschnitten. Anmeldung mit Dribbble. ${TRIAL_DAYS} Tage kostenlos.`,
       h1: 'Dribbble-Shots für Ihr Profil planen.',
       intro: 'Verbinden Sie Dribbble per Dribbble-Anmeldung und veröffentlichen Sie geplante Shots, jeweils mit Titel und einem Bild.',
       plan: [
@@ -813,7 +814,7 @@ const dict: Dict = {
     },
     'twitch-scheduler': {
       action: 'Twitch-Chatnachrichten planen',
-      description: 'Planen Sie Twitch-Chatnachrichten und hervorgehobene Ankündigungen im Chat Ihres Kanals, in einer Farbe Ihrer Wahl. 7 Tage kostenlos, keine Kreditkarte nötig.',
+      description: `Planen Sie Twitch-Chatnachrichten und hervorgehobene Ankündigungen im Chat Ihres Kanals, in einer Farbe Ihrer Wahl. ${TRIAL_DAYS} Tage kostenlos, keine Kreditkarte nötig.`,
       h1: 'Twitch-Chatnachrichten und Ankündigungen planen.',
       intro: 'Verbinden Sie einen Twitch-Kanal per Twitch-Anmeldung und senden Sie geplante Chatnachrichten oder Ankündigungen in den Chat Ihres Kanals.',
       plan: [
@@ -828,7 +829,7 @@ const dict: Dict = {
     },
     'kick-scheduler': {
       action: 'Kick-Chatnachrichten planen',
-      description: 'Planen Sie Kick-Chatnachrichten mit bis zu 500 Zeichen im Chat Ihres Kanals, nach der Anmeldung mit Kick. 7 Tage kostenlos, keine Kreditkarte nötig.',
+      description: `Planen Sie Kick-Chatnachrichten mit bis zu 500 Zeichen im Chat Ihres Kanals, nach der Anmeldung mit Kick. ${TRIAL_DAYS} Tage kostenlos, keine Kreditkarte nötig.`,
       h1: 'Kick-Chatnachrichten für Ihren Kanal planen.',
       intro: 'Verbinden Sie einen Kick-Kanal per Kick-Anmeldung und senden Sie geplante Textnachrichten in den Chat Ihres Kanals.',
       plan: [
@@ -843,7 +844,7 @@ const dict: Dict = {
     },
     'listmonk-scheduler': {
       action: 'E-Mail-Kampagnen planen',
-      description: 'Planen Sie Listmonk-E-Mail-Kampagnen an eine Liste direkt aus PostDelegate, mit Betreff, Vorschautext und Vorlage. 7 Tage kostenlos, keine Kreditkarte nötig.',
+      description: `Planen Sie Listmonk-E-Mail-Kampagnen an eine Liste direkt aus PostDelegate, mit Betreff, Vorschautext und Vorlage. ${TRIAL_DAYS} Tage kostenlos, keine Kreditkarte nötig.`,
       h1: 'Listmonk-E-Mail-Kampagnen planen.',
       intro: 'Senden Sie eine E-Mail-Kampagne über Ihr eigenes, selbst gehostetes Listmonk, sobald ein Beitrag veröffentlicht wird.',
       plan: [
