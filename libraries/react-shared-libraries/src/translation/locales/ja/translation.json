@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "このPinterestアカウントにはまだボードがありません。投稿するにはボードを作成してください。",
   "pinterest_board_name": "ボード名",
   "pinterest_create_board": "ボードを作成",
-  "pinterest_create_board_failed": "Pinterestでボードを作成できませんでした。もう一度お試しください。"
+  "pinterest_create_board_failed": "Pinterestでボードを作成できませんでした。もう一度お試しください。",
+  "pinterest_boards_failed": "Pinterestでこのアカウントのボードを読み込めませんでした。しばらくしてからもう一度お試しください。"
 }

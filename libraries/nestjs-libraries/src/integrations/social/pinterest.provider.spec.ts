@@ -140,6 +140,47 @@ describe('PinterestProvider error messages', () => {
     });
   });
 
+  it('recognises the Trial access refusal by its message alone', () => {
+    expect(
+      new PinterestProvider().handleErrors(
+        JSON.stringify({
+          message: 'Apps with Trial access may not create Pins in production',
+        }),
+        403
+      )?.value
+    ).toContain('Trial access');
+  });
+
+  it('does not treat code 29 on a 401 or 500 as the Trial refusal', () => {
+    const provider = new PinterestProvider();
+    expect(
+      provider.handleErrors(JSON.stringify({ code: 29, message: 'x' }), 500)
+    ).toBeUndefined();
+    expect(
+      provider.handleErrors(JSON.stringify({ code: 29, message: 'x' }), 401)
+    ).toBeUndefined();
+  });
+
+  it('explains PINNER_DATA_ACCESS_DENIED', async () => {
+    replies({
+      status: 403,
+      body: { code: 403, message: 'PINNER_DATA_ACCESS_DENIED' },
+    });
+    await expect(createPin()).rejects.toMatchObject({
+      message: expect.stringContaining('PINNER_DATA_ACCESS_DENIED'),
+    });
+  });
+
+  it("shows Pinterest's message for an unmapped 403", async () => {
+    replies({
+      status: 403,
+      body: { code: 50, message: 'Pin creation is temporarily blocked.' },
+    });
+    await expect(createPin()).rejects.toMatchObject({
+      message: 'Pinterest rejected the request: Pin creation is temporarily blocked.',
+    });
+  });
+
   it('leaves rate limits to the generic retry', () => {
     expect(
       new PinterestProvider().handleErrors(
@@ -200,6 +241,34 @@ describe('PinterestProvider sandbox mode', () => {
     // the authorization page is the same for both
     expect((await provider.generateAuthUrl()).url).toMatch(
       /^https:\/\/www\.pinterest\.com\/oauth\//
+    );
+  });
+
+  it('refreshes the sandbox token on the sandbox', async () => {
+    process.env.PINTEREST_SANDBOX = 'true';
+    const calls: string[] = [];
+    global.fetch = jest.fn(async (url: string) => {
+      calls.push(url);
+      return {
+        status: 200,
+        json: async () =>
+          url.endsWith('/oauth/token')
+            ? { access_token: 'a', expires_in: 100 }
+            : { id: 'u1', username: 'me' },
+      };
+    }) as any;
+
+    await new PinterestProvider().refreshToken('r');
+    expect(calls).toEqual([
+      'https://api-sandbox.pinterest.com/v5/oauth/token',
+      'https://api-sandbox.pinterest.com/v5/user_account',
+    ]);
+  });
+
+  it('asks for a token refresh instead of listing no boards', async () => {
+    replies({ status: 401, body: { code: 2, message: 'Authentication failed.' } });
+    await expect(new PinterestProvider().boards('token')).rejects.toBeInstanceOf(
+      RefreshToken
     );
   });
 

@@ -19,6 +19,7 @@ export const PinterestBoard: FC<{
 
   const customFunc = useCustomProviderFunction();
   const [orgs, setOrgs] = useState<undefined | any[]>();
+  const [loadFailed, setLoadFailed] = useState(false);
   const { getValues } = useSettings();
   const [currentMedia, setCurrentMedia] = useState<string | undefined>();
   const [boardName, setBoardName] = useState('');
@@ -34,7 +35,17 @@ export const PinterestBoard: FC<{
     onChange(event);
   };
   useEffect(() => {
-    customFunc.get('boards').then((data) => setOrgs(data));
+    customFunc
+      .get('boards')
+      .catch(() => false)
+      .then((data) => {
+        // the dashboard function answers false when Pinterest refused
+        if (Array.isArray(data)) {
+          setOrgs(data);
+        } else {
+          setLoadFailed(true);
+        }
+      });
     const settings = getValues()[props.name];
     if (settings) {
       setCurrentMedia(settings);
@@ -62,6 +73,16 @@ export const PinterestBoard: FC<{
     onChangeInner({ target: { name, value: board.id } });
   };
 
+  if (loadFailed) {
+    return (
+      <div className="text-[12px] text-red-400" role="alert">
+        {t(
+          'pinterest_boards_failed',
+          'Pinterest could not load the boards of this account. Please try again later.'
+        )}
+      </div>
+    );
+  }
   if (!orgs) {
     return null;
   }

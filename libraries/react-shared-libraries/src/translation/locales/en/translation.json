@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "No boards on this Pinterest account yet. Create one to post to it.",
   "pinterest_board_name": "Board name",
   "pinterest_create_board": "Create board",
-  "pinterest_create_board_failed": "Pinterest could not create the board. Please try again."
+  "pinterest_create_board_failed": "Pinterest could not create the board. Please try again.",
+  "pinterest_boards_failed": "Pinterest could not load the boards of this account. Please try again later."
 }

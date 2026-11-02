@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "Esta conta do Pinterest ainda não tem pastas. Crie uma para publicar nela.",
   "pinterest_board_name": "Nome da pasta",
   "pinterest_create_board": "Criar pasta",
-  "pinterest_create_board_failed": "O Pinterest não conseguiu criar a pasta. Tente novamente."
+  "pinterest_create_board_failed": "O Pinterest não conseguiu criar a pasta. Tente novamente.",
+  "pinterest_boards_failed": "O Pinterest não conseguiu carregar as pastas desta conta. Tente novamente mais tarde."
 }

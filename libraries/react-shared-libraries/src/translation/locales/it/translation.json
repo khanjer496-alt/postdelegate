@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "Questo account Pinterest non ha ancora bacheche. Creane una per pubblicare.",
   "pinterest_board_name": "Nome della bacheca",
   "pinterest_create_board": "Crea bacheca",
-  "pinterest_create_board_failed": "Pinterest non è riuscito a creare la bacheca. Riprova."
+  "pinterest_create_board_failed": "Pinterest non è riuscito a creare la bacheca. Riprova.",
+  "pinterest_boards_failed": "Pinterest non è riuscito a caricare le bacheche di questo account. Riprova più tardi."
 }

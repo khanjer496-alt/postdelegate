@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "Esta cuenta de Pinterest aún no tiene tableros. Crea uno para publicar en él.",
   "pinterest_board_name": "Nombre del tablero",
   "pinterest_create_board": "Crear tablero",
-  "pinterest_create_board_failed": "Pinterest no pudo crear el tablero. Inténtalo de nuevo."
+  "pinterest_create_board_failed": "Pinterest no pudo crear el tablero. Inténtalo de nuevo.",
+  "pinterest_boards_failed": "Pinterest no pudo cargar los tableros de esta cuenta. Inténtalo de nuevo más tarde."
 }

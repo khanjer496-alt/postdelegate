@@ -226,8 +226,8 @@ export class PinterestProvider
       };
     }
     if (
-      error.code === 29 ||
-      /Trial access may not create Pins in production/i.test(body)
+      /Trial access may not create Pins/i.test(body) ||
+      (error.code === 29 && status === 403)
     ) {
       return {
         type: 'bad-body' as const,
@@ -247,7 +247,7 @@ export class PinterestProvider
       return {
         type: 'bad-body' as const,
         value:
-          'Pinterest refused this app access to the boards and pins of this account (PINNER_DATA_ACCESS_DENIED). Pinterest has to authorize the app for personal accounts, a Pinterest business account is not affected.',
+          'Pinterest refused this app access to the boards and pins of this account (PINNER_DATA_ACCESS_DENIED). Pinterest has to authorize the app for this account first.',
       };
     }
 
@@ -375,12 +375,13 @@ export class PinterestProvider
   @Tool({ description: 'List of boards', dataSchema: [] })
   async boards(accessToken: string) {
     // Follow the bookmark: the sandbox can answer an empty page with a
-    // bookmark even when boards exist
+    // bookmark even when boards exist. this.fetch so an expired token is
+    // refreshed and a refusal is an error, never an empty list.
     const items: any[] = [];
     let bookmark = '';
     for (let page = 0; page < 10; page++) {
       const { items: pageItems, bookmark: next } = await (
-        await fetch(
+        await this.fetch(
           pinterestApi(
             `/boards?page_size=250${
               bookmark ? `&bookmark=${encodeURIComponent(bookmark)}` : ''

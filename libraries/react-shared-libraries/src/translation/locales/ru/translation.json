@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "В этом аккаунте Pinterest пока нет досок. Создайте доску, чтобы публиковать в неё.",
   "pinterest_board_name": "Название доски",
   "pinterest_create_board": "Создать доску",
-  "pinterest_create_board_failed": "Pinterest не удалось создать доску. Попробуйте ещё раз."
+  "pinterest_create_board_failed": "Pinterest не удалось создать доску. Попробуйте ещё раз.",
+  "pinterest_boards_failed": "Pinterest не удалось загрузить доски этого аккаунта. Попробуйте позже."
 }

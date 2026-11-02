@@ -2326,5 +2326,6 @@
   "pinterest_no_boards": "Tài khoản Pinterest này chưa có bảng nào. Hãy tạo một bảng để đăng lên.",
   "pinterest_board_name": "Tên bảng",
   "pinterest_create_board": "Tạo bảng",
-  "pinterest_create_board_failed": "Pinterest không thể tạo bảng. Vui lòng thử lại."
+  "pinterest_create_board_failed": "Pinterest không thể tạo bảng. Vui lòng thử lại.",
+  "pinterest_boards_failed": "Pinterest không thể tải các bảng của tài khoản này. Vui lòng thử lại sau."
 }
