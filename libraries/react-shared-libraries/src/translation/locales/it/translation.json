@@ -2322,5 +2322,9 @@
   "cookies_save": "Salva le scelte",
   "cookies_reject": "Rifiuta i non essenziali",
   "cookies_customize": "Personalizza",
-  "cookies_accept": "Accetta tutti"
+  "cookies_accept": "Accetta tutti",
+  "pinterest_no_boards": "Questo account Pinterest non ha ancora bacheche. Creane una per pubblicare.",
+  "pinterest_board_name": "Nome della bacheca",
+  "pinterest_create_board": "Crea bacheca",
+  "pinterest_create_board_failed": "Pinterest non è riuscito a creare la bacheca. Riprova."
 }

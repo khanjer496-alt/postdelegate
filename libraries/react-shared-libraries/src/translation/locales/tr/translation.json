@@ -2322,5 +2322,9 @@
   "cookies_save": "Seçimleri kaydet",
   "cookies_reject": "Gerekli olmayanları reddet",
   "cookies_customize": "Özelleştir",
-  "cookies_accept": "Tümünü kabul et"
+  "cookies_accept": "Tümünü kabul et",
+  "pinterest_no_boards": "Bu Pinterest hesabında henüz pano yok. Paylaşım yapmak için bir pano oluşturun.",
+  "pinterest_board_name": "Pano adı",
+  "pinterest_create_board": "Pano oluştur",
+  "pinterest_create_board_failed": "Pinterest panoyu oluşturamadı. Lütfen tekrar deneyin."
 }

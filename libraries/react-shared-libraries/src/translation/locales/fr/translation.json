@@ -2322,5 +2322,9 @@
   "cookies_save": "Enregistrer mes choix",
   "cookies_reject": "Refuser les non essentiels",
   "cookies_customize": "Personnaliser",
-  "cookies_accept": "Tout accepter"
+  "cookies_accept": "Tout accepter",
+  "pinterest_no_boards": "Ce compte Pinterest n'a pas encore de tableau. Créez-en un pour y publier.",
+  "pinterest_board_name": "Nom du tableau",
+  "pinterest_create_board": "Créer un tableau",
+  "pinterest_create_board_failed": "Pinterest n'a pas pu créer le tableau. Veuillez réessayer."
 }

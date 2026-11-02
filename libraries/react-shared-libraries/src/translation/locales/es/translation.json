@@ -2322,5 +2322,9 @@
   "cookies_save": "Guardar elección",
   "cookies_reject": "Rechazar las no esenciales",
   "cookies_customize": "Personalizar",
-  "cookies_accept": "Aceptar todas"
+  "cookies_accept": "Aceptar todas",
+  "pinterest_no_boards": "Esta cuenta de Pinterest aún no tiene tableros. Crea uno para publicar en él.",
+  "pinterest_board_name": "Nombre del tablero",
+  "pinterest_create_board": "Crear tablero",
+  "pinterest_create_board_failed": "Pinterest no pudo crear el tablero. Inténtalo de nuevo."
 }

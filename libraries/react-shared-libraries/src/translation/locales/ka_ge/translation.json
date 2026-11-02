@@ -2327,5 +2327,9 @@
   "cookies_save": "არჩევანის შენახვა",
   "cookies_reject": "არააუცილებლის უარყოფა",
   "cookies_customize": "მორგება",
-  "cookies_accept": "ყველას მიღება"
+  "cookies_accept": "ყველას მიღება",
+  "pinterest_no_boards": "ამ Pinterest ანგარიშზე ჯერ დაფები არ არის. შექმენით დაფა, რომ გამოაქვეყნოთ.",
+  "pinterest_board_name": "დაფის სახელი",
+  "pinterest_create_board": "დაფის შექმნა",
+  "pinterest_create_board_failed": "Pinterest-მა დაფა ვერ შექმნა. გთხოვთ, სცადოთ თავიდან."
 }

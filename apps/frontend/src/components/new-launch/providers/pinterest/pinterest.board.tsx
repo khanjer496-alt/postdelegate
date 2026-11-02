@@ -21,6 +21,9 @@ export const PinterestBoard: FC<{
   const [orgs, setOrgs] = useState<undefined | any[]>();
   const { getValues } = useSettings();
   const [currentMedia, setCurrentMedia] = useState<string | undefined>();
+  const [boardName, setBoardName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createFailed, setCreateFailed] = useState(false);
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -37,11 +40,75 @@ export const PinterestBoard: FC<{
       setCurrentMedia(settings);
     }
   }, []);
+
+  // An account without boards (always the case at first in Pinterest's
+  // sandbox, where boards made on pinterest.com don't exist) can create one
+  // here and have it selected right away.
+  const createBoard = async () => {
+    if (!boardName.trim() || creating) {
+      return;
+    }
+    setCreating(true);
+    setCreateFailed(false);
+    const board = await customFunc
+      .get('createBoard', { name: boardName.trim() })
+      .catch(() => false);
+    setCreating(false);
+    if (!board?.id) {
+      setCreateFailed(true);
+      return;
+    }
+    setOrgs([board]);
+    onChangeInner({ target: { name, value: board.id } });
+  };
+
   if (!orgs) {
     return null;
   }
   if (!orgs.length) {
-    return 'No boards found, you have to create a board first';
+    return (
+      <div className="flex flex-col gap-[6px]">
+        <div className="text-[14px]">
+          {t(
+            'pinterest_no_boards',
+            'No boards on this Pinterest account yet. Create one to post to it.'
+          )}
+        </div>
+        <div className="flex gap-[6px]">
+          <div className="flex-1 h-[42px] bg-newBgColorInner border-newTableBorder border rounded-[8px] flex items-center">
+            <input
+              className="h-full w-full bg-transparent outline-none px-[16px] text-[14px] text-textColor placeholder-textColor"
+              placeholder={t('pinterest_board_name', 'Board name')}
+              aria-label={t('pinterest_board_name', 'Board name')}
+              value={boardName}
+              onChange={(e) => setBoardName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  createBoard();
+                }
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            className="h-[42px] px-[16px] flex items-center bg-newBgColorInner border-newTableBorder border rounded-[8px] text-[14px] disabled:opacity-50"
+            disabled={!boardName.trim() || creating}
+            onClick={createBoard}
+          >
+            {t('pinterest_create_board', 'Create board')}
+          </button>
+        </div>
+        {createFailed && (
+          <div className="text-[12px] text-red-400" role="alert">
+            {t(
+              'pinterest_create_board_failed',
+              'Pinterest could not create the board. Please try again.'
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
   return (
     <Select
