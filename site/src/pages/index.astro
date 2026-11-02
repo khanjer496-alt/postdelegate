@@ -34,10 +34,10 @@ const orbitLabel=`${liveCount} networks connect today: ${AVAILABLE_NETWORKS.map(
 // Hotspots on the real workspace screenshot (percent of the 1280x720 image), set on
 // the corner of each control so the pin never hides the label it points at.
 const demoPins=[
- {x:26.6,y:29.2,title:'Create once',text:'Write a post, choose its channels and pick a time from one composer.'},
- {x:52.8,y:33,title:'Posts in their slots',text:'Every scheduled post sits on the calendar, right where it goes out.'},
- {x:72.7,y:15.8,title:'Day, week or month',text:'Zoom from today’s time slots out to the whole month.'},
- {x:19,y:41,title:'Channels at hand',text:'Your connected channels stay beside the calendar, ready to use.'},
+ {x:16,y:23.8,title:'Create once',text:'Write a post, choose its channels and pick a time from one composer.'},
+ {x:52.9,y:27.4,title:'Posts in their slots',text:'Every scheduled post sits on the calendar, right where it goes out.'},
+ {x:83.8,y:10.8,title:'Day, week or month',text:'Zoom from today’s time slots out to the whole month.'},
+ {x:22.8,y:47,title:'Channels at hand',text:'Your connected channels stay beside the calendar, ready to use.'},
 ];
 const integrations=[
  {name:'Claude',route:'/claude-cowork',style:'claude-card',text:'Turn a rough idea into a thoughtful content plan.',prompt:'Help me plan a week of useful posts for our new launch.',response:'Start with the story, the audience and three ideas worth sharing.',label:'Plan with Claude'},
@@ -117,12 +117,12 @@ const compareCards=[
       <figure class="demo-frame">
         <div class="demo-browser" aria-hidden="true"><span></span><span></span><span></span><span class="demo-address">app.postdelegate.com</span><span class="demo-live"><i></i>Current workspace</span></div>
         <div class="demo-shot">
-          <img src="/images/postdelegate-workspace.jpg" width="1280" height="720" alt="The current PostDelegate calendar workspace in week view, with a Create Post button, a connected YouTube channel and a scheduled post on Tuesday" loading="lazy" decoding="async"/>
+          <img src="/images/postdelegate-workspace.webp" width="1600" height="1000" alt="The current PostDelegate calendar in week view: six demo channels in the sidebar (YouTube, Bluesky, Discord, Telegram, Slack and DEV) and a week of launch posts, mostly scheduled, one published and two drafts" loading="lazy" decoding="async"/>
           {demoPins.map((p,i)=><span class="demo-pin" style={`left:${p.x}%;top:${p.y}%;--d:${i*0.15}s`} aria-hidden="true">{i+1}</span>)}
         </div>
       </figure>
       <ol class="demo-notes">{demoPins.map((p,i)=><li class="reveal"><span class="pin-num" aria-hidden="true">{i+1}</span><div><h3>{p.title}</h3><p>{p.text}</p></div></li>)}</ol>
-      <div class="demo-cta reveal"><a class="button button-lime" href={SITE.signup}>Try it free for {TRIAL_DAYS} days <span aria-hidden="true">↗</span></a><p class="demo-caption">A screenshot of the real PostDelegate workspace. {CTA_NOTE}.</p></div>
+      <div class="demo-cta reveal"><a class="button button-lime" href={SITE.signup}>Try it free for {TRIAL_DAYS} days <span aria-hidden="true">↗</span></a><p class="demo-caption">A screenshot of the real PostDelegate workspace, filled with demo channels and posts. {CTA_NOTE}.</p></div>
     </div>
   </section>
   <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap reveal"><span class="eyebrow">BRING YOUR OWN AI</span><h2 class="section-heading" id="ai-title">No AI markup. Use the assistant<br/>you already <span class="ink-circle">pay for.<OrbitAccent kind="ring"/></span></h2><p class="section-intro">Plug in your own OpenAI key, or connect Claude or ChatGPT over MCP. You pay the provider’s own rates; we never resell AI credits.</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card','reveal',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview" aria-hidden="true"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>Example workflow</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">Draft idea</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">Illustrative conversations. Your assistant does the writing under your own account; PostDelegate keeps the calendar.</p><div class="agent-files-band reveal"><div class="agent-files-copy"><span class="agent-files-kicker">Ready-made assistant files</span><h3>Teach your assistant the PostDelegate way.</h3><p>A Claude skill, AGENTS.md, ChatGPT instructions and a Cursor rule. Each one tells your assistant to draft first and never schedule or publish without your OK.</p><a class="text-link" href="/docs/mcp/agent-files">Get the agent files <span aria-hidden="true">↗</span></a></div><ul class="agent-files-list" aria-label="Agent files">{agentFiles.map(f=><li><a href={f.href}><span class="agent-file-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5M10 15h5"/></svg></span><span><b>{f.title}</b><small>{f.file}</small></span></a></li>)}</ul></div></div></section>
