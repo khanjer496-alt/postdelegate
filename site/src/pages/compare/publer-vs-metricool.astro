@@ -1,0 +1,111 @@
+---
+import CompareTool from '../../components/CompareTool.astro';
+import { PLANS, TRIAL_DAYS } from '../../data/plans';
+const [starter, team] = PLANS;
+const faq = [
+  { q: 'Is Metricool free?', a: 'Metricool has a free plan for one brand with up to 20 posts a month, 30 days of analytics, 5 competitor profiles, the AI assistant and its MCP server. It cannot connect LinkedIn or X. Paid plans start at $25 a month for up to 5 brands on monthly billing.' },
+  { q: 'Does Metricool charge extra for X?', a: 'Yes. X is an add-on on Starter and above, at $10 a month for each connected X account. It is not available on the free plan. Publer includes X on its paid plans without an add-on, but not on its free plan.' },
+  { q: 'Which has better analytics?', a: 'Metricool, for most people. Analytics is its core: unlimited history on paid plans, up to 100 competitors, PDF and PowerPoint reports, ads data from Facebook, Google and TikTok, and a Data Studio connector on Advanced. Publer’s analytics, reports, best times and competitor analysis are solid but sit on its Business plan.' },
+  { q: 'Which suits agencies?', a: 'Metricool is usually cheaper for agencies with many clients on a few networks each, because it charges per brand rather than per account. Five clients on four networks each cost $67 a month on Metricool Advanced with team access and approvals, against $126 on Publer Business before extra members. Without approvals, and with X in every client’s mix, Publer Professional ($72) edges out Metricool Starter plus five X add-ons ($75).' },
+  { q: 'Does Publer have a free plan?', a: 'Yes. Publer Free connects 3 social accounts, not including X, with 10 scheduled posts per account at a time and one user. Paid plans start at $5 a month for one account.' },
+];
+const links = [
+  { href: '/compare/publer-vs-buffer', label: 'Publer vs Buffer' },
+  { href: '/compare/publer', label: 'PostDelegate vs Publer' },
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/compare', label: 'All comparisons' },
+  { href: '/pricing', label: 'PostDelegate pricing' },
+  { href: '/mcp', label: 'PostDelegate MCP server' },
+  { href: '/youtube-scheduler', label: 'YouTube scheduler' },
+  { href: '/wordpress-scheduler', label: 'WordPress scheduler' },
+  { href: '/guides/bulk-schedule-social-posts-csv', label: 'Bulk schedule social posts from a CSV' },
+];
+const metricoolPricing = 'https://metricool.com/pricing/';
+const metricoolHelp = 'https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u';
+const publerPricing = 'https://publer.com/pricing';
+const publerHelp = 'https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/';
+const reporting = [
+  { label: 'Analytics history', publer: 'Analytics insights and reports on Business', metricool: '30 days on Free; unlimited on paid plans (30 days for X)', src: [publerHelp, metricoolPricing] },
+  { label: 'Competitor tracking', publer: 'Competitor analysis on Business', metricool: '5 profiles on Free, up to 100 on paid plans', src: [publerPricing, metricoolPricing] },
+  { label: 'Reports', publer: 'Downloadable analytics reports on Business', metricool: 'PDF and PowerPoint on Starter; custom templates and a Data Studio connector on Advanced', src: [publerHelp, metricoolPricing] },
+  { label: 'Ads', publer: 'Not listed', metricool: 'Facebook Ads, Google Ads and TikTok Ads connections', src: [metricoolPricing] },
+  { label: 'Best times to post', publer: 'On Business', metricool: 'Listed in the planner', src: [publerPricing, metricoolPricing] },
+  { label: 'Paid extra', publer: 'None listed for analytics', metricool: 'Advanced Analytics add-on, from $12 a month on Starter or $36 on Advanced', src: [publerPricing, metricoolHelp] },
+];
+---
+<CompareTool
+  a="publer" b="metricool" published="2026-11-02"
+  title="Publer vs Metricool (2026): Price, Analytics, Bulk"
+  description="Publer vs Metricool compared on free plans, per-account vs per-brand pricing, analytics, competitor tracking, bulk tools, API, MCP and the cost of adding X."
+  h1="Publer vs Metricool: publishing volume or analytics depth?"
+  shortAnswer="Pick Metricool if reporting comes first: competitor tracking, ads data and MCP on its free plan, priced per brand. Pick Publer if publishing volume comes first: bulk CSV, RSS and recycling, X without an add-on and a low price per account. One brand on five networks, LinkedIn included, costs $25 on Metricool Starter and $20 on Publer Professional."
+  costIntro="The two count different things. Publer charges for every social account. Metricool charges for brands, and one brand holds one profile per network, so the same number of accounts can cost very different amounts. The Metricool ranges below depend on how your accounts split into brands."
+  fitIntro={`PostDelegate is lighter than either: a scheduler with flat plans from $${starter.monthly}, team members from $${team.monthly} and the API and MCP on every plan, with analytics that today cover YouTube only. It does not replace Metricool's reporting, and it cannot reach Instagram, Facebook, Threads, TikTok, LinkedIn, Pinterest or X yet, because those are pending platform approval. Every plan starts with a ${TRIAL_DAYS}-day trial and no card.`}
+  faq={faq} links={links}
+>
+  <h3>A worked agency example: 5 clients on 4 networks</h3>
+  <p>Say each client posts to Instagram, Facebook, TikTok and LinkedIn. That is 20 social accounts in 5 brands.</p>
+  <ul>
+    <li><strong>Publer:</strong> Professional costs $72 a month for 20 accounts (two of them free). Business, which adds approvals, analytics and the API, costs $126, plus $3 for each extra team member.</li>
+    <li><strong>Metricool:</strong> Starter covers 5 brands for $25, but has no team access or approvals. Advanced adds both and covers up to 15 brands for $67.</li>
+  </ul>
+  <p>Swap LinkedIn for X and Publer's totals stay the same, while Metricool adds $10 for each X account: $50 more for five clients.</p>
+
+  <h2>Analytics and reports</h2>
+  <p>Metricool started as an analytics tool and it shows. Even the free plan tracks five competitors and keeps 30 days of data, and paid plans keep history with no time limit. Publer treats analytics as a Business-plan feature alongside its publishing tools.</p>
+  <div class="pm-scroll">
+    <table class="pm">
+      <caption class="sr-only">Publer and Metricool analytics and reporting compared</caption>
+      <thead><tr><th scope="col">Feature</th><th scope="col">Publer</th><th scope="col">Metricool</th><th scope="col">Sources</th></tr></thead>
+      <tbody>{reporting.map((row) => <tr><th scope="row">{row.label}</th><td>{row.publer}</td><td>{row.metricool}</td><td>{row.src.map((href, i) => <>{i > 0 && ' '}<a href={href} target="_blank" rel="noopener">{new URL(href).hostname.replace(/^www\./, '')}</a></>)}</td></tr>)}</tbody>
+    </table>
+  </div>
+
+  <h2>Bulk, RSS and recycling</h2>
+  <p>Publer is the stronger publishing engine. Paid plans can schedule up to 500 posts at once from a CSV file, Professional includes unlimited RSS automations, and Business adds automatic recycling of evergreen posts with spintax so repeats do not read identically. Metricool includes unlimited RSS feeds on every plan, and its paid plans include autolists and recurring scheduling, but we did not find bulk CSV upload on its pricing page. Its free plan stops at 20 posts a month, and paid scheduling is unlimited under a fair use policy.</p>
+
+  <h2>The cost of X</h2>
+  <p>Both treat X as a paid extra in some way, because X charges for its API. Publer leaves X off its free plan and includes it on every paid plan. Metricool sells X as an add-on at $10 a month per connected account on Starter and above, keeps X analytics for 30 days, and gives fuller X analytics on Advanced. If several of your brands post to X, add that to Metricool's price before comparing.</p>
+
+  <h2>API and MCP</h2>
+  <p>Metricool is the easier way to connect an AI assistant: its MCP server is on every plan, Free included, with limits that may apply. Its API, for Zapier, Make, Data Studio and custom integrations, is on Advanced and Custom only. Publer puts both its API and its MCP server on Business and Enterprise for eligible customers.</p>
+
+  <h2>Teams and approvals</h2>
+  <p>Publer adds members to any paid plan for a small monthly fee each, with every tenth member free, and puts advanced collaboration and approval workflows on Business. Metricool keeps team and client management, roles and its post approval system on Advanced, which starts at $67 a month for up to 15 brands.</p>
+
+  <h2>Where Publer wins</h2>
+  <ul>
+    <li>Bulk scheduling of up to 500 posts from a CSV, and unlimited RSS automations from Professional.</li>
+    <li>Evergreen recycling with spintax and recurring posts on Business.</li>
+    <li>X on every paid plan without a per-account add-on.</li>
+    <li>Telegram and Mastodon publishing, which Metricool's pricing page does not list.</li>
+    <li>Low entry pricing for one or two accounts: $5 a month for one.</li>
+  </ul>
+
+  <h2>Where Metricool wins</h2>
+  <ul>
+    <li>Per-brand pricing that suits agencies with many clients on a few networks each.</li>
+    <li>Deeper analytics: unlimited history, up to 100 competitors and ads data.</li>
+    <li>MCP on every plan, including Free.</li>
+    <li>A comment and message inbox, and Twitch, which Publer's pricing page does not list.</li>
+    <li>A free plan that includes analytics and competitor tracking.</li>
+  </ul>
+
+  <h2>What to check before you switch</h2>
+  <ul>
+    <li>Map your accounts into brands before reading Metricool's prices, and count X accounts separately.</li>
+    <li>Decide whether you need approvals. On both tools that moves you up a tier.</li>
+    <li>If you post in volume, test a bulk upload or RSS feed during Publer's trial, 7 days on Professional and 14 on Business.</li>
+    <li>If clients expect monthly reports, build one in Metricool's free plan first to see whether it fits.</li>
+  </ul>
+</CompareTool>
+<style>
+  .pm-scroll { margin: 22px 0; overflow-x: auto; border: 1px solid #303030; border-radius: 18px; background: #171717; }
+  .pm { width: 100%; min-width: 40rem; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+  .pm thead th { background: #222; color: #fff; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .pm th, .pm td { padding: 12px 16px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+  .pm tbody tr:last-child > * { border-bottom: 0; }
+  .pm tbody th { color: #fff; font-weight: 700; }
+  .pm td { color: #c4c4c4; }
+  .pm td a { color: #b39aff; font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+</style>

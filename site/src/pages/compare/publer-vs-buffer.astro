@@ -1,0 +1,111 @@
+---
+import CompareTool from '../../components/CompareTool.astro';
+import { PLANS, TRIAL_DAYS } from '../../data/plans';
+import { AVAILABLE_NETWORKS } from '../../data/networks';
+const [starter, team] = PLANS;
+const faq = [
+  { q: 'Is Publer cheaper than Buffer?', a: 'For solo use, usually yes. On monthly billing, 10 accounts cost $36 on Publer Professional and $60 on Buffer Essentials, and 30 cost $108 against $135. With a team the gap closes: 30 accounts and three extra people come to $198 on Publer Business and $195 on Buffer Team.' },
+  { q: 'Does Publer’s free plan include X?', a: 'No. Publer’s free plan connects 3 social accounts but not X, which needs a paid plan because of the cost of X’s API. Buffer’s pricing page lists no such exclusion for its free plan of 3 channels.' },
+  { q: 'Which has an API?', a: 'Both, on different terms. Buffer gives API keys on every plan, Free included, with monthly request limits per channel that rise with the plan. Publer’s API is for eligible Business and Enterprise customers, and Publer says it has no public API open to everyone.' },
+  { q: 'Which has an MCP server?', a: 'Both. Buffer includes its MCP server on every plan, Free included. Publer lists API and MCP access on Business and Enterprise.' },
+  { q: 'Which is better for agencies?', a: 'It depends on the ratio of accounts to people. Many accounts and few people favour Publer, because accounts cost less and every tenth one is free. Many people favour Buffer Team, which includes unlimited users for its per-channel price. Both put approval workflows on their team tier.' },
+];
+const links = [
+  { href: '/compare/publer-vs-metricool', label: 'Publer vs Metricool' },
+  { href: '/compare/postiz-vs-buffer', label: 'Postiz vs Buffer' },
+  { href: '/compare/publer', label: 'PostDelegate vs Publer' },
+  { href: '/compare/buffer', label: 'PostDelegate vs Buffer' },
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/pricing', label: 'PostDelegate pricing' },
+  { href: '/mcp', label: 'PostDelegate MCP server' },
+  { href: '/wordpress-scheduler', label: 'WordPress scheduler' },
+  { href: '/telegram-scheduler', label: 'Telegram scheduler' },
+  { href: '/guides/client-approval-workflow', label: 'Set up a client approval workflow' },
+];
+---
+<CompareTool
+  a="publer" b="buffer" published="2026-11-02"
+  title="Publer vs Buffer (2026): Price, Free Plan, Features"
+  description="Publer vs Buffer: free plans and the X catch, per-account vs per-channel pricing, bulk CSV, RSS, approvals, API and MCP. Worked monthly costs, sources linked."
+  h1="Publer vs Buffer: which scheduler suits you?"
+  shortAnswer="Pick Buffer if you want the API and MCP on every plan, Free included, a comment inbox, or a team plan with unlimited users. Pick Publer if you want a lower bill as accounts grow, bulk CSV scheduling and RSS automation. At 10 accounts on monthly billing, Publer Professional costs $36 and Buffer Essentials $60."
+  costIntro="Both charge by the account, so the question is the rate. Publer Professional works out at about $4 an account with every tenth free; Buffer Essentials is $6 a channel for the first ten, then cheaper. Solo, Publer stays ahead at every size below."
+  fitIntro={`PostDelegate prices like neither: flat plans by channel count, from $${starter.monthly} for ${starter.channels} channels, with team members from the $${team.monthly} plan and the API and MCP on every plan. The catch today is reach. It connects YouTube, Bluesky, Telegram, WordPress and ${AVAILABLE_NETWORKS.length - 4} more networks, but Instagram, Facebook, Threads, TikTok, LinkedIn, Pinterest and X are still pending approval, so it is not yet a swap for either tool. Every plan starts with a ${TRIAL_DAYS}-day trial and no card.`}
+  faq={faq} links={links}
+>
+  <h3>With a team and approvals</h3>
+  <p>Approval workflows sit on each tool's team tier: Publer Business and Buffer Team. Publer Business costs $63 a month for 10 accounts plus $3 per extra member; Buffer Team costs $12 a channel for the first ten and includes unlimited users. Worked out on monthly billing:</p>
+  <div class="pv-scroll">
+    <table class="pv">
+      <caption class="sr-only">Monthly cost with approval workflows for Publer Business and Buffer Team</caption>
+      <thead><tr><th scope="col">Setup</th><th scope="col">Publer Business</th><th scope="col">Buffer Team</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">10 accounts, owner + 3 people</th><td>$72</td><td>$120</td></tr>
+        <tr><th scope="row">30 accounts, owner + 3 people</th><td>$198</td><td>$195</td></tr>
+        <tr><th scope="row">30 accounts, owner + 9 people</th><td>$216</td><td>$195</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="pv-small">Read from the calculators on <a href="https://publer.com/pricing" target="_blank" rel="noopener">publer.com/pricing</a> and <a href="https://buffer.com/pricing" target="_blank" rel="noopener">buffer.com/pricing</a> on 2 November 2026. Publer's tenth member is free, so 9 extra members cost the same as 10.</p>
+
+  <h2>Free plans compared</h2>
+  <p>Both free plans hold three accounts for one person, and both cap scheduled posts at ten per account at a time, refilling as posts go out. The differences are in the details:</p>
+  <ul>
+    <li><strong>X.</strong> Publer Free cannot connect X at all. Buffer's pricing page lists no such limit.</li>
+    <li><strong>Pinterest.</strong> On Publer Free, a Pinterest account needs at least 100 followers or a claimed website.</li>
+    <li><strong>History and drafts.</strong> Publer Free keeps published posts for 24 hours and holds 25 drafts. Buffer Free keeps 30 days of analytics.</li>
+    <li><strong>Automation.</strong> Buffer Free includes an API key (1,000 requests per channel a month) and its MCP server. Publer Free includes neither.</li>
+    <li><strong>Comments.</strong> Buffer Free includes its community inbox for replying to comments.</li>
+  </ul>
+
+  <h2>Bulk, RSS and recycling</h2>
+  <p>This is where Publer pulls ahead. Its paid plans can schedule up to 500 posts at once from a CSV file, and Professional includes unlimited RSS automations that turn new articles into posts. Business adds automatic recycling of evergreen posts, recurring posts and spintax, which varies the wording each time a post repeats. Buffer has a reorderable queue, duplicate posts and channel groups for picking several accounts at once, but we did not find bulk CSV upload or RSS auto-posting on its pricing page.</p>
+
+  <h2>Teams and approvals</h2>
+  <p>Buffer's Free and Essentials plans are for one user. Team adds unlimited users, approval workflows and custom permissions. Publer lets you add members to any paid plan at a per-member price, and Business adds advanced collaboration with approval workflows.</p>
+
+  <h2>API and MCP</h2>
+  <p>Buffer is the more open of the two. API access comes with every plan: one key and 1,000 requests per channel a month on Free, three keys on Essentials and five on Team, with higher limits. Its MCP server is on every plan too. Publer restricts both to Business and Enterprise customers in good standing and says it has no public API for everyone, so automation starts on Business, from $10 a month for one account (about $7 per account after that).</p>
+
+  <h2>Analytics and inbox</h2>
+  <p>Buffer includes analytics on every plan, with 30 days of history on Free and unlimited history, reports you can export as CSV or PDF and custom UTM parameters on paid plans. Branded reports are on Team. Its community inbox handles comments across ten networks on every plan. Publer's analytics insights and reports, best times to post, competitor analysis and hashtag analytics are on Business. We did not find a comment inbox on Publer's pricing page.</p>
+
+  <h2>Networks</h2>
+  <p>They overlap on eleven: Facebook, Instagram, TikTok, X, Threads, LinkedIn, Pinterest, Mastodon, Google Business Profile, YouTube and Bluesky. Publer adds Telegram and WordPress, including self-hosted WordPress. Buffer adds Substack. On Publer, Facebook covers profiles, pages, locations and groups, and LinkedIn covers profiles and pages.</p>
+
+  <h2>Where Publer wins</h2>
+  <ul>
+    <li>A lower price per account: $36 for 10 and $108 for 30 on Professional.</li>
+    <li>Bulk scheduling of up to 500 posts from a CSV, and unlimited RSS automations.</li>
+    <li>Evergreen recycling with spintax and recurring posts on Business.</li>
+    <li>Telegram and WordPress publishing.</li>
+    <li>Competitor analysis on Business.</li>
+  </ul>
+
+  <h2>Where Buffer wins</h2>
+  <ul>
+    <li>API keys and an MCP server on every plan, Free included.</li>
+    <li>A free plan with no X exclusion listed, and 30 days of analytics.</li>
+    <li>A comment inbox on every plan.</li>
+    <li>Unlimited users on Team, which gets cheaper than Publer as headcount grows.</li>
+    <li>Substack publishing.</li>
+  </ul>
+
+  <h2>What to check before you switch</h2>
+  <ul>
+    <li>Count people as well as accounts. The cheaper tool flips once several people need approval rights.</li>
+    <li>If you post to X, confirm it is on the plan you pick.</li>
+    <li>If you automate with an AI assistant or scripts, check API and MCP access on your plan, not just the top one.</li>
+    <li>Publer's Business trial is 14 days and Professional's 7; Buffer's paid trials are 14 days. Use the trial to bulk-load a real week of posts.</li>
+  </ul>
+</CompareTool>
+<style>
+  .pv-scroll { margin: 22px 0; overflow-x: auto; border: 1px solid #303030; border-radius: 18px; background: #171717; }
+  .pv { width: 100%; min-width: 30rem; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+  .pv thead th { background: #222; color: #fff; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .pv th, .pv td { padding: 12px 16px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+  .pv tbody tr:last-child > * { border-bottom: 0; }
+  .pv tbody th { color: #fff; font-weight: 700; }
+  .pv td { color: #c4c4c4; }
+  .pv-small { color: #9a9a9a; font-size: 13px !important; }
+</style>
