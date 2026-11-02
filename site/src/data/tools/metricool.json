@@ -13,7 +13,7 @@
   "cost": {
     "3": { "value": "$0 / $25", "note": "Free if it is one brand without LinkedIn or X and 20 posts a month is enough; otherwise Starter", "src": "https://metricool.com/pricing/" },
     "10": { "value": "$25 to $45", "note": "Starter: $25 for up to 5 brands, $45 for up to 10, depending on how the 10 accounts split into brands", "src": "https://metricool.com/pricing/" },
-    "30": { "value": "$45 to $107", "note": "Starter with 10 brands, or Advanced for team access and approvals ($67 for 15 brands, $107 for 25). X adds $10 per account", "src": ["https://metricool.com/pricing/", "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u"] }
+    "30": { "value": "$25 to $210", "note": "Depends on how the accounts split into brands (one profile per network per brand): 5 brands on Starter at $25, up to 30 single-network brands on the 50-brand Advanced tier at $210. X adds $10 per account", "src": ["https://metricool.com/pricing/", "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u"] }
   },
   "networks": { "value": "Facebook, Instagram, Threads, X (add-on), Bluesky, Pinterest, TikTok, YouTube, Twitch, LinkedIn (paid plans) and Google Business Profile, plus a website or blog and Facebook, Google and TikTok Ads", "src": "https://metricool.com/pricing/" },
   "api": { "value": "Metricool API on Advanced and Custom only", "src": "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u" },

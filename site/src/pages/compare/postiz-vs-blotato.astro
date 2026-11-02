@@ -5,7 +5,7 @@ const [starter] = PLANS;
 const faq = [
   { q: 'Does Blotato have a free trial?', a: 'Yes, 7 days on every plan. A card is required, nothing is charged during the trial, and you get the web app plus 60 AI credits. The trial does not include the API or MCP server: creating an API key ends the trial and starts the paid plan straight away.' },
   { q: 'Can Postiz make videos?', a: 'Within monthly limits, yes. Every Postiz Cloud plan includes AI video credits (3 a month on Standard, up to 60 on Ultimate) and clipping minutes that cut a long YouTube video into short vertical clips with captions. Blotato puts more weight on generated media: Starter includes 1,250 credits a month shared between AI images and video, plus AI voiceovers.' },
-  { q: 'Which works with Claude?', a: 'Both. Blotato has a hosted MCP server with 35 tools, available once you are on a paid plan. Postiz includes a hosted MCP server on every Cloud plan, and its trial gives you the plan you picked in full.' },
+  { q: 'Which works with Claude?', a: 'Both. Blotato has a hosted MCP server with 35 tools, available once you are on a paid plan. Postiz includes a hosted MCP server on every Cloud plan, and its trial includes the API, so you can connect an agent before paying.' },
   { q: 'Which is cheaper for 20 accounts?', a: 'Blotato. Its $29 Starter plan covers 20 accounts. On Postiz, 20 channels need the Pro plan at $49 a month, which covers up to 30.' },
   { q: 'Is Postiz free?', a: 'The code is: Postiz is open source under AGPL-3.0, so you can self-host it with no license fee. Postiz Cloud has no free plan and starts at $29 a month after a 7-day trial that asks for a payment method.' },
 ];
@@ -47,7 +47,7 @@ const links = [
   <p>Blotato publishes to nine networks: X, LinkedIn, Facebook, Instagram, TikTok, YouTube, Threads, Bluesky and Pinterest. It reads analytics on eight of them (all but LinkedIn) and handles comments and DMs on Instagram and Facebook. Postiz lists all nine and 21 more, adding Reddit, Mastodon, Google Business Profile, Discord, Telegram, Slack, WordPress, Medium and other community and publishing destinations.</p>
 
   <h2>API and MCP</h2>
-  <p>Both give AI agents a way in. Blotato's hosted MCP endpoint exposes 35 tools across its nine networks, and it ships official n8n and Make nodes. Every paid plan includes the API and MCP with no separate developer tier, but the trial does not: generating an API key ends the trial and starts billing, even with trial days left. Postiz includes its MCP server, CLI, public API and webhooks on every Cloud plan, and its trial runs the plan you picked in full, so you can wire up an agent before paying.</p>
+  <p>Both give AI agents a way in. Blotato's hosted MCP endpoint exposes 35 tools across its nine networks, and it ships official n8n and Make nodes. Every paid plan includes the API and MCP with no separate developer tier, but the trial does not: generating an API key ends the trial and starts billing, even with trial days left. Postiz includes its MCP server, CLI, public API and webhooks on every Cloud plan, and its trial includes the API, so you can wire up an agent before paying. Video clipping and some paid AI video tools unlock when billing starts.</p>
 
   <h2>Self-hosting</h2>
   <p>Blotato is a hosted service, and its MCP server is hosted too. Postiz can also be self-hosted under AGPL-3.0. That route has no license fee, but you run the stack yourself and get your own developer app approved by each network.</p>
