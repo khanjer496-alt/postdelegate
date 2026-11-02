@@ -83,13 +83,12 @@ const youtubeScopes = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/youtube.upload',
-  'https://www.googleapis.com/auth/yt-analytics.readonly',
 ];
 const pinterestScopes = ['boards:read', 'boards:write', 'pins:read', 'pins:write', 'user_accounts:read'];
 const authenticateParams = { code: 'test-code', codeVerifier: 'test-verifier', refresh: '' };
 const jsonResponse = (value) => ({ json: async () => value });
 
-test('YouTube requests only identity, uploads, channel reads and analytics', async () => {
+test('YouTube requests only identity, uploads and channel reads (the Google-verified set)', async () => {
   const provider = new YoutubeProvider();
   await provider.generateAuthUrl();
   assert.deepEqual(googleAuthOptions.scope, youtubeScopes);
