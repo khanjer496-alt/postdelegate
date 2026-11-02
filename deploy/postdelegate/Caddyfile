@@ -17,6 +17,11 @@ app.postdelegate.com {
     handle @direct {
         abort
     }
+    # The API reference is internal: never serve Swagger publicly
+    @swagger path /api/docs /api/docs/* /api/docs-json /api/docs-yaml
+    handle @swagger {
+        respond 404
+    }
     handle /source {
         header Cache-Control "no-store"
         redir * /source/postdelegate-80283818.tar.gz 302
@@ -55,6 +60,18 @@ app.postdelegate.com {
     handle @deletion {
         root * /legal-public
         rewrite * /data-deletion.html
+        file_server
+    }
+    @dpa path /legal/dpa /legal/dpa/
+    handle @dpa {
+        root * /legal-public
+        rewrite * /dpa.html
+        file_server
+    }
+    @subprocessors path /legal/subprocessors /legal/subprocessors/
+    handle @subprocessors {
+        root * /legal-public
+        rewrite * /subprocessors.html
         file_server
     }
     handle {

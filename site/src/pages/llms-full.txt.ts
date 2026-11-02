@@ -50,6 +50,8 @@ Support: ${SITE.url}/support
 Account and data requests: ${SITE.url}/support#data-requests
 Privacy: ${SITE.legal.privacy}
 Terms: ${SITE.legal.terms}
+Data Processing Addendum: ${SITE.legal.dpa}
+Sub-processors: ${SITE.legal.subprocessors}
 This website does not publish an automated uptime history or an availability guarantee.
 
 ## Independence
