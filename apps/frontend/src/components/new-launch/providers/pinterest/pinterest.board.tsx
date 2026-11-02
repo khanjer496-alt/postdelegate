@@ -24,7 +24,8 @@ export const PinterestBoard: FC<{
   const [currentMedia, setCurrentMedia] = useState<string | undefined>();
   const [boardName, setBoardName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [createFailed, setCreateFailed] = useState(false);
+  // true for a generic failure, or Pinterest's reason
+  const [createFailed, setCreateFailed] = useState<boolean | string>(false);
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -66,7 +67,9 @@ export const PinterestBoard: FC<{
       .catch(() => false);
     setCreating(false);
     if (!board?.id) {
-      setCreateFailed(true);
+      setCreateFailed(
+        typeof board?.error === 'string' && board.error ? board.error : true
+      );
       return;
     }
     setOrgs([board]);
@@ -102,6 +105,7 @@ export const PinterestBoard: FC<{
               placeholder={t('pinterest_board_name', 'Board name')}
               aria-label={t('pinterest_board_name', 'Board name')}
               value={boardName}
+              maxLength={100}
               onChange={(e) => setBoardName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -120,12 +124,14 @@ export const PinterestBoard: FC<{
             {t('pinterest_create_board', 'Create board')}
           </button>
         </div>
-        {createFailed && (
+        {!!createFailed && (
           <div className="text-[12px] text-red-400" role="alert">
-            {t(
-              'pinterest_create_board_failed',
-              'Pinterest could not create the board. Please try again.'
-            )}
+            {typeof createFailed === 'string'
+              ? createFailed
+              : t(
+                  'pinterest_create_board_failed',
+                  'Pinterest could not create the board. Please try again.'
+                )}
           </div>
         )}
       </div>

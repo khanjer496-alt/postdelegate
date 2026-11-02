@@ -43,9 +43,17 @@ const pinterestApi = (path: string) =>
 // carry a credential.
 const pinterestMessage = (message: string) =>
   message
-    .replace(/pina_[A-Za-z0-9._-]+/g, '[redacted]')
-    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
-    .replace(/(access_token|refresh_token|client_secret|code)=[^&\s]+/gi, '$1=[redacted]')
+    // pina_ access tokens, pinr refresh tokens
+    .replace(/\bpin[ar][._-][A-Za-z0-9._-]+/g, '[redacted]')
+    .replace(/\b(Bearer|Basic)\s+\S+/gi, '$1 [redacted]')
+    .replace(
+      /"(access_token|refresh_token|client_secret)"\s*:\s*"[^"]*"/gi,
+      '"$1":"[redacted]"'
+    )
+    .replace(
+      /(access_token|refresh_token|client_secret|code)=[^&\s]+/gi,
+      '$1=[redacted]'
+    )
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 300);
@@ -125,7 +133,8 @@ export class PinterestProvider
     if (isPinterestSandbox() && isMp4) {
       return 'Video pins are not available while Pinterest runs in sandbox mode, please post images';
     }
-    if (firstItem?.some((item) => (item?.alt?.length ?? 0) > 500)) {
+    // only the first image's alt text is sent (as the pin's alt_text)
+    if ((isPicture?.alt?.length ?? 0) > 500) {
       return 'Pinterest alt text can be at most 500 characters';
     }
     if ((firstItem?.length ?? 0) > 5) {
@@ -412,30 +421,42 @@ export class PinterestProvider
   // Lets the composer create a board when the account has none - the only way
   // to get a board in sandbox mode, as boards made on pinterest.com are
   // production boards.
+  // A refusal comes back as { error } with Pinterest's reason, as the
+  // dashboard function route answers a bare `false` for a thrown error; an
+  // expired token still throws so the route refreshes it.
   @DashboardFunction()
-  async createBoard(accessToken: string, data: { name?: string }) {
+  async createBoard(
+    accessToken: string,
+    data: { name?: string }
+  ): Promise<{ id: string; name: string } | { error: string }> {
     const name = typeof data?.name === 'string' ? data.name.trim() : '';
     if (!name) {
-      throw new BadBody(
-        'pinterest',
-        JSON.stringify({}),
-        {} as any,
-        'Board name is required'
-      );
+      return { error: 'Board name is required' };
+    }
+    if (name.length > 100) {
+      return { error: 'Board name can be at most 100 characters' };
     }
 
-    const { id, name: boardName } = await (
-      await this.fetch(pinterestApi('/boards'), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name }),
-      })
-    ).json();
+    try {
+      const { id, name: boardName } = await (
+        await this.fetch(pinterestApi('/boards'), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name }),
+        })
+      ).json();
 
-    return { id, name: boardName };
+      return { id, name: boardName };
+    } catch (err) {
+      if (err instanceof BadBody) {
+        // '' lets the composer show its own generic message
+        return { error: err.message === 'Unknown Error' ? '' : err.message };
+      }
+      throw err;
+    }
   }
 
   async postPending(
@@ -654,7 +675,11 @@ export class PinterestProvider
     return {
       status: 'completed',
       postId: pId,
-      releaseURL: `https://www.pinterest.com/pin/${pId}`,
+      // sandbox pins have no public page (only their creator sees them on
+      // the profile), so they get no link
+      releaseURL: isPinterestSandbox()
+        ? ''
+        : `https://www.pinterest.com/pin/${pId}`,
     };
   }
 

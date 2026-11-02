@@ -181,6 +181,22 @@ describe('PinterestProvider error messages', () => {
     });
   });
 
+  it.each([
+    ['a refresh token', 'Refresh pinr.ABC123def456 failed', 'Refresh [redacted] failed'],
+    [
+      'JSON access and refresh tokens',
+      'Bad payload {"access_token":"abc","refresh_token": "def"}',
+      'Bad payload {"access_token":"[redacted]","refresh_token":"[redacted]"}',
+    ],
+    ['Basic credentials', 'Header Basic Y2xpZW50OnNlY3JldA== refused', 'Header Basic [redacted] refused'],
+    ['query parameters', 'Sent refresh_token=xyz&client_secret=abc', 'Sent refresh_token=[redacted]&client_secret=[redacted]'],
+  ])('redacts %s from Pinterest messages', (_, message, expected) => {
+    expect(
+      new PinterestProvider().handleErrors(JSON.stringify({ code: 1, message }), 400)
+        ?.value
+    ).toBe(`Pinterest rejected the request: ${expected}`);
+  });
+
   it('leaves rate limits to the generic retry', () => {
     expect(
       new PinterestProvider().handleErrors(
@@ -302,12 +318,61 @@ describe('PinterestProvider sandbox mode', () => {
     ]);
   });
 
-  it('refuses a board without a name', async () => {
+  it('refuses a board without a name or over 100 characters', async () => {
     const calls = replies({ status: 201, body: {} });
+    const provider = new PinterestProvider();
+    await expect(provider.createBoard('token', { name: '  ' })).resolves.toEqual({
+      error: 'Board name is required',
+    });
     await expect(
-      new PinterestProvider().createBoard('token', { name: '  ' })
-    ).rejects.toBeInstanceOf(BadBody);
+      provider.createBoard('token', { name: 'a'.repeat(101) })
+    ).resolves.toEqual({ error: 'Board name can be at most 100 characters' });
     expect(calls).toHaveLength(0);
+  });
+
+  it('accepts a 100 character board name once trimmed', async () => {
+    const calls = replies({ status: 201, body: { id: '1', name: 'x' } });
+    await new PinterestProvider().createBoard('token', {
+      name: ` ${'a'.repeat(100)} `,
+    });
+    expect(calls[0].body).toEqual({ name: 'a'.repeat(100) });
+  });
+
+  it("returns Pinterest's reason when it refuses the board", async () => {
+    replies({
+      status: 400,
+      body: { code: 58, message: 'You already have a board with this name.' },
+    });
+    await expect(
+      new PinterestProvider().createBoard('token', { name: 'Demo' })
+    ).resolves.toEqual({
+      error:
+        'Pinterest rejected the request: You already have a board with this name.',
+    });
+  });
+
+  it('leaves an unexplained board refusal to the generic message', async () => {
+    replies({ status: 400, body: { unexpected: true } });
+    await expect(
+      new PinterestProvider().createBoard('token', { name: 'Demo' })
+    ).resolves.toEqual({ error: '' });
+  });
+
+  it('still refreshes an expired token when creating a board', async () => {
+    replies({ status: 401, body: { code: 2, message: 'Authentication failed.' } });
+    await expect(
+      new PinterestProvider().createBoard('token', { name: 'Demo' })
+    ).rejects.toBeInstanceOf(RefreshToken);
+  });
+
+  it('gives sandbox pins no public link', async () => {
+    process.env.PINTEREST_SANDBOX = 'true';
+    replies({ status: 201, body: { id: 'pin-1' } });
+    await expect(createPin()).resolves.toEqual({
+      status: 'completed',
+      postId: 'pin-1',
+      releaseURL: '',
+    });
   });
 
   it('refuses video pins in sandbox mode, the sandbox has none', async () => {
@@ -420,6 +485,23 @@ describe('PinterestProvider pin payload', () => {
     await expect(
       provider.checkValidity(
         [[{ path: 'https://media.postdelegate.com/a.png', alt: 'a'.repeat(500) }]],
+        {},
+        []
+      )
+    ).resolves.toBe(true);
+  });
+
+  it('only checks the alt text of the first image, the one Pinterest gets', async () => {
+    const provider = new PinterestProvider();
+    (provider as any).getImageDimensions = jest.fn(async () => ({ width: 1, height: 1 }));
+    await expect(
+      provider.checkValidity(
+        [
+          [
+            { path: 'https://media.postdelegate.com/a.png', alt: 'ok' },
+            { path: 'https://media.postdelegate.com/b.png', alt: 'a'.repeat(501) },
+          ],
+        ],
         {},
         []
       )
