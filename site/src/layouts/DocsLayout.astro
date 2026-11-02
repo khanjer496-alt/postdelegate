@@ -16,6 +16,8 @@ const index = DOC_PAGES.findIndex((page) => page.href === current);
 const prev = index > 0 ? DOC_PAGES[index - 1] : undefined;
 const next = index > -1 && index < DOC_PAGES.length - 1 ? DOC_PAGES[index + 1] : undefined;
 const url = new URL(current, SITE.url).href;
+// Every docs page has a Markdown version at its URL plus .md (src/data/docs-markdown.ts).
+const markdown = `${current}.md`;
 const crumbs = [
   { name: 'PostDelegate', item: SITE.url },
   { name: 'Docs', item: new URL('/docs', SITE.url).href },
@@ -26,11 +28,12 @@ const jsonLd = [
   ...(isHome ? [] : [{ '@context': 'https://schema.org', '@type': 'TechArticle', headline: title, description, url, inLanguage: 'en', publisher: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url } }]),
 ];
 ---
-<Base title={`${title} — PostDelegate Docs`} description={description} jsonLd={jsonLd}>
+<Base title={`${title} — PostDelegate Docs`} description={description} jsonLd={jsonLd} markdown={markdown}>
   <div class="docs-shell">
     <div class="docs-grid">
-      <aside class="docs-sidebar" aria-label="Documentation sidebar"><DocsSidebar current={current} /></aside>
       <div class="docs-main">
+        {/* Visually hidden plain text for agents reading the HTML: no links, so it never takes keyboard focus, and hidden from screen readers. */}
+        <p class="docs-agent-hint" aria-hidden="true">For AI agents: documentation index {SITE.url}/llms.txt · this page as Markdown {SITE.url}{markdown}</p>
         <details class="docs-mobile-nav">
           <summary>Browse the docs<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary>
           <DocsSidebar current={current} />
@@ -54,6 +57,7 @@ const jsonLd = [
           </>
         )}
       </div>
+      <aside class="docs-sidebar" aria-label="Documentation sidebar"><DocsSidebar current={current} /></aside>
       <aside class="docs-toc-wrap" aria-label="Page contents"><DocsToc headings={headings} /></aside>
     </div>
   </div>
@@ -61,6 +65,11 @@ const jsonLd = [
 <style>
   .docs-shell { background: var(--bg, #0d0d0d); color: var(--text, #fff); padding: 38px 0 96px; }
   .docs-grid { width: min(1320px, calc(100% - 48px)); margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 0 56px; align-items: start; }
+  /* The sidebar follows the article in source order, so content comes first for agents and screen readers; the grid puts it back on the left. */
+  .docs-main { grid-column: 2; grid-row: 1; }
+  .docs-sidebar { grid-column: 1; grid-row: 1; }
+  .docs-toc-wrap { grid-column: 3; grid-row: 1; }
+  .docs-agent-hint { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .docs-sidebar { position: sticky; top: 104px; max-height: calc(100dvh - 124px); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #333 transparent; }
   .docs-toc-wrap { position: sticky; top: 104px; min-width: 0; max-height: calc(100dvh - 124px); overflow-y: auto; padding-top: 6px; scrollbar-width: thin; scrollbar-color: #333 transparent; }
   .docs-main { min-width: 0; max-width: 780px; width: 100%; }

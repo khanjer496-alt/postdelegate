@@ -2,10 +2,9 @@
 import DocsLayout from '../../../layouts/DocsLayout.astro';
 import { SITE } from '../../../data/site';
 import { AGENT_FILES, MCP_OAUTH_URL } from '../../../data/agent-files';
-const frontmatter = {
-  title: 'Agent files for Claude, ChatGPT and Cursor',
-  description: 'Hosted instruction files that teach Claude, ChatGPT, Cursor and Codex to use PostDelegate: a Claude skill, AGENTS.md, ChatGPT instructions and a Cursor rule.',
-};
+import { AGENT_FILES_META } from '../../../data/docs';
+// The Markdown version of this page (/docs/mcp/agent-files.md) is written out in src/data/docs-markdown.ts; keep it in step.
+const frontmatter = AGENT_FILES_META;
 const headings = [
   { depth: 2, slug: 'the-files', text: 'The files' },
   { depth: 2, slug: 'claude-skill', text: 'Claude skill' },

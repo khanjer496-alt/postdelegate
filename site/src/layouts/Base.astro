@@ -4,8 +4,9 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import CookieConsent from '../components/CookieConsent.astro';
 import { SITE, SOCIAL_PROFILES } from '../data/site';
-interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string }
-const { title, description, ogImage = '/og.png', jsonLd = [], noindex = false, type = 'website' } = Astro.props;
+// markdown: path of the page's Markdown version, announced to agents with rel=alternate.
+interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string; markdown?: string }
+const { title, description, ogImage = '/og.png', jsonLd = [], noindex = false, type = 'website', markdown } = Astro.props;
 const canonicalPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const canonical = new URL(canonicalPath, SITE.url).href;
 const og = new URL(ogImage, SITE.url).href;
@@ -42,6 +43,7 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={og} />
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable product facts" />
+    {markdown && <link rel="alternate" type="text/markdown" href={markdown} title="This page as Markdown" />}
     {[org, website, ...jsonLd].map((value) => <script type="application/ld+json" set:html={safeJson(value)} />)}
   </head>
   <body>

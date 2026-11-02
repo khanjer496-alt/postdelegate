@@ -70,3 +70,10 @@ export const DOC_PAGES: DocPage[] = DOC_SECTIONS.flatMap((section) => section.it
 
 export const findDocSection = (pathname: string) =>
   DOC_SECTIONS.find((section) => section.items.some((item) => item.href === pathname));
+
+// Title and description of the two .astro docs pages, shared with their Markdown versions in docs-markdown.ts.
+export const DOCS_HOME_META = { title: 'PostDelegate documentation', description: 'PostDelegate docs: schedule posts, connect channels, use the REST API and MCP, connect your own AI assistant, and manage billing, team members and data.' };
+export const AGENT_FILES_META = {
+  title: 'Agent files for Claude, ChatGPT and Cursor',
+  description: 'Hosted instruction files that teach Claude, ChatGPT, Cursor and Codex to use PostDelegate: a Claude skill, AGENTS.md, ChatGPT instructions and a Cursor rule.',
+};

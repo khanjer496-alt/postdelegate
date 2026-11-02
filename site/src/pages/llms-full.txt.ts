@@ -36,7 +36,8 @@ PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, wo
 YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram and Discord. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals, and cannot be connected today.
 
 ## Documentation
-${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `${SITE.url}${item.href} : ${item.title}. ${item.description}`).join('\n')}
+Markdown version of each docs page (drop the .md for the HTML page):
+${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `${SITE.url}${item.href}.md : ${item.title}. ${item.description}`).join('\n')}
 
 ## Channel directory
 Every network in the PostDelegate channel directory and whether it can be connected today:

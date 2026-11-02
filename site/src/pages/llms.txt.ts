@@ -70,7 +70,9 @@ Claude Desktop: the simplest route is Settings > Connectors > Add custom connect
 \`\`\`
 
 ## Documentation
-${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.title}](${SITE.url}${item.href}): ${item.description}`).join('\n')}
+Each link below is the page's Markdown version. Every docs page has one at its URL plus \`.md\`, and docs pages also return Markdown to requests that send \`Accept: text/markdown\`.
+- [Documentation home](${SITE.url}/docs.md): every docs page by section.
+${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.title}](${SITE.url}${item.href}.md): ${item.description}`).join('\n')}
 
 ## Agent instruction files
 - [Claude skill (SKILL.md)](${SITE.url}/agents/postdelegate/SKILL.md): how to use PostDelegate over MCP or the REST API, with per-network rules and safety rules.

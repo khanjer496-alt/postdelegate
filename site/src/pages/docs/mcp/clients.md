@@ -24,7 +24,7 @@ claude mcp add --transport http postdelegate https://app.postdelegate.com/api/mc
 
 ## Cursor
 
-Add to `.cursor/mcp.json` in your project.
+If Cursor is installed, [add PostDelegate to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=postdelegate&config=eyJ1cmwiOiJodHRwczovL2FwcC5wb3N0ZGVsZWdhdGUuY29tL21jcC1vYXV0aC1keW5hbWljIn0=) in one step: the link opens Cursor's install prompt for the sign-in address. Or add it to `.cursor/mcp.json` in your project yourself.
 
 ```json
 {
