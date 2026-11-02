@@ -1,3 +1,4 @@
+import { AVAILABLE_NETWORKS } from './networks';
 // Channel landing pages. Availability comes from NETWORKS (`available`); `docs` points to our own guide.
 // Every fact on an available page comes from its channel guide in src/pages/docs/channels.
 // Optional fields (action, description, about, steps, settings, faq, guides) add the search-facing
@@ -499,3 +500,6 @@ export const SCHEDULERS: Scheduler[] = [
     ],
   },
 ];
+
+// Pages of the networks that can be connected today, the ones translated into every language.
+export const LIVE_SCHEDULERS = SCHEDULERS.filter((s) => AVAILABLE_NETWORKS.some((n) => n.key === s.key));

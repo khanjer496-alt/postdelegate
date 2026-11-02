@@ -1,16 +1,4 @@
 ---
-import Doc from '../layouts/Doc.astro';
-import { SITE, CTA_LABEL } from '../data/site';
+import McpPage from '../components/pages/McpPage.astro';
 ---
-<Doc title="MCP server — PostDelegate" description="Connect your own AI assistant to PostDelegate over MCP to draft and schedule posts. Setup guides for Claude, ChatGPT, Claude Code, Cursor and other clients." h1="Your AI, connected to your content." eyebrow="MCP" lead="MCP gives compatible AI tools a way to work with a publishing workspace. Bring your own assistant, sign in with PostDelegate and keep every post under your review.">
-  <a slot="actions" href="/docs/mcp" class="button">Read the MCP docs</a>
-  <a slot="actions" href={SITE.signup} class="button button-outline">{CTA_LABEL}</a>
-  <h2>From a conversation to a draft</h2>
-  <p>A compatible client discovers the tools the server offers and uses them to list your channels, read each network's rules, upload media and create drafts. The useful starting point is a single draft that you can inspect in the calendar before anything is scheduled.</p>
-  <h2>Set it up</h2>
-  <p>The server address is <code>https://app.postdelegate.com/mcp-oauth-dynamic</code>. Add it to your assistant and sign in with your PostDelegate account. There are step-by-step guides for <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> and <a href="/docs/mcp/clients">Claude Code, Cursor and other clients</a>.</p>
-  <h2>What to verify first</h2>
-  <ol><li>The client is connected to the intended PostDelegate workspace.</li><li>You understand which tools can change or publish content. The <a href="/docs/mcp/tools">tools reference</a> lists them.</li><li>A draft is visible in the app and the destination channel is correct.</li></ol>
-  <aside class="doc-note">PostDelegate does not provide an AI of its own, and does not claim an official directory listing in Claude or ChatGPT. You add the server as a custom connector. MCP access depends on your plan.</aside>
-  <p>Related: <a href="/api">REST API</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude and Cowork</a>.</p>
-</Doc>
+<McpPage lang="en" />

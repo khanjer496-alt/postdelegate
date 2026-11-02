@@ -4,11 +4,19 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import CookieConsent from '../components/CookieConsent.astro';
 import { SITE, SOCIAL_PROFILES } from '../data/site';
+import { LOCALES, LANGUAGES, TRANSLATED_PATHS, localePath, splitPath, strings, type Lang } from '../i18n';
 // markdown: path of the page's Markdown version, announced to agents with rel=alternate.
-interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string; markdown?: string }
-const { title, description, ogImage = '/og.png', jsonLd = [], noindex = false, type = 'website', markdown } = Astro.props;
+// lang: the page's language; pages that exist in every language get hreflang alternates.
+interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string; markdown?: string; lang?: Lang }
+const { title, description, ogImage = '/og.png', jsonLd = [], noindex = false, type = 'website', markdown, lang = 'en' } = Astro.props;
 const canonicalPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const canonical = new URL(canonicalPath, SITE.url).href;
+const { path: englishPath } = splitPath(canonicalPath);
+const alternates = TRANSLATED_PATHS.has(englishPath)
+  ? [...LOCALES.map((code) => ({ hreflang: code as string, href: new URL(localePath(code, englishPath), SITE.url).href })), { hreflang: 'x-default', href: new URL(englishPath, SITE.url).href }]
+  : [];
+const language = LANGUAGES[lang];
+const t = strings(lang);
 const og = new URL(ogImage, SITE.url).href;
 const logo = { '@type': 'ImageObject', '@id': `${SITE.url}/#logo`, url: new URL('/postdelegate-icon-512.png', SITE.url).href, contentUrl: new URL('/postdelegate-icon-512.png', SITE.url).href, width: 512, height: 512, caption: 'PostDelegate logo' };
 const org = { '@context': 'https://schema.org', '@type': 'Organization', '@id': `${SITE.url}/#organization`, name: 'PostDelegate', legalName: SITE.operator, url: SITE.url, logo, image: { '@id': `${SITE.url}/#logo` }, email: SITE.email, sameAs: SOCIAL_PROFILES.map((profile) => profile.href) };
@@ -16,13 +24,14 @@ const website = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'P
 const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 ---
 <!doctype html>
-<html lang="en">
+<html lang={lang} dir={language.dir === 'rtl' ? 'rtl' : undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {alternates.map((alternate) => <link rel="alternate" hreflang={alternate.hreflang} href={alternate.href} />)}
     {noindex && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content="#0d0d0d" />
     <link rel="preload" href="/fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin />
@@ -35,6 +44,8 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    {alternates.length > 0 && <meta property="og:locale" content={language.ogLocale} />}
+    {alternates.length > 0 && LOCALES.filter((code) => code !== lang).map((code) => <meta property="og:locale:alternate" content={LANGUAGES[code].ogLocale} />)}
     <meta property="og:image" content={og} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -50,12 +61,12 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     {/* Cloudflare's email obfuscation would swap support@ and every other address
     for a link that only works with JavaScript; email_off keeps them plain */}
     <!--email_off-->
-    <a href="#main" class="skip-link">Skip to content</a>
-    <CookieConsent />
-    <Header />
+    <a href="#main" class="skip-link">{t.common.skipToContent}</a>
+    <CookieConsent lang={lang} />
+    <Header lang={lang} />
     <main id="main"><slot /></main>
-    <Footer />
+    <Footer lang={lang} />
     <!--/email_off-->
   </body>
 </html>
-<style>.skip-link{position:fixed;top:12px;left:16px;z-index:100;transform:translateY(-180%);padding:12px 18px;background:#fff;border-radius:999px;color:#111;font-size:13px;font-weight:600;text-decoration:none}.skip-link:focus{transform:translateY(0);outline:2px solid var(--accent,#7357ff);outline-offset:4px}</style>
+<style>.skip-link{position:fixed;top:12px;inset-inline-start:16px;z-index:100;transform:translateY(-180%);padding:12px 18px;background:#fff;border-radius:999px;color:#111;font-size:13px;font-weight:600;text-decoration:none}.skip-link:focus{transform:translateY(0);outline:2px solid var(--accent,#7357ff);outline-offset:4px}</style>

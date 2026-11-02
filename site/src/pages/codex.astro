@@ -1,15 +1,4 @@
 ---
-import Doc from '../layouts/Doc.astro';
-import { SITE, CTA_LABEL } from '../data/site';
+import CodexPage from '../components/pages/CodexPage.astro';
 ---
-<Doc title="Codex and coding agents — PostDelegate" description="Connect Codex, Cursor, Claude Code and other coding agents to PostDelegate over MCP or the REST API, with copy-paste setup for each client in the docs." h1="Keep content close to your coding workflow." eyebrow="Codex and coding agents" lead="Coding agents can use PostDelegate over MCP or the REST API. Bring your own tool, sign in with PostDelegate and review every draft.">
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
-  <a slot="actions" href="/docs/mcp/clients" class="button button-outline">MCP client setup</a>
-  <h2>A launch post is a good first task</h2>
-  <p>Have your coding tool prepare a short launch announcement and any supporting media. Review the wording in PostDelegate and choose an available channel and time yourself.</p>
-  <h2>Once your agent is connected</h2>
-  <p>Start by discovering the workspace and connected accounts, then create one draft. Confirm that the draft arrived before allowing a workflow to schedule content.</p>
-  <h2>Use the right connection instructions</h2>
-  <p>Codex, Cursor, Claude Code and other coding tools connect to PostDelegate over MCP, or call the REST API directly. The <a href="/docs/mcp/clients">client setup guide</a> has the configuration for each tool using the PostDelegate server address. Tools and endpoints from other services are not connected to PostDelegate.</p>
-  <p>See the <a href="/agents">agent overview</a>, <a href="/mcp">MCP</a> and <a href="/api">REST API</a>.</p>
-</Doc>
+<CodexPage lang="en" />

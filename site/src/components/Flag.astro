@@ -1,0 +1,11 @@
+---
+// Small flag for the language switcher, from the sprite in public/flags.svg (like Icon.astro).
+// A flag marks the language's version of the site; each language has one (src/i18n LANGUAGES).
+interface Props { code: string; class?: string }
+const { code, class: cls = '' } = Astro.props;
+---
+<span class:list={['flag', cls]} aria-hidden="true"><svg width="20" height="14" focusable="false"><use href={`/flags.svg#flag-${code}`} /></svg></span>
+<style>
+  .flag { display: inline-flex; flex: none; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #ffffff1f; line-height: 0; }
+  .flag svg { display: block; width: 20px; height: 14px; }
+</style>
