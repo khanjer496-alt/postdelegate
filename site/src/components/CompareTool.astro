@@ -21,7 +21,8 @@ const pair = [left, right];
 const checked = checkedOn(pair);
 const modified = [published, checked].sort().at(-1)!;
 const path = `/compare/${a}-vs-${b}`;
-const namesPostiz = pair.some((t) => t.slug === 'postiz');
+// The PostDelegate box below always says it is built on Postiz, so every page carries the AGPL line.
+const namesPostiz = true;
 const rows: Row[] = [
   { label: 'What it is', key: 'kind' },
   { label: 'Hosting', key: 'hosting' },

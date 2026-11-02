@@ -1,0 +1,24 @@
+{
+  "name": "Publer",
+  "slug": "publer",
+  "site": "https://publer.com",
+  "pricingUrl": "https://publer.com/pricing",
+  "checked": "2026-11-02",
+  "kind": { "value": "Hosted scheduler with bulk scheduling, RSS automation and post recycling", "src": "https://publer.com/pricing" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://publer.com/pricing" },
+  "pricingModel": { "value": "Per social account per month, plus optional extra members; every 10th account and every 10th member is free", "src": "https://publer.com/pricing" },
+  "freeOption": { "value": "Free plan: 3 social accounts (X excluded), 10 scheduled posts per account, 1 user", "src": "https://publer.com/pricing" },
+  "trial": { "value": "7-day trial of Professional, 14-day trial of Business", "src": "https://publer.com/pricing" },
+  "entryPaid": { "value": "Professional, $5/month for 1 account on monthly billing", "src": "https://publer.com/pricing" },
+  "plans": { "value": "Professional from $5 and Business from $10 a month for 1 account; extra members $2 each on Professional and $3 on Business (pricing calculator, monthly billing); Enterprise by quote", "src": ["https://publer.com/pricing", "https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/"] },
+  "cost": {
+    "3": { "value": "$0 / $12", "note": "Free plan (no X, 10 scheduled posts per account), or Professional", "src": "https://publer.com/pricing" },
+    "10": { "value": "$36", "note": "Professional, with the 10th account free (Business: $63)", "src": "https://publer.com/pricing" },
+    "30": { "value": "$108", "note": "Professional, 3 of the 30 accounts free (Business: $189)", "src": "https://publer.com/pricing" }
+  },
+  "networks": { "value": "13: Facebook, Instagram, TikTok, X (paid plans only), Threads, LinkedIn, Pinterest, Mastodon, Google Business Profile, YouTube, Telegram, Bluesky and WordPress", "src": "https://publer.com/pricing" },
+  "api": { "value": "Publer API on Business and Enterprise for eligible customers; no public API open to every plan", "src": "https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/" },
+  "mcp": { "value": "MCP server on Business and Enterprise for eligible customers", "src": ["https://publer.com/pricing", "https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/"] },
+  "ai": { "value": "AI Assist, with unlimited prompts on Business", "src": "https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/" },
+  "teams": { "value": "Extra members on paid plans; advanced collaboration and approval workflows on Business", "src": "https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/" }
+}

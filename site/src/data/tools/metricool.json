@@ -1,0 +1,23 @@
+{
+  "name": "Metricool",
+  "slug": "metricool",
+  "site": "https://metricool.com",
+  "pricingUrl": "https://metricool.com/pricing/",
+  "checked": "2026-11-02",
+  "kind": { "value": "Analytics-led social media suite with planning, inbox, reports and ads", "src": "https://metricool.com/pricing/" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://metricool.com/pricing/" },
+  "pricingModel": { "value": "Per brand: plans cover up to 5, 10, 15, 25 or 50 brands, and each brand holds one profile per network. X is a paid add-on per account", "src": ["https://metricool.com/pricing/", "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u"] },
+  "freeOption": { "value": "Free plan: 1 brand, 20 posts a month, 30 days of analytics; no LinkedIn or X", "src": "https://metricool.com/pricing/" },
+  "entryPaid": { "value": "Starter, $25/month for up to 5 brands on monthly billing", "src": "https://metricool.com/pricing/" },
+  "plans": { "value": "Starter $25 (5 brands) or $45 (10); Advanced $67 (15), $107 (25) or $210 (50); Custom by quote. Monthly billing, before VAT", "src": "https://metricool.com/pricing/" },
+  "cost": {
+    "3": { "value": "$0 / $25", "note": "Free if it is one brand without LinkedIn or X and 20 posts a month is enough; otherwise Starter", "src": "https://metricool.com/pricing/" },
+    "10": { "value": "$25 to $45", "note": "Starter: $25 for up to 5 brands, $45 for up to 10, depending on how the 10 accounts split into brands", "src": "https://metricool.com/pricing/" },
+    "30": { "value": "$45 to $107", "note": "Starter with 10 brands, or Advanced for team access and approvals ($67 for 15 brands, $107 for 25). X adds $10 per account", "src": ["https://metricool.com/pricing/", "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u"] }
+  },
+  "networks": { "value": "Facebook, Instagram, Threads, X (add-on), Bluesky, Pinterest, TikTok, YouTube, Twitch, LinkedIn (paid plans) and Google Business Profile, plus a website or blog and Facebook, Google and TikTok Ads", "src": "https://metricool.com/pricing/" },
+  "api": { "value": "Metricool API on Advanced and Custom only", "src": "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u" },
+  "mcp": { "value": "Metricool MCP on every plan, including Free (limits may apply)", "src": ["https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u", "https://metricool.com/pricing/"] },
+  "ai": { "value": "AI assistant with credits per brand each month: 5 on Free, 20 on Starter, 35 on Advanced", "src": "https://metricool.com/pricing/" },
+  "teams": { "value": "Team and client management, roles and a post approval system on Advanced", "src": "https://metricool.com/pricing/" }
+}
