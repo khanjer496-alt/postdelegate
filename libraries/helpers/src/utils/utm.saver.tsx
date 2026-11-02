@@ -4,18 +4,22 @@ import { FC, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useLocalStorage } from '@mantine/hooks';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
-import { hasReferralConsent } from '@gitroom/helpers/affiliate/affiliate.cookie';
+import { useConsent } from '@gitroom/helpers/consent/use.consent';
 
 // The campaign source of the link the visitor followed
 export const getUtmFromQuery = (query: Pick<URLSearchParams, 'get'>) =>
-  query.get('utm_source') || query.get('utm') || query.get('ref') || '';
+  query.get('utm_source') || query.get('utm') || '';
 
-// The campaign source is only saved in the browser once the visitor said yes
-// to the referral prompt (AffiliateSaver asks, and saves it on a yes)
+// The campaign source is saved in the browser only while the referral and
+// campaign category of the cookie banner is on, and removed when it is off
 const UtmSaver: FC = () => {
   const query = useSearchParams();
-  const [value, setValue] = useLocalStorage({ key: 'utm', defaultValue: '' });
+  const [value, setValue, removeValue] = useLocalStorage({
+    key: 'utm',
+    defaultValue: '',
+  });
   const fireEvents = useFireEvents();
+  const consent = useConsent();
 
   // the Facebook pixel StartTrial is sent by the backend once Stripe confirms
   // the trial, firing it here as well would count it twice
@@ -37,11 +41,16 @@ const UtmSaver: FC = () => {
   }, []);
 
   useEffect(() => {
+    if (consent && !consent.ref) {
+      removeValue();
+      return;
+    }
+
     const utm = getUtmFromQuery(query);
-    if (utm && !value && hasReferralConsent(document.cookie)) {
+    if (utm && !value && consent?.ref) {
       setValue(utm);
     }
-  }, [query, value]);
+  }, [query, value, consent]);
 
   return <></>;
 };

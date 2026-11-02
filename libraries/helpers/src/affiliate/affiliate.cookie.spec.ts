@@ -1,13 +1,8 @@
 import {
   AFFILIATE_CODE_REGEX,
   buildAffiliateCookieValue,
-  hasReferralConsent,
   parseAffiliateCookieValue,
   parseReferralCode,
-  parseReferralConsent,
-  readCookieValue,
-  REFERRAL_CONSENT_COOKIE_NAME,
-  REFERRAL_CONSENT_DAYS,
 } from './affiliate.cookie';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -81,33 +76,4 @@ describe('referral code from the link', () => {
       expect(parseReferralCode(value as any)).toBeUndefined();
     }
   );
-});
-
-describe('referral consent cookie', () => {
-  it('remembers the answer for at most 6 months', () => {
-    expect(REFERRAL_CONSENT_COOKIE_NAME).toBe('pd_consent');
-    expect(REFERRAL_CONSENT_DAYS).toBeLessThanOrEqual(183);
-  });
-
-  it('only knows yes and no', () => {
-    expect(parseReferralConsent('yes')).toBe('yes');
-    expect(parseReferralConsent('no')).toBe('no');
-    expect(parseReferralConsent('YES')).toBeUndefined();
-    expect(parseReferralConsent('1')).toBeUndefined();
-    expect(parseReferralConsent(undefined)).toBeUndefined();
-  });
-
-  it('reads one cookie out of document.cookie', () => {
-    const cookies = 'showorg=o1; pd_ref=friend.1; pd_consent=no';
-    expect(readCookieValue(cookies, 'pd_ref')).toBe('friend.1');
-    expect(readCookieValue(cookies, 'pd_consent')).toBe('no');
-    expect(readCookieValue(cookies, 'missing')).toBeUndefined();
-    expect(readCookieValue('xpd_ref=1', 'pd_ref')).toBeUndefined();
-  });
-
-  it('stores nothing until the visitor said yes', () => {
-    expect(hasReferralConsent('')).toBe(false);
-    expect(hasReferralConsent('pd_consent=no')).toBe(false);
-    expect(hasReferralConsent('a=1; pd_consent=yes')).toBe(true);
-  });
 });

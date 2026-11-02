@@ -1,0 +1,235 @@
+---
+import { SITE } from '../data/site';
+// The cookie banner, shared with the app through the pd_consent cookie
+// ("v1|ref:1|analytics:0", 6 months, on .postdelegate.com; the "yes" / "no" of
+// the first version still counts as the referral answer). This site has no
+// analytics, so the only optional category is referral and campaign
+// attribution: the first-touch pd_ref cookie ("<code>.<ms>", 60 days) that
+// the app reads at sign-up. Without it, ?ref= and utm_* ride along in the
+// links of this visit and the sign-up form sends them to the app.
+// The footer's Cookie settings button reopens it.
+const privacy = `${SITE.legal.privacy}#cookies`;
+---
+<section class="cc" role="region" aria-labelledby="cc-title" data-cc hidden>
+  <div class="cc-head">
+    <h2 id="cc-title" tabindex="-1" data-cc-title>Cookies</h2>
+    <button type="button" class="cc-close" aria-label="Close" title="Close" data-cc-close>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg>
+    </button>
+  </div>
+  <p>We use a few cookies to keep you signed in and, if you agree, to credit the person who referred you. <a href={privacy}>Learn more</a></p>
+  <p class="cc-note" data-cc-referral hidden>You followed a referral link. Accepting lets us credit the person who sent it.</p>
+  <div class="cc-categories" data-cc-view="customize" hidden>
+    <div class="cc-row">
+      <div><span id="cc-necessary">Strictly necessary</span><small id="cc-necessary-text">Sign-in, security and your settings, including this choice. Always on.</small></div>
+      <button type="button" role="switch" class="cc-switch" aria-checked="true" aria-disabled="true" aria-labelledby="cc-necessary" aria-describedby="cc-necessary-text"><span></span></button>
+    </div>
+    <div class="cc-row">
+      <div><span id="cc-ref">Referral and campaign attribution</span><small id="cc-ref-text">Remembers the referral or campaign link you came from, so the right person gets credit when you sign up.</small></div>
+      <button type="button" role="switch" class="cc-switch" aria-checked="false" aria-labelledby="cc-ref" aria-describedby="cc-ref-text" data-cc-switch="ref"><span></span></button>
+    </div>
+  </div>
+  <div class="cc-actions" data-cc-view="banner">
+    <button type="button" class="cc-button" data-cc-answer="reject">Reject non-essential</button>
+    <button type="button" class="cc-button" data-cc-answer="customize">Customize</button>
+    <button type="button" class="cc-button" data-cc-answer="accept">Accept all</button>
+  </div>
+  <div class="cc-actions" data-cc-view="customize" hidden>
+    <button type="button" class="cc-button" data-cc-answer="save">Save choices</button>
+  </div>
+</section>
+<script>
+  import { SITE } from '../data/site';
+
+  type Choices = { ref: boolean; analytics: boolean };
+  const CODE = /^[a-z0-9][a-z0-9-]{2,23}$/;
+  const CARRIED = ['ref', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm'];
+  const DAY = 86400;
+  const app = new URL(SITE.app).origin;
+
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('ref') || '').trim().toLowerCase();
+  const ref = CODE.test(code) ? code : '';
+  const carried = CARRIED.flatMap((name) => {
+    const value = name === 'ref' ? ref : (params.get(name) || '').slice(0, 200);
+    return value ? [[name, value] as const] : [];
+  });
+
+  const cookie = (name: string) => document.cookie.split('; ').find((row) => row.startsWith(`${name}=`))?.slice(name.length + 1);
+  const domain = /(^|\.)postdelegate\.com$/.test(location.hostname) ? '; domain=.postdelegate.com' : '';
+  const write = (name: string, value: string, days: number) => {
+    document.cookie = `${name}=${value}; max-age=${days * DAY}; path=/; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}${domain}`;
+  };
+  const readChoices = (): Choices | undefined => {
+    const value = cookie('pd_consent');
+    if (value === 'yes' || value === 'no') return { ref: value === 'yes', analytics: false };
+    const [version, ...parts] = (value || '').split('|');
+    if (version !== 'v1') return undefined;
+    const flags = Object.fromEntries(parts.map((part) => part.split(':')));
+    return { ref: flags.ref === '1', analytics: flags.analytics === '1' };
+  };
+  // first touch: a referral already remembered is never replaced
+  const applyChoices = (choices: Choices | undefined) => {
+    if (choices?.ref && ref && !cookie('pd_ref')) write('pd_ref', `${ref}.${Date.now()}`, 60);
+    if (choices && !choices.ref) {
+      document.cookie = `pd_ref=; max-age=0; path=/${domain}`;
+      document.cookie = 'pd_ref=; max-age=0; path=/';
+    }
+  };
+
+  // Carry the values in this visit's own links and the sign-up links, nothing stored
+  if (carried.length) {
+    document.querySelectorAll<HTMLAnchorElement>('a[href]:not([href^="#"])').forEach((link) => {
+      const url = new URL(link.href, location.href);
+      const internal = url.origin === location.origin;
+      // the app's home sends a signed-out visitor to /auth with the same query
+      const signup = url.origin === app && (url.pathname === '/' || url.pathname.startsWith('/auth'));
+      if (!internal && !signup) return;
+      carried.forEach(([name, value]) => {
+        if (!url.searchParams.has(name)) url.searchParams.set(name, value);
+      });
+      link.href = url.href;
+    });
+  }
+
+  applyChoices(readChoices());
+
+  const banner = document.querySelector<HTMLElement>('[data-cc]');
+  if (banner) {
+    const title = banner.querySelector<HTMLElement>('[data-cc-title]')!;
+    const refSwitch = banner.querySelector<HTMLButtonElement>('[data-cc-switch="ref"]')!;
+    let opener: HTMLElement | null = null;
+
+    const setView = (view: 'banner' | 'customize') => {
+      title.textContent = view === 'customize' ? 'Cookie settings' : 'Cookies';
+      banner.querySelectorAll<HTMLElement>('[data-cc-view]').forEach((part) => (part.hidden = part.dataset.ccView !== view));
+      banner.querySelector<HTMLElement>('[data-cc-referral]')!.hidden = !(ref && view === 'banner');
+    };
+    // The banner never sits on top of a sign-up button in the page: it moves
+    // to the other corner, or on phones waits, invisible, until it scrolled away
+    const covering = () => {
+      const area = banner.getBoundingClientRect();
+      return Array.from(document.querySelectorAll<HTMLElement>(`main a[href^="${SITE.signup}"]`)).some((cta) => {
+        const rect = cta.getBoundingClientRect();
+        return rect.height > 0 && rect.bottom > area.top && rect.top < area.bottom && rect.right > area.left && rect.left < area.right;
+      });
+    };
+    // Re-checked while the hero animates in and as the page scrolls. To avoid
+    // jumping around, it only ever moves to the right, and once it is showing
+    // and the visitor scrolled it stays.
+    let atEnd = false;
+    let scrolled = false;
+    const reveal = () => {
+      if (innerWidth >= 640 && !atEnd && covering()) {
+        atEnd = true;
+        banner.classList.add('cc-end');
+      }
+      const showing = banner.style.visibility !== 'hidden';
+      const hide = !(showing && scrolled) && covering();
+      banner.style.visibility = hide ? 'hidden' : '';
+      if (hide) banner.setAttribute('aria-hidden', 'true');
+      else banner.removeAttribute('aria-hidden');
+      document.documentElement.classList.toggle('cc-open', !hide);
+    };
+    const onScroll = () => {
+      reveal();
+      scrolled = true;
+    };
+    const stopWatching = () => {
+      removeEventListener('scroll', onScroll);
+      removeEventListener('resize', reveal);
+    };
+    const show = (view: 'banner' | 'customize') => {
+      setView(view);
+      banner.hidden = false;
+      document.body.style.paddingBottom = `${banner.offsetHeight + 16}px`;
+      document.addEventListener('keydown', onKey);
+      if (view === 'banner') {
+        reveal();
+        addEventListener('scroll', onScroll, { passive: true });
+        addEventListener('resize', reveal);
+        setTimeout(reveal, 700);
+        setTimeout(reveal, 1500);
+      } else {
+        stopWatching();
+        banner.style.visibility = '';
+        banner.removeAttribute('aria-hidden');
+        document.documentElement.classList.add('cc-open');
+      }
+    };
+    const hide = () => {
+      banner.hidden = true;
+      document.body.style.paddingBottom = '';
+      document.documentElement.classList.remove('cc-open');
+      document.removeEventListener('keydown', onKey);
+      stopWatching();
+      opener?.focus();
+      opener = null;
+    };
+    // Escape closes without saving, the banner comes back on the next page.
+    // Only from inside it, so Escape still closes menus elsewhere on the page
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && banner.contains(document.activeElement) && hide();
+    // where focus came from, to return it there when the banner closes
+    banner.addEventListener('focusin', (event) => {
+      const from = event.relatedTarget as HTMLElement | null;
+      if (!opener && from && !banner.contains(from)) opener = from;
+    });
+    // the app's analytics choice is kept, this site has no analytics to ask about
+    const save = (choices: Choices) => {
+      write('pd_consent', `v1|ref:${choices.ref ? 1 : 0}|analytics:${choices.analytics ? 1 : 0}`, 180);
+      applyChoices(choices);
+      hide();
+    };
+    const customize = () => {
+      refSwitch.setAttribute('aria-checked', String(!!readChoices()?.ref));
+      show('customize');
+      title.focus();
+    };
+
+    refSwitch.addEventListener('click', () => refSwitch.setAttribute('aria-checked', String(refSwitch.getAttribute('aria-checked') !== 'true')));
+    banner.querySelector('[data-cc-close]')!.addEventListener('click', hide);
+    banner.querySelectorAll<HTMLButtonElement>('[data-cc-answer]').forEach((button) => button.addEventListener('click', () => {
+      const answer = button.dataset.ccAnswer;
+      const analytics = !!readChoices()?.analytics;
+      if (answer === 'reject') save({ ref: false, analytics: false });
+      else if (answer === 'accept') save({ ref: true, analytics });
+      else if (answer === 'save') save({ ref: refSwitch.getAttribute('aria-checked') === 'true', analytics });
+      else customize();
+    }));
+    document.querySelectorAll<HTMLElement>('[data-cookie-settings]').forEach((button) => button.addEventListener('click', () => {
+      opener = button;
+      customize();
+    }));
+
+    // after fonts and images settled, so the check sees the final layout
+    if (!readChoices()) {
+      const ready = () => document.fonts.ready.then(() => show('banner'));
+      if (document.readyState === 'complete') ready();
+      else addEventListener('load', ready, { once: true });
+    }
+  }
+</script>
+<style>
+  .cc{position:fixed;z-index:90;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:6px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #303030;background:#171717;box-shadow:0 -12px 40px #0008;color:#fff;font-size:12.5px;line-height:1.4}
+  @media(prefers-reduced-motion:no-preference){.cc:not([hidden]){animation:cc-in .2s ease-out}}
+  @keyframes cc-in{from{opacity:0;transform:translateY(8px)}}
+  .cc p{margin:0}.cc .cc-note{color:#b9b9b9}
+  .cc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .cc h2{margin:0;font-size:14px;font-weight:700;line-height:1.3}.cc h2:focus{outline:none}.cc h2:focus-visible{outline:2px solid #c8ff4d;outline-offset:3px}
+  .cc-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin:-4px -6px -4px 0;border:0;border-radius:8px;background:none;color:#b9b9b9}.cc-close:hover{color:#fff;background:#222}
+  .cc a{color:#d1bfff;text-decoration:underline;text-underline-offset:3px}.cc a:hover{color:#fff}
+  .cc-categories{display:flex;flex-direction:column;gap:12px;padding:4px 0}
+  .cc-categories:not([hidden]){display:flex}.cc [hidden]{display:none!important}
+  .cc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.cc-row>div{display:flex;flex-direction:column;gap:2px}.cc-row span{font-weight:650}.cc-row small{color:#b9b9b9;font-size:12px;line-height:1.45}
+  .cc-switch{flex-shrink:0;width:44px;height:26px;padding:3px;border:1px solid #555;border-radius:99px;background:#0d0d0d}.cc-switch span{display:block;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+  .cc-switch[aria-checked="true"]{border-color:#7357ff;background:#7357ff}.cc-switch[aria-checked="true"] span{transform:translateX(18px)}.cc-switch[aria-disabled="true"]{opacity:.6;cursor:not-allowed}
+  .cc-actions{display:flex;gap:8px}
+  /* the three answers look the same: saying no is as easy as saying yes */
+  .cc-button{flex:1;min-height:36px;padding:5px 8px;border:1px solid #777;border-radius:100px;background:transparent;color:#fff;font-size:12.5px;font-weight:650;line-height:1.2;transition:background .18s,border-color .18s}.cc-button:hover{background:#222;border-color:#fff}
+  @media(min-width:640px){.cc{left:16px;right:auto;bottom:16px;width:380px;gap:10px;padding:18px;border:1px solid #303030;border-radius:18px;box-shadow:0 20px 60px #000a;font-size:14px;line-height:1.45}.cc h2{font-size:15px}.cc-button{min-height:38px;font-size:13px}.cc.cc-end{left:auto;right:16px}}
+  @media(prefers-reduced-motion:reduce){.cc-switch span,.cc-button{transition:none}}
+</style>
+<style is:global>
+  /* the support bubble would sit under the banner */
+  html.cc-open .support-bubble{display:none}
+</style>

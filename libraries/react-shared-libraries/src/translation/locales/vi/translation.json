@@ -2300,5 +2300,21 @@
   "approval_client_status_outdated": "Đã thay đổi, hãy yêu cầu nhóm gửi liên kết mới",
   "webhook_paused": "Đã tạm dừng: vượt quá giới hạn webhook của gói. Hãy nâng cấp hoặc xóa một webhook khác để gửi lại.",
   "webhook_save_failed": "Không thể lưu webhook",
-  "webhook_send_failed": "Webhook thử nghiệm chưa được gửi tới"
+  "webhook_send_failed": "Webhook thử nghiệm chưa được gửi tới",
+  "cookie_settings": "Cài đặt cookie",
+  "cookies_title": "Cookie",
+  "cookies_text": "Chúng tôi dùng một vài cookie để giữ bạn đăng nhập và, nếu bạn đồng ý, để ghi nhận cho người đã giới thiệu bạn.",
+  "cookies_text_analytics": "Chúng tôi dùng một vài cookie để giữ bạn đăng nhập và, nếu bạn đồng ý, để ghi nhận cho người đã giới thiệu bạn và đo lường cách PostDelegate được sử dụng.",
+  "cookies_learn_more": "Tìm hiểu thêm",
+  "cookies_referral_note": "Bạn đã mở một liên kết giới thiệu. Nếu đồng ý, chúng tôi có thể ghi nhận cho người đã gửi liên kết.",
+  "cookies_necessary": "Thực sự cần thiết",
+  "cookies_necessary_text": "Đăng nhập, bảo mật và cài đặt của bạn, bao gồm lựa chọn này. Luôn bật.",
+  "cookies_referral": "Ghi nhận giới thiệu và chiến dịch",
+  "cookies_referral_text": "Ghi nhớ liên kết giới thiệu hoặc chiến dịch mà bạn đã mở, để đúng người được ghi nhận khi bạn đăng ký.",
+  "cookies_analytics": "Phân tích",
+  "cookies_analytics_text": "Đo lường cách PostDelegate được sử dụng, bằng {{tools}}.",
+  "cookies_save": "Lưu lựa chọn",
+  "cookies_reject": "Từ chối loại không cần thiết",
+  "cookies_customize": "Tùy chỉnh",
+  "cookies_accept": "Chấp nhận tất cả"
 }

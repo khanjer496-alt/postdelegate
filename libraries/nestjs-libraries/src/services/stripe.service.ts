@@ -2330,8 +2330,10 @@ export class StripeService extends PaymentProviderAbstract {
     additional: Record<string, any>
   ) {
     try {
+      // _fbc / _fbp only exist when the pixel ran, which waits for the
+      // analytics choice in the cookie banner, so no consent means no event
       const { userId, fbc, fbp } = metadata || {};
-      if (!userId) {
+      if (!userId || (!fbc && !fbp)) {
         return;
       }
 

@@ -8,6 +8,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Provider } from '@prisma/client';
+import { Transform } from 'class-transformer';
+import { parseReferralCode } from '@gitroom/helpers/affiliate/affiliate.cookie';
 
 export class CreateOrgUserDto {
   @IsString()
@@ -40,9 +42,12 @@ export class CreateOrgUserDto {
   datafast_visitor_id: string;
 
   // the ?ref= code of the sign-up page, sent when the visitor did not allow
-  // the referral cookie. An unknown or malformed code is ignored, not refused
+  // the referral cookie. A malformed value is dropped here, never refused, so
+  // it can't fail the sign-up
+  @Transform(({ value }) =>
+    typeof value === 'string' ? parseReferralCode(value) : undefined
+  )
   @IsOptional()
   @IsString()
-  @MaxLength(64)
   ref?: string;
 }
