@@ -105,8 +105,10 @@ export const TimeTable: FC<{
 
   const times = useMemo(() => {
     return sortBy(
-      currentTimes.map(({ time }) => ({
+      currentTimes.map(({ time }, index) => ({
         value: time,
+        // the position in currentTimes, which removeSlot deletes by
+        index,
         formatted: fromUtc(
           dayjs.utc().startOf('day').add(time, 'minutes')
         ).format('HH:mm'),
@@ -210,7 +212,7 @@ export const TimeTable: FC<{
                 </div>
                 <button
                   type="button"
-                  onClick={removeSlot(index)}
+                  onClick={removeSlot(timeSlot.index)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-red-500/10 rounded-[6px] text-red-400 hover:text-red-500"
                 >
                   <TrashIcon size={16} />

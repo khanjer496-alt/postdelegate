@@ -91,13 +91,16 @@ describe('set.timezone', () => {
   });
 
   describe('device and saved timezone', () => {
+    // a device on `timezone`: formatters without an explicit timeZone use it,
+    // explicit ones keep theirs, like a browser
     const device = (timezone: string) => {
-      const real = Intl.DateTimeFormat.prototype.resolvedOptions;
+      const Real = Intl.DateTimeFormat;
       jest
-        .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
-        .mockImplementation(function (this: Intl.DateTimeFormat) {
-          return { ...real.call(this), timeZone: timezone };
-        });
+        .spyOn(Intl, 'DateTimeFormat')
+        .mockImplementation(
+          (locales?: string | string[], options?: Intl.DateTimeFormatOptions) =>
+            new Real(locales, { timeZone: timezone, ...options })
+        );
     };
 
     it('tells a saved timezone apart from the device one', () => {
@@ -110,6 +113,13 @@ describe('set.timezone', () => {
     it('treats a saved timezone that is the device one as the same', () => {
       device('Asia/Dubai');
       setUserTimezone('Asia/Dubai');
+      expect(getTimezone()).toBe(browserTimezone());
+    });
+
+    it('treats an alias of the device timezone as the same', () => {
+      // Chrome reports the old name Asia/Calcutta; Settings offers Asia/Kolkata
+      device('Asia/Calcutta');
+      setUserTimezone('Asia/Kolkata');
       expect(getTimezone()).toBe(browserTimezone());
     });
 

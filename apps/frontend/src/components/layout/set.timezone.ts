@@ -279,11 +279,19 @@ export const isTimezone = (timezone: string) => {
   }
 };
 
+// the engine's own name for a timezone: Chrome reports Asia/Calcutta for
+// Asia/Kolkata, so names are compared in this form
+const canonicalTimezone = (timezone: string) =>
+  new Intl.DateTimeFormat('en-US', { timeZone: timezone }).resolvedOptions()
+    .timeZone;
+
 // null is the browser's timezone, where plain dayjs is already right
 let userTimezone: string | null = null;
 const applyTimezone = (timezone?: string | null) => {
   userTimezone =
-    timezone && timezone !== browserTimezone() && isTimezone(timezone)
+    timezone &&
+    isTimezone(timezone) &&
+    canonicalTimezone(timezone) !== browserTimezone()
       ? timezone
       : null;
 };
