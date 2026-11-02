@@ -4,7 +4,10 @@ import Faq from '../components/Faq.astro';
 import { SCHEDULERS } from '../data/schedulers';
 import { SITE, CTA_LABEL } from '../data/site';
 import { PLANS, TRIAL_DAYS } from '../data/plans';
-import { AVAILABLE_NETWORKS } from '../data/networks';
+import { NETWORKS, AVAILABLE_NETWORKS } from '../data/networks';
+import NetworkBadge from '../components/NetworkBadge.astro';
+import LogoStack from '../components/LogoStack.astro';
+import NetworkGrid from '../components/NetworkGrid.astro';
 export function getStaticPaths() { return SCHEDULERS.map((s) => ({ params: { scheduler: s.slug }, props: { s } })); }
 const { s } = Astro.props;
 const availableKeys = new Set(AVAILABLE_NETWORKS.map((network) => network.key));
@@ -17,6 +20,8 @@ const plain = (text: string) => text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 const pending = s.pending ?? 'the connection is ready';
 const starter = PLANS[0];
 const openCount = AVAILABLE_NETWORKS.length;
+const network = NETWORKS.find((n) => n.key === s.key);
+const alongside = AVAILABLE_NETWORKS.filter((n) => n.key !== s.key);
 
 const action = s.action ?? `Schedule ${s.name} Posts`;
 const howTo = `${action.charAt(0).toLowerCase()}${action.slice(1)}`;
@@ -38,14 +43,6 @@ const faq = available
       { q: `Can Claude or ChatGPT post to ${s.name}?`, a: `Not yet. An assistant connected over MCP can only work with channels that are connected in PostDelegate, so it cannot publish to ${s.name} until that connection exists. You can still use Claude or ChatGPT to draft the text, then bring it into PostDelegate. See the [MCP guide](/docs/mcp).` },
     ];
 
-// Link to other platform pages, available networks first. The available list is rotated per page so the links are spread out.
-const availableList = SCHEDULERS.filter(isAvailable);
-const soonList = SCHEDULERS.filter((item) => !isAvailable(item));
-const offset = available ? availableList.indexOf(s) + 1 : soonList.indexOf(s);
-const rotated = availableList.filter((item) => item.slug !== s.slug);
-const start = rotated.length ? offset % rotated.length : 0;
-const others = [...rotated.slice(start), ...rotated.slice(0, start), ...soonList.filter((item) => item.slug !== s.slug)].slice(0, 6);
-
 const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
   { '@type': 'ListItem', position: 1, name: 'Platforms', item: `${SITE.url}/platforms` },
   { '@type': 'ListItem', position: 2, name: s.name, item: `${SITE.url}/${s.slug}` }] };
@@ -55,6 +52,11 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 <Doc title={title} description={description} h1={s.h1} eyebrow={available ? `${s.name} · available now` : `${s.name} · coming soon`} lead={s.intro} jsonLd={[crumbs, ...(howToLd ? [howToLd] : []), faqLd]}>
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/tools/caption-checker" class="button button-outline">Try the caption checker</a>
+  {network && <div class:list={['sch-head', { 'is-soon': !available }]}>
+    <NetworkBadge n={network} size="lg" />
+    <p><strong>{available ? `${s.name} is live on PostDelegate` : `${s.name}: ${s.pending ? 'pending approval' : 'coming soon'}`}</strong><span>{available ? `Plan it on one calendar with ${alongside.length} other live networks.` : `Meanwhile, ${openCount} networks connect today.`}</span></p>
+    <LogoStack networks={alongside} max={6} size="xs" />
+  </div>}
   {available
     ? <aside class="doc-note"><strong>Available now.</strong> Connect {s.name} from <strong>Add Channel</strong> on the calendar page. The <a href={s.docs}>{s.name} guide</a> has the exact fields and post settings.</aside>
     : <aside class="doc-note"><strong>Coming soon.</strong> {s.name} cannot be connected on PostDelegate yet. It opens once {pending}. See the <a href="/docs/channels">networks you can connect today</a>, or <a href="/support">contact support</a> to tell us you need it.</aside>}
@@ -92,6 +94,14 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
     <h2>Guides</h2>
     <ul>{s.guides.map((guide) => <li><a href={guide.href}>{guide.label}</a></li>)}</ul>
   </>}
-  <h2>Explore more platform coverage</h2>
-  <ul>{others.map((other) => <li><a href={`/${other.slug}`}>{other.name}{isAvailable(other) ? '' : ' (coming soon)'}</a></li>)}<li><a href="/platforms">All platform coverage</a></li></ul>
+  <h2>{available ? `Schedule on ${alongside.length} more networks from the same calendar` : `Schedule on these ${openCount} networks today`}</h2>
+  <div class="sch-grid"><NetworkGrid exclude={s.key} /></div>
 </Doc>
+<style>
+  .sch-head { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 16px; margin: 0 0 22px; padding: 18px 20px; border: 1px solid #2c2c2c; border-radius: 18px; background: linear-gradient(180deg, #17151c, #131313); --stack-ring: #151417; }
+  .sch-head p { display: flex; flex: 1 1 220px; flex-direction: column; gap: 2px; margin: 0; font-size: 14px; line-height: 1.5; }
+  .sch-head p strong { color: #fff; font-size: 16px; }
+  .sch-head.is-soon > :global(span[aria-hidden]) { filter: grayscale(1); opacity: .55; }
+  .sch-grid { margin: 22px 0 36px; }
+  .sch-grid :global(.ng-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+</style>

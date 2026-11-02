@@ -1,0 +1,266 @@
+---
+// Home feature bento. Each card names the result, then shows a small HTML/CSS illustration
+// with sample content. Facts come from the docs linked on each card.
+import NetworkBadge from './NetworkBadge.astro';
+import LogoStack from './LogoStack.astro';
+import Icon from './Icon.astro';
+import { AVAILABLE_NETWORKS, FEATURED_LIVE_NETWORKS, type Network } from '../data/networks';
+const live = (key: string) => AVAILABLE_NETWORKS.find((n) => n.key === key) as Network;
+const liveCount = AVAILABLE_NETWORKS.length;
+const targets = [
+  { n: live('youtube'), time: '09:00' },
+  { n: live('bluesky'), time: '09:00' },
+  { n: live('discord'), time: '09:00' },
+  { n: live('telegram'), time: '09:00' },
+  { n: live('wordpress'), time: '09:00' },
+];
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const calendar = [
+  { day: 0, row: 0, n: live('youtube'), label: 'Launch video' },
+  { day: 1, row: 1, n: live('bluesky'), label: 'Thread recap' },
+  { day: 2, row: 0, n: live('discord'), label: 'Release notes' },
+  { day: 3, row: 2, n: live('wordpress'), label: 'Blog post' },
+  { day: 4, row: 1, n: live('telegram'), label: 'Weekly digest' },
+  { day: 5, row: 0, n: live('devto'), label: 'Tutorial', draft: true },
+];
+const bars = [38, 52, 44, 70, 61, 88, 74];
+const files = [
+  { name: 'launch-teaser.mp4', slot: 'Mon 09:00' },
+  { name: 'feature-tour.mp4', slot: 'Wed 12:30' },
+  { name: 'team-intro.mp4', slot: 'Fri 17:00' },
+];
+---
+<div class="bento">
+  <article class="bento-card bento-publish">
+    <div class="bento-copy">
+      <span class="bento-tag">Publishing</span>
+      <h3>Post once, publish everywhere you’re live.</h3>
+      <p>Write one post, adjust the text and settings per network, and send it to every connected channel at the time you pick. Each version is checked against that network’s limits first.</p>
+      <div class="bento-stack"><LogoStack networks={FEATURED_LIVE_NETWORKS} max={6} size="sm" /><span><b>{liveCount} networks</b> connect today</span></div>
+      <a class="bento-link" href="/platforms">See every network <span aria-hidden="true">↗</span></a>
+    </div>
+    <div class="bv bv-publish" aria-hidden="true">
+      <div class="bv-post">
+        <div class="bv-post-head"><span class="bv-dot"></span>New post<small>Fri 09:00</small></div>
+        <p>Our new docs are live. Here’s what changed and why.</p>
+        <div class="bv-post-media"><i></i><span>docs-tour.mp4</span></div>
+      </div>
+      <svg class="bv-wires" viewBox="0 0 100 250" preserveAspectRatio="none">{targets.map((_, i) => <path d={`M0 125 C 55 125, 45 ${25 + i * 50}, 100 ${25 + i * 50}`} />)}</svg>
+      <ul class="bv-targets">{targets.map((t) => <li><NetworkBadge n={t.n} size="sm" /><span>{t.n.name}<small>{t.time}</small></span><b>✓</b></li>)}</ul>
+    </div>
+  </article>
+
+  <article class="bento-card bento-agent">
+    <div class="bento-copy">
+      <span class="bento-tag">AI agents</span>
+      <h3>Let Claude or ChatGPT schedule for you.</h3>
+      <p>Connect your assistant over MCP. It drafts and schedules with the same checks as the app, and its posts can wait in your Approvals inbox until you say yes.</p>
+    </div>
+    <div class="bv bv-chat" aria-hidden="true">
+      <div class="bv-chat-top"><span class="bv-ai"><Icon name="claude" class="size-3.5" /></span>Your assistant<small>via MCP</small></div>
+      <p class="bv-msg bv-msg-you">Schedule three posts for Friday’s launch. I’ll approve them first.</p>
+      <p class="bv-tool"><code>integrationSchedulePostTool</code><span>3 posts · in review</span></p>
+      <p class="bv-msg bv-msg-ai">Done. Three posts for Friday 09:00 are waiting in Approvals.</p>
+    </div>
+    <a class="bento-link" href="/mcp">How MCP works <span aria-hidden="true">↗</span></a>
+  </article>
+
+  <article class="bento-card bento-calendar">
+    <div class="bv bv-cal" aria-hidden="true">
+      <div class="bv-cal-head"><b>This week</b><span>Week · Month</span></div>
+      <div class="bv-cal-grid">
+        {days.map((d, i) => <span class:list={['bv-cal-day', { 'is-today': i === 2 }]}>{d}</span>)}
+        {calendar.map((c) => <span class:list={['bv-cal-post', { 'is-draft': c.draft }]} style={`grid-column:${c.day + 1};grid-row:${c.row + 2}`}><NetworkBadge n={c.n} size="xs" /><small>{c.label}</small></span>)}
+      </div>
+    </div>
+    <div class="bento-copy">
+      <span class="bento-tag">Calendar</span>
+      <h3>See the whole week on one calendar.</h3>
+      <p>Day, week and month views across every channel, with drafts and scheduled posts side by side.</p>
+      <a class="bento-link" href="/docs/posts">How posts work <span aria-hidden="true">↗</span></a>
+    </div>
+  </article>
+
+  <article class="bento-card bento-views">
+    <div class="bv bv-views" aria-hidden="true">
+      <div class="bv-views-head"><span><small>Views gained this week</small><b>+2,418</b></span><span class="bv-live"><NetworkBadge n={live('youtube')} size="xs" />Live</span></div>
+      <div class="bv-bars">{bars.map((h, i) => <span style={`--h:${h}%`} class:list={{ 'is-peak': i === 5 }}></span>)}</div>
+      <div class="bv-views-foot"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+      <p class="bv-sample">Sample data</p>
+    </div>
+    <div class="bento-copy">
+      <span class="bento-tag">Analytics</span>
+      <h3>Find the posts that keep earning views.</h3>
+      <p>Views gained per day, your top posts ranked, and an optional summary email on Mondays. YouTube today, more as networks open.</p>
+      <a class="bento-link" href="/docs/analytics#views">How analytics work <span aria-hidden="true">↗</span></a>
+    </div>
+  </article>
+
+  <article class="bento-card bento-approve">
+    <div class="bv bv-approve" aria-hidden="true">
+      <div class="bv-approve-post"><NetworkBadge n={live('bluesky')} size="xs" /><span>Launch thread, part 1 of 3<small>Thu 14:00 · In review</small></span></div>
+      <div class="bv-approve-actions"><span class="bv-btn-yes">Approve</span><span class="bv-btn-no">Request changes</span></div>
+      <p class="bv-approve-note"><i></i>Client link · no account needed</p>
+    </div>
+    <div class="bento-copy">
+      <span class="bento-tag">Approvals</span>
+      <h3>Clients approve with one link.</h3>
+      <p>Send a link and the client approves or asks for changes without signing up. Nothing publishes while it waits.</p>
+      <a class="bento-link" href="/docs/approvals">How approvals work <span aria-hidden="true">↗</span></a>
+    </div>
+  </article>
+
+  <article class="bento-card bento-bulk">
+    <div class="bento-copy">
+      <span class="bento-tag">Bulk video</span>
+      <h3>50 videos in, weeks of posts out.</h3>
+      <p>Drop in up to 50 videos, pick your channels, and PostDelegate spreads them across your posting slots. You check every date before anything is scheduled.</p>
+      <a class="bento-link" href="/docs/bulk-import#bulk-schedule-videos">How bulk video works <span aria-hidden="true">↗</span></a>
+    </div>
+    <div class="bv bv-bulk" aria-hidden="true">
+      {files.map((f) => <div class="bv-file"><span class="bv-thumb"><i></i></span><span>{f.name}<small>Sample file</small></span><b>{f.slot}</b></div>)}
+      <p class="bv-more">+ 47 more in the preview</p>
+    </div>
+  </article>
+
+  <article class="bento-card bento-api">
+    <div class="bento-copy">
+      <span class="bento-tag">Developers</span>
+      <h3>Automate it with the REST API and webhooks.</h3>
+      <p>The same API and MCP server on every plan, and webhooks that tell your own tools when a post goes out.</p>
+      <a class="bento-link" href="/api">Read the API docs <span aria-hidden="true">↗</span></a>
+    </div>
+    <pre class="bv bv-code" aria-hidden="true"><code><span class="c-k">POST</span> /api/public/v1/posts
+{'{'}
+  <span class="c-s">"type"</span>: <span class="c-v">"schedule"</span>,
+  <span class="c-s">"date"</span>: <span class="c-v">"2026-11-06T09:00:00Z"</span>,
+  <span class="c-s">"posts"</span>: [ … ]
+{'}'}
+<span class="c-ok">201</span> <span class="c-dim">Created · scheduled</span></code></pre>
+  </article>
+</div>
+<p class="bento-caption">Illustrations with sample content.</p>
+
+<style>
+  .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+  .bento-card { position: relative; isolation: isolate; display: flex; flex-direction: column; gap: 26px; min-width: 0; padding: 30px; overflow: hidden; border: 1px solid #27242f; border-radius: 26px; background: radial-gradient(90% 80% at 100% 0%, #7357ff1f, transparent 60%), #111014; --stack-ring: #121116; }
+  .bento-card:hover { border-color: #3a3448; }
+  .bento-publish { grid-column: span 4; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr); align-items: center; gap: 28px; }
+  .bento-agent { grid-column: span 2; }
+  .bento-calendar, .bento-views, .bento-approve { grid-column: span 2; }
+  .bento-bulk, .bento-api { grid-column: span 3; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 24px; }
+  .bento-views { background: radial-gradient(90% 80% at 0% 0%, #c8ff4d14, transparent 60%), #111014; }
+  .bento-tag { display: inline-flex; color: #c8ff4d; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .bento-copy h3 { margin-top: 12px; color: #fff; font-size: clamp(22px, 2vw, 27px); line-height: 1.18; font-weight: 750; letter-spacing: -.03em; text-wrap: balance; }
+  .bento-publish .bento-copy h3 { font-size: clamp(26px, 2.6vw, 34px); }
+  .bento-copy p { margin-top: 12px; color: #bdb6c9; font-size: 15px; line-height: 1.65; text-wrap: pretty; }
+  .bento-stack { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; color: #bdb6c9; font-size: 13px; }
+  .bento-stack b { color: #fff; }
+  .bento-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; color: #d1bfff; font-size: 14px; font-weight: 650; }
+  .bento-agent .bento-link { margin-top: auto; }
+  .bento-link:hover { color: #fff; text-decoration: underline; text-underline-offset: 5px; }
+  .bento-caption { margin-top: 18px; color: #8f8f8f; font-size: 12px; text-align: center; }
+
+  /* Shared illustration frame */
+  .bv { position: relative; margin: 0; border: 1px solid #2b2733; border-radius: 18px; background: #18161d; color: #e9e5f0; font-size: 12px; box-shadow: 0 24px 50px -28px #000; }
+  .bv small { color: #9d96aa; }
+
+  /* Publish: one post wired to each network */
+  .bv-publish { display: grid; grid-template-columns: minmax(0, 1.1fr) 44px minmax(0, 1fr); align-items: center; padding: 18px 16px; min-height: 270px; }
+  .bv-post { padding: 14px; border: 1px solid #36303f; border-radius: 14px; background: #201d26; }
+  .bv-post-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12px; white-space: nowrap; }
+  .bv-post-head small { margin-left: auto; font-weight: 500; font-size: 11px; }
+  .bv-dot { width: 7px; height: 7px; border-radius: 50%; background: #c8ff4d; }
+  .bv-post p { margin-top: 10px; color: #d9d4e2; font-size: 12.5px; line-height: 1.5; }
+  .bv-post-media { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px; border: 1px solid #36303f; border-radius: 9px; color: #9d96aa; font-size: 11px; }
+  .bv-post-media i { width: 28px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #7357ff, #c8ff4d); }
+  .bv-wires { width: 100%; height: 250px; overflow: visible; }
+  .bv-wires path { fill: none; stroke: #7357ff; stroke-width: 1.4; vector-effect: non-scaling-stroke; opacity: .8; }
+  .bv-targets { display: grid; grid-template-rows: repeat(5, 50px); align-items: center; margin: 0; padding: 0; list-style: none; }
+  .bv-targets li { display: flex; align-items: center; gap: 9px; padding: 6px 8px 6px 6px; border: 1px solid #2f2a37; border-radius: 12px; background: #1d1a22; }
+  .bv-targets li span { display: flex; flex-direction: column; min-width: 0; font-size: 12px; font-weight: 650; }
+  .bv-targets li small { font-size: 10.5px; font-weight: 500; }
+  .bv-targets li b { margin-left: auto; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #c8ff4d; color: #111; font-size: 10px; }
+
+  /* Agent chat */
+  .bv-chat { display: grid; gap: 10px; padding: 14px; }
+  .bv-chat-top { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+  .bv-chat-top small { margin-left: auto; padding: 3px 8px; border: 1px solid #36303f; border-radius: 99px; font-size: 10px; }
+  .bv-ai { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: #d97757; color: #fff; }
+  .bv-msg { margin: 0; padding: 10px 12px; border-radius: 14px; line-height: 1.5; font-size: 12.5px; }
+  .bv-msg-you { margin-left: 14%; border-bottom-right-radius: 4px; background: #7357ff; color: #fff; }
+  .bv-msg-ai { margin-right: 10%; border-bottom-left-radius: 4px; background: #24212a; color: #e3deeb; }
+  .bv-tool { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 7px 10px; border: 1px dashed #3d3647; border-radius: 10px; font-size: 11px; color: #b6aec3; }
+  .bv-tool code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c8ff4d; font-family: var(--font-mono); font-size: 10.5px; }
+  .bv-tool span { flex: none; }
+
+  /* Mini calendar */
+  .bv-cal { padding: 14px; }
+  .bv-cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .bv-cal-head span { color: #9d96aa; font-size: 10.5px; }
+  .bv-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(3, 34px); gap: 5px 4px; }
+  .bv-cal-day { padding: 3px 0; border-radius: 6px; color: #9d96aa; font-size: 10px; text-align: center; }
+  .bv-cal-day.is-today { background: #7357ff; color: #fff; font-weight: 700; }
+  .bv-cal-post { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; border: 1px solid #36303f; border-radius: 8px; background: #221f28; }
+  .bv-cal-post small { display: none; }
+  .bv-cal-post.is-draft { border-style: dashed; background: transparent; opacity: .75; }
+
+  /* Views strip */
+  .bv-views { padding: 14px 14px 10px; }
+  .bv-views-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .bv-views-head > span:first-child { display: flex; flex-direction: column; gap: 2px; }
+  .bv-views-head b { color: #fff; font-size: 24px; font-weight: 800; letter-spacing: -.03em; }
+  .bv-live { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid #36303f; border-radius: 99px; color: #c8ff4d; font-size: 10.5px; font-weight: 700; }
+  .bv-bars { display: flex; align-items: flex-end; gap: 7px; height: 78px; margin-top: 12px; }
+  .bv-bars span { flex: 1; height: var(--h); border-radius: 5px 5px 2px 2px; background: #3a3348; }
+  .bv-bars span.is-peak { background: #c8ff4d; }
+  .bv-views-foot { display: flex; gap: 7px; margin-top: 6px; }
+  .bv-views-foot span { flex: 1; color: #8c8597; font-size: 9.5px; text-align: center; }
+  .bv-sample { position: absolute; right: 12px; bottom: -1px; transform: translateY(100%); padding-top: 4px; color: #8f8f8f; font-size: 10px; }
+
+  /* Approval card */
+  .bv-approve { display: grid; gap: 12px; padding: 14px; }
+  .bv-approve-post { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #36303f; border-radius: 12px; background: #201d26; }
+  .bv-approve-post span { display: flex; flex-direction: column; gap: 2px; font-weight: 650; font-size: 12.5px; }
+  .bv-approve-post small { font-weight: 500; font-size: 10.5px; }
+  .bv-approve-actions { display: flex; gap: 8px; }
+  .bv-approve-actions span { flex: 1; padding: 9px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; text-align: center; }
+  .bv-btn-yes { background: #c8ff4d; color: #111; }
+  .bv-btn-no { border: 1px solid #3d3647; color: #ddd7e6; }
+  .bv-approve-note { display: flex; align-items: center; gap: 7px; margin: 0; color: #a49db1; font-size: 11px; }
+  .bv-approve-note i { width: 7px; height: 7px; border-radius: 50%; background: #c8ff4d; }
+
+  /* Bulk video */
+  .bv-bulk { display: grid; gap: 8px; padding: 14px; }
+  .bv-file { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 1px solid #2f2a37; border-radius: 11px; background: #1d1a22; }
+  .bv-file > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bv-file small { font-size: 10px; font-weight: 500; }
+  .bv-file b { margin-left: auto; flex: none; padding: 4px 7px; border-radius: 7px; background: #7357ff2e; color: #d1bfff; font-size: 10.5px; }
+  .bv-thumb { position: relative; flex: none; width: 18px; height: 28px; border-radius: 4px; background: linear-gradient(160deg, #7357ff, #3b2d7a); }
+  .bv-thumb i { position: absolute; left: 50%; top: 50%; translate: -40% -50%; border-left: 6px solid #fff; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+  .bv-more { margin: 2px 0 0; color: #9d96aa; font-size: 11px; text-align: center; }
+
+  /* Code */
+  .bv-code { overflow-x: auto; padding: 16px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.65; color: #d9d4e2; white-space: pre; }
+  .c-k { color: #c8ff4d; font-weight: 700; } .c-s { color: #d1bfff; } .c-v { color: #f5f0ff; } .c-ok { color: #111; background: #c8ff4d; padding: 1px 5px; border-radius: 4px; font-weight: 700; } .c-dim { color: #9d96aa; }
+
+  @media (max-width: 1100px) {
+    .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bento-publish { grid-column: span 2; }
+    .bento-agent, .bento-calendar, .bento-views, .bento-approve, .bento-bulk, .bento-api { grid-column: span 1; }
+    .bento-bulk, .bento-api { display: flex; }
+    .bento-approve { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+    .bento-approve .bento-copy { order: -1; }
+  }
+  @media (max-width: 720px) {
+    .bento { grid-template-columns: 1fr; gap: 14px; }
+    .bento-card, .bento-publish, .bento-approve { grid-column: auto; display: flex; padding: 22px; border-radius: 22px; gap: 22px; }
+    .bento-approve .bento-copy { order: 0; }
+    .bento-publish .bento-copy h3 { font-size: 28px; }
+    .bv-publish { grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr); padding: 12px 10px; min-height: 0; }
+    .bv-post { padding: 10px; }
+    .bv-post p { font-size: 11.5px; }
+    .bv-targets li { gap: 6px; padding: 4px 6px 4px 4px; }
+    .bv-targets li b { display: none; }
+  }
+</style>
