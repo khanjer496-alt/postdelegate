@@ -1,24 +1,4 @@
 ---
-import Doc from '../layouts/Doc.astro';
-import { SITE, CTA_LABEL } from '../data/site';
-const guides = [
-  { title: 'MCP connections', text: 'How compatible AI clients connect to PostDelegate and what they can do.', href: '/mcp' },
-  { title: 'The REST API', text: 'The developer interface behind drafts, media and publishing workflows.', href: '/api' },
-  { title: 'Claude and Cowork', text: 'Add PostDelegate to Claude as a custom connector.', href: '/claude-cowork' },
-  { title: 'Codex and coding agents', text: 'Connect Codex, Cursor and other coding tools over MCP.', href: '/codex' },
-];
+import AgentsPage from '../components/pages/AgentsPage.astro';
 ---
-<Doc title="AI agents and automation — PostDelegate" description="Connect your own AI assistant or software to PostDelegate through MCP and the REST API. Agents draft and schedule posts, and every post stays under your review." h1="Bring your workflow. Keep your calendar." eyebrow="AI agents and automation" lead="Use the assistant you already have. PostDelegate offers an MCP server and a REST API so your tools can prepare content while you keep the final say.">
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
-  <a slot="actions" href="/docs" class="button button-outline">Read the docs</a>
-  <div class="document-grid">
-    {guides.map((guide) => <a href={guide.href} class="document-card"><h2>{guide.title}</h2><p>{guide.text}</p><span>Explore the integration →</span></a>)}
-  </div>
-  <h2>A useful place to start</h2>
-  <p>Prepare a post with your AI tool, then bring the draft and media into the workspace. Review the destination, content and timing before scheduling on an available channel.</p>
-  <h2>How it connects</h2>
-  <p>Add the PostDelegate MCP server to your assistant and sign in with your PostDelegate account, or use your workspace API key. The <a href="/docs/mcp">MCP docs</a> have the server address, sign-in options and setup for each client.</p>
-  <aside class="doc-note">PostDelegate does not provide an AI of its own: you bring your own assistant. Connection availability depends on your plan, and only the channels listed as available in the <a href="/docs/channels">channel guides</a> can be published to today.</aside>
-  <h2>For developers</h2>
-  <p>The <a href="/docs/api">REST API docs</a> cover authentication, rate limits and every endpoint. Ask <a href="/support">PostDelegate support</a> if you get stuck.</p>
-</Doc>
+<AgentsPage lang="en" />

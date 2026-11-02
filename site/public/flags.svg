@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+<!-- Flags for the language switcher (src/components/Flag.astro), one per site language. -->
+<symbol id="flag-us" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#fff"/><rect y="0.0" width="30" height="1.539" fill="#b22234"/><rect y="3.077" width="30" height="1.539" fill="#b22234"/><rect y="6.154" width="30" height="1.539" fill="#b22234"/><rect y="9.231" width="30" height="1.539" fill="#b22234"/><rect y="12.308" width="30" height="1.539" fill="#b22234"/><rect y="15.385" width="30" height="1.539" fill="#b22234"/><rect y="18.462" width="30" height="1.539" fill="#b22234"/><rect width="13" height="10.769" fill="#3c3b6e"/></symbol>
+<symbol id="flag-es" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#c60b1e"/><rect y="5" width="30" height="10" fill="#ffc400"/></symbol>
+<symbol id="flag-br" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#009c3b"/><path d="M15 2.6 27.4 10 15 17.4 2.6 10z" fill="#ffdf00"/><circle cx="15" cy="10" r="4.3" fill="#002776"/></symbol>
+<symbol id="flag-de" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#ffce00"/><rect width="30" height="13.34" fill="#dd0000"/><rect width="30" height="6.67" fill="#000"/></symbol>
+<symbol id="flag-fr" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#ef4135"/><rect width="20" height="20" fill="#fff"/><rect width="10" height="20" fill="#0055a4"/></symbol>
+<symbol id="flag-ae" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#000"/><rect width="30" height="13.34" fill="#fff"/><rect width="30" height="6.67" fill="#00732f"/><rect width="8" height="20" fill="#ff0000"/></symbol>
+<symbol id="flag-it" viewBox="0 0 30 20" preserveAspectRatio="none"><rect width="30" height="20" fill="#ce2b37"/><rect width="20" height="20" fill="#f1f2f1"/><rect width="10" height="20" fill="#009246"/></symbol>
+</svg>

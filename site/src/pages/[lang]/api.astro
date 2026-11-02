@@ -1,0 +1,7 @@
+---
+import ApiPage from '../../components/pages/ApiPage.astro';
+import { localeStaticPaths, type Lang } from '../../i18n';
+export const getStaticPaths = localeStaticPaths;
+const lang = Astro.params.lang as Lang;
+---
+<ApiPage lang={lang} />

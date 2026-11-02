@@ -1,17 +1,4 @@
 ---
-import Doc from '../layouts/Doc.astro';
-import { SITE } from '../data/site';
+import ApiPage from '../components/pages/ApiPage.astro';
 ---
-<Doc title="REST API — PostDelegate" description="PostDelegate's REST API for channels, posts and media. Authenticate with an API key, schedule posts from your own code, and find rate limits and examples." h1="Build around your publishing workflow." eyebrow="REST API" lead="A REST API for your channels, media and posts. Authenticate with your workspace API key and schedule from your own software.">
-  <a slot="actions" href="/docs/api" class="button">Read the API docs</a>
-  <a slot="actions" href={`mailto:${SITE.email}`} class="button button-outline">Discuss an integration</a>
-  <h2>One interface for your content</h2>
-  <p>The API covers discovering connected channels, uploading media, creating drafts and scheduling posts. Each network still has its own content rules and account permissions, and the API applies the same checks as the app.</p>
-  <h2>Before connecting a production workflow</h2>
-  <ul><li>Find your API key under Settings, Agents / Dev in the app. API access depends on your plan.</li><li>Check which channels the workspace has connected. Only the networks listed as available in the <a href="/docs/channels">channel guides</a> can be connected today.</li><li>Begin with a draft, review it in the app, then test the scheduling and error-recovery path.</li></ul>
-  <aside class="doc-note">Base address: <code>https://app.postdelegate.com/api/public/v1</code>. Creating posts is rate limited per workspace. The <a href="/docs/api">API overview</a> has the details.</aside>
-  <h2>Keep credentials out of content</h2>
-  <p>Store your API key in your application or agent's secure settings. Do not include it in prompts, public repositories or screenshots. You can rotate it at any time in the app.</p>
-  <h2>Explore the docs</h2>
-  <p><a href="/docs/api/posts">Posts</a> · <a href="/docs/api/uploads">Uploads</a> · <a href="/docs/api/channels">Channels</a> · <a href="/docs/webhooks">Webhooks</a> · <a href="/docs/mcp">MCP</a> · <a href="/agents">Agent overview</a></p>
-</Doc>
+<ApiPage lang="en" />

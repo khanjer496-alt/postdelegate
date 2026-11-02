@@ -1,15 +1,18 @@
 ---
 // Comparison card for the home page and /compare. The PostDelegate mark sits beside a neutral
 // monogram for each other tool: we do not reproduce other companies' logos.
-interface Props { href: string; title: string; text: string; tools: string[]; as?: 'h2' | 'h3'; cta?: string }
-const { href, title, text, tools, as = 'h3', cta = 'Read the comparison' } = Astro.props;
+import { strings, type Lang } from '../i18n';
+interface Props { href: string; title: string; text: string; tools: string[]; as?: 'h2' | 'h3'; cta?: string; lang?: Lang }
+const { lang = 'en' } = Astro.props;
+const words = strings(lang).compareCard;
+const { href, title, text, tools, as = 'h3', cta = words.cta } = Astro.props;
 const Heading = as;
 const monogram = (name: string) => { const words = name.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean); return words.length > 1 ? words.map((w) => w[0]).join('').slice(0, 2).toUpperCase() : name.slice(0, 2); };
 ---
 <a class="cc" href={href}>
   <span class="cc-logos" aria-hidden="true">
     {tools.map((t, i) => <>
-      {i > 0 && <span class="cc-vs">vs</span>}
+      {i > 0 && <span class="cc-vs">{words.vs}</span>}
       {t === 'PostDelegate' ? <img class="cc-mark" src="/mark.svg" width="36" height="36" alt="" /> : <span class="cc-mono">{monogram(t)}</span>}
     </>)}
   </span>

@@ -1,0 +1,7 @@
+---
+import CodexPage from '../../components/pages/CodexPage.astro';
+import { localeStaticPaths, type Lang } from '../../i18n';
+export const getStaticPaths = localeStaticPaths;
+const lang = Astro.params.lang as Lang;
+---
+<CodexPage lang={lang} />

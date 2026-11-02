@@ -1,15 +1,4 @@
 ---
-import Doc from '../layouts/Doc.astro';
-import { SITE, CTA_LABEL } from '../data/site';
+import ClaudePage from '../components/pages/ClaudePage.astro';
 ---
-<Doc title="Claude and Cowork — PostDelegate" description="Connect Claude to PostDelegate as a custom connector so it can turn a conversation into drafts and scheduled posts on your calendar, with your review first." h1="Turn a good conversation into content." eyebrow="Claude and Cowork" lead="Use Claude to shape an idea, then review the result in your publishing workspace. Add PostDelegate to Claude as a custom connector.">
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
-  <a slot="actions" href="/docs/mcp/claude" class="button button-outline">Connect Claude</a>
-  <h2>Start with the content</h2>
-  <p>Work on a caption, campaign idea or post outline in Claude. Bring the result into PostDelegate, attach the right media and inspect the channel preview before scheduling.</p>
-  <h2>Direct connections</h2>
-  <p>Claude can connect to PostDelegate as a custom connector. You add the server address, sign in with your PostDelegate account and approve access. The <a href="/docs/mcp/claude">Claude setup guide</a> has the steps, and the <a href="/docs/mcp/tools">tools reference</a> lists what Claude can do.</p>
-  <aside class="doc-note">PostDelegate does not claim an official Claude directory listing or affiliation. You add it as a custom connector, and availability of custom connectors depends on your Claude plan.</aside>
-  <h2>Keep the final review in view</h2>
-  <p>Confirm the destination account, final wording, media and schedule. Review the tools a connection exposes before allowing it to act on your behalf.</p>
-</Doc>
+<ClaudePage lang="en" />

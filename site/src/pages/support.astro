@@ -1,18 +1,4 @@
 ---
-import Doc from '../layouts/Doc.astro';
-import { SITE } from '../data/site';
+import SupportPage from '../components/pages/SupportPage.astro';
 ---
-<Doc title="Support — PostDelegate" description="Contact PostDelegate support about account access, channel connections, content or a data request, and see how to disconnect a channel or delete your account." h1="A little help with your next post." eyebrow="Support" lead="Tell us what happened and which part of your workflow needs a hand.">
-  <a slot="actions" href={`mailto:${SITE.email}`} class="button">Email support</a>
-  <a slot="actions" href={SITE.app} class="button button-outline">Open your workspace</a>
-  <h2>Help us find the issue</h2>
-  <p>Include your workspace name, affected platform, the time and timezone, and what you expected to happen. An error message or a screenshot can help.</p>
-  <p>Remove passwords, API keys, access tokens, payment details and recovery codes before sending a screenshot. We do not need your social account password.</p>
-  <h2>Connecting a channel</h2>
-  <p>Connections are being rolled out during early access. The <a href="/docs/channels">channels overview</a> lists the networks you can connect today. A platform appearing in our directory is not a guarantee that every account or publishing feature is available on PostDelegate.</p>
-  <h2 id="data-requests">Account and data requests</h2>
-  <p>Email <a href={`mailto:${SITE.email}`}>{SITE.email}</a> from the email associated with your account and describe your request. Tell us whether you want to disconnect a channel, request information about your data, or delete your account. We may need to verify account ownership before acting.</p>
-  <p>See our <a href={SITE.legal.privacy}>privacy policy</a> for details about the data the service processes.</p>
-  <h2>Useful links</h2>
-  <p><a href="/status">Service availability</a> · <a href="/platforms">Platform coverage</a> · <a href="/agents">Integration previews</a> · <a href={SITE.source}>Application source</a></p>
-</Doc>
+<SupportPage lang="en" />

@@ -8,34 +8,38 @@ import { SITE } from '../data/site';
 // the app reads at sign-up. Without it, ?ref= and utm_* ride along in the
 // links of this visit and the sign-up form sends them to the app.
 // The footer's Cookie settings button reopens it.
+import { strings, type Lang } from '../i18n';
+interface Props { lang?: Lang }
+const { lang = 'en' } = Astro.props;
+const c = strings(lang).cookies;
 const privacy = `${SITE.legal.privacy}#cookies`;
 ---
-<section class="cc" role="region" aria-labelledby="cc-title" data-cc hidden>
+<section class="cc" role="region" aria-labelledby="cc-title" data-cc data-title={c.title} data-settings-title={c.settingsTitle} hidden>
   <div class="cc-head">
-    <h2 id="cc-title" tabindex="-1" data-cc-title>Cookies</h2>
-    <button type="button" class="cc-close" aria-label="Close" title="Close" data-cc-close>
+    <h2 id="cc-title" tabindex="-1" data-cc-title>{c.title}</h2>
+    <button type="button" class="cc-close" aria-label={c.close} title={c.close} data-cc-close>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg>
     </button>
   </div>
-  <p>We use a few cookies to keep you signed in and, if you agree, to credit the person who referred you. <a href={privacy}>Learn more</a></p>
-  <p class="cc-note" data-cc-referral hidden>You followed a referral link. Accepting lets us credit the person who sent it.</p>
+  <p>{c.text} <a href={privacy}>{c.learnMore}</a></p>
+  <p class="cc-note" data-cc-referral hidden>{c.referral}</p>
   <div class="cc-categories" data-cc-view="customize" hidden>
     <div class="cc-row">
-      <div><span id="cc-necessary">Strictly necessary</span><small id="cc-necessary-text">Sign-in, security and your settings, including this choice. Always on.</small></div>
+      <div><span id="cc-necessary">{c.necessary}</span><small id="cc-necessary-text">{c.necessaryText}</small></div>
       <button type="button" role="switch" class="cc-switch" aria-checked="true" aria-disabled="true" aria-labelledby="cc-necessary" aria-describedby="cc-necessary-text"><span></span></button>
     </div>
     <div class="cc-row">
-      <div><span id="cc-ref">Referral and campaign attribution</span><small id="cc-ref-text">Remembers the referral or campaign link you came from, so the right person gets credit when you sign up.</small></div>
+      <div><span id="cc-ref">{c.attribution}</span><small id="cc-ref-text">{c.attributionText}</small></div>
       <button type="button" role="switch" class="cc-switch" aria-checked="false" aria-labelledby="cc-ref" aria-describedby="cc-ref-text" data-cc-switch="ref"><span></span></button>
     </div>
   </div>
   <div class="cc-actions" data-cc-view="banner">
-    <button type="button" class="cc-button" data-cc-answer="reject">Reject non-essential</button>
-    <button type="button" class="cc-button" data-cc-answer="customize">Customize</button>
-    <button type="button" class="cc-button" data-cc-answer="accept">Accept all</button>
+    <button type="button" class="cc-button" data-cc-answer="reject">{c.reject}</button>
+    <button type="button" class="cc-button" data-cc-answer="customize">{c.customize}</button>
+    <button type="button" class="cc-button" data-cc-answer="accept">{c.accept}</button>
   </div>
   <div class="cc-actions" data-cc-view="customize" hidden>
-    <button type="button" class="cc-button" data-cc-answer="save">Save choices</button>
+    <button type="button" class="cc-button" data-cc-answer="save">{c.save}</button>
   </div>
 </section>
 <script>
@@ -101,7 +105,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     let opener: HTMLElement | null = null;
 
     const setView = (view: 'banner' | 'customize') => {
-      title.textContent = view === 'customize' ? 'Cookie settings' : 'Cookies';
+      title.textContent = (view === 'customize' ? banner.dataset.settingsTitle : banner.dataset.title) ?? '';
       banner.querySelectorAll<HTMLElement>('[data-cc-view]').forEach((part) => (part.hidden = part.dataset.ccView !== view));
       banner.querySelector<HTMLElement>('[data-cc-referral]')!.hidden = !(ref && view === 'banner');
     };
@@ -216,17 +220,17 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   .cc p{margin:0}.cc .cc-note{color:#b9b9b9}
   .cc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .cc h2{margin:0;font-size:14px;font-weight:700;line-height:1.3}.cc h2:focus{outline:none}.cc h2:focus-visible{outline:2px solid #c8ff4d;outline-offset:3px}
-  .cc-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin:-4px -6px -4px 0;border:0;border-radius:8px;background:none;color:#b9b9b9}.cc-close:hover{color:#fff;background:#222}
+  .cc-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin-block:-4px;margin-inline-end:-6px;border:0;border-radius:8px;background:none;color:#b9b9b9}.cc-close:hover{color:#fff;background:#222}
   .cc a{color:#d1bfff;text-decoration:underline;text-underline-offset:3px}.cc a:hover{color:#fff}
   .cc-categories{display:flex;flex-direction:column;gap:12px;padding:4px 0}
   .cc-categories:not([hidden]){display:flex}.cc [hidden]{display:none!important}
   .cc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.cc-row>div{display:flex;flex-direction:column;gap:2px}.cc-row span{font-weight:650}.cc-row small{color:#b9b9b9;font-size:12px;line-height:1.45}
   .cc-switch{flex-shrink:0;width:44px;height:26px;padding:3px;border:1px solid #555;border-radius:99px;background:#0d0d0d}.cc-switch span{display:block;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
-  .cc-switch[aria-checked="true"]{border-color:#7357ff;background:#7357ff}.cc-switch[aria-checked="true"] span{transform:translateX(18px)}.cc-switch[aria-disabled="true"]{opacity:.6;cursor:not-allowed}
+  .cc-switch[aria-checked="true"]{border-color:#7357ff;background:#7357ff}.cc-switch[aria-checked="true"] span{transform:translateX(18px)}:global([dir=rtl]) .cc-switch[aria-checked="true"] span{transform:translateX(-18px)}.cc-switch[aria-disabled="true"]{opacity:.6;cursor:not-allowed}
   .cc-actions{display:flex;gap:8px}
   /* the three answers look the same: saying no is as easy as saying yes */
   .cc-button{flex:1;min-height:36px;padding:5px 8px;border:1px solid #777;border-radius:100px;background:transparent;color:#fff;font-size:12.5px;font-weight:650;line-height:1.2;transition:background .18s,border-color .18s}.cc-button:hover{background:#222;border-color:#fff}
-  @media(min-width:640px){.cc{left:16px;right:auto;bottom:16px;width:380px;gap:10px;padding:18px;border:1px solid #303030;border-radius:18px;box-shadow:0 20px 60px #000a;font-size:14px;line-height:1.45}.cc h2{font-size:15px}.cc-button{min-height:38px;font-size:13px}.cc.cc-end{left:auto;right:16px}}
+  @media(min-width:640px){.cc{inset-inline:16px auto;bottom:16px;width:380px;gap:10px;padding:18px;border:1px solid #303030;border-radius:18px;box-shadow:0 20px 60px #000a;font-size:14px;line-height:1.45}.cc h2{font-size:15px}.cc-button{min-height:38px;font-size:13px}.cc.cc-end{inset-inline:auto 16px}}
   @media(prefers-reduced-motion:reduce){.cc-switch span,.cc-button{transition:none}}
 </style>
 <style is:global>

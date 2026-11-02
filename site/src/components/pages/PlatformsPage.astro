@@ -1,0 +1,49 @@
+---
+import Base from '../../layouts/Base.astro';
+import NetworkBadge from '../NetworkBadge.astro';
+import PageHero from '../PageHero.astro';
+import CtaBand from '../CtaBand.astro';
+import { NETWORKS } from '../../data/networks';
+import { SITE } from '../../data/site';
+import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = strings(lang);
+const p = t.platformsPage;
+const networks = [...NETWORKS].sort((a, b) => Number(!!b.available) - Number(!!a.available));
+const href = (network: typeof NETWORKS[number]) => localeHref(lang, network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon');
+---
+<Base title={p.title} description={p.description} lang={lang}>
+  <PageHero eyebrow={p.eyebrow} title={p.h1} lead={p.lead}>
+    <a href={SITE.signup} class="button">{t.common.ctaLabel}</a>
+    <a href={localeHref(lang, '/support')} class="button button-outline">{p.ask}</a>
+  </PageHero>
+  <section class="section"><div class="container">
+    <p class="coverage-note muted" set:html={localizeLinks(lang, p.note)} />
+    <ul class="network-grid">
+      {networks.map((network) => (
+        <li><a href={href(network)} class="network-card">
+          <NetworkBadge n={network} size="lg" />
+          <span class="network-copy"><strong>{network.name}</strong><span>{network.available ? p.connectIt : p.notYet}</span></span>
+          <span class={network.available ? 'rollout-label is-available' : 'rollout-label'}>{network.available ? p.available : p.soon}</span>
+        </a></li>
+      ))}
+    </ul>
+    <p class="coverage-note muted">{p.googleNote}</p>
+  </div></section>
+  <CtaBand lang={lang} />
+</Base>
+<style>
+  .coverage-note { max-width: 760px; text-align: center; margin: 0 auto 34px; font-size: 15px; line-height: 1.85; }
+  .network-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; list-style: none; padding: 0; margin: 0 0 35px; }
+  .network-card { height: 100%; padding: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 13px; border: 1px solid #363636; border-radius: 18px; background: #171717; color: #fff; text-decoration: none; transition: border-color .2s; }
+  .network-card:hover { border-color: #888; }
+  .network-copy { display: flex; flex: 1; min-width: 120px; flex-direction: column; gap: 5px; }
+  .network-copy strong { font-size: 15px; font-weight: 750; }
+  .network-copy > span { font-size: 11px; color: #b2b2ba; }
+  .rollout-label { padding: 5px 8px; border: 1px solid #454545; border-radius: 100px; color: #b9b9c0; font-size: 10px; white-space: nowrap; }
+  .rollout-label.is-available { border-color: #c8ff4d66; color: #c8ff4d; }
+  .coverage-note a { color: #d1bfff; text-decoration: underline; text-underline-offset: 4px; }
+  @media (max-width: 1000px) { .network-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 580px) { .network-grid { grid-template-columns: 1fr; } }
+</style>

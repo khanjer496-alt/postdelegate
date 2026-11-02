@@ -1,0 +1,11 @@
+---
+import SchedulerPage from '../../components/pages/SchedulerPage.astro';
+import { localeStaticPaths, TRANSLATED_SCHEDULERS, type Lang } from '../../i18n';
+// Live networks only; pages for networks that are not live yet stay English.
+export function getStaticPaths() {
+  return localeStaticPaths().flatMap(({ params }) => TRANSLATED_SCHEDULERS.map((s) => ({ params: { lang: params.lang, scheduler: s.slug }, props: { s } })));
+}
+const { s } = Astro.props;
+const lang = Astro.params.lang as Lang;
+---
+<SchedulerPage s={s} lang={lang} />

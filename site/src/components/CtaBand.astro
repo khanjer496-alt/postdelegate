@@ -1,12 +1,16 @@
 ---
-import { SITE, CTA_LABEL, CTA_NOTE } from '../data/site';
-interface Props { eyebrow?: string; title?: string; text?: string }
-const { eyebrow = 'Try it for 7 days', title = 'Your next great post starts here.', text = 'Give your ideas a home. Plan your content, find your rhythm, and bring your social channels together.' } = Astro.props;
+import { SITE } from '../data/site';
+import { TRIAL_DAYS } from '../data/plans';
+import { strings, type Lang } from '../i18n';
+interface Props { eyebrow?: string; title?: string; text?: string; lang?: Lang }
+const { lang = 'en' } = Astro.props;
+const t = strings(lang);
+const { eyebrow = t.ctaBand.eyebrow(TRIAL_DAYS), title = t.ctaBand.title, text = t.ctaBand.text } = Astro.props;
 ---
 <section class="cta-section">
   <div class="cta-panel">
     <span class="cta-orbit orbit-one" aria-hidden="true"></span><span class="cta-orbit orbit-two" aria-hidden="true"></span>
-    <div class="cta-content"><p class="cta-eyebrow">{eyebrow}</p><h2>{title}</h2><p class="cta-description">{text}</p><a href={SITE.signup} class="cta-button">{CTA_LABEL} <span aria-hidden="true">↗</span></a><p class="cta-trial-note"><span aria-hidden="true"></span>{CTA_NOTE}</p><p class="cta-note">Add a card before the trial ends to keep your plan. More networks open as platform approvals are completed.</p></div>
+    <div class="cta-content"><p class="cta-eyebrow">{eyebrow}</p><h2>{title}</h2><p class="cta-description">{text}</p><a href={SITE.signup} class="cta-button">{t.common.ctaLabel} <span aria-hidden="true">↗</span></a><p class="cta-trial-note"><span aria-hidden="true"></span>{t.common.ctaNote}</p><p class="cta-note">{t.ctaBand.note}</p></div>
   </div>
 </section>
 <style>

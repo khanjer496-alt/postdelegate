@@ -3,12 +3,13 @@
 // Pass live networks only: the stack reads as "you can connect these today".
 import type { Network } from '../data/networks';
 import NetworkBadge from './NetworkBadge.astro';
+import { strings, type Lang } from '../i18n';
 // decorative: hide it from screen readers when visible text beside it already says the same.
-interface Props { networks: Network[]; max?: number; size?: 'xs' | 'sm' | 'md'; class?: string; decorative?: boolean }
-const { networks, max = 5, size = 'sm', class: cls = '', decorative = false } = Astro.props;
+interface Props { networks: Network[]; max?: number; size?: 'xs' | 'sm' | 'md'; class?: string; decorative?: boolean; lang?: Lang }
+const { networks, max = 5, size = 'sm', class: cls = '', decorative = false, lang = 'en' } = Astro.props;
 const shown = networks.slice(0, max);
 const rest = networks.length - shown.length;
-const label = rest > 0 ? `${shown.map((n) => n.name).join(', ')} and ${rest} more` : shown.map((n) => n.name).join(', ');
+const label = rest > 0 ? strings(lang).logoStack.andMore(shown.map((n) => n.name).join(', '), rest) : shown.map((n) => n.name).join(', ');
 ---
 <span class:list={['logo-stack', `logo-stack-${size}`, cls]} {...(decorative ? { 'aria-hidden': 'true' } : { role: 'img', 'aria-label': label })}>
   {shown.map((n) => <NetworkBadge n={n} size={size} class="logo-stack-item" />)}
@@ -17,9 +18,9 @@ const label = rest > 0 ? `${shown.map((n) => n.name).join(', ')} and ${rest} mor
 <style>
   .logo-stack { display: inline-flex; align-items: center; }
   .logo-stack :global(.logo-stack-item) { box-shadow: 0 0 0 2px var(--stack-ring, #141414); }
-  .logo-stack :global(.logo-stack-item + .logo-stack-item), .logo-stack-more { margin-left: -3px; }
-  .logo-stack-sm :global(.logo-stack-item + .logo-stack-item), .logo-stack-sm .logo-stack-more { margin-left: -5px; }
-  .logo-stack-md :global(.logo-stack-item + .logo-stack-item), .logo-stack-md .logo-stack-more { margin-left: -7px; }
+  .logo-stack :global(.logo-stack-item + .logo-stack-item), .logo-stack-more { margin-inline-start: -3px; }
+  .logo-stack-sm :global(.logo-stack-item + .logo-stack-item), .logo-stack-sm .logo-stack-more { margin-inline-start: -5px; }
+  .logo-stack-md :global(.logo-stack-item + .logo-stack-item), .logo-stack-md .logo-stack-more { margin-inline-start: -7px; }
   .logo-stack-more { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 6px; background: #2a2a2a; box-shadow: 0 0 0 2px var(--stack-ring, #141414); color: #e8e8e8; font-size: 10px; font-weight: 750; }
   .logo-stack-sm .logo-stack-more { min-width: 32px; height: 32px; border-radius: 8px; font-size: 11px; }
   .logo-stack-md .logo-stack-more { min-width: 40px; height: 40px; border-radius: 10px; font-size: 12px; }

@@ -1,0 +1,44 @@
+---
+import Doc from '../../layouts/Doc.astro';
+import CompareCard from '../CompareCard.astro';
+import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const p = strings(lang).comparePage;
+// PostDelegate against one other tool, then head-to-head pages built on CompareTool and
+// Alternatives; add each new page to the matching list, and its words to comparePage in every locale.
+const VERSUS = [
+  { href: '/compare/postiz', tools: ['PostDelegate', 'Postiz'] },
+  { href: '/compare/buffer', tools: ['PostDelegate', 'Buffer'] },
+  { href: '/compare/hootsuite', tools: ['PostDelegate', 'Hootsuite'] },
+  { href: '/compare/later', tools: ['PostDelegate', 'Later'] },
+  { href: '/compare/sprout-social', tools: ['PostDelegate', 'Sprout Social'] },
+  { href: '/compare/publer', tools: ['PostDelegate', 'Publer'] },
+  { href: '/compare/post-bridge', tools: ['PostDelegate', 'Post Bridge'], cta: p.postBridgeCta },
+].map((card, index) => ({ ...card, ...p.versus[index], href: localeHref(lang, card.href) }));
+const PAIRS = [
+  { href: '/compare/postiz-vs-buffer', tools: ['Postiz', 'Buffer'] },
+  { href: '/compare/postiz-vs-mixpost', tools: ['Postiz', 'Mixpost'] },
+  { href: '/compare/postiz-vs-post-bridge', tools: ['Postiz', 'Post Bridge'] },
+  { href: '/compare/postiz-vs-blotato', tools: ['Postiz', 'Blotato'] },
+  { href: '/compare/postiz-vs-zernio', tools: ['Postiz', 'Zernio'] },
+  { href: '/compare/publer-vs-buffer', tools: ['Publer', 'Buffer'] },
+  { href: '/compare/publer-vs-metricool', tools: ['Publer', 'Metricool'] },
+  { href: '/alternatives/postiz', tools: ['Postiz', 'PostDelegate'] },
+].map((card, index) => ({ ...card, ...p.pairs[index], href: localeHref(lang, card.href) }));
+---
+<Doc title={p.title} description={p.description} h1={p.h1} eyebrow={p.eyebrow} lead={p.lead} lang={lang}>
+  <div class="compare-grid">
+    {VERSUS.map((card) => <CompareCard {...card} as="h2" lang={lang} />)}
+  </div>
+  <h2>{p.pairsTitle}</h2>
+  <p>{p.pairsIntro}</p>
+  <div class="compare-grid">
+    {PAIRS.map((card) => <CompareCard {...card} lang={lang} />)}
+  </div>
+  <Fragment set:html={localizeLinks(lang, p.body)} />
+</Doc>
+<style>
+  .compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 28px 0 36px; }
+  @media (max-width: 600px) { .compare-grid { grid-template-columns: 1fr; } }
+</style>

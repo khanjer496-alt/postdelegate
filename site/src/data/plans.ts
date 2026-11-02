@@ -60,14 +60,19 @@ export const planFeatures = (plan: Plan) => [
 
 // The pricing card list: what each plan gets you, with an icon key for Pricing.astro.
 // Same facts as planFeatures, worded as results; channels have their own block on the card.
+// The words come from the page's language (src/i18n/locales, `perks`).
 export interface PlanPerk { icon: 'team' | 'solo' | 'posts' | 'agent' | 'webhook' | 'studio' | 'ai'; text: string; note?: string }
-export const planPerks = (plan: Plan): PlanPerk[] => [
+export interface PlanPerkStrings {
+  team: string; solo: string; soloNote: string; posts: string; agent: string; agentNote: string;
+  webhooks: (count: string) => string; webhooksNote: string; studio: string; studioNote: string; ai: string; aiNote: string;
+}
+export const planPerks = (plan: Plan, t: PlanPerkStrings, numberLocale = 'en-US'): PlanPerk[] => [
   plan.teamMembers
-    ? { icon: 'team', text: 'Invite your team members' }
-    : { icon: 'solo', text: 'Just you', note: 'No team seats on this plan' },
-  { icon: 'posts', text: 'No practical limit on posts' },
-  { icon: 'agent', text: 'Claude, ChatGPT and scripts', note: 'MCP server and public REST API' },
-  { icon: 'webhook', text: `${plan.webhooks.toLocaleString('en-US')} webhooks`, note: 'Tell your own tools when a post goes out' },
-  { icon: 'studio', text: 'Content Studio vertical videos', note: 'Fair use' },
-  { icon: 'ai', text: 'AI on your own OpenAI key', note: 'No AI markup, no credit cap' },
+    ? { icon: 'team', text: t.team }
+    : { icon: 'solo', text: t.solo, note: t.soloNote },
+  { icon: 'posts', text: t.posts },
+  { icon: 'agent', text: t.agent, note: t.agentNote },
+  { icon: 'webhook', text: t.webhooks(plan.webhooks.toLocaleString(numberLocale)), note: t.webhooksNote },
+  { icon: 'studio', text: t.studio, note: t.studioNote },
+  { icon: 'ai', text: t.ai, note: t.aiNote },
 ];

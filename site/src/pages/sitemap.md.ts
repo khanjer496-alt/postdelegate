@@ -5,7 +5,7 @@ import { GUIDES } from '../data/guides';
 import { SCHEDULERS } from '../data/schedulers';
 // Every public page as a Markdown list, for AI assistants and crawlers that read llms.txt.
 // Routes come from the page files themselves, so new pages appear here without a list to update.
-const files = Object.keys(import.meta.glob(['./**/*.astro', './**/*.md', '!./**/\\[*\\].astro', '!./404.astro']));
+const files = Object.keys(import.meta.glob(['./**/*.astro', './**/*.md', '!./**/\\[*\\].astro', '!./\\[lang\\]/**', '!./404.astro']));
 const route = (file: string) => file.replace(/^\./, '').replace(/\.(astro|md)$/, '').replace(/\/index$/, '') || '/';
 const titles = new Map<string, string>([
   ...DOC_SECTIONS.flatMap((section) => section.items).map((item) => [item.href, item.title] as [string, string]),
