@@ -542,8 +542,8 @@ const en = {
     aiQ: (name: string) => `Can Claude or ChatGPT post to ${name}?`,
     aiA: (name: string) => `Yes, through MCP. Add PostDelegate to Claude or ChatGPT as a custom connector, and the assistant can list your channels, read the rules for ${name} and create a draft or scheduled post for you. Ask for a draft first and check it in the calendar before anything is scheduled. AI is bring-your-own, and PostDelegate never charges for it. See the [Claude setup](/docs/mcp/claude) and the [ChatGPT setup](/docs/mcp/chatgpt).`,
   },
-  // Per live network, keyed by scheduler slug. English reads them from schedulers.ts.
-  schedulers: Object.fromEntries(SCHEDULERS.map((s) => [s.slug, { action: s.action ?? '', description: s.description ?? '', h1: s.h1, intro: s.intro, plan: s.plan, limits: s.limits }])) as Record<string, SchedulerStrings>,
+  // Per live network, keyed by scheduler slug. English pages read schedulers.ts directly.
+  schedulers: Object.fromEntries(SCHEDULERS.filter((s) => AVAILABLE_NETWORKS.some((n) => n.key === s.key)).map((s) => [s.slug, { action: s.action ?? '', description: s.description ?? '', h1: s.h1, intro: s.intro, plan: s.plan, limits: s.limits }])) as Record<string, SchedulerStrings>,
 };
 
 export type Dict = typeof en;

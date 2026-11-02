@@ -454,7 +454,7 @@ const dict: Dict = {
   },
   agentsPage: {
     title: 'Agenti IA e automazione — PostDelegate',
-    description: 'Collega il tuo assistente IA o il tuo software a PostDelegate tramite MCP e REST API. Gli agenti scrivono e programmano i post, e ogni post resta sotto la tua revisione.',
+    description: 'Collega il tuo assistente IA o il tuo software a PostDelegate tramite MCP e REST API. Gli agenti scrivono e programmano i post, sempre con la tua revisione.',
     eyebrow: 'Agenti IA e automazione',
     h1: 'Porta il tuo workflow. Tieni il tuo calendario.',
     lead: 'Usa l’assistente che hai già. PostDelegate offre un server MCP e una REST API, così i tuoi strumenti preparano i contenuti mentre l’ultima parola resta a te.',
@@ -470,7 +470,7 @@ const dict: Dict = {
   },
   mcpPage: {
     title: 'Server MCP — PostDelegate',
-    description: 'Collega il tuo assistente IA a PostDelegate tramite MCP per scrivere e programmare post. Guide di configurazione per Claude, ChatGPT, Claude Code, Cursor e altri client.',
+    description: 'Collega il tuo assistente IA a PostDelegate via MCP per scrivere e programmare post. Guide per Claude, ChatGPT, Claude Code, Cursor e altri client.',
     eyebrow: 'MCP',
     h1: 'La tua IA, collegata ai tuoi contenuti.',
     lead: 'MCP permette agli strumenti IA compatibili di lavorare con un workspace di pubblicazione. Usa il tuo assistente, accedi con PostDelegate e tieni ogni post sotto la tua revisione.',
@@ -783,7 +783,7 @@ const dict: Dict = {
     },
     'discord-scheduler': {
       action: 'Programma messaggi sul server',
-      description: 'Programma messaggi Discord in qualsiasi canale del tuo server, con Markdown, immagini, video e menzioni. Aggiungi il bot PostDelegate. Prova di 7 giorni, senza carta.',
+      description: 'Programma messaggi Discord in ogni canale del tuo server, con Markdown, immagini, video e menzioni tramite il bot PostDelegate. Prova di 7 giorni, senza carta.',
       h1: 'Programma messaggi Discord sul tuo server.',
       intro: 'Aggiungi il bot PostDelegate a un server Discord che gestisci, poi programma messaggi con Markdown, immagini e video nel canale che scegli.',
       plan: [

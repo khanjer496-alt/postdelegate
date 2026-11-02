@@ -423,3 +423,21 @@
 @media(prefers-reduced-motion:reduce){
  .hero-cta::after{display:none}
 }
+
+/* Right-to-left (Arabic) home page: text columns, cards and chips mirror; the orbit and Studio illustrations stay as drawn */
+[dir=rtl] .hero-copy{padding-left:0;padding-right:8px}
+[dir=rtl] .hero-mark .pd-arc,[dir=rtl] .ink-underline .pd-arc{left:.1em;right:0}
+[dir=rtl] .note-extra::before{margin-right:0;margin-left:10px}
+[dir=rtl] .orbit-card{text-align:right}
+[dir=rtl] .demo-address{margin-left:0;margin-right:19px}
+[dir=rtl] .demo-live{margin-left:0;margin-right:auto}
+[dir=rtl] .integration-copy{padding-left:0;padding-right:49px}
+[dir=rtl] .integration-symbol{left:auto;right:0}
+[dir=rtl] .chat-title small{margin-left:0;margin-right:auto}
+[dir=rtl] .channels-head .section-intro{margin-left:auto;margin-right:0}
+[dir=rtl] .channels-stat{text-align:left;justify-items:start}
+[dir=rtl] .compare-section .section-intro{margin-left:auto;margin-right:0;text-align:right}
+[dir=rtl] .support-bubble{right:auto;left:20px}
+[dir=rtl] .pd-arc i{right:auto;left:-.05em}
+@media(max-width:1023px){[dir=rtl] .hero-copy{padding-right:0}[dir=rtl] .channels-stat{justify-items:start;text-align:right}}
+@media(max-width:767px){[dir=rtl] .integration-copy{padding-right:38px}[dir=rtl] .support-bubble{left:13px}[dir=rtl] .demo-address{margin-right:8px}[dir=rtl] .chat-prompt{margin-left:0;margin-right:15%}}
