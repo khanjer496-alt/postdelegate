@@ -90,12 +90,13 @@ ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.titl
 - [Compare PostDelegate with other schedulers](${SITE.url}/compare)
 - [Changelog](${SITE.url}/changelog)
 - [Roadmap: networks in review](${SITE.url}/roadmap)
-- [Subprocessors](${SITE.url}/subprocessors)
 - [Every page (sitemap.md)](${SITE.url}/sitemap.md)
 - [Browser-based tools](${SITE.url}/tools)
 - [Support](${SITE.url}/support)
 - [Privacy](${SITE.legal.privacy})
 - [Terms](${SITE.legal.terms})
+- [Data Processing Addendum](${SITE.legal.dpa})
+- [Sub-processors](${SITE.legal.subprocessors})
 `;
   return new Response(body, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 };

@@ -2,6 +2,10 @@
 /privacy/ https://app.postdelegate.com/legal/privacy/ 301
 /terms https://app.postdelegate.com/legal/terms/ 301
 /terms/ https://app.postdelegate.com/legal/terms/ 301
+/dpa https://app.postdelegate.com/legal/dpa/ 301
+/dpa/ https://app.postdelegate.com/legal/dpa/ 301
+/subprocessors https://app.postdelegate.com/legal/subprocessors/ 301
+/subprocessors/ https://app.postdelegate.com/legal/subprocessors/ 301
 /data-deletion https://app.postdelegate.com/legal/data-deletion 302
 /data-deletion/ https://app.postdelegate.com/legal/data-deletion 302
 /postdelegate-workspace-preview.png /images/postdelegate-workspace.jpg 301
