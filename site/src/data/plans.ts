@@ -57,3 +57,17 @@ export const planFeatures = (plan: Plan) => [
   'Public API and MCP',
   `${plan.webhooks.toLocaleString('en-US')} webhooks`,
 ];
+
+// The pricing card list: what each plan gets you, with an icon key for Pricing.astro.
+// Same facts as planFeatures, worded as results; channels have their own block on the card.
+export interface PlanPerk { icon: 'team' | 'solo' | 'posts' | 'agent' | 'webhook' | 'studio' | 'ai'; text: string; note?: string }
+export const planPerks = (plan: Plan): PlanPerk[] => [
+  plan.teamMembers
+    ? { icon: 'team', text: 'Invite your team members' }
+    : { icon: 'solo', text: 'Just you', note: 'No team seats on this plan' },
+  { icon: 'posts', text: 'No practical limit on posts' },
+  { icon: 'agent', text: 'Claude, ChatGPT and scripts', note: 'MCP server and public REST API' },
+  { icon: 'webhook', text: `${plan.webhooks.toLocaleString('en-US')} webhooks`, note: 'Tell your own tools when a post goes out' },
+  { icon: 'studio', text: 'Content Studio vertical videos', note: 'Fair use' },
+  { icon: 'ai', text: 'AI on your own OpenAI key', note: 'No AI markup, no credit cap' },
+];

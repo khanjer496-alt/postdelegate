@@ -8,23 +8,28 @@ import { BUYER_FAQ } from '../data/faq';
 import { SITE, CTA_LABEL, CTA_NOTE } from '../data/site';
 import { PLANS, TRIAL_DAYS } from '../data/plans';
 import { AVAILABLE_NETWORKS } from '../data/networks';
-const rows: [string, (plan: typeof PLANS[number]) => string][] = [
+import LogoStack from '../components/LogoStack.astro';
+// true/false cells render as a check or a dash.
+const rows: [string, (plan: typeof PLANS[number]) => string | boolean][] = [
   ['Monthly price', (plan) => `$${plan.monthly}`],
   ['Yearly price', (plan) => `$${plan.yearly.toLocaleString('en-US')}`],
   ['Channels', (plan) => (plan.extraChannelMonthly ? `${plan.channels}, then $${plan.extraChannelMonthly}/month per extra channel, up to ${(plan.maxChannels || plan.channels).toLocaleString('en-US')}` : String(plan.channels))],
   ['Posts per month', () => 'No practical limit'],
-  ['Team members', (plan) => (plan.teamMembers ? 'Yes' : 'No')],
-  ['Public API and MCP', () => 'Yes'],
+  ['Team members', (plan) => plan.teamMembers],
+  ['Public API and MCP', () => true],
+  ['Content Studio (fair use)', () => true],
+  ['AI on your own OpenAI key', () => true],
   ['Webhooks', (plan) => plan.webhooks.toLocaleString('en-US')],
   ['Free trial', () => `${TRIAL_DAYS} days`],
 ];
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: BUYER_FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };
 ---
 <Base title="Plans and pricing — PostDelegate" description={`PostDelegate plans start at $${PLANS[0].monthly} a month, with channels, team members and webhooks compared by plan. Every plan has a ${TRIAL_DAYS}-day free trial, no credit card needed.`} jsonLd={[faqLd]}>
-  <PageHero eyebrow="Plans" title={`Pick a plan. Try it free for ${TRIAL_DAYS} days.`} lead="The plans differ in how many channels you connect, whether your team joins you and how many webhooks you run. Everything else comes with every plan.">
+  <PageHero eyebrow="Plans" title={`Plans from $${PLANS[0].monthly}. Try any of them free for ${TRIAL_DAYS} days.`} lead="Pay for channels, team seats and webhooks. The calendar, MCP server, REST API and Content Studio come with every plan.">
     <a href={SITE.signup} class="button">{CTA_LABEL}</a>
     <a href="/docs/billing" class="button button-outline">Read the billing guide</a>
     <p class="trial-note"><span aria-hidden="true"></span>{CTA_NOTE} · One trial per email</p>
+    <p class="hero-networks"><LogoStack networks={AVAILABLE_NETWORKS} max={8} size="sm" /><span>Publish to <b>{AVAILABLE_NETWORKS.length} live networks</b> on every plan</span></p>
   </PageHero>
   <section class="section"><div class="container"><Pricing heading={false} /></div></section>
   <section class="plan-compare"><div class="container">
@@ -32,7 +37,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
     <div class="compare-scroll">
       <table>
         <thead><tr><th scope="col"><span class="sr-only">Feature</span></th>{PLANS.map((plan) => <th scope="col">{plan.name}</th>)}</tr></thead>
-        <tbody>{rows.map(([label, value]) => <tr><th scope="row">{label}</th>{PLANS.map((plan) => <td>{value(plan)}</td>)}</tr>)}</tbody>
+        <tbody>{rows.map(([label, value]) => <tr><th scope="row">{label}</th>{PLANS.map((plan) => { const v = value(plan); return <td>{v === true ? <span class="cell-yes"><span aria-hidden="true">✓</span><span class="sr-only">Yes</span></span> : v === false ? <span class="cell-no"><span aria-hidden="true">–</span><span class="sr-only">No</span></span> : v}</td>; })}</tr>)}</tbody>
       </table>
     </div>
   </div></section>
@@ -56,6 +61,10 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 <style>
   .trial-note { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; color: #d6d6d6; font-size: 13px; font-weight: 600; }
   .trial-note span { width: 7px; height: 7px; border-radius: 50%; background: #c8ff4d; }
+  .hero-networks { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; margin-top: 18px; color: #b9b9b9; font-size: 14px; --stack-ring: #0d0d0d; }
+  .hero-networks b { color: #fff; }
+  .cell-yes { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #c8ff4d1f; color: #c8ff4d; font-weight: 800; }
+  .cell-no { color: #777; font-weight: 700; }
   .pricing-questions { padding: 0 0 80px; background: var(--bg, #0d0d0d); }
   h2 { text-align: center; font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -.04em; margin-bottom: 36px; }
   .question-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 50px; max-width: 880px; margin: auto; }
@@ -66,7 +75,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   .pricing-faq { padding: 0 0 90px; background: var(--bg, #0d0d0d); }
   .pricing-faq-list { max-width: 880px; margin: auto; }
   .plan-compare { padding: 0 0 100px; background: var(--bg, #0d0d0d); }
-  .compare-scroll { max-width: 880px; margin: auto; overflow-x: auto; border: 1px solid #303030; border-radius: 22px; background: #171717; }
+  .compare-scroll { position: relative; max-width: 880px; margin: auto; overflow-x: auto; border: 1px solid #303030; border-radius: 22px; background: #171717; }
   table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; }
   thead th { color: var(--text, #fff); font-size: 15px; font-weight: 750; }
   th, td { padding: 15px 18px; border-bottom: 1px solid #303030; text-align: left; }
