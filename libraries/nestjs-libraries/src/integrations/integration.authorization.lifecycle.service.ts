@@ -52,14 +52,12 @@ export class IntegrationAuthorizationLifecycleService {
         return this._repository.deleteChannel(organizationId, integrationId);
       }
       // A provider outside the managed lifecycle that can still revoke its
-      // grant: best effort, a failure never blocks the removal, and the stored
-      // tokens are deleted with the channel either way.
-      try {
-        await provider.revokeAuthorization(this.credentials(row));
-      } catch {
-        /**empty**/
-      }
-      return this._repository.deleteChannel(organizationId, integrationId, true);
+      // grant: the channel and its stored tokens are deleted first, then the
+      // grant is revoked with the credentials already in memory - best
+      // effort, it never blocks or delays the removal.
+      const deleted = await this._repository.deleteChannel(organizationId, integrationId, true);
+      provider.revokeAuthorization(this.credentials(row)).catch(() => undefined);
+      return deleted;
     }
     this.requireEnabled();
     if (!provider.revokeAuthorization) throw new HttpException('Provider data removal is unavailable. Please contact support.', HttpStatus.SERVICE_UNAVAILABLE);

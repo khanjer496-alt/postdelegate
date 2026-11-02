@@ -335,7 +335,7 @@ export class ApprovalsService {
     // the network's posting rules for the account, at the time it goes out
     await this._postsService.checkStoredPostingLimits(
       organizationId,
-      post.id,
+      post,
       publishDate
     );
 

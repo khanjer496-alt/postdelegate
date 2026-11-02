@@ -464,10 +464,17 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         data.armed = { ...data.armed, lookups: data.armed.lookups + 1 };
         return { status: 'pending', pendingData: data };
       } else {
-        // Armed but no accepted response was ever seen and the in-flight
-        // window has passed: conclude the submit never landed and let
-        // finalizePost run it again.
-        data.armed = undefined;
+        // Armed but no accepted response was ever seen, the in-flight window
+        // has passed and the listing doesn't show the post: the outcome is
+        // unknown. Fail closed instead of submitting again - a post held by
+        // the spam filter can be missing from the subreddit listing, and a
+        // second submit would duplicate it.
+        throw new BadBody(
+          this.identifier,
+          '{}',
+          Buffer.from('{}'),
+          `Couldn't confirm whether Reddit published this post. Check r/${data.armed.sr} before posting again.`
+        );
       }
     }
 

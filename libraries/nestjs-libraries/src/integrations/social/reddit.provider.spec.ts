@@ -359,3 +359,72 @@ describe('RedditProvider revokeAuthorization', () => {
     });
   });
 });
+
+describe('RedditProvider unconfirmed submit', () => {
+  const armedData = (armed: Record<string, unknown>) =>
+    ({
+      subreddits: [subreddit()],
+      message: 'Body',
+      cursor: 0,
+      results: [],
+      armed: {
+        sr: 'selfhosted',
+        title: 'My title',
+        armedAt: Date.now() - 60 * 1000,
+        media: false,
+        submitted: false,
+        lookups: 0,
+        ...armed,
+      },
+    }) as any;
+
+  const emptyListing = () => {
+    const provider = new RedditProvider();
+    provider.fetch = jest.fn(async () =>
+      answer({ data: { children: [] } })
+    ) as any;
+    return provider;
+  };
+
+  it('gives the listing one more look before deciding', async () => {
+    await expect(
+      emptyListing().checkPostStatus('at', armedData({}), integration)
+    ).resolves.toMatchObject({
+      status: 'pending',
+      pendingData: { armed: { lookups: 1 } },
+    });
+  });
+
+  it('fails the post instead of submitting again when Reddit never shows it', async () => {
+    const provider = emptyListing();
+    const check = provider.checkPostStatus(
+      'at',
+      armedData({ lookups: 1 }),
+      integration
+    );
+
+    await expect(check).rejects.toBeInstanceOf(BadBody);
+    await expect(check).rejects.toMatchObject({
+      message:
+        "Couldn't confirm whether Reddit published this post. Check r/selfhosted before posting again.",
+    });
+    // only the read-only listing, never /api/submit
+    expect(
+      (provider.fetch as jest.Mock).mock.calls.map(([url]) => url)
+    ).not.toContainEqual(expect.stringContaining('/api/submit'));
+  });
+
+  it('fails a media post the same way once its in-flight window is over', async () => {
+    await expect(
+      emptyListing().checkPostStatus(
+        'at',
+        armedData({
+          media: true,
+          armedAt: Date.now() - 11 * 60 * 1000,
+          lookups: 9,
+        }),
+        integration
+      )
+    ).rejects.toBeInstanceOf(BadBody);
+  });
+});

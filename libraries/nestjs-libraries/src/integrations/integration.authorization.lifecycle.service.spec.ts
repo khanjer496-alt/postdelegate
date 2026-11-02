@@ -144,7 +144,7 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete', () => {
     return { service, repository };
   };
 
-  it('revokes the grant, then deletes the channel and its tokens', async () => {
+  it('deletes the channel and its tokens first, then revokes the grant', async () => {
     const revokeAuthorization = jest.fn(async () => ({ status: 'revoked' }));
     const { service, repository } = make({ revokeAuthorization });
 
@@ -152,28 +152,47 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete', () => {
       id: 'int-1',
     });
 
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    // with the credentials read before the delete cleared them
     expect(revokeAuthorization).toHaveBeenCalledWith({
       accessToken: 'at',
       refreshToken: 'rt',
       internalId: 'u1',
       rootInternalId: null,
     });
-    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
-    expect(revokeAuthorization.mock.invocationCallOrder[0]).toBeLessThan(
-      repository.deleteChannel.mock.invocationCallOrder[0]
+    expect(repository.deleteChannel.mock.invocationCallOrder[0]).toBeLessThan(
+      revokeAuthorization.mock.invocationCallOrder[0]
     );
   });
 
-  it('never blocks the delete when the revocation fails', async () => {
-    const revokeAuthorization = jest.fn(async () => {
-      throw new Error('reddit down');
-    });
+  it('never blocks or delays the delete on the revocation', async () => {
+    let finish: () => void = () => undefined;
+    const revokeAuthorization = jest.fn(
+      () =>
+        new Promise((_, reject) => {
+          finish = () => reject(new Error('reddit down'));
+        })
+    );
     const { service, repository } = make({ revokeAuthorization });
 
+    // resolves while the revocation is still in flight
     await expect(service.requestDeletion('org-1', 'int-1')).resolves.toEqual({
       id: 'int-1',
     });
     expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+  });
+
+  it('never revokes when the delete itself fails, the channel stays usable', async () => {
+    const revokeAuthorization = jest.fn(async () => ({ status: 'revoked' }));
+    const { service, repository } = make({ revokeAuthorization });
+    repository.deleteChannel.mockRejectedValueOnce(new Error('db down'));
+
+    await expect(service.requestDeletion('org-1', 'int-1')).rejects.toThrow(
+      'db down'
+    );
+    expect(revokeAuthorization).not.toHaveBeenCalled();
   });
 
   it('keeps the plain delete for providers that cannot revoke', async () => {

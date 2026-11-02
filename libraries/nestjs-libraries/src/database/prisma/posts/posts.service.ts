@@ -1844,28 +1844,60 @@ export class PostsService {
     },
     posts: { id: string }[]
   ): Promise<string | null> {
+    // 30 seconds of slack: a post saved exactly 10 minutes after the last
+    // one (accepted when saved) still goes out when the worker picks it up a
+    // few seconds early or the clocks drift
     return this.postingLimitsProblemAt(
       integration,
-      new Date(),
+      new Date(Date.now() + 30 * 1000),
       false,
       posts.map((post) => post.id)
     );
   }
 
   // The same check for a stored post that is queued again (a draft
-  // scheduled, a post rescheduled or approved), at its new date when it moves
+  // scheduled, a post rescheduled or approved), at its new date when it moves.
+  // Takes the post the caller already loaded: nothing is read for a network
+  // without posting rules
   async checkStoredPostingLimits(
     orgId: string,
-    postId: string,
+    post: {
+      id: string;
+      parentPostId?: string | null;
+      publishDate: Date;
+      integration?: {
+        id: string;
+        providerIdentifier: string;
+        internalId?: string;
+      } | null;
+    },
     date?: string | Date
   ) {
-    const post = await this._postRepository.getPostById(postId, orgId);
-    if (!post?.integration || post.parentPostId) {
+    if (
+      !post.integration ||
+      post.parentPostId ||
+      !this._integrationManager.getSocialIntegration(
+        post.integration.providerIdentifier
+      )?.postingLimits
+    ) {
+      return;
+    }
+
+    const integration = post.integration.internalId
+      ? post.integration
+      : await this._integrationService.getIntegrationById(
+          orgId,
+          post.integration.id
+        );
+    if (!integration?.internalId) {
       return;
     }
 
     const problem = await this.postingLimitsProblemAt(
-      post.integration,
+      {
+        providerIdentifier: integration.providerIdentifier,
+        internalId: integration.internalId,
+      },
       this.publishAt('schedule', date || post.publishDate),
       true,
       [post.id]
@@ -2185,7 +2217,7 @@ export class PostsService {
     // for review is scheduled once approved, the check can't wait)
     if (status === 'schedule' && getPostById.state !== 'QUEUE') {
       await this.checkStoredPostLimit(orgId, id);
-      await this.checkStoredPostingLimits(orgId, id);
+      await this.checkStoredPostingLimits(orgId, getPostById);
     }
 
     if (status === 'schedule' && actor?.type === 'agent') {
@@ -2355,7 +2387,7 @@ export class PostsService {
       getPostById.state !== 'DRAFT' &&
       (action === 'schedule' || getPostById.state === 'QUEUE');
     if (queued) {
-      await this.checkStoredPostingLimits(orgId, id, date);
+      await this.checkStoredPostingLimits(orgId, getPostById, date);
     }
     if (
       queued &&

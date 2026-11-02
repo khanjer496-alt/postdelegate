@@ -1295,15 +1295,23 @@ describe('PostsService posting limits', () => {
       expect(
         await service.postingLimitProblem(account, [{ id: 'p-1' }])
       ).toBeNull();
-      // the account's published posts only, around now, not this post
+      // the account's published posts only, around now (with 30 seconds of
+      // slack), not this post
       expect(postRepository.getAccountPostingDates).toHaveBeenCalledWith(
         'reddit',
         'u1',
-        minutes(-24 * 60),
-        minutes(24 * 60),
+        minutes(-24 * 60 + 0.5),
+        minutes(24 * 60 + 0.5),
         false,
         ['p-1']
       );
+    });
+
+    it('lets a post go out a few seconds before its 10 minutes are up', async () => {
+      const { service } = make([minutes(-9.75)]);
+      expect(
+        await service.postingLimitProblem(account, [{ id: 'p-1' }])
+      ).toBeNull();
     });
 
     it('refuses a post less than 10 minutes after the last one', async () => {
@@ -1417,20 +1425,59 @@ describe('PostsService posting limits', () => {
       ).toEqual(['p-1']);
     });
 
+    const stored = (integration: any = { id: 'i-r', ...account }) => ({
+      id: 'p-1',
+      parentPostId: null,
+      publishDate: minutes(60),
+      integration,
+    });
+
     it('checks a stored post moved next to another one of the account', async () => {
-      const { service, postRepository } = make([minutes(122)]);
+      const { service, postRepository, integrationService } = make([
+        minutes(122),
+      ]);
       await expect(
-        service.checkStoredPostingLimits('org-1', 'p-1', minutes(120))
+        service.checkStoredPostingLimits('org-1', stored(), minutes(120))
       ).rejects.toMatchObject({
         message: expect.stringContaining('Next allowed at 2026-11-02 14:12 UTC.'),
       });
       expect(postRepository.getAccountPostingDates.mock.calls[0][5]).toEqual([
         'p-1',
       ]);
+      // the loaded post had the account, nothing else is read
+      expect(integrationService.getIntegrationById).not.toHaveBeenCalled();
       // at its stored date when it does not move
       await expect(
-        service.checkStoredPostingLimits('org-1', 'p-1')
+        service.checkStoredPostingLimits('org-1', stored())
       ).resolves.toBeUndefined();
+    });
+
+    it('reads the account only for a network with posting rules', async () => {
+      const { service, postRepository, integrationService } = make([
+        minutes(62),
+      ]);
+      // an approval's post carries the provider but not the account
+      await expect(
+        service.checkStoredPostingLimits(
+          'org-1',
+          stored({ id: 'i-r', providerIdentifier: 'reddit' })
+        )
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('Reddit allows 5 posts a day'),
+      });
+      expect(integrationService.getIntegrationById).toHaveBeenCalledWith(
+        'org-1',
+        'i-r'
+      );
+
+      integrationService.getIntegrationById.mockClear();
+      postRepository.getAccountPostingDates.mockClear();
+      await service.checkStoredPostingLimits(
+        'org-1',
+        stored({ id: 'i-x', providerIdentifier: 'x' })
+      );
+      expect(integrationService.getIntegrationById).not.toHaveBeenCalled();
+      expect(postRepository.getAccountPostingDates).not.toHaveBeenCalled();
     });
 
     it('skips drafts and updates of posts that already went out', async () => {
