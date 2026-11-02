@@ -85,7 +85,8 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     'https://www.googleapis.com/auth/youtube.readonly',
     // Covers new video uploads and optional custom thumbnails.
     'https://www.googleapis.com/auth/youtube.upload',
-    'https://www.googleapis.com/auth/yt-analytics.readonly',
+    // Only youtube.readonly and youtube.upload are Google-verified (2 Nov 2026).
+    // Adding a sensitive scope here needs a new verification request first.
   ];
 
   editor = 'normal' as const;

@@ -4,16 +4,17 @@ Verified against the implemented provider operations and primary provider docume
 
 ## YouTube
 
+Google approved OAuth verification for `youtube.readonly` and `youtube.upload` on 2 November 2026 (project `postdelegate`). Any new sensitive scope, or any change to the consent screen, needs a new verification request before release.
+
 The social-channel connection uses these scopes. Basic Google sign-in is a separate flow and continues to request profile and email only; neither its provider nor the tested `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` configuration is changed here.
 
 | Scope | Implemented operation | Review evidence to record |
 | --- | --- | --- |
 | `userinfo.profile`, `userinfo.email` | `oauth2.userinfo.get` identifies the connected Google account. | Consent and the resulting connected identity. |
 | `youtube.upload` | Resumable `videos.insert` uploads a new video with its title, description, tags, audience and visibility; `thumbnails.set` sets an optional custom thumbnail. | Compose and upload an original test video, then show it in the selected channel. Show a custom thumbnail if that feature is included in the review. |
-| `youtube.readonly` | `channels.list` selects and verifies the channel; `videos.list` reads post statistics. Google also explicitly requires this scope for `reports.query`. | Channel selection and the post statistics view. |
-| `yt-analytics.readonly` | `reports.query` reads daily channel engagement and viewing reports. | The channel analytics view, including an honest empty state when the test channel has no reportable data. |
+| `youtube.readonly` | `channels.list` selects and verifies the channel; `videos.list` reads post statistics. `reports.query` accepts this scope, so channel analytics need no separate `yt-analytics.readonly` grant. | Channel selection and the post statistics view. |
 
-Removed permissions: broad `youtube`, content-partner `youtubepartner`, and `youtube.force-ssl`. Upload and thumbnail operations accept `youtube.upload`; channel/video reads use `youtube.readonly`; this provider contains no comment insertion or reply operation that would need `youtube.force-ssl`. It does not manage YouTube CMS content owners or Analytics groups.
+Removed permissions: `yt-analytics.readonly` (not verified; `youtube.readonly` covers `reports.query`), broad `youtube`, content-partner `youtubepartner`, and `youtube.force-ssl`. Upload and thumbnail operations accept `youtube.upload`; channel/video reads use `youtube.readonly`; this provider contains no comment insertion or reply operation that would need `youtube.force-ssl`. It does not manage YouTube CMS content owners or Analytics groups.
 
 Changing the requested scope list does not revoke permissions on an older token. Use a fresh grant for review evidence, and reconnect any channel that was previously authorized with broader permissions when reducing its existing access.
 
