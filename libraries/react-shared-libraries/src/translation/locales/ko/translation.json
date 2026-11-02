@@ -2322,5 +2322,10 @@
   "cookies_save": "선택 저장",
   "cookies_reject": "필수 외 거부",
   "cookies_customize": "맞춤 설정",
-  "cookies_accept": "모두 허용"
+  "cookies_accept": "모두 허용",
+  "pinterest_no_boards": "이 Pinterest 계정에는 아직 보드가 없습니다. 게시하려면 보드를 만드세요.",
+  "pinterest_board_name": "보드 이름",
+  "pinterest_create_board": "보드 만들기",
+  "pinterest_create_board_failed": "Pinterest에서 보드를 만들지 못했습니다. 다시 시도해 주세요.",
+  "pinterest_boards_failed": "Pinterest에서 이 계정의 보드를 불러오지 못했습니다. 나중에 다시 시도해 주세요."
 }

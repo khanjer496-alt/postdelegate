@@ -2322,5 +2322,10 @@
   "cookies_save": "حفظ الاختيارات",
   "cookies_reject": "رفض غير الضرورية",
   "cookies_customize": "تخصيص",
-  "cookies_accept": "قبول الكل"
+  "cookies_accept": "قبول الكل",
+  "pinterest_no_boards": "لا توجد لوحات في حساب Pinterest هذا بعد. أنشئ لوحة للنشر عليها.",
+  "pinterest_board_name": "اسم اللوحة",
+  "pinterest_create_board": "إنشاء لوحة",
+  "pinterest_create_board_failed": "تعذر على Pinterest إنشاء اللوحة. يرجى المحاولة مرة أخرى.",
+  "pinterest_boards_failed": "تعذر على Pinterest تحميل لوحات هذا الحساب. يرجى المحاولة لاحقًا."
 }

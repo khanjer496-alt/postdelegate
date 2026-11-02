@@ -2322,5 +2322,10 @@
   "cookies_save": "Auswahl speichern",
   "cookies_reject": "Nicht notwendige ablehnen",
   "cookies_customize": "Anpassen",
-  "cookies_accept": "Alle akzeptieren"
+  "cookies_accept": "Alle akzeptieren",
+  "pinterest_no_boards": "Dieses Pinterest-Konto hat noch keine Pinnwände. Erstelle eine, um darauf zu posten.",
+  "pinterest_board_name": "Name der Pinnwand",
+  "pinterest_create_board": "Pinnwand erstellen",
+  "pinterest_create_board_failed": "Pinterest konnte die Pinnwand nicht erstellen. Bitte versuche es erneut.",
+  "pinterest_boards_failed": "Pinterest konnte die Pinnwände dieses Kontos nicht laden. Bitte versuche es später erneut."
 }

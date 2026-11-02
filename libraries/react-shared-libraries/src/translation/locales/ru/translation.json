@@ -2322,5 +2322,10 @@
   "cookies_save": "Сохранить выбор",
   "cookies_reject": "Отклонить необязательные",
   "cookies_customize": "Настроить",
-  "cookies_accept": "Принять все"
+  "cookies_accept": "Принять все",
+  "pinterest_no_boards": "В этом аккаунте Pinterest пока нет досок. Создайте доску, чтобы публиковать в неё.",
+  "pinterest_board_name": "Название доски",
+  "pinterest_create_board": "Создать доску",
+  "pinterest_create_board_failed": "Pinterest не удалось создать доску. Попробуйте ещё раз.",
+  "pinterest_boards_failed": "Pinterest не удалось загрузить доски этого аккаунта. Попробуйте позже."
 }
