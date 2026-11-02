@@ -16,7 +16,7 @@ export const RenderPreviewDate: FC<{ date: string }> = ({ date }) => {
     <>
       {day.format('MMMM D, YYYY h:mm A')}{' '}
       <span className="text-textItemBlur">
-        ({timezone}, {timezoneOffset(timezone, day.valueOf())})
+        {timezone} ({timezoneOffset(timezone, day.valueOf())})
       </span>
     </>
   );

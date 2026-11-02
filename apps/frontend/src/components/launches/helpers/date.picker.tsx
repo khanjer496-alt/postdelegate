@@ -44,7 +44,8 @@ export const TimezoneHint: FC<{
   return (
     <div
       className={clsx(
-        'text-[12px] text-newTextColor/60 flex flex-col gap-[2px]',
+        // the date button around the popover is bold and doesn't wrap
+        'text-[12px] font-[400] whitespace-normal text-start text-newTextColor/60 flex flex-col gap-[2px]',
         className
       )}
     >
@@ -63,7 +64,7 @@ export const TimezoneHint: FC<{
         <Link
           href="/settings?tab=global_settings"
           {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-          className="underline cursor-pointer hover:text-textItemFocused"
+          className="underline hover:text-textItemFocused"
         >
           {t('change_timezone', 'Change')}
           {newTab && (
