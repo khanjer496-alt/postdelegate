@@ -111,3 +111,90 @@ describe('IntegrationAuthorizationLifecycleService.closeWorkflows', () => {
     expect(terminated).toHaveLength(120);
   });
 });
+
+// Providers without an authorizationPolicy that can revoke their grant (Reddit):
+// revoked best effort when the channel is deleted, tokens deleted with it
+describe('IntegrationAuthorizationLifecycleService revoke on delete', () => {
+  const row = {
+    id: 'int-1',
+    organizationId: 'org-1',
+    providerIdentifier: 'reddit',
+    token: 'at',
+    refreshToken: 'rt',
+    internalId: 'u1',
+    rootInternalId: null,
+  };
+
+  const make = (provider: any, rows: any[] = [row]) => {
+    const repository = {
+      getIntegrationForCleanup: jest.fn(async (_org: string, id: string) =>
+        rows.find((r) => r.id === id)
+      ),
+      getAuthorizationIntegrationsForOrganization: jest.fn(async () =>
+        rows.map(({ id, providerIdentifier }) => ({ id, providerIdentifier }))
+      ),
+      deleteChannel: jest.fn(async (_org: string, id: string) => ({ id })),
+    };
+    const manager = { getSocialIntegration: () => provider };
+    const service = new IntegrationAuthorizationLifecycleService(
+      repository as any,
+      manager as any,
+      {} as any
+    );
+    return { service, repository };
+  };
+
+  it('revokes the grant, then deletes the channel and its tokens', async () => {
+    const revokeAuthorization = jest.fn(async () => ({ status: 'revoked' }));
+    const { service, repository } = make({ revokeAuthorization });
+
+    await expect(service.requestDeletion('org-1', 'int-1')).resolves.toEqual({
+      id: 'int-1',
+    });
+
+    expect(revokeAuthorization).toHaveBeenCalledWith({
+      accessToken: 'at',
+      refreshToken: 'rt',
+      internalId: 'u1',
+      rootInternalId: null,
+    });
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    expect(revokeAuthorization.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.deleteChannel.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('never blocks the delete when the revocation fails', async () => {
+    const revokeAuthorization = jest.fn(async () => {
+      throw new Error('reddit down');
+    });
+    const { service, repository } = make({ revokeAuthorization });
+
+    await expect(service.requestDeletion('org-1', 'int-1')).resolves.toEqual({
+      id: 'int-1',
+    });
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+  });
+
+  it('keeps the plain delete for providers that cannot revoke', async () => {
+    const { service, repository } = make({});
+
+    await service.requestDeletion('org-1', 'int-1');
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1');
+  });
+
+  it('revokes before an account deletion erases the channels, without taking them over', async () => {
+    const revokeAuthorization = jest.fn(async () => ({ status: 'revoked' }));
+    const { service, repository } = make({ revokeAuthorization }, [
+      row,
+      // deleted earlier, its tokens are already gone
+      { ...row, id: 'int-2', token: '', refreshToken: null },
+    ]);
+
+    await expect(service.requestOrganizationDeletion('org-1')).resolves.toEqual(
+      []
+    );
+    expect(revokeAuthorization).toHaveBeenCalledTimes(1);
+    expect(repository.deleteChannel).not.toHaveBeenCalled();
+  });
+});

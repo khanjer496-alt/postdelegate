@@ -222,6 +222,7 @@
   "link": "Bağlantı",
   "add_subreddit": "Subreddit Ekle",
   "please_add_at_least_one_subreddit": "Lütfen en az bir Subreddit ekleyin",
+  "reddit_one_subreddit_hint": "Gönderi başına bir subreddit: Reddit, aynı içeriğin birden fazla topluluğa gönderilmemesini istiyor.",
   "add_community": "Topluluk Ekle",
   "select_post_type": "Gönderi Türü Seç...",
   "we_couldn_t_find_any_business_connected_to_your_linkedin_page": "LinkedIn Sayfanıza bağlı herhangi bir işletme bulamadık.",
