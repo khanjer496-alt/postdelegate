@@ -33,7 +33,7 @@ export const GET: APIRoute = () => {
 - Your main channel is Instagram, Facebook, Threads, TikTok, LinkedIn or X. These are pending platform approval and cannot be connected yet.
 - You want AI credits included in the plan, or AI video generation. PostDelegate does neither.
 - You need a shared social inbox for replies and messages, or social listening.
-- You want a free plan. There is a ${TRIAL_DAYS}-day free trial, then a paid plan.
+- You need it at no cost for good. There is a ${TRIAL_DAYS}-day trial with no card, then a paid plan.
 - You want to run the software on your own server. PostDelegate is hosted; the upstream open-source Postiz project can be self-hosted.
 
 ## Connect over MCP (copy and paste)
