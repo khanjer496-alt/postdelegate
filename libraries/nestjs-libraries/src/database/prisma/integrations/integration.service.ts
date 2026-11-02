@@ -431,7 +431,17 @@ export class IntegrationService {
   async refreshTokens() {
     const integrations = await this._integrationRepository.needsToBeRefreshed();
     for (const integration of integrations) {
-      await this._refreshIntegrationService.refresh(integration);
+      // a failed refresh returns false and the loop moves on; one that throws
+      // (e.g. reConnect after a successful refresh) must not leave every later
+      // channel unrefreshed either
+      await this._refreshIntegrationService
+        .refresh(integration)
+        .catch(() => {
+          // no error details, they can carry provider token payloads
+          console.error(
+            `Could not refresh ${integration.providerIdentifier} integration ${integration.id}`
+          );
+        });
     }
   }
 
