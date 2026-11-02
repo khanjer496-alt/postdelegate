@@ -91,15 +91,22 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`external:${body.state}`);
     }
 
-    const refresh = await ioRedis.get(`refresh:${body.state}`);
-    if (refresh) {
-      await ioRedis.del(`refresh:${body.state}`);
-    }
+    // deleted with the login state once the channel is saved, so a retried
+    // custom-field reconnect still knows which channel it refreshes
+    let refresh = await ioRedis.get(`refresh:${body.state}`);
 
     const onboarding = await ioRedis.get(`onboarding:${body.state}`);
     if (onboarding) {
       await ioRedis.del(`onboarding:${body.state}`);
     }
+
+    // the state could come from another provider's connect link, so the
+    // provider this callback saves is checked again here
+    await this._integrationService.checkProviderAvailable(
+      org.id,
+      integration,
+      refresh || undefined
+    );
 
     const {
       error,
@@ -197,6 +204,21 @@ export class NoAuthIntegrationsController {
 
     if (!id) {
       throw new NotEnoughScopes('Invalid API key');
+    }
+
+    // Custom-field providers build the account id from what the person typed
+    // (the site URL for WordPress and Listmonk), so "Update credentials" with
+    // the same site written differently comes back with another id. Nothing
+    // migrates into this provider, so it can't be a migration: save it as a
+    // fresh connect like before, still behind the hidden-provider check.
+    if (
+      refresh &&
+      integrationProvider.customFields &&
+      String(id) !== String(refresh) &&
+      !this._integrationManager.getMigrationSources(integration).length
+    ) {
+      await this._integrationService.checkProviderAvailable(org.id, integration);
+      refresh = null;
     }
 
     let validName = name;
@@ -335,6 +357,7 @@ export class NoAuthIntegrationsController {
     }
 
     await ioRedis.del(`login:${body.state}`);
+    await ioRedis.del(`refresh:${body.state}`);
 
     const webhookUrl = await ioRedis.get(`webhookUrl:${body.state}`);
     if (webhookUrl) {
