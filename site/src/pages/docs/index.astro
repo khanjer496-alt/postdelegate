@@ -1,9 +1,10 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
-import { DOC_SECTIONS } from '../../data/docs';
+import { DOC_SECTIONS, DOCS_HOME_META } from '../../data/docs';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { SITE } from '../../data/site';
-const frontmatter = { title: 'PostDelegate documentation', description: 'PostDelegate docs: schedule posts, connect channels, use the REST API and MCP, connect your own AI assistant, and manage billing, team members and data.' };
+// The Markdown version of this page (/docs.md) is written out in src/data/docs-markdown.ts; keep it in step.
+const frontmatter = DOCS_HOME_META;
 ---
 <DocsLayout frontmatter={frontmatter}>
   <div class="docs-home">

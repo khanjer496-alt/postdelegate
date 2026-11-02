@@ -37,3 +37,17 @@
   Cache-Control: public, max-age=3600
 /website-source.tar.gz
   Cache-Control: no-cache
+/docs
+  Vary: Accept
+/docs/*
+  Vary: Accept
+/docs.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+  Link: <https://postdelegate.com/docs>; rel="canonical"
+/docs/*.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+  Link: <https://postdelegate.com/docs/:splat>; rel="canonical"
