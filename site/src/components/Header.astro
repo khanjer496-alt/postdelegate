@@ -100,7 +100,7 @@ const current = LANGUAGES[lang];
   :is(a,summary,button):focus-visible{outline:2px solid var(--accent,#7357ff);outline-offset:5px;border-radius:8px}
   /* the language switcher and longer translated labels need room: compact from 1240px, menu button from 1120px */
   @media(min-width:1241px){:global(html:not([lang=en])) .desktop-nav{gap:22px;margin-inline-start:26px}}
-  @media(max-width:1240px){.header-inner{gap:18px}.desktop-nav{gap:15px;margin-left:0}.desktop-actions{gap:15px;margin-left:0}.create-account{padding-inline:16px}}
+  @media(max-width:1240px){.header-inner{gap:18px}.desktop-nav{gap:15px;margin-inline-start:0}.desktop-actions{gap:15px;margin-inline-start:0}.create-account{padding-inline:16px}}
   @media(max-width:1120px){.header-inner{width:calc(100% - 40px);height:72px}.desktop-nav,.desktop-actions{display:none}.mobile-menu{display:block}}
   @media(max-width:1120px){.header-inner{gap:10px}.mobile-cta{display:inline-flex}}
   @media(max-width:420px){.menu-label{display:none}.mobile-toggle{padding:0 11px}.mobile-cta{padding:0 13px;font-size:12px}}

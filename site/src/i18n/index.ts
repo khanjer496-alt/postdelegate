@@ -3,8 +3,7 @@
 // with the strings in ./locales. Every other page (docs, guides, legal, tools, the
 // individual compare pages) stays English, and links to it from a translated page go
 // to the English page.
-import { AVAILABLE_NETWORKS } from '../data/networks';
-import { SCHEDULERS } from '../data/schedulers';
+import { LIVE_SCHEDULERS } from '../data/schedulers';
 import en, { type Dict } from './locales/en';
 import es from './locales/es';
 import pt from './locales/pt';
@@ -33,7 +32,7 @@ const DICTS: Record<Lang, Dict> = { en, es, pt, de, fr, ar, it };
 export const strings = (lang: Lang): Dict => DICTS[lang];
 
 // Live network pages only: pages for networks that are not live stay English.
-export const TRANSLATED_SCHEDULERS = SCHEDULERS.filter((s) => AVAILABLE_NETWORKS.some((n) => n.key === s.key));
+export const TRANSLATED_SCHEDULERS = LIVE_SCHEDULERS;
 
 // English paths of the pages that exist in every language.
 export const TRANSLATED_PATHS = new Set([

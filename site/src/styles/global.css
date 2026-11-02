@@ -30,5 +30,7 @@ html[lang=ar] body{font-family:'Plus Jakarta Sans','Noto Sans Arabic',ui-sans-se
 html[lang=ar] *{letter-spacing:normal!important}
 html:not([lang=en]) :is(h1,h2,h3){overflow-wrap:break-word}
 /* Right-to-left: arrows at the end of a link point the reading way */
-[dir=rtl] a>span[aria-hidden=true]:last-child:not(.flag){display:inline-block;transform:scaleX(-1)}
+:where([dir=rtl] a>span[aria-hidden=true]:last-child:not(.flag)){display:inline-block}
+[dir=rtl] a>span[aria-hidden=true]:last-child:not(.flag,.cta-orb){scale:-1 1}
+[dir=rtl] .cta-orb svg{scale:-1 1}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}

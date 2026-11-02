@@ -9,7 +9,7 @@ interface Props { lang?: Lang }
 const { lang = 'en' } = Astro.props;
 const t = strings(lang).testimonials;
 interface Testimonial { displayName: string; roleCompany?: string | null; rating: number; text: string; date?: string }
-const items = (Array.isArray(data) ? (data as Testimonial[]) : []).filter((t) => t && typeof t.displayName === 'string' && t.displayName.trim() && typeof t.text === 'string' && t.text.trim() && Number.isInteger(t.rating) && t.rating >= 1 && t.rating <= 5).slice(0, 6);
+const items = (Array.isArray(data) ? (data as Testimonial[]) : []).filter((item) => item && typeof item.displayName === 'string' && item.displayName.trim() && typeof item.text === 'string' && item.text.trim() && Number.isInteger(item.rating) && item.rating >= 1 && item.rating <= 5).slice(0, 6);
 ---
 {items.length > 0 && (
   <section class="testimonials-section section" aria-labelledby="testimonials-title">

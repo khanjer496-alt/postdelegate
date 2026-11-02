@@ -11,7 +11,7 @@ import { SITE, CTA_LABEL, CTA_SHORT, CTA_NOTE } from '../../data/site';
 import { FAQ, BUYER_FAQ } from '../../data/faq';
 import { PLANS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
-import { SCHEDULERS } from '../../data/schedulers';
+import { LIVE_SCHEDULERS } from '../../data/schedulers';
 
 type QA = { q: string; a: string };
 type Card = { title: string; text: string };
@@ -543,7 +543,7 @@ const en = {
     aiA: (name: string) => `Yes, through MCP. Add PostDelegate to Claude or ChatGPT as a custom connector, and the assistant can list your channels, read the rules for ${name} and create a draft or scheduled post for you. Ask for a draft first and check it in the calendar before anything is scheduled. AI is bring-your-own, and PostDelegate never charges for it. See the [Claude setup](/docs/mcp/claude) and the [ChatGPT setup](/docs/mcp/chatgpt).`,
   },
   // Per live network, keyed by scheduler slug. English pages read schedulers.ts directly.
-  schedulers: Object.fromEntries(SCHEDULERS.filter((s) => AVAILABLE_NETWORKS.some((n) => n.key === s.key)).map((s) => [s.slug, { action: s.action ?? '', description: s.description ?? '', h1: s.h1, intro: s.intro, plan: s.plan, limits: s.limits }])) as Record<string, SchedulerStrings>,
+  schedulers: Object.fromEntries(LIVE_SCHEDULERS.map((s) => [s.slug, { action: s.action ?? '', description: s.description ?? '', h1: s.h1, intro: s.intro, plan: s.plan, limits: s.limits }])) as Record<string, SchedulerStrings>,
 };
 
 export type Dict = typeof en;

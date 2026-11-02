@@ -3,9 +3,9 @@ import { SITE } from '../data/site';
 import { TRIAL_DAYS } from '../data/plans';
 import { strings, type Lang } from '../i18n';
 interface Props { eyebrow?: string; title?: string; text?: string; lang?: Lang }
-const { lang = 'en' } = Astro.props;
+const { lang = 'en', ...props } = Astro.props;
 const t = strings(lang);
-const { eyebrow = t.ctaBand.eyebrow(TRIAL_DAYS), title = t.ctaBand.title, text = t.ctaBand.text } = Astro.props;
+const { eyebrow = t.ctaBand.eyebrow(TRIAL_DAYS), title = t.ctaBand.title, text = t.ctaBand.text } = props;
 ---
 <section class="cta-section">
   <div class="cta-panel">

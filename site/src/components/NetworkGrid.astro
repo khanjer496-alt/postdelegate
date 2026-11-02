@@ -23,7 +23,7 @@ const pending = NOT_LIVE_KEYS
   {live.map((n) => (
     <li><a class="ng-card" href={href(n)}>
       <NetworkBadge n={n} size="md" />
-      <span class="ng-copy"><Heading class="ng-name">{n.name}<span class="sr-only">{g.scheduler}</span></Heading>{t.networkBlurbs[n.key] && <span class="ng-blurb">{t.networkBlurbs[n.key]}</span>}</span>
+      <span class="ng-copy"><Heading class="ng-name">{n.name}<span class="sr-only">{g.scheduler}</span></Heading>{(t.networkBlurbs[n.key] ?? n.blurb) && <span class="ng-blurb">{t.networkBlurbs[n.key] ?? n.blurb}</span>}</span>
       <span class="ng-arrow" aria-hidden="true">↗</span>
     </a></li>
   ))}
