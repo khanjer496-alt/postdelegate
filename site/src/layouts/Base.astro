@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import ReferralConsent from '../components/ReferralConsent.astro';
 import { SITE, SOCIAL_PROFILES } from '../data/site';
 interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string }
 const { title, description, ogImage = '/og.png', jsonLd = [], noindex = false, type = 'website' } = Astro.props;
@@ -42,26 +43,13 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <meta name="twitter:image" content={og} />
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable product facts" />
     {[org, website, ...jsonLd].map((value) => <script type="application/ld+json" set:html={safeJson(value)} />)}
-    <script is:inline>
-      // Affiliate links point here (postdelegate.com/?ref=CODE); sign-up happens on
-      // app.postdelegate.com. Hand the code over in the same first-touch pd_ref
-      // cookie the app writes ("<code>.<ms>", 60 days), shared across *.postdelegate.com.
-      (function () {
-        try {
-          var code = (new URLSearchParams(location.search).get('ref') || '').toLowerCase();
-          if (!/^[a-z0-9][a-z0-9-]{2,23}$/.test(code)) return;
-          if (/(?:^|; )pd_ref=/.test(document.cookie)) return;
-          var domain = /(^|\.)postdelegate\.com$/.test(location.hostname) ? '; domain=.postdelegate.com' : '';
-          document.cookie = 'pd_ref=' + code + '.' + Date.now() + '; max-age=' + 60 * 86400 + '; path=/; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '') + domain;
-        } catch (e) {}
-      })();
-    </script>
   </head>
   <body>
     {/* Cloudflare's email obfuscation would swap support@ and every other address
     for a link that only works with JavaScript; email_off keeps them plain */}
     <!--email_off-->
     <a href="#main" class="skip-link">Skip to content</a>
+    <ReferralConsent />
     <Header />
     <main id="main"><slot /></main>
     <Footer />

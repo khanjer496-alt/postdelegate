@@ -1,6 +1,7 @@
 import {
   IsDefined,
   IsEmail,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -37,4 +38,11 @@ export class CreateOrgUserDto {
   company: string;
 
   datafast_visitor_id: string;
+
+  // the ?ref= code of the sign-up page, sent when the visitor did not allow
+  // the referral cookie. An unknown or malformed code is ignored, not refused
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  ref?: string;
 }

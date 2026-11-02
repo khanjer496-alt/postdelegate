@@ -40,3 +40,35 @@ export const parseAffiliateCookieValue = (
 
   return code;
 };
+
+// The ?ref= code of an affiliate link, or undefined when it is not one
+export const parseReferralCode = (value: string | undefined | null) => {
+  const code = value?.trim().toLowerCase();
+  return code && AFFILIATE_CODE_REGEX.test(code) ? code : undefined;
+};
+
+// The visitor's answer to the referral prompt. pd_ref and the saved campaign
+// source are only stored after a "yes". This cookie only remembers the answer,
+// which makes it strictly necessary, and it is kept for 6 months (CNIL) so a
+// "no" is not asked again on every visit. Shared with the marketing site.
+export const REFERRAL_CONSENT_COOKIE_NAME = 'pd_consent';
+export const REFERRAL_CONSENT_DAYS = 180;
+
+export type ReferralConsent = 'yes' | 'no';
+
+export const parseReferralConsent = (
+  value: string | undefined | null
+): ReferralConsent | undefined =>
+  value === 'yes' || value === 'no' ? value : undefined;
+
+// One value out of a document.cookie string
+export const readCookieValue = (cookies: string, name: string) =>
+  cookies
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+
+export const hasReferralConsent = (cookies: string) =>
+  parseReferralConsent(
+    readCookieValue(cookies, REFERRAL_CONSENT_COOKIE_NAME)
+  ) === 'yes';
