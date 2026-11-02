@@ -1642,7 +1642,7 @@
   "evergreen_shared_times": "Republicaciones hasta ahora: {{count}}",
   "evergreen_next_shares": "Próximas republicaciones",
   "evergreen_no_more_shares": "No hay más republicaciones previstas.",
-  "evergreen_turn_on": "Hacer perenne",
+  "evergreen_turn_on": "Hacer evergreen",
   "evergreen_load_failed": "No pudimos cargar esta publicación. Actualiza el calendario e inténtalo de nuevo.",
   "evergreen_finished": "Esta publicación terminó de republicarse, así que no se publicará nada más. Duplícala para compartirla con una nueva programación.",
   "bulk_videos_choose": "Elegir...",

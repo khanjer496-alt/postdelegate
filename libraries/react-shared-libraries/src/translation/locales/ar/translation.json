@@ -1642,7 +1642,7 @@
   "evergreen_shared_times": "عدد مرات إعادة المشاركة حتى الآن: {{count}}",
   "evergreen_next_shares": "المشاركات القادمة",
   "evergreen_no_more_shares": "لا توجد مشاركات أخرى مخطط لها.",
-  "evergreen_turn_on": "تحويل إلى منشور دائم",
+  "evergreen_turn_on": "تحويل إلى منشور متجدد",
   "evergreen_load_failed": "تعذّر تحميل هذا المنشور. حدّث التقويم وحاول مرة أخرى.",
   "evergreen_finished": "انتهت إعادة مشاركة هذا المنشور، فلن يُنشر شيء آخر. كرّره لمشاركته وفق جدول جديد.",
   "bulk_videos_choose": "اختر...",

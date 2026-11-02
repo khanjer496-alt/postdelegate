@@ -1642,7 +1642,7 @@
   "evergreen_shared_times": "Repartages jusqu'ici : {{count}}",
   "evergreen_next_shares": "Prochains partages",
   "evergreen_no_more_shares": "Aucun autre partage n'est prévu.",
-  "evergreen_turn_on": "Rendre intemporelle",
+  "evergreen_turn_on": "Rendre evergreen",
   "evergreen_load_failed": "Impossible de charger cette publication. Actualisez le calendrier et réessayez.",
   "evergreen_finished": "Cette publication a terminé ses repartages, plus rien ne sera publié. Dupliquez-la pour la partager selon un nouveau calendrier.",
   "bulk_videos_choose": "Choisir...",
