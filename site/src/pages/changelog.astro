@@ -4,6 +4,13 @@ import { SITE } from '../data/site';
 // Changes that are live in the app, newest first. Dates are the release day in Dubai time (UTC+4).
 // Add an entry only once the release that contains it is live on app.postdelegate.com.
 const releases: { date: string; items: { title: string; text: string; href?: string }[] }[] = [
+  { date: '2026-11-02', items: [
+    { title: 'Five more Studio templates', text: 'Image slideshow, before/after, top list, quote card, and AI UGC, which writes and voices a short script on your own OpenAI key. Add your own music to your videos.', href: '/docs/studio#templates' },
+    { title: 'Studio from Claude, ChatGPT or the API', text: 'Assistants and scripts can create, render and schedule Studio videos through MCP and the public API.', href: '/docs/studio#from-claude-chatgpt-or-the-api' },
+    { title: 'Transfer ownership', text: 'Hand a workspace to another admin. While you are its only owner, you transfer it before you can delete your account.', href: '/docs/team#transfer-ownership' },
+    { title: 'New screens in every app language', text: 'The newest screens, including Studio, approvals and billing, are translated into every language the app offers.' },
+    { title: 'Fixes', text: 'Clearer errors when a channel rejects a post; fixes for Telegram, Twitch, Kick, Nostr, Slack, Hashnode and Medium posts; approvals that cover every channel in a post; and invitation fixes.' },
+  ] },
   { date: '2026-11-01', items: [
     { title: 'Content Studio', text: 'Turn a video from your media library into a vertical 1080×1920 video of up to 90 seconds, with a hook line over the clip or captions that light up word by word.', href: '/docs/studio' },
     { title: 'Bulk video scheduling', text: 'Add up to 50 videos, pick your channels, and PostDelegate spreads them across each channel’s posting time slots, with a preview of every date before anything is scheduled.', href: '/docs/bulk-import' },
@@ -25,7 +32,7 @@ const releases: { date: string; items: { title: string; text: string; href?: str
 ];
 const fmt = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 ---
-<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Content Studio, bulk video scheduling, views analytics, YouTube publish later, extra channels, Discord and Telegram." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
+<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Studio templates, ownership transfer, bulk video, views analytics, extra channels, Discord and Telegram." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
   <a slot="actions" href="/roadmap" class="button button-outline">See the roadmap</a>
   {releases.map((release) => (
     <section class="release">
