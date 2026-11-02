@@ -8,6 +8,7 @@
 /subprocessors/ https://app.postdelegate.com/legal/subprocessors/ 301
 /data-deletion https://app.postdelegate.com/legal/data-deletion 302
 /data-deletion/ https://app.postdelegate.com/legal/data-deletion 302
-/postdelegate-workspace-preview.png /images/postdelegate-workspace.jpg 301
-/postdelegate-composer-preview.png /images/postdelegate-workspace.jpg 301
+/postdelegate-workspace-preview.png /images/postdelegate-workspace.webp 301
+/postdelegate-composer-preview.png /images/postdelegate-workspace.webp 301
+/images/postdelegate-workspace.jpg /images/postdelegate-workspace.webp 301
 /sitemap.xml /sitemap-0.xml 200
