@@ -32,10 +32,12 @@ The MCP server lives under the API origin, `https://app.postdelegate.com/api`. I
 | Address | Sign-in | Use it for |
 | --- | --- | --- |
 | `https://app.postdelegate.com/mcp-oauth-dynamic` | Sign in with PostDelegate (OAuth) | **Recommended.** Claude, ChatGPT, Claude Code, Cursor and any client that can register itself. |
-| `https://app.postdelegate.com/api/mcp` | API key as `Authorization: Bearer YOUR_API_KEY` | Clients and scripts that can set a header. |
+| `https://app.postdelegate.com/api/mcp` | API key as `Authorization: Bearer YOUR_API_KEY` (the bare key works too), or OAuth | Clients and scripts that can set a header. |
 | `https://app.postdelegate.com/api/mcp/YOUR_API_KEY` | API key inside the address | Clients that can only take a URL. |
 
 Settings > Agents / Dev in the app shows these with your own values filled in, ready to copy. If it shows a different base address than this page, use the one from the app.
+
+MCP directories and clients that discover servers on their own read the server card at `https://app.postdelegate.com/.well-known/mcp/server-card.json` (also served as `/.well-known/mcp.json`) and the OAuth metadata at `https://app.postdelegate.com/.well-known/oauth-protected-resource`.
 
 Other addresses exist for directory listings of specific assistants (`/mcp-oauth-claude`, `/mcp-oauth-chatgpt`, `/mcp-oauth`) and a legacy server-sent-events address (`/sse/YOUR_API_KEY`). You should not need them.
 
@@ -46,12 +48,12 @@ Other addresses exist for directory listings of specific assistants (`/mcp-oauth
 You add the server address to your assistant. The assistant opens a PostDelegate page in your browser, you sign in and approve, and the assistant gets its own token for your workspace. You never copy an API key.
 
 - The client registers itself using dynamic client registration and PKCE (S256). The scopes are `mcp:read` and `mcp:write`.
-- Web assistants may only register callback addresses on claude.ai, claude.com, chatgpt.com or openai.com (and their subdomains). Local tools can register `http://localhost`, `http://127.0.0.1` or `http://[::1]` callbacks, or a private-use scheme such as `cursor://`, as native apps do.
+- Web assistants may only register callback addresses on claude.ai, claude.com, chatgpt.com or openai.com (and their subdomains), plus a short list of exact callback URLs of MCP directories such as Vercel Connect (`https://connect.vercel.com/callback`). Local tools can register `http://localhost`, `http://127.0.0.1` or `http://[::1]` callbacks, or a private-use scheme such as `cursor://`, as native apps do.
 - Approvals appear under **Settings > Apps > Approved Apps**. Choose **Revoke** to cut an assistant off. These tokens do not expire on their own, so revoking is how you end access.
 
 ### API key
 
-Use the workspace [API key](/docs/api#authentication) from **Settings > Agents / Dev**. This works anywhere, but the key is as powerful as your account, so prefer OAuth where the client supports it. At `/mcp` send it as `Authorization: Bearer YOUR_API_KEY`. The REST API, by contrast, takes the key with no `Bearer `.
+Use the workspace [API key](/docs/api#authentication) from **Settings > Agents / Dev**. This works anywhere, but the key is as powerful as your account, so prefer OAuth where the client supports it. At `/mcp` send it as `Authorization: Bearer YOUR_API_KEY`. The bare key, the way the REST API takes it, works at `/mcp` too.
 
 Rotating the key invalidates it everywhere.
 
@@ -71,7 +73,7 @@ The API key and MCP setup live in **Settings > Agents / Dev**, which appears whe
 
 ## Troubleshooting
 
-- **`401` or "Invalid API Key or OAuth token".** The key was rotated, mistyped, or sent in the wrong form. `/mcp` needs `Bearer `, the REST API does not.
+- **`401` or "Invalid API Key or OAuth token".** The key was rotated, mistyped, or sent in the wrong form. `/mcp` takes the key with or without `Bearer `, the REST API only without it.
 - **The browser sign-in window never opens.** Your client may not support OAuth for remote servers. Use the API key address instead.
 - **"redirect_uri host is not a verified domain".** A web client is trying to register a callback outside the allowed list. Use a local client or the API key address.
 - **A tool is missing.** The server lists only the tools your connection address offers. See [MCP tools](/docs/mcp/tools).

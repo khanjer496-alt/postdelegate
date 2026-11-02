@@ -17,7 +17,7 @@ export const GET: APIRoute = () => {
 - Social channel connections are in rollout. A provider in the source or on a platform page is not a promise of a live hosted connection.
 - Google sign-in is separate from connecting a social publishing account.
 - Plans: Starter $19, Team $29, Pro $39 and Ultimate $79 per month ($180, $276, $372 and $756 per year, US dollars). Every plan starts with a 7-day free trial that needs no credit card. Add a card any time before the trial ends to keep the plan; the first payment is taken when the trial ends. If the trial ends without a card, the workspace is paused until a plan is chosen; posts are kept, and channels and team members are switched back on when subscribing to a plan that includes them. One free trial per email address. Details at ${SITE.url}/pricing and ${SITE.url}/docs/billing.
-- Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
+- Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 (OpenAPI spec: ${SITE.url}/openapi.json) and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
 - AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI. The customer pays OpenAI directly; PostDelegate never charges for AI. AI video is not available. Customers can also bring their own AI assistant, such as ChatGPT or Claude, through MCP.
 - Connectable channels today: YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram and Discord. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals.
 - Application source code (AGPL-3.0): ${SITE.source}. License details: ${SITE.url}/licenses.
@@ -86,6 +86,7 @@ ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.titl
 - [Platform rollout](${SITE.url}/platforms)
 - [Agents and automation](${SITE.url}/agents)
 - [REST API](${SITE.url}/api)
+- [REST API OpenAPI 3.1 spec](${SITE.url}/openapi.json)
 - [MCP](${SITE.url}/mcp)
 - [Compare PostDelegate with other schedulers](${SITE.url}/compare)
 - [Changelog](${SITE.url}/changelog)

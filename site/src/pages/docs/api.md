@@ -31,7 +31,7 @@ curl https://app.postdelegate.com/api/public/v1/is-connected \
 
 <div class="callout warn">
 
-The REST API wants the bare key. The [MCP server](/docs/mcp) at `/mcp` is different: it expects `Authorization: Bearer YOUR_API_KEY`. Mixing the two is the most common cause of a `401`.
+The REST API wants the bare key: `Authorization: Bearer YOUR_API_KEY` is rejected with a `401`. The [MCP server](/docs/mcp) at `/mcp` takes the key with or without `Bearer `.
 
 </div>
 
@@ -48,6 +48,15 @@ Treat the key like a password. It acts as the whole workspace: it can read, publ
 ### Apps and OAuth tokens
 
 If you build a product that posts for other PostDelegate users, create an OAuth app in **Settings > Apps**. Your users authorise your app and you receive a token that starts with `pos_`. Send it in the same `Authorization` header, again without `Bearer `. It works like an API key for the user's workspace.
+
+## OpenAPI specification
+
+The API is described in an OpenAPI 3.1 document you can import into Postman, Insomnia or a code generator:
+
+- [`https://postdelegate.com/openapi.json`](https://postdelegate.com/openapi.json)
+- [`https://app.postdelegate.com/api/public/v1/openapi.json`](https://app.postdelegate.com/api/public/v1/openapi.json), served by the API itself
+
+Both are the same file. It covers every endpoint in the [endpoint index](#endpoint-index) below.
 
 ## Rate limits
 

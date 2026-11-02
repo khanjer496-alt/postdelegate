@@ -2,7 +2,10 @@ import { initializeSentry } from '@gitroom/nestjs-libraries/sentry/initialize.se
 initializeSentry('backend', true);
 import compression from 'compression';
 
-import { loadSwagger } from '@gitroom/helpers/swagger/load.swagger';
+import {
+  loadSwagger,
+  swaggerEnabled,
+} from '@gitroom/helpers/swagger/load.swagger';
 import { json } from 'express';
 import { Runtime } from '@temporalio/worker';
 Runtime.install({ shutdownSignals: [] });
@@ -91,7 +94,10 @@ async function start() {
   app.useGlobalFilters(new PostValidationExceptionFilter());
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  loadSwagger(app);
+  // off unless ENABLE_SWAGGER=true, /docs exposes every internal route
+  if (swaggerEnabled()) {
+    loadSwagger(app);
+  }
 
   const port = process.env.PORT || 3000;
 
