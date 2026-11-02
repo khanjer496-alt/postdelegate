@@ -222,6 +222,7 @@
   "link": "Link",
   "add_subreddit": "Subreddit hinzufügen",
   "please_add_at_least_one_subreddit": "Bitte fügen Sie mindestens einen Subreddit hinzu",
+  "reddit_one_subreddit_hint": "Ein Subreddit pro Beitrag: Reddit bittet darum, denselben Inhalt nicht in mehreren Communitys zu posten.",
   "add_community": "Community hinzufügen",
   "select_post_type": "Beitragstyp auswählen...",
   "we_couldn_t_find_any_business_connected_to_your_linkedin_page": "Wir konnten kein Unternehmen finden, das mit Ihrer LinkedIn-Seite verbunden ist.",
