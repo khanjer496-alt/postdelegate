@@ -137,6 +137,7 @@ const boot = async (extraEnv: Record<string, string> = {}) => {
     ...env,
     NEXT_PUBLIC_BACKEND_URL: 'https://app.example.com/api',
     FRONTEND_URL: 'https://app.example.com',
+    STRIPE_SECRET_KEY: '',
     ...extraEnv,
   };
   const app = express();
@@ -434,6 +435,37 @@ describe('startMcp', () => {
       });
       // "ui" set at all would make the agent offer the app's post modal
       expect(requestContext.has('ui')).toBe(false);
+    });
+  });
+
+  describe('ended subscriptions', () => {
+    beforeAll(async () => {
+      await shutdown();
+      // billing on, and the test orgs have no subscription
+      await boot({ STRIPE_SECRET_KEY: 'sk_test_unit' });
+    });
+    afterAll(async () => {
+      await shutdown();
+      await boot();
+    });
+
+    it.each([
+      ['/mcp', { Authorization: 'key-123' }],
+      ['/mcp/key-123', {}],
+      ['/mcp-oauth-dynamic', { Authorization: 'Bearer pos_valid' }],
+    ])('%s answers 403 with the CORS headers, after auth', async (path, headers) => {
+      const response = await mcpPost(path, headers as Record<string, string>);
+
+      expect(response.status).toBe(403);
+      expectMcpCors(response);
+    });
+
+    it('still answers preflights and a bad key first', async () => {
+      const preflight = await fetch(`${base}/mcp`, { method: 'OPTIONS' });
+      expect(preflight.status).toBe(204);
+
+      const bad = await mcpPost('/mcp', { Authorization: 'nope' });
+      expect(bad.status).toBe(401);
     });
   });
 
