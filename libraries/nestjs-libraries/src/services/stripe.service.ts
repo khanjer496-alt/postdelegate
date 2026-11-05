@@ -19,6 +19,9 @@ import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/us
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import {
+  emptyGrowthStats,
+  PaymentGrowthPlan,
+  PaymentGrowthStats,
   PaymentInvoice,
   PaymentPlatform,
   PaymentProvider,
@@ -331,6 +334,179 @@ export const trialEndsSoonDetails = (
   );
 
   return html.join('');
+};
+
+// The Stripe subscriptions of the admin growth stats are listed at most once
+// per 5 minutes, reloading the stats page reads them from memory
+const GROWTH_CACHE_MS = 5 * 60 * 1000;
+
+// A trial that ended without paying: canceled during the trial, or canceled
+// by Stripe when it ended (no card, or set to cancel at the trial end)
+const isExpiredTrial = (subscription: Stripe.Subscription) =>
+  !!subscription.trial_end &&
+  !!subscription.ended_at &&
+  subscription.ended_at - subscription.trial_end < 3600;
+
+// Stripe charges the subscription default first, then the customer default.
+// Reads the customer expanded on the subscription unless one is given
+const hasCardOf = (
+  subscription: Stripe.Subscription,
+  customer:
+    | string
+    | Stripe.Customer
+    | Stripe.DeletedCustomer = subscription.customer
+) => {
+  if (subscription.default_payment_method || subscription.default_source) {
+    return true;
+  }
+  if (!customer || typeof customer === 'string' || customer.deleted) {
+    return false;
+  }
+  const { invoice_settings, default_source } = customer as Stripe.Customer;
+  return !!(invoice_settings?.default_payment_method || default_source);
+};
+
+// What the subscription brings in a month, minor units: every item's price
+// times its quantity (a yearly price / 12), less the discounts still running
+// on the subscription. Discounts come off the plan only, like the admin
+// coupons limited to the plan products: extra channels keep their price
+export const monthlyAmountOf = (
+  subscription: Stripe.Subscription,
+  now = Date.now() / 1000
+) => {
+  const monthsOf = (item?: Stripe.SubscriptionItem) =>
+    (item?.price?.recurring?.interval === 'year' ? 12 : 1) *
+    (item?.price?.recurring?.interval_count || 1);
+  const monthlyOf = (item?: Stripe.SubscriptionItem) =>
+    item?.price?.recurring
+      ? ((item.price.unit_amount || 0) * (item.quantity ?? 1)) / monthsOf(item)
+      : 0;
+
+  const planItem = planItemOf(subscription);
+  let plan = monthlyOf(planItem);
+  for (const discount of subscription.discounts || []) {
+    if (typeof discount === 'string' || (discount.end && discount.end <= now)) {
+      continue;
+    }
+    const coupon = discount.source?.coupon;
+    if (!coupon || typeof coupon === 'string') {
+      continue;
+    }
+    if (coupon.percent_off) {
+      plan = plan * (1 - coupon.percent_off / 100);
+    } else if (coupon.amount_off) {
+      // taken off every invoice, so a yearly invoice spreads it over 12 months
+      plan = Math.max(0, plan - coupon.amount_off / monthsOf(planItem));
+    }
+  }
+
+  const extras = (subscription.items?.data || [])
+    .filter((item) => item !== planItem)
+    .reduce((sum, item) => sum + monthlyOf(item), 0);
+
+  return Math.round(Math.max(0, plan) + extras);
+};
+
+// The admin growth numbers from every subscription of the app (already
+// filtered on metadata.service). Trials are told apart by trial_start /
+// trial_end. Paying is active only (paid), a failing payment (past_due /
+// unpaid) is counted on its own and not in the revenue
+export const growthStatsOf = (
+  subscriptions: Stripe.Subscription[],
+  from: Date,
+  to: Date,
+  now = Date.now() / 1000
+): PaymentGrowthStats => {
+  const start = from.getTime() / 1000;
+  const end = to.getTime() / 1000;
+  const inRange = (time?: number | null) =>
+    !!time && time >= start && time <= end;
+
+  const stats = emptyGrowthStats(true);
+  const plans = new Map<string, PaymentGrowthPlan>();
+
+  for (const subscription of subscriptions) {
+    // created and canceled right away by the app itself (a duplicate
+    // checkout), never a trial or a customer
+    if (
+      subscription.ended_at &&
+      subscription.ended_at - subscription.created < 300
+    ) {
+      continue;
+    }
+    stats.currency = stats.currency || subscription.currency || null;
+    const expired = isExpiredTrial(subscription);
+
+    if (subscription.trial_start && inRange(subscription.trial_start)) {
+      stats.trialsStarted++;
+    }
+
+    if (subscription.status === 'trialing') {
+      stats.trialsRunning++;
+      if (hasCardOf(subscription)) {
+        stats.trialsRunningWithCard++;
+      }
+    }
+
+    if (expired && inRange(subscription.ended_at)) {
+      stats.trialsExpired++;
+    }
+
+    if (
+      !expired &&
+      subscription.status === 'active' &&
+      subscription.trial_end &&
+      subscription.trial_end <= now &&
+      inRange(subscription.trial_end)
+    ) {
+      stats.trialsConverted++;
+    }
+
+    // ended in the range, not a trial running out
+    if (
+      !expired &&
+      subscription.status === 'canceled' &&
+      inRange(subscription.ended_at)
+    ) {
+      stats.cancellations++;
+    }
+
+    if (
+      subscription.status === 'past_due' ||
+      subscription.status === 'unpaid'
+    ) {
+      stats.paymentFailing++;
+    }
+
+    if (subscription.status === 'active') {
+      if (subscription.cancel_at_period_end || subscription.cancel_at) {
+        stats.cancelling++;
+      }
+      const tier = subscription.metadata?.billing || 'UNKNOWN';
+      const period = billedPeriodOf(
+        subscription,
+        subscription.metadata?.period
+      );
+      const mrr = monthlyAmountOf(subscription, now);
+      const key = `${tier}_${period}`;
+      const plan = plans.get(key) || { tier, period, count: 0, mrr: 0 };
+      plan.count++;
+      plan.mrr += mrr;
+      plans.set(key, plan);
+      stats.paying++;
+      stats.mrr += mrr;
+    }
+  }
+
+  const order = Object.keys(pricing);
+  stats.payingByPlan = [...plans.values()].sort(
+    (a, b) =>
+      (order.indexOf(a.tier) + 1 || order.length + 1) -
+        (order.indexOf(b.tier) + 1 || order.length + 1) ||
+      a.period.localeCompare(b.period)
+  );
+
+  return stats;
 };
 
 @PaymentProvider({ provider: STRIPE_PROVIDER })
@@ -813,18 +989,17 @@ export class StripeService extends PaymentProviderAbstract {
 
   // Stripe charges the subscription default first, then the customer default
   private async hasPaymentMethod(subscription: Stripe.Subscription) {
-    if (subscription.default_payment_method || subscription.default_source) {
+    if (hasCardOf(subscription)) {
       return true;
     }
-
-    const customer = await stripe.customers.retrieve(
-      subscription.customer as string
-    );
-    if (customer.deleted) {
+    if (typeof subscription.customer !== 'string') {
       return false;
     }
-    const { invoice_settings, default_source } = customer as Stripe.Customer;
-    return !!(invoice_settings?.default_payment_method || default_source);
+
+    return hasCardOf(
+      subscription,
+      await stripe.customers.retrieve(subscription.customer)
+    );
   }
 
   // After a login swap, move each Stripe customer's email to the login that
@@ -2639,6 +2814,55 @@ export class StripeService extends PaymentProviderAbstract {
     await stripe.subscriptions.deleteDiscount(stripeSubscription.id);
 
     return { cancelled: true };
+  }
+
+  // the load itself is kept, so requests arriving while it pages through
+  // Stripe wait for it instead of starting their own
+  private _growthSubscriptions: {
+    at: number;
+    data: Promise<Stripe.Subscription[]>;
+  } | null = null;
+
+  private getAppSubscriptions() {
+    if (
+      this._growthSubscriptions &&
+      Date.now() - this._growthSubscriptions.at < GROWTH_CACHE_MS
+    ) {
+      return this._growthSubscriptions.data;
+    }
+
+    const data = this.listAppSubscriptions().catch((err) => {
+      this._growthSubscriptions = null;
+      throw err;
+    });
+    this._growthSubscriptions = { at: Date.now(), data };
+    return data;
+  }
+
+  // Every subscription of this app, paged through 100 at a time. Other
+  // products share the Stripe account, only metadata.service gitroom is ours
+  private async listAppSubscriptions() {
+    const data: Stripe.Subscription[] = [];
+    let startingAfter: string | undefined;
+    do {
+      const page = await stripe.subscriptions.list({
+        status: 'all',
+        limit: 100,
+        expand: ['data.customer', 'data.discounts.source.coupon'],
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      data.push(...page.data.filter((f) => f.metadata?.service === 'gitroom'));
+      startingAfter = page.has_more ? page.data.at(-1)?.id : undefined;
+    } while (startingAfter);
+
+    return data;
+  }
+
+  override async getGrowthStats(from: Date, to: Date) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return emptyGrowthStats();
+    }
+    return growthStatsOf(await this.getAppSubscriptions(), from, to);
   }
 
   async lifetimeDeal(organizationId: string, code: string) {

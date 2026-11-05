@@ -24,6 +24,60 @@ export interface PaymentInvoice {
   viewUrl: string | null;
 }
 
+// Paying subscriptions of one plan and billing period, for the admin stats
+export interface PaymentGrowthPlan {
+  // pricing key (STANDARD, TEAM, PRO, ULTIMATE)
+  tier: string;
+  period: 'MONTHLY' | 'YEARLY';
+  count: number;
+  // monthly revenue after discounts, minor units (cents)
+  mrr: number;
+}
+
+// Trials and revenue of the whole app as the provider has them, for the
+// admin stats. "In the range" counts use the from / to dates, the others are
+// the state right now
+export interface PaymentGrowthStats {
+  supported: boolean;
+  currency: string | null;
+  // trials started in the range
+  trialsStarted: number;
+  // trials running now, and how many of them have a payment method
+  trialsRunning: number;
+  trialsRunningWithCard: number;
+  // trials that ended in the range: became paid / ended without paying
+  trialsConverted: number;
+  trialsExpired: number;
+  // paid subscriptions now (a 100% coupon pays $0), per plan and period
+  paying: number;
+  payingByPlan: PaymentGrowthPlan[];
+  // monthly recurring revenue now (yearly / 12), minor units (cents)
+  mrr: number;
+  // paid subscriptions that ended in the range (trials ending are not counted)
+  cancellations: number;
+  // paid subscriptions set to cancel at the end of their period, now
+  cancelling: number;
+  // subscriptions whose payment is failing now (past_due / unpaid), left out
+  // of paying and the revenue
+  paymentFailing: number;
+}
+
+export const emptyGrowthStats = (supported = false): PaymentGrowthStats => ({
+  supported,
+  currency: null,
+  trialsStarted: 0,
+  trialsRunning: 0,
+  trialsRunningWithCard: 0,
+  trialsConverted: 0,
+  trialsExpired: 0,
+  paying: 0,
+  payingByPlan: [],
+  mrr: 0,
+  cancellations: 0,
+  cancelling: 0,
+  paymentFailing: 0,
+});
+
 // Every billing use-case goes through this contract. Webhooks and `platform`
 // are mandatory; everything else has a default that says "not supported on
 // this platform" so a provider only implements what its platform offers
@@ -215,6 +269,13 @@ export abstract class PaymentProviderAbstract {
 
   async cancelCoupon(organizationId: string): Promise<any> {
     return this.notSupported();
+  }
+
+  // Trials, paying subscriptions and revenue of the whole app. A provider
+  // that can't list them says so instead of throwing, so the stats page
+  // still renders
+  async getGrowthStats(from: Date, to: Date): Promise<PaymentGrowthStats> {
+    return emptyGrowthStats();
   }
 
   // After a login swap, keep the provider's customer email in sync (no-op by default)

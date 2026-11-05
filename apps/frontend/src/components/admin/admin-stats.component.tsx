@@ -6,6 +6,8 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { capitalize } from 'lodash';
 
 interface PerSocial {
   provider: string;
@@ -29,6 +31,40 @@ interface StatsResponse {
   scheduledChannels?: StatsBlock;
   activeOrgsBySource?: StatsBlock;
   connectedClients?: StatsBlock;
+}
+
+interface GrowthPlan {
+  tier: string;
+  period: 'MONTHLY' | 'YEARLY';
+  count: number;
+  mrr: number;
+}
+
+interface GrowthResponse {
+  from: string;
+  to: string;
+  signUps: {
+    total: number;
+    activated: number;
+    perMethod: StatsBlock;
+    perDay: { date: string; count: number }[];
+  };
+  comped: { lifetime: number; setByAdmin: number };
+  billing: {
+    supported: boolean;
+    currency: string | null;
+    trialsStarted: number;
+    trialsRunning: number;
+    trialsRunningWithCard: number;
+    trialsConverted: number;
+    trialsExpired: number;
+    paying: number;
+    payingByPlan: GrowthPlan[];
+    mrr: number;
+    cancellations: number;
+    cancelling: number;
+    paymentFailing: number;
+  };
 }
 
 const isoDaysAgo = (days: number) => {
@@ -59,6 +95,7 @@ const PRESETS: { label: string; range: () => { from: string; to: string } }[] = 
   { label: 'This month', range: () => ({ from: startOfMonth(), to: today() }) },
   { label: 'Last 7 days', range: () => ({ from: isoDaysAgo(7), to: today() }) },
   { label: 'Last 30 days', range: () => ({ from: isoDaysAgo(30), to: today() }) },
+  { label: 'Last 90 days', range: () => ({ from: isoDaysAgo(90), to: today() }) },
 ];
 
 const useStats = (params: {
@@ -89,13 +126,39 @@ const useStats = (params: {
   );
 };
 
-const SummaryCard: FC<{ label: string; value: number }> = ({
-  label,
-  value,
-}) => (
-  <div className="border border-newTableBorder rounded-[8px] p-[16px] bg-newBgColorInner">
+const useGrowthStats = (params: { from: string; to: string }) => {
+  const fetch = useFetch();
+  const query = new URLSearchParams({ from: params.from, to: params.to });
+  const key = `/admin/stats/growth?${query.toString()}`;
+  return useSWR<GrowthResponse>(
+    key,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error('Failed to load growth stats');
+      }
+      return res.json();
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+};
+
+const SummaryCard: FC<{
+  label: string;
+  value: number | string;
+  title?: string;
+}> = ({ label, value, title }) => (
+  <div
+    className="border border-newTableBorder rounded-[8px] p-[16px] bg-newBgColorInner"
+    title={title}
+  >
     <div className="text-[12px] opacity-70">{label}</div>
-    <div className="text-[28px] font-[600]">{value.toLocaleString()}</div>
+    <div className="text-[28px] font-[600]">
+      {typeof value === 'number' ? value.toLocaleString() : value}
+    </div>
   </div>
 );
 
@@ -125,6 +188,217 @@ const PerSocialTable: FC<{ title: string; block: StatsBlock }> = ({
     )}
   </div>
 );
+
+// "–" instead of dividing by zero
+const percentOf = (part: number, whole: number) =>
+  whole ? `${Math.round((part / whole) * 100)}%` : '–';
+
+const formatMoney = (cents: number, currency: string | null) =>
+  (cents / 100).toLocaleString(undefined, {
+    style: 'currency',
+    currency: (currency || 'usd').toUpperCase(),
+  });
+
+const SIGN_UP_METHODS: Record<string, string> = { LOCAL: 'email' };
+
+const SignUpsChart: FC<{ perDay: { date: string; count: number }[] }> = ({
+  perDay,
+}) => {
+  const busiest = Math.max(0, ...perDay.map((day) => day.count));
+  // the bars of a range without sign-ups stay flat
+  const max = Math.max(1, busiest);
+  return (
+    <div className="border border-newTableBorder rounded-[8px] p-[12px] flex flex-col gap-[8px] min-w-0">
+      <div className="text-[12px] uppercase opacity-70">
+        New sign-ups per day
+      </div>
+      {/* bars shrink below a pixel rather than scroll a long range sideways */}
+      <div className="flex items-end gap-px h-[120px] min-w-0 overflow-hidden">
+        {perDay.map((day) => (
+          <div
+            key={day.date}
+            title={`${new Date(`${day.date}T00:00:00`).toLocaleDateString()}: ${
+              day.count
+            }`}
+            className="flex-1 min-w-0 h-full flex items-end"
+          >
+            <div
+              className="w-full bg-forth rounded-t-[2px]"
+              style={{ height: `${(day.count / max) * 100}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      {perDay.length > 0 && (
+        <div className="flex flex-wrap justify-between gap-[8px] text-[12px] opacity-70">
+          <div>
+            {new Date(`${perDay[0].date}T00:00:00`).toLocaleDateString()}
+          </div>
+          <div>Busiest day: {busiest.toLocaleString()}</div>
+          <div>
+            {new Date(
+              `${perDay[perDay.length - 1].date}T00:00:00`
+            ).toLocaleDateString()}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const GrowthSection: FC<{ range: { from: string; to: string } }> = ({
+  range,
+}) => {
+  const { data, isLoading, error } = useGrowthStats(range);
+
+  if (isLoading) {
+    return <LoadingComponent />;
+  }
+
+  if (error || !data) {
+    return <div className="text-red-400">Failed to load growth stats.</div>;
+  }
+
+  const { signUps, billing, comped } = data;
+
+  return (
+    <div className="flex flex-col gap-[12px]">
+      <div className="text-[16px] font-[600]">Growth</div>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-[12px]">
+        <SummaryCard label="New sign-ups" value={signUps.total} />
+        <SummaryCard label="Confirmed their email" value={signUps.activated} />
+        {billing.supported && (
+          <>
+            <SummaryCard label="Trials started" value={billing.trialsStarted} />
+            <SummaryCard
+              label="Trials running (right now)"
+              value={billing.trialsRunning}
+            />
+            <SummaryCard
+              label="Card added (trials running)"
+              value={billing.trialsRunningWithCard}
+            />
+            <SummaryCard
+              label="Became paying"
+              value={billing.trialsConverted}
+            />
+            <SummaryCard label="Trials expired" value={billing.trialsExpired} />
+            <SummaryCard
+              label="Paying customers (right now)"
+              value={billing.paying}
+              title="Paid subscriptions only. A plan with a 100% coupon counts as paying at $0"
+            />
+            <SummaryCard
+              label="Monthly revenue (MRR)"
+              value={formatMoney(billing.mrr, billing.currency)}
+              title="After discounts, yearly plans divided by 12. A plan with a 100% coupon adds $0"
+            />
+            <SummaryCard
+              label="Payment failing (right now)"
+              value={billing.paymentFailing}
+              title="The card was declined, Stripe is retrying. Not counted as paying or in MRR"
+            />
+            <SummaryCard label="Cancellations" value={billing.cancellations} />
+            <SummaryCard
+              label="Cancelling at period end"
+              value={billing.cancelling}
+              title="Still paying now, set to stop at the end of the period they paid for"
+            />
+          </>
+        )}
+        <SummaryCard label="Lifetime deals" value={comped.lifetime} />
+        <SummaryCard
+          label="Set by admin"
+          value={comped.setByAdmin}
+          title="Plans given from the admin billing tools, nobody pays for them"
+        />
+      </div>
+
+      {billing.supported ? (
+        <div
+          className="border border-newTableBorder rounded-[8px] p-[12px] text-[14px] flex flex-wrap items-center gap-[8px]"
+          title="Counted in the selected dates, so they are not always the same people. Became paying is out of the trials that ended in these dates"
+        >
+          <div>
+            New sign-ups <strong>{signUps.total.toLocaleString()}</strong>
+          </div>
+          <div className="opacity-70">→</div>
+          <div>
+            Trials started{' '}
+            <strong>{billing.trialsStarted.toLocaleString()}</strong> (
+            {percentOf(billing.trialsStarted, signUps.total)})
+          </div>
+          <div className="opacity-70">→</div>
+          <div>
+            Became paying{' '}
+            <strong>{billing.trialsConverted.toLocaleString()}</strong> (
+            {percentOf(
+              billing.trialsConverted,
+              billing.trialsConverted + billing.trialsExpired
+            )}{' '}
+            of trials that ended)
+          </div>
+        </div>
+      ) : (
+        <div className="text-[13px] opacity-70">
+          Trial and revenue numbers are not available right now (no billing
+          provider could be reached).
+        </div>
+      )}
+
+      <SignUpsChart perDay={signUps.perDay} />
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-[12px] items-start">
+        <PerSocialTable
+          title="New sign-ups per method"
+          block={{
+            total: signUps.perMethod.total,
+            perSocial: signUps.perMethod.perSocial.map((row) => ({
+              provider:
+                SIGN_UP_METHODS[row.provider] || row.provider.toLowerCase(),
+              count: row.count,
+            })),
+          }}
+        />
+        {billing.supported && (
+          <div className="border border-newTableBorder rounded-[8px] overflow-hidden">
+            <div className="grid grid-cols-[1fr_80px_100px] gap-[12px] px-[12px] py-[10px] bg-newBgColorInner text-[12px] uppercase opacity-70 border-b border-newTableBorder">
+              <div>Paying customers per plan</div>
+              <div className="text-right">Count</div>
+              <div className="text-right">MRR</div>
+            </div>
+            {billing.payingByPlan.length === 0 ? (
+              <div className="px-[12px] py-[10px] text-[13px] opacity-70">
+                No paying customers yet.
+              </div>
+            ) : (
+              billing.payingByPlan.map((plan) => (
+                <div
+                  key={`${plan.tier}_${plan.period}`}
+                  className="grid grid-cols-[1fr_80px_100px] gap-[12px] px-[12px] py-[10px] text-[13px] border-b border-newTableBorder last:border-b-0"
+                >
+                  <div>
+                    {pricing[plan.tier]?.label || capitalize(plan.tier)}{' '}
+                    <span className="opacity-70">
+                      ({plan.period === 'YEARLY' ? 'yearly' : 'monthly'})
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    {plan.count.toLocaleString()}
+                  </div>
+                  <div className="text-right">
+                    {formatMoney(plan.mrr, billing.currency)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const AdminStatsComponent: FC = () => {
   const user = useUser();
@@ -224,6 +498,8 @@ export const AdminStatsComponent: FC = () => {
           Unknown errors only
         </label>
       </div>
+
+      <GrowthSection range={range} />
 
       {isLoading ? (
         <LoadingComponent />

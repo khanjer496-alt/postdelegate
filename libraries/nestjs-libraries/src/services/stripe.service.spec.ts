@@ -49,6 +49,8 @@ jest.mock(
 
 import {
   extraChannelsOf,
+  growthStatsOf,
+  monthlyAmountOf,
   planItemOf,
   planProductIds,
   resolveExtraChannelPrice,
@@ -2318,6 +2320,398 @@ describe('extra channels', () => {
       expect(mockStripe.subscriptions.update.mock.calls[0][1].items).toEqual([
         { id: 'si_plan', price: 'price_pro_month', quantity: 1 },
       ]);
+    });
+  });
+});
+
+describe('admin growth stats', () => {
+  const DAY = 24 * 3600;
+  // a fixed "now" and a range of the 30 days before it
+  const now = Date.UTC(2026, 10, 5) / 1000;
+  const from = new Date((now - 30 * DAY) * 1000);
+  const to = new Date(now * 1000);
+
+  const sub = (overrides: Record<string, any> = {}) =>
+    ({
+      id: 'sub_1',
+      status: 'active',
+      currency: 'usd',
+      created: now - 60 * DAY,
+      customer: { id: 'cus_1', invoice_settings: {} },
+      default_payment_method: null,
+      default_source: null,
+      trial_start: null,
+      trial_end: null,
+      canceled_at: null,
+      ended_at: null,
+      discounts: [],
+      metadata: { service: 'gitroom', billing: 'STANDARD', period: 'MONTHLY' },
+      items: {
+        data: [
+          {
+            id: 'si_plan',
+            quantity: 1,
+            price: {
+              id: 'price_starter_month',
+              unit_amount: 1900,
+              recurring: { interval: 'month', interval_count: 1 },
+            },
+          },
+        ],
+      },
+      ...overrides,
+    } as any);
+
+  const yearly = (unit_amount: number, overrides: Record<string, any> = {}) =>
+    sub({
+      metadata: { service: 'gitroom', billing: 'TEAM', period: 'YEARLY' },
+      items: {
+        data: [
+          {
+            id: 'si_plan',
+            quantity: 1,
+            price: {
+              id: 'price_team_year',
+              unit_amount,
+              recurring: { interval: 'year', interval_count: 1 },
+            },
+          },
+        ],
+      },
+      ...overrides,
+    });
+
+  const trialing = (overrides: Record<string, any> = {}) =>
+    sub({
+      status: 'trialing',
+      trial_start: now - 2 * DAY,
+      trial_end: now + 5 * DAY,
+      ...overrides,
+    });
+
+  it('counts running trials and the ones with a card', () => {
+    const stats = growthStatsOf(
+      [
+        trialing({ id: 'no_card' }),
+        trialing({ id: 'sub_card', default_payment_method: 'pm_1' }),
+        trialing({
+          id: 'customer_card',
+          customer: {
+            id: 'cus_2',
+            invoice_settings: { default_payment_method: 'pm_2' },
+          },
+        }),
+        trialing({ id: 'deleted_customer', customer: { deleted: true } }),
+      ],
+      from,
+      to,
+      now
+    );
+
+    expect(stats.supported).toBe(true);
+    expect(stats.trialsStarted).toBe(4);
+    expect(stats.trialsRunning).toBe(4);
+    expect(stats.trialsRunningWithCard).toBe(2);
+    expect(stats.paying).toBe(0);
+    expect(stats.mrr).toBe(0);
+  });
+
+  it('tells a converted trial from an expired one', () => {
+    const stats = growthStatsOf(
+      [
+        // paid when the trial ended
+        sub({
+          id: 'converted',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+        }),
+        // Stripe canceled it at the end of a trial without a card
+        sub({
+          id: 'expired',
+          status: 'canceled',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+          canceled_at: now - 3 * DAY,
+          ended_at: now - 3 * DAY + 5,
+        }),
+        // canceled in the middle of the trial
+        sub({
+          id: 'canceled_in_trial',
+          status: 'canceled',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+          canceled_at: now - 6 * DAY,
+          ended_at: now - 6 * DAY,
+        }),
+        // converted before the range, so not this range's
+        sub({
+          id: 'old',
+          trial_start: now - 50 * DAY,
+          trial_end: now - 43 * DAY,
+        }),
+        // the card was declined when the trial ended: not paying yet
+        sub({
+          id: 'declined',
+          status: 'past_due',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+        }),
+        sub({
+          id: 'unpaid',
+          status: 'unpaid',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+        }),
+      ],
+      from,
+      to,
+      now
+    );
+
+    expect(stats.trialsStarted).toBe(5);
+    expect(stats.trialsConverted).toBe(1);
+    expect(stats.trialsExpired).toBe(2);
+    expect(stats.paymentFailing).toBe(2);
+    // ending trials are not cancellations of paying customers
+    expect(stats.cancellations).toBe(0);
+    expect(stats.paying).toBe(2);
+    expect(stats.mrr).toBe(3800);
+  });
+
+  it('leaves out a duplicate the app canceled right away', () => {
+    const stats = growthStatsOf(
+      [
+        trialing({
+          id: 'duplicate',
+          status: 'canceled',
+          created: now - 2 * DAY,
+          canceled_at: now - 2 * DAY + 3,
+          ended_at: now - 2 * DAY + 3,
+        }),
+      ],
+      from,
+      to,
+      now
+    );
+
+    expect(stats.trialsStarted).toBe(0);
+    expect(stats.trialsExpired).toBe(0);
+    expect(stats.cancellations).toBe(0);
+  });
+
+  it('counts a paid subscription that ended in the range', () => {
+    const stats = growthStatsOf(
+      [
+        // still paying until the period end
+        sub({
+          id: 'at_period_end',
+          canceled_at: now - 2 * DAY,
+          cancel_at_period_end: true,
+        }),
+        sub({ id: 'cancel_at', cancel_at: now + 9 * DAY }),
+        sub({
+          id: 'ended',
+          status: 'canceled',
+          canceled_at: now - 4 * DAY,
+          ended_at: now - 4 * DAY,
+        }),
+        // asked to cancel in the range, ended after it
+        sub({
+          id: 'ended_later',
+          status: 'canceled',
+          canceled_at: now - 4 * DAY,
+          ended_at: now + DAY,
+        }),
+        // ended before the range
+        sub({
+          id: 'ended_before',
+          status: 'canceled',
+          canceled_at: now - 40 * DAY,
+          ended_at: now - 40 * DAY,
+        }),
+        // abandoned checkout
+        sub({
+          id: 'incomplete',
+          status: 'incomplete_expired',
+          canceled_at: now - 4 * DAY,
+        }),
+      ],
+      from,
+      to,
+      now
+    );
+
+    expect(stats.cancellations).toBe(1);
+    expect(stats.cancelling).toBe(2);
+    expect(stats.paying).toBe(2);
+  });
+
+  it('spreads a yearly plan over 12 months and groups paying per plan', () => {
+    const stats = growthStatsOf(
+      [yearly(27600), sub(), sub({ id: 'sub_2', status: 'past_due' })],
+      from,
+      to,
+      now
+    );
+
+    // a failing payment is not revenue
+    expect(stats.mrr).toBe(2300 + 1900);
+    expect(stats.paying).toBe(2);
+    expect(stats.paymentFailing).toBe(1);
+    expect(stats.payingByPlan).toEqual([
+      { tier: 'STANDARD', period: 'MONTHLY', count: 1, mrr: 1900 },
+      { tier: 'TEAM', period: 'YEARLY', count: 1, mrr: 2300 },
+    ]);
+  });
+
+  it('takes the discounts off the monthly revenue', () => {
+    const coupon = (c: Record<string, any>, end: number | null = null) => ({
+      id: 'di_1',
+      end,
+      source: { coupon: c },
+    });
+
+    expect(
+      monthlyAmountOf(sub({ discounts: [coupon({ percent_off: 50 })] }), now)
+    ).toBe(950);
+    // an amount off a yearly invoice is spread over the year
+    expect(
+      monthlyAmountOf(
+        yearly(27600, { discounts: [coupon({ amount_off: 2400 })] }),
+        now
+      )
+    ).toBe(2100);
+    // a discount that already ended is not taken off
+    expect(
+      monthlyAmountOf(
+        sub({ discounts: [coupon({ percent_off: 50 }, now - DAY)] }),
+        now
+      )
+    ).toBe(1900);
+    // extra channels count as well, without the plan's discount
+    expect(
+      monthlyAmountOf(
+        sub({
+          discounts: [coupon({ percent_off: 50 })],
+          items: {
+            data: [
+              sub().items.data[0],
+              {
+                id: 'si_extra',
+                quantity: 3,
+                price: {
+                  id: 'price_extra',
+                  lookup_key: 'postdelegate_extra_channel_month',
+                  unit_amount: 300,
+                  recurring: { interval: 'month', interval_count: 1 },
+                },
+              },
+            ],
+          },
+        }),
+        now
+      )
+    ).toBe(950 + 900);
+  });
+
+  describe('getGrowthStats', () => {
+    const service = new StripeService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    const key = process.env.STRIPE_PUBLISHABLE_KEY;
+
+    beforeEach(() => {
+      jest.resetAllMocks();
+      (service as any)._growthSubscriptions = null;
+      process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    });
+
+    afterAll(() => {
+      process.env.STRIPE_PUBLISHABLE_KEY = key;
+    });
+
+    it("pages through every subscription and keeps only this app's", async () => {
+      mockStripe.subscriptions.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            sub({ id: 'sub_a' }),
+            sub({ id: 'sub_other', metadata: { service: 'other-app' } }),
+          ],
+        })
+        .mockResolvedValueOnce({
+          has_more: false,
+          data: [sub({ id: 'sub_b' }), sub({ id: 'sub_none', metadata: {} })],
+        });
+
+      const stats = await service.getGrowthStats(from, to);
+
+      expect(stats.paying).toBe(2);
+      expect(mockStripe.subscriptions.list).toHaveBeenCalledTimes(2);
+      expect(mockStripe.subscriptions.list.mock.calls[0][0]).toMatchObject({
+        status: 'all',
+        limit: 100,
+      });
+      expect(
+        mockStripe.subscriptions.list.mock.calls[0][0].starting_after
+      ).toBeUndefined();
+      expect(
+        mockStripe.subscriptions.list.mock.calls[1][0].starting_after
+      ).toBe('sub_other');
+    });
+
+    it('pages through Stripe once for requests arriving together', async () => {
+      mockStripe.subscriptions.list.mockResolvedValue({
+        has_more: false,
+        data: [sub()],
+      });
+
+      const [a, b] = await Promise.all([
+        service.getGrowthStats(from, to),
+        service.getGrowthStats(from, to),
+      ]);
+
+      expect(a.paying).toBe(1);
+      expect(b.paying).toBe(1);
+      expect(mockStripe.subscriptions.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('loads again after a failed load', async () => {
+      mockStripe.subscriptions.list
+        .mockRejectedValueOnce(new Error('ECONNRESET'))
+        .mockResolvedValueOnce({ has_more: false, data: [sub()] });
+
+      await expect(service.getGrowthStats(from, to)).rejects.toThrow(
+        'ECONNRESET'
+      );
+      expect((await service.getGrowthStats(from, to)).paying).toBe(1);
+    });
+
+    it('reads the subscriptions from memory on a reload', async () => {
+      mockStripe.subscriptions.list.mockResolvedValue({
+        has_more: false,
+        data: [sub()],
+      });
+
+      await service.getGrowthStats(from, to);
+      const stats = await service.getGrowthStats(from, to);
+
+      expect(stats.paying).toBe(1);
+      expect(mockStripe.subscriptions.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not supported without Stripe', async () => {
+      delete process.env.STRIPE_PUBLISHABLE_KEY;
+
+      const stats = await service.getGrowthStats(from, to);
+
+      expect(stats.supported).toBe(false);
+      expect(mockStripe.subscriptions.list).not.toHaveBeenCalled();
     });
   });
 });
