@@ -2,15 +2,16 @@
 import { SITE } from '../data/site';
 import { TRIAL_DAYS } from '../data/plans';
 import { strings, type Lang } from '../i18n';
-interface Props { eyebrow?: string; title?: string; text?: string; lang?: Lang }
-const { lang = 'en', ...props } = Astro.props;
+// trialNote: false when the text already says the trial needs no card.
+interface Props { eyebrow?: string; title?: string; text?: string; trialNote?: boolean; lang?: Lang }
+const { lang = 'en', trialNote = true, ...props } = Astro.props;
 const t = strings(lang);
 const { eyebrow = t.ctaBand.eyebrow(TRIAL_DAYS), title = t.ctaBand.title, text = t.ctaBand.text } = props;
 ---
 <section class="cta-section">
   <div class="cta-panel">
     <span class="cta-orbit orbit-one" aria-hidden="true"></span><span class="cta-orbit orbit-two" aria-hidden="true"></span>
-    <div class="cta-content"><p class="cta-eyebrow">{eyebrow}</p><h2>{title}</h2><p class="cta-description">{text}</p><a href={SITE.signup} class="cta-button">{t.common.ctaLabel} <span aria-hidden="true">↗</span></a><p class="cta-trial-note"><span aria-hidden="true"></span>{t.common.ctaNote}</p><p class="cta-note">{t.ctaBand.note}</p></div>
+    <div class="cta-content">{eyebrow && <p class="cta-eyebrow">{eyebrow}</p>}<h2>{title}</h2><p class="cta-description">{text}</p><a href={SITE.signup} class="cta-button">{t.common.ctaLabel} <span aria-hidden="true">↗</span></a>{trialNote && <p class="cta-trial-note"><span aria-hidden="true"></span>{t.common.ctaNote}</p>}<p class="cta-note">{t.ctaBand.note}</p></div>
   </div>
 </section>
 <style>

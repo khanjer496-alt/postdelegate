@@ -96,7 +96,7 @@ Some settings are picked from a list loaded from the network, like a Discord or 
 - Up to 50 videos at a time, up to 1 GB each.
 - Each channel of a video counts as one post. Five videos on two channels are ten posts.
 - Paid plans have no practical monthly post limit, see [Plans and billing](/docs/billing). In the rare case that the workspace still reaches its monthly post limit part way, PostDelegate stops there and tells you how many videos were created. The rest are listed, and **Try the rest again** goes back to them once you have room.
-- If one network's monthly cap on your plan is reached (X will have one once it is available), only that network's posts are skipped. The other channels still get every video, and the result lists the skipped ones.
+- If one network's monthly cap on your plan is reached (for example, a network that limits posts per month), only that network's posts are skipped. The other channels still get every video, and the result lists the skipped ones.
 - A large batch can take a while. If the connection drops or times out, the window says "This may still be running" and keeps checking for up to 20 minutes. It shows the result when the run is done, so nothing is created twice. A run that stopped on the server is picked up again after 15 minutes. Sending the same videos again while they run, or after they are done, never asks you to upgrade: it waits for, or shows, the first result.
 - A video that fails for another reason is listed with the reason, and the others are still created.
 - Sending the same videos with the same settings twice doesn't create them twice. The second time says "These videos were already scheduled, nothing new was added."
