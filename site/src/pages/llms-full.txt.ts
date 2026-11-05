@@ -1,11 +1,12 @@
 import type { APIRoute } from 'astro';
 import { SITE } from '../data/site';
-import { NETWORKS } from '../data/networks';
+import { NETWORKS, networkStatus } from '../data/networks';
 import { PLANS, planFeatures } from '../data/plans';
 import { DOC_SECTIONS } from '../data/docs';
 export const GET: APIRoute = () => {
   const plans = PLANS.map((plan) => `- ${plan.name}: $${plan.monthly}/month or $${plan.yearly}/year; ${planFeatures(plan).join(', ')}.`).join('\n');
-  const networks = NETWORKS.map((network) => `- ${network.name}: ${network.available ? 'available to connect today' : 'coming soon; cannot be connected today'}.`).join('\n');
+  const STATUS = { live: 'available to connect today', waiting: 'waiting on approval; cannot be connected today', unavailable: 'not available on PostDelegate' } as const;
+  const networks = NETWORKS.map((network) => `- ${network.name}: ${STATUS[networkStatus(network)]}.`).join('\n');
   const body = `# PostDelegate: product facts
 
 PostDelegate is an independently operated social media scheduler.
@@ -30,10 +31,10 @@ Content Studio turns a video from the workspace's media library into a vertical 
 Bulk video scheduling takes up to 50 MP4 videos (up to 1 GB each), one post per video on the chosen channels, spread over each channel's posting time slots or one every few hours or days. Every date is shown in a preview before anything is scheduled, and the videos can be saved as drafts instead. Posts can also be imported from a CSV file, up to 200 rows per file. Guide: ${SITE.url}/docs/bulk-import
 
 ## Automation and AI
-PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs. Access depends on the plan. AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI; the customer pays OpenAI directly, PostDelegate never charges for AI, and AI video is not available. Customers can also bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services are not PostDelegate connections.
+PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs and included on every plan. AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI; the customer pays OpenAI directly, PostDelegate never charges for AI, and AI video is not available. Customers can also bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services are not PostDelegate connections.
 
 ## Channels available to connect today
-YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram and Discord. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and others are coming soon, pending platform approvals, and cannot be connected today.
+YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram and Discord. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and Reddit are waiting on platform approval and cannot be connected today. X is not available on PostDelegate.
 
 ## Documentation
 Markdown version of each docs page (drop the .md for the HTML page):

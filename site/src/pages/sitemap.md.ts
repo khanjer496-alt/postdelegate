@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { SITE } from '../data/site';
+import { SITE, NOINDEX_PATHS } from '../data/site';
 import { DOC_SECTIONS } from '../data/docs';
 import { GUIDES } from '../data/guides';
 import { SCHEDULERS } from '../data/schedulers';
@@ -36,7 +36,7 @@ const groups: [string, (path: string) => boolean][] = [
 ];
 
 export const GET: APIRoute = () => {
-  const paths = [...new Set([...files.map(route), ...SCHEDULERS.map((s) => `/${s.slug}`)])].sort();
+  const paths = [...new Set([...files.map(route), ...SCHEDULERS.map((s) => `/${s.slug}`)])].filter((path) => !NOINDEX_PATHS.includes(path)).sort();
   const sections = groups.map(([title, test]) => {
     const items = paths.filter(test);
     return items.length ? `## ${title}\n${items.map((p) => `- [${label(p)}](${SITE.url}${p === '/' ? '' : p})`).join('\n')}` : '';

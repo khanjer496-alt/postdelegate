@@ -2,7 +2,7 @@
 // "Where PostDelegate fits": kept apart from the head-to-head table so the comparison stays A vs B.
 // Prices come from plans.ts and networks from networks.ts, so this box never drifts from the product.
 import { tool, planFor, COST_POINTS } from '../../data/tools';
-import { AVAILABLE_NETWORKS } from '../../data/networks';
+import { AVAILABLE_NETWORKS, WAITING_NETWORKS } from '../../data/networks';
 import { TRIAL_DAYS } from '../../data/plans';
 import { SITE, CTA_LABEL } from '../../data/site';
 import FactCell from './FactCell.astro';
@@ -10,7 +10,7 @@ interface Props { intro: string }
 const { intro } = Astro.props;
 const pd = tool('postdelegate');
 const live = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
-const pending = 'Instagram, Facebook, Threads, TikTok, LinkedIn, Pinterest and X';
+const pending = WAITING_NETWORKS.map((n) => n.name).join(', ');
 ---
 <section class="pd-fit" aria-labelledby="pd-fit-title">
   <h2 id="pd-fit-title">Where PostDelegate fits</h2>
@@ -19,7 +19,7 @@ const pending = 'Instagram, Facebook, Threads, TikTok, LinkedIn, Pinterest and X
     <div><dt>What it is</dt><dd><FactCell fact={pd.kind} vendor="PostDelegate" /></dd></div>
     <div><dt>Price</dt><dd>{TRIAL_DAYS}-day free trial, no card, then from ${planFor(1).monthly}/month. {COST_POINTS.map((n) => { const plan = planFor(Number(n)); return `${n} accounts: $${plan.monthly} (${plan.name}, ${plan.channels} channels)`; }).join(' · ')}. <a href="/pricing">Pricing</a></dd></div>
     <div><dt>Live today</dt><dd>{AVAILABLE_NETWORKS.length} networks: {live}. <a href="/platforms">Platform status</a></dd></div>
-    <div><dt>Pending approval</dt><dd>{pending}. These cannot be connected yet.</dd></div>
+    <div><dt>Waiting on approval</dt><dd>{pending}. These cannot be connected yet. X is not available.</dd></div>
     <div><dt>API and MCP</dt><dd><FactCell fact={pd.mcp} vendor="PostDelegate" /></dd></div>
     <div><dt>AI</dt><dd><FactCell fact={pd.ai} vendor="PostDelegate" /></dd></div>
   </dl>

@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Channels overview
-description: Which networks you can connect to PostDelegate today, which are coming soon, how each connection works, and what to do when a channel needs to be reconnected.
+description: Which networks you can connect to PostDelegate today, which are waiting on approval, how each connection works, and what to do when a channel needs to be reconnected.
 ---
 
 A channel is one connected account or destination, such as a Bluesky profile, a YouTube channel or a WordPress site. This page covers what is available now. Each network has its own guide with exact fields and post settings.
@@ -27,9 +27,9 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | [Telegram](/docs/channels/telegram) | Add @PostDelegateBot, then send a connect command | Messages to a channel or group |
 | [Discord](/docs/channels/discord) | Discord sign-in, then add the bot to a server | Messages to a channel |
 
-## Coming soon
+## Waiting on approval
 
-Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, X and several other networks are in preparation. Each one needs approval from the network before PostDelegate can offer a connection, so we do not give dates. See [Coming soon](/docs/channels/coming-soon). A network that is not in the table above does not work today.
+Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and Reddit are waiting on approval from each network, and Mastodon and Google Business Profile are not switched on yet. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the table above does not work today.
 
 ## How connections work
 

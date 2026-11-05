@@ -10,7 +10,7 @@ import NetworkGrid from '../NetworkGrid.astro';
 import CompareCard from '../CompareCard.astro';
 import Testimonials from '../Testimonials.astro';
 import Pricing from '../Pricing.astro';
-import { NETWORKS, AVAILABLE_NETWORKS, type Network } from '../../data/networks';
+import { NETWORKS, AVAILABLE_NETWORKS, WAITING_KEYS, type Network } from '../../data/networks';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
 import { AGENT_FILES } from '../../data/agent-files';
@@ -23,18 +23,18 @@ const h = t.home;
 const href = (path: string) => localeHref(lang, path);
 const HOME_FAQ=[...t.faq,...t.buyerFaq];
 const faqLd={'@context':'https://schema.org','@type':'FAQPage',mainEntity:HOME_FAQ.map(f=>({'@type':'Question',name:f.q,acceptedAnswer:{'@type':'Answer',text:f.a}}))};
-const appLd={'@context':'https://schema.org','@type':'SoftwareApplication',name:'PostDelegate',applicationCategory:'BusinessApplication',operatingSystem:'Web',url:SITE.url,description:h.appDescription(TRIAL_DAYS),featureList:h.appFeatures,inLanguage:lang,offers:{'@type':'AggregateOffer',priceCurrency:'USD',lowPrice:Math.min(...PLANS.map(p=>p.monthly)),highPrice:Math.max(...PLANS.map(p=>p.monthly)),offerCount:PLANS.length}};
+const appLd={'@context':'https://schema.org','@type':'SoftwareApplication',name:'PostDelegate',applicationCategory:'BusinessApplication',operatingSystem:'Web',url:SITE.url,description:h.appDescription(TRIAL_DAYS),featureList:h.appFeatures,inLanguage:lang,image:new URL('/og.png',SITE.url).href,screenshot:{'@type':'ImageObject',url:new URL('/images/postdelegate-workspace.webp',SITE.url).href,width:1600,height:1000,caption:h.demoAlt},offers:{'@type':'AggregateOffer',priceCurrency:'USD',lowPrice:Math.min(...PLANS.map(p=>p.monthly)),highPrice:Math.max(...PLANS.map(p=>p.monthly)),offerCount:PLANS.length}};
 const liveCount=AVAILABLE_NETWORKS.length;
 const lowestPrice=Math.min(...PLANS.map(p=>p.monthly));
 // Hero orbit: only networks marked available sit on the bright inner rings; a few
-// coming-soon networks sit greyed out on the dashed outer ring.
+// networks waiting on approval sit greyed out on the dashed outer ring.
 const pick=(keys:string[])=>keys.map(k=>NETWORKS.find(n=>n.key===k)).filter((n):n is Network=>Boolean(n));
 const innerKeys=['youtube','bluesky','wordpress','devto'];
 const orbitInner=AVAILABLE_NETWORKS.filter(n=>innerKeys.includes(n.key));
 const orbitMiddle=AVAILABLE_NETWORKS.filter(n=>!innerKeys.includes(n.key));
 // The comet sits in the gap halfway round the middle ring, whatever its size.
 const cometAngle=(Math.floor(orbitMiddle.length/2)-0.5)*360/orbitMiddle.length;
-const orbitOuter=pick(['instagram','linkedin','tiktok','x','threads','facebook','pinterest','mastodon','reddit','discord','telegram','google_business']).filter(n=>!n.available);
+const orbitOuter=pick(WAITING_KEYS);
 const orbitLabel=h.orbitLabel(liveCount,AVAILABLE_NETWORKS.map(n=>n.name).join(', '));
 // Hotspots on the real workspace screenshot (percent of the 1280x720 image), set on
 // the corner of each control so the pin never hides the label it points at.
@@ -61,7 +61,7 @@ const compareCards=[
  {href:'/alternatives/postiz',tools:['Postiz','PostDelegate']},
 ].map((card,i)=>({...card,...h.compareCards[i]}));
 ---
-<Base title={h.title} description={h.description(TRIAL_DAYS)} jsonLd={[appLd,faqLd]} lang={lang}>
+<Base title={h.title} description={h.description(TRIAL_DAYS, AVAILABLE_NETWORKS.length)} jsonLd={[appLd,faqLd]} lang={lang}>
   <section class="home-hero" aria-labelledby="hero-title">
     <div class="hero-sky" aria-hidden="true"><span class="hero-grid"></span><span class="hero-glow"></span></div>
     <OrbitAccent kind="planet" class="hero-star-one" />
@@ -120,7 +120,7 @@ const compareCards=[
       <div class="demo-cta reveal"><a class="button button-lime" href={SITE.signup}>{h.demoCta(TRIAL_DAYS)} <span aria-hidden="true">↗</span></a><p class="demo-caption">{h.demoCaption(t.common.ctaNote)}</p></div>
     </div>
   </section>
-  <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap reveal"><span class="eyebrow">{h.aiEyebrow}</span><h2 class="section-heading" id="ai-title">{h.aiTitleA}<br/>{h.aiTitleB}<span class="ink-circle">{h.aiMark}<OrbitAccent kind="ring"/></span></h2><p class="section-intro">{h.aiIntro}</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card','reveal',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview" aria-hidden="true"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>{h.exampleWorkflow}</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">{h.draftIdea}</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">{h.aiCaption}</p><div class="agent-files-band reveal"><div class="agent-files-copy"><span class="agent-files-kicker">{h.agentFilesKicker}</span><h3>{h.agentFilesTitle}</h3><p>{h.agentFilesText}</p><a class="text-link" href="/docs/mcp/agent-files">{h.agentFilesLink} <span aria-hidden="true">↗</span></a></div><ul class="agent-files-list" aria-label={h.agentFilesLabel}>{agentFiles.map(f=><li><a href={f.href}><span class="agent-file-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5M10 15h5"/></svg></span><span><b>{f.title}</b><small>{f.file}</small></span></a></li>)}</ul></div></div></section>
+  <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap reveal"><span class="eyebrow">{h.aiEyebrow}</span><h2 class="section-heading" id="ai-title">{h.aiTitleA}{' '}<br/>{h.aiTitleB}<span class="ink-circle">{h.aiMark}<OrbitAccent kind="ring"/></span></h2><p class="section-intro">{h.aiIntro}</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card','reveal',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview" aria-hidden="true"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>{h.exampleWorkflow}</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">{h.draftIdea}</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">{h.aiCaption}</p><div class="agent-files-band reveal"><div class="agent-files-copy"><span class="agent-files-kicker">{h.agentFilesKicker}</span><h3>{h.agentFilesTitle}</h3><p>{h.agentFilesText}</p><a class="text-link" href="/docs/mcp/agent-files">{h.agentFilesLink} <span aria-hidden="true">↗</span></a></div><ul class="agent-files-list" aria-label={h.agentFilesLabel}>{agentFiles.map(f=><li><a href={f.href}><span class="agent-file-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5M10 15h5"/></svg></span><span><b>{f.title}</b><small>{f.file}</small></span></a></li>)}</ul></div></div></section>
   <section class="studio-section section" id="studio" aria-labelledby="studio-title">
     <div class="home-wide">
       <div class="studio-card">

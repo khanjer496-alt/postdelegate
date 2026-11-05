@@ -1,6 +1,6 @@
 ---
 import Guide from '../../layouts/Guide.astro';
-import { NETWORKS } from '../../data/networks';
+import { NETWORKS, networkStatus } from '../../data/networks';
 // The table is built from NETWORKS, the same data the caption checker uses, so the two never disagree.
 const frontmatter = {
   title: 'Social media character limits in 2026',
@@ -19,7 +19,8 @@ const counted: Record<string, string> = {
 const assessed = NETWORKS.filter((network) => network.limit > 0);
 const unassessed = NETWORKS.filter((network) => network.limit === 0);
 const notes = (network: typeof NETWORKS[number]) => [network.note, network.urlCost ? `Every link counts as ${network.urlCost}.` : '', network.noMentionDomain ? 'A remote mention counts as just @user.' : ''].filter(Boolean).join(' ');
-const status = (network: typeof NETWORKS[number]) => network.available ? 'Connect today' : 'Coming soon';
+const STATUS = { live: 'Connect today', waiting: 'Waiting on approval', unavailable: 'Not available' } as const;
+const status = (network: typeof NETWORKS[number]) => STATUS[networkStatus(network)];
 const list = (items: string[]) => items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 ---
 <Guide frontmatter={frontmatter}>
@@ -27,7 +28,7 @@ const list = (items: string[]) => items.length < 2 ? items.join('') : `${items.s
   <aside class="doc-note"><strong>The platform has the last word.</strong> These are planning estimates, the same ones the <a href="/tools/caption-checker">caption checker</a> uses. Each platform validates the final post, and its rules can change. Confirm the actual post in the composer before it goes out.</aside>
 
   <h2>Character limits by network</h2>
-  <p>The table lists every network in the PostDelegate directory that has an assessed limit. The last column shows whether you can connect the network today. A network that is coming soon has a limit listed for planning but cannot be connected yet.</p>
+  <p>The table lists every network in the PostDelegate directory that has an assessed limit. The last column shows whether you can connect the network today. A network that is waiting on approval or not available has a limit listed for planning but cannot be connected.</p>
   <table>
     <thead><tr><th>Network</th><th>Limit</th><th>Counted as</th><th>Notes</th><th>On PostDelegate</th></tr></thead>
     <tbody>

@@ -55,7 +55,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <a slot="actions" href="/tools/caption-checker" class="button button-outline">{c.tryCaption}</a>
   {network && <div class:list={['sch-head', { 'is-soon': !available }]}>
     <NetworkBadge n={network} size="lg" />
-    <p><strong>{available ? c.head(s.name) : soon.head(s.name, !!s.pending)}</strong><span>{available ? c.headSub(alongside.length) : soon.headSub(openCount)}</span></p>
+    <p><strong>{available ? c.head(s.name) : soon.head(s.name)}</strong><span>{available ? c.headSub(alongside.length) : soon.headSub(openCount)}</span></p>
     <LogoStack networks={alongside} max={6} size="xs" lang={lang} />
   </div>}
   {available

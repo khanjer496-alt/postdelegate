@@ -1,6 +1,8 @@
 // Network families in the PostDelegate channel directory.
-// `available` marks networks that can be connected in the app today; every other
-// network is coming soon and directory presence is not a claim of access.
+// `available` marks networks that can be connected in the app today. WAITING_KEYS are the
+// networks that are not live yet but are on their way (platform approval, or access in hand
+// and not switched on). Every other network here (X, Farcaster) is not offered on
+// PostDelegate and is listed only for the free tools' character limits.
 // Caption limits are tool estimates; providers validate the actual post.
 // unit: codepoints | utf16 | utf8_bytes | graphemes | codepoints_emoji_bytes | weighted (X)
 export interface Network {
@@ -37,11 +39,6 @@ export const NETWORKS: Network[] = [
   { key: 'wordpress', name: 'WordPress', color: '#21759b', abbr: 'Wp', limit: 100000, unit: 'codepoints', scheduler: 'wordpress-scheduler', available: true, blurb: 'Posts or pages with categories, tags and a featured image.' },
   { key: 'hashnode', name: 'Hashnode', color: '#2962ff', abbr: 'Hn', limit: 10000, unit: 'codepoints', scheduler: 'hashnode-scheduler', available: true, blurb: 'Markdown articles to one of your publications.' },
   { key: 'listmonk', name: 'Listmonk (email)', color: '#0055d4', abbr: 'Lm', limit: 100000, unit: 'codepoints', scheduler: 'listmonk-scheduler', available: true, blurb: 'Email campaigns through your own Listmonk.' },
-  { key: 'vk', name: 'VK', color: '#0077ff', abbr: 'VK', limit: 0, unit: 'not-assessed', note: 'Connection rollout pending.' },
-  { key: 'whop', name: 'Whop', color: '#ff6243', abbr: 'Wh', limit: 0, unit: 'not-assessed', note: 'Connection rollout pending.' },
-  { key: 'skool', name: 'Skool', color: '#f9d54a', abbr: 'Sk', limit: 0, unit: 'not-assessed', note: 'Connection rollout pending.' },
-  { key: 'mewe', name: 'MeWe', color: '#18b69b', abbr: 'Mw', limit: 0, unit: 'not-assessed', note: 'Connection rollout pending.' },
-  { key: 'moltbook', name: 'Moltbook', color: '#e85b48', abbr: 'Mb', limit: 0, unit: 'not-assessed', note: 'Connection rollout pending.' },
 ];
 export const NETWORK_COUNT = NETWORKS.length;
 export const AVAILABLE_NETWORKS = NETWORKS.filter((network) => network.available);
@@ -51,8 +48,15 @@ export const FEATURED_LIVE_NETWORKS = [
   ...FEATURED_KEYS.map((key) => AVAILABLE_NETWORKS.find((network) => network.key === key)).filter((network): network is Network => Boolean(network)),
   ...AVAILABLE_NETWORKS.filter((network) => !FEATURED_KEYS.includes(network.key)),
 ];
-// The networks listed on /docs/channels/coming-soon, in that order. None of them can be connected today.
-export const NOT_LIVE_KEYS = ['facebook', 'instagram', 'threads', 'tiktok', 'linkedin', 'pinterest', 'x'];
+// The networks listed on /docs/channels/coming-soon as waiting on approval, in that order.
+// None of them can be connected today. X is not one of them: it is not available on PostDelegate.
+export const WAITING_KEYS = ['facebook', 'instagram', 'threads', 'tiktok', 'linkedin', 'pinterest', 'reddit', 'mastodon', 'google_business'];
+export const WAITING_NETWORKS = WAITING_KEYS
+  .map((key) => NETWORKS.find((network) => network.key === key))
+  .filter((network): network is Network => Boolean(network));
+export type NetworkStatus = 'live' | 'waiting' | 'unavailable';
+export const networkStatus = (network: Network): NetworkStatus =>
+  network.available ? 'live' : WAITING_KEYS.includes(network.key) ? 'waiting' : 'unavailable';
 // Scheduler pages for a menu, in the order given with the available networks first.
 // The header and footer menus show only available networks, so a network joins them once it is marked available above.
 export const menuNetworks = (keys: string[]) => keys

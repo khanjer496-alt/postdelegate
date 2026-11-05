@@ -40,7 +40,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Slack', href: '/docs/channels/slack', description: 'Add PostDelegate to a Slack workspace.' },
     { title: 'Telegram', href: '/docs/channels/telegram', description: 'Add @PostDelegateBot to a channel or group.' },
     { title: 'Discord', href: '/docs/channels/discord', description: 'Add the PostDelegate bot to a Discord server.' },
-    { title: 'Coming soon', href: '/docs/channels/coming-soon', description: 'Networks waiting on platform approval.' },
+    { title: 'Waiting on approval', href: '/docs/channels/coming-soon', description: 'Networks waiting on platform approval.' },
   ] },
   { title: 'REST API', items: [
     { title: 'API overview', href: '/docs/api', description: 'Base URL, authentication, rate limits and errors.' },

@@ -8,7 +8,7 @@ import { SITE } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import LogoStack from '../LogoStack.astro';
-import { localizeLinks, strings, type Lang } from '../../i18n';
+import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = strings(lang);
@@ -37,9 +37,13 @@ const questions = [
   { q: p.creditsQ, a: p.creditsA },
   { q: p.aiQ, a: p.aiA },
 ];
+// One Offer per plan, monthly price in US dollars, from plans.ts.
+const productLd = { '@context': 'https://schema.org', '@type': 'Product', name: 'PostDelegate', description: p.description(PLANS[0].monthly, TRIAL_DAYS), brand: { '@type': 'Brand', name: 'PostDelegate' }, image: new URL('/og.png', SITE.url).href, url: `${SITE.url}${localeHref(lang, '/pricing')}`,
+  offers: PLANS.map((plan) => ({ '@type': 'Offer', name: plan.name, description: t.planTaglines[plan.slug] ?? plan.tagline, price: plan.monthly, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: `${SITE.url}${localeHref(lang, '/pricing')}`,
+    priceSpecification: { '@type': 'UnitPriceSpecification', price: plan.monthly, priceCurrency: 'USD', unitCode: 'MON', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' } } })) };
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: t.buyerFaq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };
 ---
-<Base title={p.title} description={p.description(PLANS[0].monthly, TRIAL_DAYS)} jsonLd={[faqLd]} lang={lang}>
+<Base title={p.title} description={p.description(PLANS[0].monthly, TRIAL_DAYS)} jsonLd={[productLd, faqLd]} lang={lang}>
   <PageHero eyebrow={p.eyebrow} title={p.h1(PLANS[0].monthly, TRIAL_DAYS)} lead={p.lead}>
     <a href={SITE.signup} class="button">{t.common.ctaLabel}</a>
     <a href="/docs/billing" class="button button-outline">{p.billingGuide}</a>
@@ -55,6 +59,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
         <tbody>{rows.map(([label, value]) => <tr><th scope="row">{label}</th>{PLANS.map((plan) => { const v = value(plan); return <td>{v === true ? <span class="cell-yes"><span aria-hidden="true">✓</span><span class="sr-only">{p.yes}</span></span> : v === false ? <span class="cell-no"><span aria-hidden="true">–</span><span class="sr-only">{p.no}</span></span> : v}</td>; })}</tr>)}</tbody>
       </table>
     </div>
+    <p class="compare-links" set:html={localizeLinks(lang, p.compareLinks)} />
   </div></section>
   <section class="pricing-questions"><div class="container">
     <h2>{p.questionsTitle}</h2>
@@ -85,6 +90,8 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   .pricing-faq { padding: 0 0 90px; background: var(--bg, #0d0d0d); }
   .pricing-faq-list { max-width: 880px; margin: auto; }
   .plan-compare { padding: 0 0 100px; background: var(--bg, #0d0d0d); }
+  .compare-links { max-width: 880px; margin: 22px auto 0; color: var(--muted, #b9b9b9); font-size: 15px; line-height: 1.8; text-align: center; }
+  .compare-links :global(a) { color: var(--text, #fff); text-decoration: underline; text-underline-offset: 4px; }
   .compare-scroll { position: relative; max-width: 880px; margin: auto; overflow-x: auto; border: 1px solid #303030; border-radius: 22px; background: #171717; }
   table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; }
   thead th { color: var(--text, #fff); font-size: 15px; font-weight: 750; }

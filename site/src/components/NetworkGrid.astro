@@ -1,9 +1,8 @@
 ---
 // "Schedule posts for every network": one card per live network, linking to its scheduler page,
-// then the networks that are not live yet, greyed out and labelled. Never mix the two.
+// then the networks waiting on approval, greyed out under one label. Never mix the two.
 import NetworkBadge from './NetworkBadge.astro';
-import { NETWORKS, AVAILABLE_NETWORKS, NOT_LIVE_KEYS, type Network } from '../data/networks';
-import { SCHEDULERS } from '../data/schedulers';
+import { AVAILABLE_NETWORKS, WAITING_NETWORKS, type Network } from '../data/networks';
 import { localeHref, strings, type Lang } from '../i18n';
 interface Props { exclude?: string; headingLevel?: 'h3' | 'h4'; lang?: Lang }
 const { exclude, headingLevel = 'h3', lang = 'en' } = Astro.props;
@@ -12,12 +11,8 @@ const g = t.networkGrid;
 const Heading = headingLevel;
 const live = AVAILABLE_NETWORKS.filter((n) => n.key !== exclude);
 const href = (n: Network) => localeHref(lang, n.scheduler ? `/${n.scheduler}` : `/docs/channels/${n.key}`);
-// Same wording as /docs/channels/coming-soon: networks waiting on a platform review are
-// "Pending approval"; the others are "Coming soon".
-const pending = NOT_LIVE_KEYS
-  .map((key) => NETWORKS.find((n) => n.key === key))
-  .filter((n): n is Network => Boolean(n) && !n!.available && n!.key !== exclude)
-  .map((n) => ({ n, label: SCHEDULERS.find((s) => s.key === n.key)?.pending ? g.pendingApproval : g.comingSoon }));
+// Same list as /docs/channels/coming-soon.
+const pending = WAITING_NETWORKS.filter((n) => n.key !== exclude);
 ---
 <ul class="ng-grid" aria-label={g.label}>
   {live.map((n) => (
@@ -32,9 +27,9 @@ const pending = NOT_LIVE_KEYS
   <div class="ng-pending">
     <p class="ng-pending-title" set:html={g.pendingTitle} />
     <ul class="ng-pending-list" aria-label={g.pendingLabel}>
-      {pending.map(({ n, label }) => <li>{n.scheduler
-        ? <a class="ng-chip" href={`/${n.scheduler}`}><NetworkBadge n={n} size="xs" /><span>{n.name}</span><small>{label}</small></a>
-        : <span class="ng-chip"><NetworkBadge n={n} size="xs" /><span>{n.name}</span><small>{label}</small></span>}</li>)}
+      {pending.map((n) => <li>{n.scheduler
+        ? <a class="ng-chip" href={`/${n.scheduler}`}><NetworkBadge n={n} size="xs" /><span>{n.name}</span></a>
+        : <span class="ng-chip"><NetworkBadge n={n} size="xs" /><span>{n.name}</span></span>}</li>)}
     </ul>
     <a class="ng-pending-link" href={localeHref(lang, '/platforms')}>{g.status} <span aria-hidden="true">↗</span></a>
   </div>
@@ -56,8 +51,6 @@ const pending = NOT_LIVE_KEYS
   .ng-chip > :global(span[aria-hidden]) { filter: grayscale(1); opacity: .55; }
   a.ng-chip { text-decoration: none !important; color: #a3a3a3 !important; }
   a.ng-chip:hover { border-color: #4a4a4a; color: #d6d6d6 !important; }
-  .ng-pending-list small { color: #8a8a8a; font-size: 10.5px; }
-  .ng-pending-list small::before { content: '·'; margin-inline-end: 6px; }
   .ng-pending a.ng-pending-link { color: #d1bfff; text-decoration: none; font-size: 13.5px; font-weight: 650; white-space: nowrap; }
   .ng-pending a.ng-pending-link:hover { text-decoration: underline; text-underline-offset: 5px; }
   @media (max-width: 1000px) { .ng-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

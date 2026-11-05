@@ -98,7 +98,7 @@ A render only creates media, never a post. Fair use: one render at a time per wo
 
 {{networks}}
 
-Follow-up entries are published on: {{followup_names}}. Only YouTube channels return analytics today. Other networks in the directory are coming soon and cannot be connected.
+Follow-up entries are published on: {{followup_names}}. Only YouTube channels return analytics today. Other networks cannot be connected.
 
 ## Errors and limits
 
