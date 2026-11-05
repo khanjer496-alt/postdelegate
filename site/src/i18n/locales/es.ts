@@ -114,6 +114,8 @@ const dict: Dict = {
     wordpress: 'Entradas o páginas con categorías, etiquetas e imagen destacada.',
     hashnode: 'Artículos en Markdown en una de tus publicaciones.',
     listmonk: 'Campañas de email a través de tu propio Listmonk.',
+    mastodon: 'Publicaciones e hilos en mastodon.social, con imágenes o un video.',
+    google_business: 'Novedades, eventos y ofertas en la ubicación de empresa que elijas.',
   },
   planTaglines: {
     starter: 'Para tu propio contenido.',
@@ -171,7 +173,7 @@ const dict: Dict = {
     },
     {
       q: '¿Cuándo estarán disponibles Instagram, TikTok y LinkedIn?',
-      a: 'Cada red revisa una aplicación antes de permitir que un servicio publique por sus usuarios. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon y Google Business esperan la aprobación de la plataforma. X no está disponible en PostDelegate. No publicamos fechas, porque los plazos dependen de cada red. Sigue la <a href="/roadmap">hoja de ruta</a> y el <a href="/platforms">estado de las plataformas</a>.',
+      a: 'Cada red revisa una aplicación antes de permitir que un servicio publique por sus usuarios. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest y Reddit esperan la aprobación de la plataforma. X no está disponible en PostDelegate. No publicamos fechas, porque los plazos dependen de cada red. Sigue la <a href="/roadmap">hoja de ruta</a> y el <a href="/platforms">estado de las plataformas</a>.',
     },
     {
       q: '¿Hay un límite de publicaciones?',
@@ -230,7 +232,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: '¿Qué es PostDelegate?', a: `Un planificador de redes sociales que tu IA puede manejar. Claude o ChatGPT redacta las publicaciones mediante MCP, tú las apruebas en un solo calendario y PostDelegate las publica en ${p.count} redes. También puedes planificarlo y escribirlo todo tú mismo.` },
       { q: '¿Necesito una tarjeta de crédito para la prueba?', a: `No. Todos los planes empiezan con una prueba gratuita de ${p.days} días sin tarjeta. Agrega una antes de que termine la prueba para conservar tu plan. Si no lo haces, tu espacio de trabajo queda en pausa y tus publicaciones se conservan.` },
-      { q: '¿Qué redes puedo conectar?', a: `Hoy puedes conectar ${p.count}: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon y Google Business están a la espera de aprobación. X no está disponible. Consulta el <a href="/platforms">estado de las plataformas</a>.` },
+      { q: '¿Qué redes puedo conectar?', a: `Hoy puedes conectar ${p.count}: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest y Reddit están a la espera de aprobación. X no está disponible. Consulta el <a href="/platforms">estado de las plataformas</a>.` },
       { q: '¿Cuánto cuesta la IA?', a: 'Nada por nuestra parte. Conecta mediante MCP el asistente que ya pagas, o agrega tu propia clave de OpenAI y paga a OpenAI directamente. No hay créditos de IA ni recargos.' },
       { q: '¿Puedo cancelar en cualquier momento?', a: 'Sí. Un administrador del espacio de trabajo cancela desde Facturación, y el plan sigue activo hasta el final del periodo que ya pagaste. Consulta <a href="/docs/billing">planes y facturación</a>.' },
     ],
@@ -698,6 +700,36 @@ const dict: Dict = {
       limits: [
         'Publicar inicia la campaña. Cuando sale la publicación, PostDelegate crea una campaña normal en la lista elegida y la pone en marcha, lo que la envía.',
         'Usa un borrador de PostDelegate para retener una campaña, y envía antes una prueba desde el propio Listmonk.',
+      ],
+    },
+    'mastodon-scheduler': {
+      action: 'Programar publicaciones',
+      description: `Programa publicaciones e hilos de Mastodon con imágenes o un video en mastodon.social, con inicio de sesión de Mastodon. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
+      h1: 'Programa publicaciones e hilos en Mastodon.',
+      intro: 'Conecta una cuenta de mastodon.social a PostDelegate iniciando sesión con Mastodon y programa publicaciones e hilos con imágenes o un video.',
+      plan: [
+        'Inicia sesión con Mastodon desde Agregar canal.',
+        'Escribe hasta 500 caracteres con hasta cuatro imágenes o un video.',
+        'Agrega más entradas para publicar un hilo de respuestas.',
+      ],
+      limits: [
+        'PostDelegate conecta cuentas de mastodon.social. Las cuentas de otros servidores de Mastodon aún no se pueden conectar.',
+        'Las publicaciones salen como públicas, con un límite de 500 caracteres y hasta cuatro imágenes o un video.',
+      ],
+    },
+    'google-business-scheduler': {
+      action: 'Programar publicaciones',
+      description: `Programa novedades, eventos y ofertas en tu Perfil de Empresa de Google, con una imagen y un botón de acción. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
+      h1: 'Programa publicaciones en tu Perfil de Empresa de Google.',
+      intro: 'Conecta una ubicación de tu Perfil de Empresa de Google iniciando sesión con Google y programa novedades, eventos y ofertas junto con el resto de tus publicaciones.',
+      plan: [
+        'Inicia sesión con Google desde Agregar canal y elige la ubicación de la empresa.',
+        'Escribe hasta 1.500 caracteres con una imagen opcional.',
+        'Publica una novedad, un evento o una oferta, con un botón de acción opcional.',
+      ],
+      limits: [
+        'Iniciar sesión en PostDelegate con Google no conecta por sí solo un Perfil de Empresa. La cuenta de Google debe gestionar una ubicación de empresa verificada.',
+        'Las publicaciones admiten texto y como máximo una imagen. Google puede rechazar una publicación que incumpla sus políticas de contenido, y el calendario muestra el motivo.',
       ],
     },
   },

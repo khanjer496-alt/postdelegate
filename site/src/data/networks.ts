@@ -1,13 +1,15 @@
 // Network families in the PostDelegate channel directory.
 // `available` marks networks that can be connected in the app today. WAITING_KEYS are the
-// networks that are not live yet but are on their way (platform approval, or access in hand
-// and not switched on). Every other network here (X, Farcaster) is not offered on
+// networks that are not live yet but are on their way (waiting on platform approval).
+// Every other network here (X, Farcaster) is not offered on
 // PostDelegate and is listed only for the free tools' character limits.
 // Caption limits are tool estimates; providers validate the actual post.
 // unit: codepoints | utf16 | utf8_bytes | graphemes | codepoints_emoji_bytes | weighted (X)
 export interface Network {
   key: string; name: string; color: string; abbr: string; limit: number;
   unit: string; urlCost?: number; noMentionDomain?: boolean; scheduler?: string; note?: string; available?: boolean;
+  /** The app's provider identifier (the MCP and API `platform`), when it differs from `key`. */
+  identifier?: string;
   /** Available networks: one line on what you can schedule there, from its channel guide. */
   blurb?: string;
 }
@@ -21,8 +23,8 @@ export const NETWORKS: Network[] = [
   { key: 'threads', name: 'Threads', color: '#9aa0b4', abbr: 'Th', limit: 500, unit: 'codepoints_emoji_bytes', scheduler: 'threads-scheduler' },
   { key: 'bluesky', name: 'Bluesky', color: '#0085ff', abbr: 'Bs', limit: 300, unit: 'graphemes', scheduler: 'bluesky-scheduler', available: true, blurb: 'Posts and threads, connected with an app password.' },
   { key: 'pinterest', name: 'Pinterest', color: '#e60023', abbr: 'Pi', limit: 500, unit: 'codepoints', scheduler: 'pinterest-scheduler' },
-  { key: 'mastodon', name: 'Mastodon', color: '#6364ff', abbr: 'Ma', limit: 500, unit: 'codepoints', urlCost: 23, noMentionDomain: true, scheduler: 'mastodon-scheduler' },
-  { key: 'google_business', name: 'Google Business', color: '#4285f4', abbr: 'Gb', limit: 1500, unit: 'codepoints', scheduler: 'google-business-scheduler' },
+  { key: 'mastodon', name: 'Mastodon', color: '#6364ff', abbr: 'Ma', limit: 500, unit: 'codepoints', urlCost: 23, noMentionDomain: true, scheduler: 'mastodon-scheduler', available: true, blurb: 'Posts and threads on mastodon.social, with images or a video.' },
+  { key: 'google_business', name: 'Google Business Profile', color: '#4285f4', abbr: 'Gb', limit: 1500, unit: 'codepoints', scheduler: 'google-business-scheduler', identifier: 'gmb', available: true, blurb: 'Updates, events and offers on the business location you pick.' },
   { key: 'reddit', name: 'Reddit', color: '#ff4500', abbr: 'Re', limit: 40000, unit: 'codepoints' },
   { key: 'telegram', name: 'Telegram', color: '#26a5e4', abbr: 'Tg', limit: 4096, unit: 'codepoints', scheduler: 'telegram-scheduler', available: true, blurb: 'Text, photos, videos and files to a channel or group.' },
   { key: 'discord', name: 'Discord', color: '#5865f2', abbr: 'Dc', limit: 1980, unit: 'codepoints', note: 'Discord allows 2,000; PostDelegate keeps a small margin.', scheduler: 'discord-scheduler', available: true, blurb: 'Markdown messages, images and videos to the channel you pick.' },
@@ -50,7 +52,7 @@ export const FEATURED_LIVE_NETWORKS = [
 ];
 // The networks listed on /docs/channels/coming-soon as waiting on approval, in that order.
 // None of them can be connected today. X is not one of them: it is not available on PostDelegate.
-export const WAITING_KEYS = ['facebook', 'instagram', 'threads', 'tiktok', 'linkedin', 'pinterest', 'reddit', 'mastodon', 'google_business'];
+export const WAITING_KEYS = ['facebook', 'instagram', 'threads', 'tiktok', 'linkedin', 'pinterest', 'reddit'];
 export const WAITING_NETWORKS = WAITING_KEYS
   .map((key) => NETWORKS.find((network) => network.key === key))
   .filter((network): network is Network => Boolean(network));

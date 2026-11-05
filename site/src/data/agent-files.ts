@@ -17,7 +17,8 @@ export const MCP_OAUTH_URL = 'https://app.postdelegate.com/mcp-oauth-dynamic';
 export const MCP_KEY_URL = 'https://app.postdelegate.com/api/mcp';
 export const REST_BASE_URL = 'https://app.postdelegate.com/api/public/v1';
 
-// What an agent must know per network, keyed by the provider identifier (networks.ts key).
+// What an agent must know per network, keyed by networks.ts key (the provider identifier
+// unless the network sets `identifier`).
 // `settings` lists the settings fields, `media` the media rules the server checks,
 // `followUps` whether postsAndComments[1..] are published (the provider has comment()).
 interface NetworkAgentNotes { settings: string; media: string; followUps?: boolean }
@@ -38,6 +39,8 @@ const NETWORK_AGENT_NOTES: Record<string, NetworkAgentNotes> = {
   wordpress: { settings: 'Required `title` (2+ characters) and `type` (helper `postTypes`). Optional `main_image` (cover), `categories` and `tags` as number ids (helpers `categoriesList`, `tagsList`), `status` (`publish`, `draft`, `pending`, `private`).', media: 'Pictures go inside the content as `<img src="...">` with a media-library path. Attachments are not published.' },
   hashnode: { settings: 'Required `title` (6+ characters), `publication` (helper `publications`) and at least one tag in `tags` (helper `tagsList`). Optional `subtitle`, `main_image`, `canonical` URL.', media: 'Published as an article. Use `main_image` for the cover.' },
   listmonk: { settings: 'Required `subject`, `preview` and `list` (a list id from helper `list`). Optional `template` (helper `templates`).', media: 'Sent as an email. Pictures go inside the content as `<img src="...">` with a media-library path. Attachments are not sent.' },
+  mastodon: { settings: 'None.', media: 'Up to 4 images or 1 video per post, or no media. Published as a public post on mastodon.social.', followUps: true },
+  google_business: { settings: 'Optional `topicType` (`STANDARD`, `EVENT` or `OFFER`; default `STANDARD`) and `callToActionType` (`NONE`, `BOOK`, `ORDER`, `SHOP`, `LEARN_MORE`, `SIGN_UP`, `GET_OFFER`, `CALL`) with `callToActionUrl`; the button is only added with a URL, so `CALL` adds none. `EVENT` needs `eventTitle`, with `eventStartDate` and `eventEndDate` (YYYY-MM-DD, default the publish day) and optional `eventStartTime` and `eventEndTime` (HH:MM). `OFFER` takes optional `offerCouponCode`, `offerRedeemUrl` and `offerTerms`.', media: 'Text only or exactly one image. No video.' },
 };
 const FALLBACK_NOTES: NetworkAgentNotes = { settings: 'Read them from `integrationSchema`.', media: 'Read the rules from `integrationSchema`.' };
 const notesFor = (key: string) => NETWORK_AGENT_NOTES[key] ?? FALLBACK_NOTES;
@@ -47,9 +50,9 @@ const limitText = (limit: number, note?: string) => `about ${limit.toLocaleStrin
 
 const networksFull = AVAILABLE_NETWORKS.map((network) => {
   const notes = notesFor(network.key);
-  return `- **${network.name}** (\`${network.key}\`). Limit: ${limitText(network.limit, network.note)} Settings: ${notes.settings} Media: ${notes.media}`;
+  return `- **${network.name}** (\`${network.identifier ?? network.key}\`). Limit: ${limitText(network.limit, network.note)} Settings: ${notes.settings} Media: ${notes.media}`;
 }).join('\n');
-const networksCompact = AVAILABLE_NETWORKS.map((network) => `- ${network.name} (\`${network.key}\`, ~${network.limit.toLocaleString('en-US')} chars): ${notesFor(network.key).settings}`).join('\n');
+const networksCompact = AVAILABLE_NETWORKS.map((network) => `- ${network.name} (\`${network.identifier ?? network.key}\`, ~${network.limit.toLocaleString('en-US')} chars): ${notesFor(network.key).settings}`).join('\n');
 const followUpNames = listNames(AVAILABLE_NETWORKS.filter((network) => notesFor(network.key).followUps).map((network) => network.name));
 const networkNames = listNames(AVAILABLE_NETWORKS.map((network) => network.name));
 const plans = PLANS.map((plan) => `${plan.name} $${plan.monthly}/month`).join(', ');
