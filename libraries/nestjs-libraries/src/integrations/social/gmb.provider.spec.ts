@@ -74,7 +74,19 @@ describe('GmbProvider revokeAuthorization', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it('marks its grant as covering the whole Google account', () => {
-    expect(new GmbProvider().revokesAccountGrant).toBe(true);
+  it('shares the grant group of the Google project its client belongs to', () => {
+    const realGmb = process.env.GOOGLE_GMB_CLIENT_ID;
+    const realYoutube = process.env.YOUTUBE_CLIENT_ID;
+    delete process.env.GOOGLE_GMB_CLIENT_ID;
+    process.env.YOUTUBE_CLIENT_ID = '123-abc.apps.googleusercontent.com';
+    expect(new GmbProvider().authorizationGrantGroup).toBe('google-project:123');
+    process.env.GOOGLE_GMB_CLIENT_ID = '456-def.apps.googleusercontent.com';
+    expect(new GmbProvider().authorizationGrantGroup).toBe('google-project:456');
+    process.env.GOOGLE_GMB_CLIENT_ID = 'not-a-google-client';
+    expect(new GmbProvider().authorizationGrantGroup).toBeUndefined();
+    if (realGmb === undefined) delete process.env.GOOGLE_GMB_CLIENT_ID;
+    else process.env.GOOGLE_GMB_CLIENT_ID = realGmb;
+    if (realYoutube === undefined) delete process.env.YOUTUBE_CLIENT_ID;
+    else process.env.YOUTUBE_CLIENT_ID = realYoutube;
   });
 });

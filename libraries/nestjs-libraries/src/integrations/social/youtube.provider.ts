@@ -105,6 +105,11 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
+  // shared with the other Google channels (Business Profile) of the project
+  get authorizationGrantGroup() {
+    return this.configuredGoogleRealm();
+  }
+
   private configuredGoogleRealm() {
     const project = process.env.YOUTUBE_CLIENT_ID?.match(
       /^(\d+)-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/

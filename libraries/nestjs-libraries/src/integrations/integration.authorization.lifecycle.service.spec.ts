@@ -17,6 +17,7 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
 jest.mock('nestjs-temporal-core', () => ({ TemporalService: class {} }));
 
 import { IntegrationAuthorizationLifecycleService } from './integration.authorization.lifecycle.service';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 const makeService = (
   running: { workflowId: string; runId: string; searchAttributes?: any }[],
@@ -219,10 +220,22 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete', () => {
   });
 });
 
-// Providers whose revocation ends the grant of the whole account (Google
-// Business Profile): the deleted channel's tokens always go, the grant is
-// revoked only once no other live channel uses that account
-describe('IntegrationAuthorizationLifecycleService revoke on delete, account grant', () => {
+// Providers sharing an authorizationGrantGroup (one Google project): the
+// deleted channel's tokens always go, the grant is revoked only once no other
+// live channel of the group uses that account
+const GROUP = 'google-project:123';
+
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+const groupManager = (providers: Record<string, any>) => ({
+  getSocialIntegration: (id: string) => providers[id],
+  getAuthorizationGrantGroup: (group: string) =>
+    Object.entries(providers)
+      .filter(([, p]) => p.authorizationGrantGroup === group)
+      .map(([identifier, p]) => ({ identifier, ...p })),
+});
+
+describe('IntegrationAuthorizationLifecycleService revoke on delete, shared grant', () => {
   const row = {
     id: 'int-1',
     organizationId: 'org-1',
@@ -245,12 +258,11 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete, account gra
       deleteChannel: jest.fn(async (_org: string, id: string) => ({ id })),
       countLiveChannelsOnGrant: jest.fn(async () => liveOnGrant),
     };
-    const manager = {
-      getSocialIntegration: () => ({
-        revokesAccountGrant: true,
-        revokeAuthorization,
-      }),
-    };
+    const manager = groupManager({
+      gmb: { authorizationGrantGroup: GROUP, revokeAuthorization },
+      youtube: { authorizationGrantGroup: GROUP, authorizationPolicy: {} },
+      reddit: {},
+    });
     const service = new IntegrationAuthorizationLifecycleService(
       repository as any,
       manager as any,
@@ -258,8 +270,6 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete, account gra
     );
     return { service, repository, revokeAuthorization };
   };
-
-  const settle = () => new Promise((resolve) => setImmediate(resolve));
 
   it('revokes the grant when the last channel of the account is deleted', async () => {
     const { service, repository, revokeAuthorization } = make(0);
@@ -270,8 +280,10 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete, account gra
     await settle();
 
     expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    // every provider of the group counts, managed ones included
     expect(repository.countLiveChannelsOnGrant).toHaveBeenCalledWith(
       'google-sub',
+      ['gmb', 'youtube'],
       ['int-1']
     );
     expect(revokeAuthorization).toHaveBeenCalledWith({
@@ -282,7 +294,7 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete, account gra
     });
   });
 
-  it('deletes the tokens but keeps the grant while another channel uses the account', async () => {
+  it('deletes the tokens but keeps the grant while another channel or a pending location choice uses the account', async () => {
     const { service, repository, revokeAuthorization } = make(1);
 
     await service.requestDeletion('org-1', 'int-1');
@@ -331,9 +343,91 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete, account gra
 
     expect(repository.countLiveChannelsOnGrant).toHaveBeenCalledWith(
       'google-sub',
+      ['gmb', 'youtube'],
       ['int-1', 'int-2']
     );
     expect(revokeAuthorization).toHaveBeenCalled();
     expect(repository.deleteChannel).not.toHaveBeenCalled();
+  });
+});
+
+// The managed lifecycle (YouTube) removes its own verified siblings with the
+// grant; a live channel of the group outside it (Business Profile) keeps it
+describe('IntegrationAuthorizationLifecycleService.processDeletion, shared grant', () => {
+  const realFlag = process.env.INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED;
+  beforeEach(() => {
+    process.env.INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED = 'true';
+    (ioRedis as any).scan = jest.fn(async () => ['0', []]);
+  });
+  afterEach(() => {
+    if (realFlag === undefined) delete process.env.INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED;
+    else process.env.INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED = realFlag;
+  });
+
+  const make = (liveOnGrant: number) => {
+    const youtube = {
+      authorizationGrantGroup: GROUP,
+      authorizationPolicy: { authorizationRealm: GROUP },
+      revokeAuthorization: jest.fn(async () => ({ status: 'revoked' })),
+      getAuthorizationGrant: jest.fn(async () => undefined),
+    };
+    const repository = {
+      getIntegrationForCleanup: jest.fn(async () => ({
+        id: 'yt-1',
+        organizationId: 'org-1',
+        providerIdentifier: 'youtube',
+        token: 'at',
+        refreshToken: 'rt',
+        internalId: 'channel-1',
+        rootInternalId: 'google-sub',
+        picture: null,
+        deletedAt: new Date(),
+        disabled: true,
+        refreshNeeded: true,
+      })),
+      getAuthorizationPostIds: jest.fn(async () => []),
+      countLiveChannelsOnGrant: jest.fn(async () => liveOnGrant),
+      purgeAuthorizationNotifications: jest.fn(async () => ({ unattributed: 0 })),
+      scrubAuthorizationData: jest.fn(async () => undefined),
+    };
+    const notFound = Object.assign(new Error('nf'), { name: 'WorkflowNotFoundError' });
+    const workflow = {
+      list: () => (async function* () { /* nothing running */ })(),
+      getHandle: () => ({ describe: async () => { throw notFound; } }),
+    };
+    const service = new IntegrationAuthorizationLifecycleService(
+      repository as any,
+      groupManager({
+        youtube,
+        gmb: { authorizationGrantGroup: GROUP, revokeAuthorization: jest.fn() },
+      }) as any,
+      { client: { getRawClient: () => ({ workflow }) } } as any
+    );
+    return { service, repository, youtube };
+  };
+
+  it('keeps the grant while a Business Profile channel of the account is alive, and still removes the YouTube data', async () => {
+    const { service, repository, youtube } = make(1);
+
+    await service.processDeletion('org-1', 'yt-1');
+
+    // only providers outside the managed lifecycle count
+    expect(repository.countLiveChannelsOnGrant).toHaveBeenCalledWith(
+      'google-sub',
+      ['gmb'],
+      ['yt-1']
+    );
+    expect(youtube.revokeAuthorization).not.toHaveBeenCalled();
+    expect(youtube.getAuthorizationGrant).not.toHaveBeenCalled();
+    expect(repository.scrubAuthorizationData).toHaveBeenCalledWith('org-1', 'yt-1');
+  });
+
+  it('revokes as before when no other channel of the group uses the account', async () => {
+    const { service, repository, youtube } = make(0);
+
+    await service.processDeletion('org-1', 'yt-1');
+
+    expect(youtube.revokeAuthorization).toHaveBeenCalled();
+    expect(repository.scrubAuthorizationData).toHaveBeenCalledWith('org-1', 'yt-1');
   });
 });

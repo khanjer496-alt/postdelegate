@@ -6,6 +6,8 @@ import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { TemporalService } from 'nestjs-temporal-core';
 
+type CleanupRow = NonNullable<Awaited<ReturnType<IntegrationRepository['getIntegrationForCleanup']>>>;
+
 @Injectable()
 export class IntegrationAuthorizationLifecycleService {
   private storage = UploadFactory.createStorage();
@@ -43,18 +45,29 @@ export class IntegrationAuthorizationLifecycleService {
     };
   }
 
+  // True while another live channel of the provider's authorizationGrantGroup
+  // (any organization, a pending location or page choice included) still uses
+  // the account's grant; removedIds go away with this one. managed: the
+  // managed lifecycle removes its own verified siblings with the grant, so
+  // only providers outside it keep the grant.
+  private async grantStillInUse(provider: SocialProvider, row: CleanupRow, removedIds: string[], managed = false) {
+    const group = provider.authorizationGrantGroup;
+    if (!group) return false;
+    // the account is unknown: outside the managed lifecycle, never risk
+    // ending another channel's access
+    if (!row.rootInternalId) return !managed;
+    const providers = this._manager.getAuthorizationGrantGroup(group)
+      .filter((p) => !managed || !p.authorizationPolicy)
+      .map((p) => p.identifier);
+    return !!providers.length &&
+      (await this._repository.countLiveChannelsOnGrant(row.rootInternalId, providers, removedIds)) > 0;
+  }
+
   // Providers outside the managed lifecycle that can revoke their grant: best
   // effort, never blocks the removal and logs a failure without credentials.
-  // A grant that covers the whole account (revokesAccountGrant) stays while
-  // another live channel uses that account; removedIds go away with this one.
-  private async revokeBestEffort(
-    provider: SocialProvider,
-    row: NonNullable<Awaited<ReturnType<IntegrationRepository['getIntegrationForCleanup']>>>,
-    removedIds: string[]
-  ) {
+  private async revokeBestEffort(provider: SocialProvider, row: CleanupRow, removedIds: string[]) {
     try {
-      if (provider.revokesAccountGrant &&
-        (!row.rootInternalId || await this._repository.countLiveChannelsOnGrant(row.rootInternalId, removedIds))) return;
+      if (await this.grantStillInUse(provider, row, removedIds)) return;
       const result = await provider.revokeAuthorization!(this.credentials(row));
       if (result.status !== 'revoked') console.error(`Integration ${row.id}: ${row.providerIdentifier} did not confirm the revocation`);
     } catch {
@@ -212,7 +225,7 @@ export class IntegrationAuthorizationLifecycleService {
     return true;
   }
 
-  private async queueVerifiedGrantSiblings(row: Awaited<ReturnType<IntegrationRepository['getIntegrationForCleanup']>>) {
+  private async queueVerifiedGrantSiblings(row: CleanupRow | null) {
     if (!row) return;
     const provider = this._manager.getSocialIntegration(row.providerIdentifier);
     if (!provider?.getAuthorizationGrant) return;
@@ -252,11 +265,16 @@ export class IntegrationAuthorizationLifecycleService {
       }
       const provider = this._manager.getSocialIntegration(row.providerIdentifier);
       if (!provider?.authorizationPolicy || !provider.revokeAuthorization) return { status: 'pending' };
-      // Verify any cross-organization grouping before revoking a project-wide
-      // grant. A stored or hashed principal alone is never sufficient proof.
-      await this.queueVerifiedGrantSiblings(row);
-      const result = await provider.revokeAuthorization(this.credentials(row));
-      if (result.status !== 'revoked') return { status: 'pending' };
+      // While a channel outside the managed lifecycle still uses the grant,
+      // it is kept for it: no revocation and no sibling removal, this
+      // channel's data is still removed below.
+      if (!(await this.grantStillInUse(provider, row, [integrationId], true))) {
+        // Verify any cross-organization grouping before revoking a project-wide
+        // grant. A stored or hashed principal alone is never sufficient proof.
+        await this.queueVerifiedGrantSiblings(row);
+        const result = await provider.revokeAuthorization(this.credentials(row));
+        if (result.status !== 'revoked') return { status: 'pending' };
+      }
       const notifications = await this._repository.purgeAuthorizationNotifications(organizationId, integrationId);
       if (notifications.unattributed) return { status: 'pending' };
       await this.purgeAnalytics(organizationId, [integrationId, ...posts]);

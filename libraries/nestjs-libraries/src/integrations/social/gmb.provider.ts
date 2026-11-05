@@ -53,9 +53,14 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
   ];
   editor = 'normal' as const;
   dto = GmbSettingsDto;
-  // every location connected from one Google account shares its grant, and
-  // so can a YouTube channel of that account
-  revokesAccountGrant = true;
+  // every location connected from one Google account shares its grant with
+  // the other Google channels of that account in the same Google project
+  get authorizationGrantGroup() {
+    const project = (
+      process.env.GOOGLE_GMB_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID
+    )?.match(/^(\d+)-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/)?.[1];
+    return project ? `google-project:${project}` : undefined;
+  }
 
   maxLength() {
     return 1500;

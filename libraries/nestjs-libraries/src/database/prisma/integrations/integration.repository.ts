@@ -1149,12 +1149,12 @@ export class IntegrationRepository {
     });
   }
 
-  // Live channels, in any organization, still connected through the same
-  // account (rootInternalId), apart from the ones being removed. An abandoned
-  // location or page choice (inBetweenSteps) is not a channel.
-  countLiveChannelsOnGrant(rootInternalId: string, excludeIds: string[]) {
+  // Live channels of these providers, in any organization and including a
+  // pending location or page choice (inBetweenSteps), still connected through
+  // the same account (rootInternalId), apart from the ones being removed
+  countLiveChannelsOnGrant(rootInternalId: string, providerIdentifiers: string[], excludeIds: string[]) {
     return this._integration.model.integration.count({
-      where: { rootInternalId, deletedAt: null, inBetweenSteps: false, id: { notIn: excludeIds } },
+      where: { rootInternalId, providerIdentifier: { in: providerIdentifiers }, deletedAt: null, id: { notIn: excludeIds } },
     });
   }
 

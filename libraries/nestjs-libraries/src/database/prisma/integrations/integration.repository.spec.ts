@@ -154,15 +154,16 @@ describe('IntegrationRepository.deleteChannel', () => {
 });
 
 describe('IntegrationRepository.countLiveChannelsOnGrant', () => {
-  it('counts the live channels of the account in every organization, apart from the removed ones', async () => {
+  it('counts the live channels of the account for these providers in every organization, pending location choices included', async () => {
     const { repo, integration } = makeRepo();
-    await repo.countLiveChannelsOnGrant('google-sub', ['int-1', 'int-2']);
+    await repo.countLiveChannelsOnGrant('google-sub', ['gmb', 'youtube'], ['int-1', 'int-2']);
 
+    // no inBetweenSteps filter: a pending location choice holds the grant too
     expect(integration.count.mock.calls[0][0]).toEqual({
       where: {
         rootInternalId: 'google-sub',
+        providerIdentifier: { in: ['gmb', 'youtube'] },
         deletedAt: null,
-        inBetweenSteps: false,
         id: { notIn: ['int-1', 'int-2'] },
       },
     });
