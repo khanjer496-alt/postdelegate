@@ -1,7 +1,11 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { PaymentProviderManager } from '@gitroom/nestjs-libraries/services/payment/payment.provider.manager';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
-import { PaymentPlatform } from '@gitroom/nestjs-libraries/services/payment/payment.provider.interface';
+import {
+  emptyGrowthStats,
+  PaymentGrowthStats,
+  PaymentPlatform,
+} from '@gitroom/nestjs-libraries/services/payment/payment.provider.interface';
 
 @Injectable()
 export class PaymentService {
@@ -158,6 +162,54 @@ export class PaymentService {
     for (const { provider } of this._paymentProviderManager.getProviders()) {
       await provider.cancelAllSubscriptions(organizationId);
     }
+  }
+
+  // Admin growth stats of every provider added together. A provider that
+  // can't list them, or can't be reached, is left out so the page still
+  // renders; with none left the result says it is not supported
+  async getGrowthStats(from: Date, to: Date): Promise<PaymentGrowthStats> {
+    const total = emptyGrowthStats();
+    for (const {
+      name,
+      provider,
+    } of this._paymentProviderManager.getProviders()) {
+      let stats: PaymentGrowthStats;
+      try {
+        stats = await provider.getGrowthStats(from, to);
+      } catch (err) {
+        console.error('payment_growth_stats_failed', {
+          provider: name,
+          err: (err as Error)?.message,
+        });
+        continue;
+      }
+      if (!stats.supported) {
+        continue;
+      }
+
+      total.supported = true;
+      total.currency = total.currency || stats.currency;
+      total.trialsStarted += stats.trialsStarted;
+      total.trialsRunning += stats.trialsRunning;
+      total.trialsRunningWithCard += stats.trialsRunningWithCard;
+      total.trialsConverted += stats.trialsConverted;
+      total.trialsExpired += stats.trialsExpired;
+      total.paying += stats.paying;
+      total.mrr += stats.mrr;
+      total.cancellations += stats.cancellations;
+      for (const plan of stats.payingByPlan) {
+        const found = total.payingByPlan.find(
+          (p) => p.tier === plan.tier && p.period === plan.period
+        );
+        if (found) {
+          found.count += plan.count;
+          found.mrr += plan.mrr;
+        } else {
+          total.payingByPlan.push({ ...plan });
+        }
+      }
+    }
+    return total;
   }
 
   async syncCustomerEmailsAfterSwitch(

@@ -1,6 +1,7 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import dayjs from 'dayjs';
 
 export interface StatsParams {
   from: Date;
@@ -58,6 +59,25 @@ export interface StatsResponse {
   connectedClients: { total: number; perSocial: PerSocial[] };
 }
 
+export interface GrowthParams {
+  from: Date;
+  to: Date;
+}
+
+export interface SignUpsResponse {
+  total: number;
+  // confirmed their email (social sign-ups are confirmed when created)
+  activated: number;
+  // per sign-up method (LOCAL is email and password, GOOGLE, ...)
+  perMethod: { total: number; perSocial: PerSocial[] };
+  // every day of the range, days without sign-ups included
+  perDay: { date: string; count: number }[];
+}
+
+// Subscriptions given away rather than bought: lifetime deal codes and plans
+// set by hand
+const MANUAL_SUBSCRIPTION_PROVIDER = 'manual';
+
 const sortDesc = (list: PerSocial[]) =>
   list.sort((a, b) => b.count - a.count || a.provider.localeCompare(b.provider));
 
@@ -68,7 +88,9 @@ export class AdminStatsRepository {
     private _integration: PrismaRepository<'integration'>,
     private _errors: PrismaRepository<'errors'>,
     private _oauthApp: PrismaRepository<'oAuthApp'>,
-    private _oauthAuth: PrismaRepository<'oAuthAuthorization'>
+    private _oauthAuth: PrismaRepository<'oAuthAuthorization'>,
+    private _user: PrismaRepository<'user'>,
+    private _subscription: PrismaRepository<'subscription'>
   ) {}
 
   private async errorStats(params: StatsParams) {
@@ -463,6 +485,66 @@ export class AdminStatsRepository {
       postsByState,
       ...activity,
     };
+  }
+
+  // Users created in the range, deleted ones left out, per method and per
+  // day. Days are the server's days, like the from / to of the range
+  async getSignUps(params: GrowthParams): Promise<SignUpsResponse> {
+    const users = await this._user.model.user.findMany({
+      where: {
+        deletedAt: null,
+        createdAt: { gte: params.from, lte: params.to },
+      },
+      select: { createdAt: true, providerName: true, activated: true },
+    });
+
+    const byMethod = new Map<string, number>();
+    const byDay = new Map<string, number>();
+    for (const user of users) {
+      byMethod.set(
+        user.providerName,
+        (byMethod.get(user.providerName) || 0) + 1
+      );
+      const day = dayjs(user.createdAt).format('YYYY-MM-DD');
+      byDay.set(day, (byDay.get(day) || 0) + 1);
+    }
+
+    const perDay: { date: string; count: number }[] = [];
+    const last = dayjs(params.to).startOf('day');
+    for (
+      let day = dayjs(params.from).startOf('day');
+      !day.isAfter(last);
+      day = day.add(1, 'day')
+    ) {
+      const date = day.format('YYYY-MM-DD');
+      perDay.push({ date, count: byDay.get(date) || 0 });
+    }
+
+    return {
+      total: users.length,
+      activated: users.filter((user) => user.activated).length,
+      perMethod: {
+        total: users.length,
+        perSocial: sortDesc(
+          [...byMethod.entries()].map(([provider, count]) => ({
+            provider,
+            count,
+          }))
+        ),
+      },
+      perDay,
+    };
+  }
+
+  // Live subscriptions of live organizations that nobody pays for
+  async getCompedSubscriptions() {
+    return this._subscription.model.subscription.count({
+      where: {
+        deletedAt: null,
+        organization: { deletedAt: null },
+        OR: [{ isLifetime: true }, { provider: MANUAL_SUBSCRIPTION_PROVIDER }],
+      },
+    });
   }
 
   async getStats(params: StatsParams): Promise<StatsResponse> {
