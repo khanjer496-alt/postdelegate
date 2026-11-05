@@ -48,13 +48,18 @@ export interface PaymentGrowthStats {
   // trials that ended in the range: became paid / ended without paying
   trialsConverted: number;
   trialsExpired: number;
-  // paying subscriptions now, per plan and period
+  // paid subscriptions now (a 100% coupon pays $0), per plan and period
   paying: number;
   payingByPlan: PaymentGrowthPlan[];
   // monthly recurring revenue now (yearly / 12), minor units (cents)
   mrr: number;
-  // paid subscriptions canceled in the range (trials ending are not counted)
+  // paid subscriptions that ended in the range (trials ending are not counted)
   cancellations: number;
+  // paid subscriptions set to cancel at the end of their period, now
+  cancelling: number;
+  // subscriptions whose payment is failing now (past_due / unpaid), left out
+  // of paying and the revenue
+  paymentFailing: number;
 }
 
 export const emptyGrowthStats = (supported = false): PaymentGrowthStats => ({
@@ -69,6 +74,8 @@ export const emptyGrowthStats = (supported = false): PaymentGrowthStats => ({
   payingByPlan: [],
   mrr: 0,
   cancellations: 0,
+  cancelling: 0,
+  paymentFailing: 0,
 });
 
 // Every billing use-case goes through this contract. Webhooks and `platform`

@@ -2449,15 +2449,29 @@ describe('admin growth stats', () => {
           trial_start: now - 50 * DAY,
           trial_end: now - 43 * DAY,
         }),
+        // the card was declined when the trial ended: not paying yet
+        sub({
+          id: 'declined',
+          status: 'past_due',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+        }),
+        sub({
+          id: 'unpaid',
+          status: 'unpaid',
+          trial_start: now - 10 * DAY,
+          trial_end: now - 3 * DAY,
+        }),
       ],
       from,
       to,
       now
     );
 
-    expect(stats.trialsStarted).toBe(3);
+    expect(stats.trialsStarted).toBe(5);
     expect(stats.trialsConverted).toBe(1);
     expect(stats.trialsExpired).toBe(2);
+    expect(stats.paymentFailing).toBe(2);
     // ending trials are not cancellations of paying customers
     expect(stats.cancellations).toBe(0);
     expect(stats.paying).toBe(2);
@@ -2485,16 +2499,35 @@ describe('admin growth stats', () => {
     expect(stats.cancellations).toBe(0);
   });
 
-  it('counts a paid subscription canceled in the range', () => {
+  it('counts a paid subscription that ended in the range', () => {
     const stats = growthStatsOf(
       [
         // still paying until the period end
-        sub({ id: 'at_period_end', canceled_at: now - 2 * DAY }),
+        sub({
+          id: 'at_period_end',
+          canceled_at: now - 2 * DAY,
+          cancel_at_period_end: true,
+        }),
+        sub({ id: 'cancel_at', cancel_at: now + 9 * DAY }),
         sub({
           id: 'ended',
           status: 'canceled',
           canceled_at: now - 4 * DAY,
           ended_at: now - 4 * DAY,
+        }),
+        // asked to cancel in the range, ended after it
+        sub({
+          id: 'ended_later',
+          status: 'canceled',
+          canceled_at: now - 4 * DAY,
+          ended_at: now + DAY,
+        }),
+        // ended before the range
+        sub({
+          id: 'ended_before',
+          status: 'canceled',
+          canceled_at: now - 40 * DAY,
+          ended_at: now - 40 * DAY,
         }),
         // abandoned checkout
         sub({
@@ -2508,8 +2541,9 @@ describe('admin growth stats', () => {
       now
     );
 
-    expect(stats.cancellations).toBe(2);
-    expect(stats.paying).toBe(1);
+    expect(stats.cancellations).toBe(1);
+    expect(stats.cancelling).toBe(2);
+    expect(stats.paying).toBe(2);
   });
 
   it('spreads a yearly plan over 12 months and groups paying per plan', () => {
@@ -2520,9 +2554,12 @@ describe('admin growth stats', () => {
       now
     );
 
-    expect(stats.mrr).toBe(2300 + 1900 * 2);
+    // a failing payment is not revenue
+    expect(stats.mrr).toBe(2300 + 1900);
+    expect(stats.paying).toBe(2);
+    expect(stats.paymentFailing).toBe(1);
     expect(stats.payingByPlan).toEqual([
-      { tier: 'STANDARD', period: 'MONTHLY', count: 2, mrr: 3800 },
+      { tier: 'STANDARD', period: 'MONTHLY', count: 1, mrr: 1900 },
       { tier: 'TEAM', period: 'YEARLY', count: 1, mrr: 2300 },
     ]);
   });
@@ -2626,6 +2663,33 @@ describe('admin growth stats', () => {
       expect(
         mockStripe.subscriptions.list.mock.calls[1][0].starting_after
       ).toBe('sub_other');
+    });
+
+    it('pages through Stripe once for requests arriving together', async () => {
+      mockStripe.subscriptions.list.mockResolvedValue({
+        has_more: false,
+        data: [sub()],
+      });
+
+      const [a, b] = await Promise.all([
+        service.getGrowthStats(from, to),
+        service.getGrowthStats(from, to),
+      ]);
+
+      expect(a.paying).toBe(1);
+      expect(b.paying).toBe(1);
+      expect(mockStripe.subscriptions.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('loads again after a failed load', async () => {
+      mockStripe.subscriptions.list
+        .mockRejectedValueOnce(new Error('ECONNRESET'))
+        .mockResolvedValueOnce({ has_more: false, data: [sub()] });
+
+      await expect(service.getGrowthStats(from, to)).rejects.toThrow(
+        'ECONNRESET'
+      );
+      expect((await service.getGrowthStats(from, to)).paying).toBe(1);
     });
 
     it('reads the subscriptions from memory on a reload', async () => {

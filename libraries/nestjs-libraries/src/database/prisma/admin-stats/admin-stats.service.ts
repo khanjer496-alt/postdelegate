@@ -23,11 +23,14 @@ export class AdminStatsService {
   }
 
   // Sign-ups from our database, trials and revenue from the billing
-  // providers, comped plans from our subscriptions
+  // providers, comped plans from our subscriptions (admin set ones are
+  // stored under the web provider, like add-subscription does)
   async getGrowth(params: GrowthParams) {
     const [signUps, comped, billing] = await Promise.all([
       this._adminStatsRepository.getSignUps(params),
-      this._adminStatsRepository.getCompedSubscriptions(),
+      this._adminStatsRepository.getCompedSubscriptions(
+        this._paymentService.getDefaultProviderName('web')
+      ),
       this._paymentService.getGrowthStats(params.from, params.to),
     ]);
 

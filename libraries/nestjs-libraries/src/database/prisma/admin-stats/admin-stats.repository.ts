@@ -74,10 +74,6 @@ export interface SignUpsResponse {
   perDay: { date: string; count: number }[];
 }
 
-// Subscriptions given away rather than bought: lifetime deal codes and plans
-// set by hand
-const MANUAL_SUBSCRIPTION_PROVIDER = 'manual';
-
 const sortDesc = (list: PerSocial[]) =>
   list.sort((a, b) => b.count - a.count || a.provider.localeCompare(b.provider));
 
@@ -536,15 +532,43 @@ export class AdminStatsRepository {
     };
   }
 
-  // Live subscriptions of live organizations that nobody pays for
-  async getCompedSubscriptions() {
-    return this._subscription.model.subscription.count({
-      where: {
-        deletedAt: null,
-        organization: { deletedAt: null },
-        OR: [{ isLifetime: true }, { provider: MANUAL_SUBSCRIPTION_PROVIDER }],
-      },
-    });
+  // Live plans of live organizations that nobody pays for: lifetime deal
+  // codes, and plans an admin set. Add-subscription stores them under the
+  // web provider with a member's user id as the organization's paymentId,
+  // so the provider never has a customer, nor a subscription, under it
+  async getCompedSubscriptions(adminProvider: string) {
+    const where: Prisma.SubscriptionWhereInput = {
+      deletedAt: null,
+      organization: { deletedAt: null },
+    };
+
+    const [lifetime, notLifetime] = await Promise.all([
+      this._subscription.model.subscription.count({
+        where: { ...where, isLifetime: true },
+      }),
+      this._subscription.model.subscription.findMany({
+        where: {
+          ...where,
+          isLifetime: false,
+          provider: adminProvider,
+          organization: { deletedAt: null, paymentId: { not: null } },
+        },
+        select: {
+          organization: {
+            select: { paymentId: true, users: { select: { userId: true } } },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      lifetime,
+      setByAdmin: notLifetime.filter(({ organization }) =>
+        organization.users.some(
+          (user) => user.userId === organization.paymentId
+        )
+      ).length,
+    };
   }
 
   async getStats(params: StatsParams): Promise<StatsResponse> {

@@ -49,7 +49,7 @@ interface GrowthResponse {
     perMethod: StatsBlock;
     perDay: { date: string; count: number }[];
   };
-  comped: number;
+  comped: { lifetime: number; setByAdmin: number };
   billing: {
     supported: boolean;
     currency: string | null;
@@ -62,6 +62,8 @@ interface GrowthResponse {
     payingByPlan: GrowthPlan[];
     mrr: number;
     cancellations: number;
+    cancelling: number;
+    paymentFailing: number;
   };
 }
 
@@ -144,11 +146,15 @@ const useGrowthStats = (params: { from: string; to: string }) => {
   );
 };
 
-const SummaryCard: FC<{ label: string; value: number | string }> = ({
-  label,
-  value,
-}) => (
-  <div className="border border-newTableBorder rounded-[8px] p-[16px] bg-newBgColorInner">
+const SummaryCard: FC<{
+  label: string;
+  value: number | string;
+  title?: string;
+}> = ({ label, value, title }) => (
+  <div
+    className="border border-newTableBorder rounded-[8px] p-[16px] bg-newBgColorInner"
+    title={title}
+  >
     <div className="text-[12px] opacity-70">{label}</div>
     <div className="text-[28px] font-[600]">
       {typeof value === 'number' ? value.toLocaleString() : value}
@@ -202,18 +208,19 @@ const SignUpsChart: FC<{ perDay: { date: string; count: number }[] }> = ({
   // the bars of a range without sign-ups stay flat
   const max = Math.max(1, busiest);
   return (
-    <div className="border border-newTableBorder rounded-[8px] p-[12px] flex flex-col gap-[8px]">
+    <div className="border border-newTableBorder rounded-[8px] p-[12px] flex flex-col gap-[8px] min-w-0">
       <div className="text-[12px] uppercase opacity-70">
         New sign-ups per day
       </div>
-      <div className="flex items-end gap-[2px] h-[120px]">
+      {/* bars shrink below a pixel rather than scroll a long range sideways */}
+      <div className="flex items-end gap-px h-[120px] min-w-0 overflow-hidden">
         {perDay.map((day) => (
           <div
             key={day.date}
             title={`${new Date(`${day.date}T00:00:00`).toLocaleDateString()}: ${
               day.count
             }`}
-            className="flex-1 min-w-[2px] h-full flex items-end"
+            className="flex-1 min-w-0 h-full flex items-end"
           >
             <div
               className="w-full bg-forth rounded-t-[2px]"
@@ -223,7 +230,7 @@ const SignUpsChart: FC<{ perDay: { date: string; count: number }[] }> = ({
         ))}
       </div>
       {perDay.length > 0 && (
-        <div className="flex justify-between text-[12px] opacity-70">
+        <div className="flex flex-wrap justify-between gap-[8px] text-[12px] opacity-70">
           <div>
             {new Date(`${perDay[0].date}T00:00:00`).toLocaleDateString()}
           </div>
@@ -280,21 +287,38 @@ const GrowthSection: FC<{ range: { from: string; to: string } }> = ({
             <SummaryCard
               label="Paying customers (right now)"
               value={billing.paying}
+              title="Paid subscriptions only. A plan with a 100% coupon counts as paying at $0"
             />
             <SummaryCard
               label="Monthly revenue (MRR)"
               value={formatMoney(billing.mrr, billing.currency)}
+              title="After discounts, yearly plans divided by 12. A plan with a 100% coupon adds $0"
+            />
+            <SummaryCard
+              label="Payment failing (right now)"
+              value={billing.paymentFailing}
+              title="The card was declined, Stripe is retrying. Not counted as paying or in MRR"
             />
             <SummaryCard label="Cancellations" value={billing.cancellations} />
+            <SummaryCard
+              label="Cancelling at period end"
+              value={billing.cancelling}
+              title="Still paying now, set to stop at the end of the period they paid for"
+            />
           </>
         )}
-        <SummaryCard label="Comped / lifetime (right now)" value={comped} />
+        <SummaryCard label="Lifetime deals" value={comped.lifetime} />
+        <SummaryCard
+          label="Set by admin"
+          value={comped.setByAdmin}
+          title="Plans given from the admin billing tools, nobody pays for them"
+        />
       </div>
 
       {billing.supported ? (
         <div
           className="border border-newTableBorder rounded-[8px] p-[12px] text-[14px] flex flex-wrap items-center gap-[8px]"
-          title="All three are counted in the selected dates, so they are not always the same people"
+          title="Counted in the selected dates, so they are not always the same people. Became paying is out of the trials that ended in these dates"
         >
           <div>
             New sign-ups <strong>{signUps.total.toLocaleString()}</strong>
@@ -309,7 +333,11 @@ const GrowthSection: FC<{ range: { from: string; to: string } }> = ({
           <div>
             Became paying{' '}
             <strong>{billing.trialsConverted.toLocaleString()}</strong> (
-            {percentOf(billing.trialsConverted, billing.trialsStarted)})
+            {percentOf(
+              billing.trialsConverted,
+              billing.trialsConverted + billing.trialsExpired
+            )}{' '}
+            of trials that ended)
           </div>
         </div>
       ) : (

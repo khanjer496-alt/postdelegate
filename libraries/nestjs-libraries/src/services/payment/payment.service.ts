@@ -197,6 +197,8 @@ export class PaymentService {
       total.paying += stats.paying;
       total.mrr += stats.mrr;
       total.cancellations += stats.cancellations;
+      total.cancelling += stats.cancelling;
+      total.paymentFailing += stats.paymentFailing;
       for (const plan of stats.payingByPlan) {
         const found = total.payingByPlan.find(
           (p) => p.tier === plan.tier && p.period === plan.period

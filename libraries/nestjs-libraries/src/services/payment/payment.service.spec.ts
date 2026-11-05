@@ -54,6 +54,8 @@ describe('PaymentService.getGrowthStats', () => {
     ],
     mrr: 1900,
     cancellations: 0,
+    cancelling: 1,
+    paymentFailing: 1,
     ...overrides,
   });
   const web = { getGrowthStats: jest.fn() };
@@ -92,6 +94,8 @@ describe('PaymentService.getGrowthStats', () => {
     expect(total.supported).toBe(true);
     expect(total.trialsStarted).toBe(3);
     expect(total.mrr).toBe(4800);
+    expect(total.cancelling).toBe(2);
+    expect(total.paymentFailing).toBe(2);
     expect(total.payingByPlan).toEqual([
       { tier: 'STANDARD', period: 'MONTHLY', count: 2, mrr: 3800 },
       { tier: 'PRO', period: 'MONTHLY', count: 1, mrr: 1000 },

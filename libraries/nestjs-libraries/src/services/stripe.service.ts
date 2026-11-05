@@ -348,12 +348,17 @@ const isExpiredTrial = (subscription: Stripe.Subscription) =>
   subscription.ended_at - subscription.trial_end < 3600;
 
 // Stripe charges the subscription default first, then the customer default.
-// Reads the customer expanded on the subscription, no extra call
-const hasCardOf = (subscription: Stripe.Subscription) => {
+// Reads the customer expanded on the subscription unless one is given
+const hasCardOf = (
+  subscription: Stripe.Subscription,
+  customer:
+    | string
+    | Stripe.Customer
+    | Stripe.DeletedCustomer = subscription.customer
+) => {
   if (subscription.default_payment_method || subscription.default_source) {
     return true;
   }
-  const customer = subscription.customer;
   if (!customer || typeof customer === 'string' || customer.deleted) {
     return false;
   }
@@ -404,7 +409,8 @@ export const monthlyAmountOf = (
 
 // The admin growth numbers from every subscription of the app (already
 // filtered on metadata.service). Trials are told apart by trial_start /
-// trial_end, paying is active or past_due (Stripe still collects past_due)
+// trial_end. Paying is active only (paid), a failing payment (past_due /
+// unpaid) is counted on its own and not in the revenue
 export const growthStatsOf = (
   subscriptions: Stripe.Subscription[],
   from: Date,
@@ -448,29 +454,34 @@ export const growthStatsOf = (
 
     if (
       !expired &&
+      subscription.status === 'active' &&
       subscription.trial_end &&
       subscription.trial_end <= now &&
-      inRange(subscription.trial_end) &&
-      subscription.status !== 'trialing' &&
-      subscription.status !== 'incomplete_expired'
+      inRange(subscription.trial_end)
     ) {
       stats.trialsConverted++;
     }
 
+    // ended in the range, not a trial running out
     if (
       !expired &&
-      inRange(subscription.canceled_at) &&
-      subscription.status !== 'trialing' &&
-      subscription.status !== 'incomplete' &&
-      subscription.status !== 'incomplete_expired'
+      subscription.status === 'canceled' &&
+      inRange(subscription.ended_at)
     ) {
       stats.cancellations++;
     }
 
     if (
-      subscription.status === 'active' ||
-      subscription.status === 'past_due'
+      subscription.status === 'past_due' ||
+      subscription.status === 'unpaid'
     ) {
+      stats.paymentFailing++;
+    }
+
+    if (subscription.status === 'active') {
+      if (subscription.cancel_at_period_end || subscription.cancel_at) {
+        stats.cancelling++;
+      }
       const tier = subscription.metadata?.billing || 'UNKNOWN';
       const period = billedPeriodOf(
         subscription,
@@ -978,18 +989,17 @@ export class StripeService extends PaymentProviderAbstract {
 
   // Stripe charges the subscription default first, then the customer default
   private async hasPaymentMethod(subscription: Stripe.Subscription) {
-    if (subscription.default_payment_method || subscription.default_source) {
+    if (hasCardOf(subscription)) {
       return true;
     }
-
-    const customer = await stripe.customers.retrieve(
-      subscription.customer as string
-    );
-    if (customer.deleted) {
+    if (typeof subscription.customer !== 'string') {
       return false;
     }
-    const { invoice_settings, default_source } = customer as Stripe.Customer;
-    return !!(invoice_settings?.default_payment_method || default_source);
+
+    return hasCardOf(
+      subscription,
+      await stripe.customers.retrieve(subscription.customer)
+    );
   }
 
   // After a login swap, move each Stripe customer's email to the login that
@@ -2806,14 +2816,14 @@ export class StripeService extends PaymentProviderAbstract {
     return { cancelled: true };
   }
 
+  // the load itself is kept, so requests arriving while it pages through
+  // Stripe wait for it instead of starting their own
   private _growthSubscriptions: {
     at: number;
-    data: Stripe.Subscription[];
+    data: Promise<Stripe.Subscription[]>;
   } | null = null;
 
-  // Every subscription of this app, paged through 100 at a time. Other
-  // products share the Stripe account, only metadata.service gitroom is ours
-  private async getAppSubscriptions() {
+  private getAppSubscriptions() {
     if (
       this._growthSubscriptions &&
       Date.now() - this._growthSubscriptions.at < GROWTH_CACHE_MS
@@ -2821,6 +2831,17 @@ export class StripeService extends PaymentProviderAbstract {
       return this._growthSubscriptions.data;
     }
 
+    const data = this.listAppSubscriptions().catch((err) => {
+      this._growthSubscriptions = null;
+      throw err;
+    });
+    this._growthSubscriptions = { at: Date.now(), data };
+    return data;
+  }
+
+  // Every subscription of this app, paged through 100 at a time. Other
+  // products share the Stripe account, only metadata.service gitroom is ours
+  private async listAppSubscriptions() {
     const data: Stripe.Subscription[] = [];
     let startingAfter: string | undefined;
     do {
@@ -2834,7 +2855,6 @@ export class StripeService extends PaymentProviderAbstract {
       startingAfter = page.has_more ? page.data.at(-1)?.id : undefined;
     } while (startingAfter);
 
-    this._growthSubscriptions = { at: Date.now(), data };
     return data;
   }
 

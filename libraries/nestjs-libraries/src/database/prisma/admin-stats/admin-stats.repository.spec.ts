@@ -3,7 +3,10 @@ import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/
 describe('AdminStatsRepository growth', () => {
   const makeRepo = () => {
     const user = { findMany: jest.fn().mockResolvedValue([]) };
-    const subscription = { count: jest.fn().mockResolvedValue(0) };
+    const subscription = {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+    };
     const repo = new AdminStatsRepository(
       {} as any,
       {} as any,
@@ -69,17 +72,39 @@ describe('AdminStatsRepository growth', () => {
     ]);
   });
 
-  it('counts the lifetime and hand-set plans of live organizations', async () => {
+  it('counts lifetime deals and the plans an admin set', async () => {
     const { repo, subscription } = makeRepo();
     subscription.count.mockResolvedValue(4);
+    subscription.findMany.mockResolvedValue([
+      // add-subscription: the paymentId is a member's user id
+      {
+        organization: {
+          paymentId: 'user_1',
+          users: [{ userId: 'user_2' }, { userId: 'user_1' }],
+        },
+      },
+      // a real customer of the provider
+      {
+        organization: { paymentId: 'cus_1', users: [{ userId: 'user_3' }] },
+      },
+    ]);
 
-    expect(await repo.getCompedSubscriptions()).toBe(4);
+    expect(await repo.getCompedSubscriptions('stripe')).toEqual({
+      lifetime: 4,
+      setByAdmin: 1,
+    });
     expect(subscription.count.mock.calls[0][0]).toEqual({
       where: {
         deletedAt: null,
         organization: { deletedAt: null },
-        OR: [{ isLifetime: true }, { provider: 'manual' }],
+        isLifetime: true,
       },
+    });
+    expect(subscription.findMany.mock.calls[0][0].where).toEqual({
+      deletedAt: null,
+      isLifetime: false,
+      provider: 'stripe',
+      organization: { deletedAt: null, paymentId: { not: null } },
     });
   });
 });
