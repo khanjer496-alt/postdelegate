@@ -42,11 +42,11 @@ const featureMeta = [
   { href: '/docs/studio', icon: 'M7 3h10v18H7zM10 9l4 3-4 3z' },
   { href: '/docs/bulk-import#bulk-schedule-videos', icon: 'M4 6h12v12H4zM8 3h12v12M8 10l4 2-4 2z' },
 ];
-const [calendar, ...features] = h.features.map((f, i) => ({ ...f, ...featureMeta[i] }));
+const [calendar, ...features] = h.features.map((f, i) => ({ ...f, ...featureMeta[i], href: href(featureMeta[i].href) }));
 // Bring your own AI: where each assistant connects.
 const aiLinks = [
   { label: 'Claude', href: href('/claude-cowork'), icon: 'claude' },
-  { label: 'ChatGPT', href: '/docs/mcp/chatgpt', glyph: '❋' },
+  { label: 'ChatGPT', href: href('/docs/mcp/chatgpt'), glyph: '❋' },
   { label: 'Cursor', href: href('/codex'), icon: 'cursor' },
   { label: 'REST API', href: href('/api'), glyph: '{ }' },
 ];

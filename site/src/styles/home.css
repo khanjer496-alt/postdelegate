@@ -37,9 +37,6 @@
 .hero-cta::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,#ffffff8c 50%,transparent 65%);transform:translateX(-120%);pointer-events:none}
 .hero-trial-note{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:18px;color:#bdbdbd;font-size:14px;font-weight:500}
 .hero-trial-note .note-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#c8ff4d;box-shadow:0 0 0 4px #c8ff4d26}
-.hero-trial-note strong{color:#fff;font-weight:650}
-.note-extra{color:#a3a3a3}
-.note-extra::before{content:'·';margin-right:10px;color:#666}
 .hero-mcp{margin-top:14px;color:#d1bfff;font-size:15px}
 
 /* Orbit visual */
@@ -76,7 +73,6 @@
 .orbit-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
 .legend-live{background:#c8ff4d}
 .legend-soon{border:1.5px dashed #8a8a8a}
-.legend-note{color:#8f8f8f}
 
 /* ---------- How it works: three steps on one orbit line ---------- */
 .relay-section{padding:34px 0 10px}
@@ -112,11 +108,12 @@
 .feature-card:hover .feature-arrow{translate:3px -3px}
 .feature-icon{display:grid;place-items:center;width:42px;height:42px;margin-bottom:8px;border:1px solid #3a3150;border-radius:13px;background:#1c1828;color:#c8ff4d}
 .feature-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.feature-calendar{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);align-items:center;gap:40px;padding:44px 0 0 44px;overflow:hidden;background:radial-gradient(60% 90% at 85% 10%,#7357ff33,transparent 65%),radial-gradient(40% 60% at 0% 100%,#c8ff4d14,transparent 70%),#111014}
+.feature-calendar{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr);align-items:center;gap:40px;padding-block:44px 0;padding-inline:44px 0;overflow:hidden;background:radial-gradient(60% 90% at 85% 10%,#7357ff33,transparent 65%),radial-gradient(40% 60% at 0% 100%,#c8ff4d14,transparent 70%),#111014}
 .feature-calendar .feature-copy{display:flex;flex-direction:column;gap:12px;align-self:center;padding-bottom:44px}
 .feature-calendar h3{font-size:clamp(28px,3vw,40px);letter-spacing:-.04em}
 .feature-calendar p{font-size:18px;max-width:340px}
-.feature-calendar .demo-frame{align-self:end;margin:0;border-bottom:0;border-inline-end:0;border-radius:18px 0 0 0;transform-origin:0 100%}
+/* the screenshot lets clicks through to the card's link */
+.feature-calendar .demo-frame{align-self:end;margin:0;border-bottom:0;border-inline-end:0;border-radius:0;border-start-start-radius:18px;transform-origin:0 100%;pointer-events:none}
 
 /* The real workspace screenshot, in a browser frame */
 .demo-frame{position:relative;border:1px solid #363636;overflow:hidden;border-radius:22px;background:#111;box-shadow:0 50px 120px -30px #000,0 0 0 8px #ffffff06}
@@ -132,7 +129,7 @@
 .ai-panel .eyebrow{margin-bottom:22px}
 .ai-panel .section-heading{max-width:780px;margin-inline:auto}
 .ai-links{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:36px 0 0;padding:0;list-style:none}
-.ai-links a{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:8px 18px 8px 8px;border:1px solid #3a3150;border-radius:99px;background:#0b0a0e;color:#fff;font-size:15px;font-weight:650;transition:border-color .2s,transform .2s}
+.ai-links a{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding-block:8px;padding-inline:8px 18px;border:1px solid #3a3150;border-radius:99px;background:#0b0a0e;color:#fff;font-size:15px;font-weight:650;transition:border-color .2s,transform .2s}
 .ai-links a:hover{border-color:#c8ff4d80;transform:translateY(-2px)}
 .ai-glyph{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#1c1828;color:#c8ff4d;font-size:13px;font-weight:800;font-family:var(--font-mono)}
 .ai-arrow{color:#8f8f8f;font-size:13px}
@@ -171,8 +168,8 @@
  .home-hero .hero-star-one{left:auto;right:4%;top:40px;width:56px}
  .orbit{width:min(100%,540px)}
  .feature-grid{grid-template-columns:1fr 1fr}
- .feature-calendar{grid-template-columns:1fr;gap:30px;padding:36px 0 0 36px}
- .feature-calendar .feature-copy{padding:0 36px 0 0}
+ .feature-calendar{grid-template-columns:1fr;gap:30px;padding-block:36px 0;padding-inline:36px 0}
+ .feature-calendar .feature-copy{padding-bottom:0;padding-inline-end:36px}
  .feature-calendar p{max-width:none}
  .feature-card:last-child{grid-column:1/-1}
 }
@@ -208,7 +205,7 @@
  .feature-card{padding:24px 22px 26px;border-radius:22px}
  .feature-card h3{font-size:20px}
  .feature-card p{font-size:15px}
- .feature-calendar{padding:28px 0 0 22px;gap:24px;border-radius:22px}
+ .feature-calendar{padding-block:28px 0;padding-inline:22px 0;gap:24px;border-radius:22px}
  .feature-calendar .feature-copy{padding-inline-end:22px}
  .feature-calendar h3{font-size:28px}
  .feature-calendar p{font-size:16px}
@@ -287,10 +284,9 @@
 [dir=rtl] .hero-mark .pd-arc,[dir=rtl] .ink-underline .pd-arc{left:.1em;right:0}
 [dir=rtl] .orbit-card{text-align:right}
 [dir=rtl] .demo-address{margin-left:0;margin-right:19px}
-[dir=rtl] .feature-calendar{padding:44px 44px 0 0}
-[dir=rtl] .feature-calendar .demo-frame{border-radius:0 18px 0 0;border-inline-end:1px solid #363636;border-inline-start:0;transform-origin:100% 100%}
+[dir=rtl] .feature-calendar .demo-frame{transform-origin:100% 100%}
 [dir=rtl] .feature-card:hover .feature-arrow{translate:-3px -3px}
 [dir=rtl] .support-bubble{right:auto;left:20px}
 [dir=rtl] .pd-arc i{right:auto;left:-.05em}
-@media(max-width:1023px){[dir=rtl] .hero-copy{padding-right:0}[dir=rtl] .feature-calendar{padding:36px 36px 0 0}[dir=rtl] .feature-calendar .feature-copy{padding:0 0 0 36px}}
-@media(max-width:767px){[dir=rtl] .support-bubble{left:13px}[dir=rtl] .demo-address{margin-right:8px}[dir=rtl] .feature-calendar{padding:28px 22px 0 0}[dir=rtl] .relay-track{left:auto;right:30px}}
+@media(max-width:1023px){[dir=rtl] .hero-copy{padding-right:0}}
+@media(max-width:767px){[dir=rtl] .support-bubble{left:13px}[dir=rtl] .demo-address{margin-right:8px}[dir=rtl] .relay-track{left:auto;right:30px}}

@@ -55,14 +55,20 @@ const icons: Record<string, string> = {
         <p class="plan-yearly price-monthly">{p.orYearly(num(plan.yearly), num(plan.monthly * 12 - plan.yearly))}</p>
         <p class="plan-price price-yearly"><strong>${perMonth(plan.yearly)}</strong><span>{p.perMonth}</span></p>
         <p class="plan-yearly price-yearly">{p.billedYearly(num(plan.yearly), num(plan.monthly * 12 - plan.yearly))}</p>
-        <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>{p.startTrial}</a>
-        <p class="plan-trial">{p.trialNote(TRIAL_DAYS)}</p>
+        {!compact && <>
+          <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>{p.startTrial}</a>
+          <p class="plan-trial">{p.trialNote(TRIAL_DAYS)}</p>
+        </>}
         <div class="plan-channels">
           <p><strong>{plan.channels}</strong> {p.channels}{plan.extraChannelMonthly && <span class="plan-extra price-monthly">{p.extraMonthly(num(plan.extraChannelMonthly), num(plan.maxChannels || plan.channels))}</span>}{plan.extraChannelYearly && <span class="plan-extra price-yearly">{p.extraYearly(num(plan.extraChannelYearly, 2), num(plan.maxChannels || plan.channels))}</span>}</p>
           {compact
             ? <p class="plan-seats">{plan.teamMembers ? t.perks.team : t.perks.solo}</p>
             : <div class="plan-networks"><LogoStack networks={FEATURED_LIVE_NETWORKS} max={5} size="xs" decorative lang={lang} /><small>{p.anyLive(AVAILABLE_NETWORKS.length)}</small></div>}
         </div>
+        {compact && <>
+          <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>{p.startTrial}</a>
+          <p class="plan-trial">{p.trialNote(TRIAL_DAYS)}</p>
+        </>}
         {!compact && <ul class="plan-perks">
           {planPerks(plan, t.perks, t.numberLocale).map((perk) => (
             <li>
@@ -120,11 +126,9 @@ const icons: Record<string, string> = {
   .plan-networks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; }
   .plan-networks small { color: #a8a8a8; font-size: 11.5px; }
   .plan-channels .plan-seats { display: block; margin-top: 8px; color: #b9b9b9; font-size: 13px; font-weight: 500; }
-  .is-compact .plan-card .button { margin-top: auto; }
   .is-compact .plan-price { margin-top: 18px; }
-  .is-compact .plan-card { gap: 0; }
-  .is-compact .plan-channels { order: 1; margin-top: 18px; margin-bottom: 20px; }
-  .is-compact .plan-card .button, .is-compact .plan-trial { order: 2; }
+  .is-compact .plan-channels { margin-top: 18px; margin-bottom: 20px; }
+  .is-compact .plan-card .button { margin-top: auto; }
   .plan-perks { display: grid; gap: 11px; margin: 20px 0 0; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.5; color: #e2e2e2; }
   .plan-perks li { display: flex; align-items: flex-start; gap: 10px; }
   .plan-perks small { display: block; color: #9a9a9a; font-size: 12px; }

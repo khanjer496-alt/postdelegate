@@ -234,7 +234,7 @@ const dict: Dict = {
       { q: 'Quanto custa a IA?', a: 'Nada da nossa parte. Conecte pelo MCP o assistente que você já assina, ou adicione sua própria chave da OpenAI e pague direto à OpenAI. Não há créditos de IA nem sobretaxa.' },
       { q: 'Posso cancelar quando quiser?', a: 'Sim. Um administrador do espaço de trabalho cancela na página de Cobrança, e o plano continua até o fim do período que você já pagou. Veja <a href="/docs/billing">planos e cobrança</a>.' },
     ],
-    ctaTitle: 'Deixe os posts da próxima semana por nossa conta.',
+    ctaTitle: 'Tire os posts da próxima semana da sua lista.',
     ctaText: (days: number, price: number) => `${days} dias grátis, sem cartão. Depois, a partir de $${price}/mês.`,
     pricingLabel: 'Planos e preços',
     supportBubble: 'Suporte',
