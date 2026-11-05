@@ -3,6 +3,8 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  ProviderAuthorizationCredentials,
+  ProviderAuthorizationRevocation,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
@@ -51,6 +53,14 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
   ];
   editor = 'normal' as const;
   dto = GmbSettingsDto;
+  // every location connected from one Google account shares its grant with
+  // the other Google channels of that account in the same Google project
+  get authorizationGrantGroup() {
+    const project = (
+      process.env.GOOGLE_GMB_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID
+    )?.match(/^(\d+)-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/)?.[1];
+    return project ? `google-project:${project}` : undefined;
+  }
 
   maxLength() {
     return 1500;
@@ -201,6 +211,39 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       picture: data?.picture || '',
       username: '',
     };
+  }
+
+  // Revokes the grant at Google when the channel is deleted. Revoking the
+  // refresh token also revokes the access tokens issued from it.
+  async revokeAuthorization(
+    credentials: ProviderAuthorizationCredentials
+  ): Promise<ProviderAuthorizationRevocation> {
+    const token = credentials.refreshToken || credentials.accessToken;
+    if (!token) {
+      return { status: 'unknown' };
+    }
+    try {
+      const { client } = clientAndGmb();
+      // The SDK's revokeToken helper puts the token in the query string.
+      // Its existing transporter supports a form body without URL leakage.
+      const response = await client.transporter.request({
+        url: 'https://oauth2.googleapis.com/revoke',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        data: new URLSearchParams({ token }).toString(),
+        timeout: 10_000,
+        retry: false,
+      });
+      return response.status === 200
+        ? { status: 'revoked' }
+        : { status: 'unknown' };
+    } catch (error: any) {
+      // already revoked or expired at Google
+      return error?.response?.status === 400 &&
+        error?.response?.data?.error === 'invalid_token'
+        ? { status: 'revoked' }
+        : { status: 'unknown' };
+    }
   }
 
   @DashboardFunction()

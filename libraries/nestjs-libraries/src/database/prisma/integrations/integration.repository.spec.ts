@@ -9,6 +9,7 @@ const makeRepo = () => {
   const integration = {
     findFirst: jest.fn(),
     update: jest.fn().mockResolvedValue({ id: 'int-1' }),
+    count: jest.fn().mockResolvedValue(0),
   };
   const customer = { findFirst: jest.fn() };
   const plugs = { upsert: jest.fn().mockResolvedValue({ activated: true }) };
@@ -149,5 +150,22 @@ describe('IntegrationRepository.deleteChannel', () => {
       tokenExpiration: null,
     });
     expect(args.data.deletedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('IntegrationRepository.countLiveChannelsOnGrant', () => {
+  it('counts the live channels of the account for these providers in every organization, pending location choices included', async () => {
+    const { repo, integration } = makeRepo();
+    await repo.countLiveChannelsOnGrant('google-sub', ['gmb', 'youtube'], ['int-1', 'int-2']);
+
+    // no inBetweenSteps filter: a pending location choice holds the grant too
+    expect(integration.count.mock.calls[0][0]).toEqual({
+      where: {
+        rootInternalId: 'google-sub',
+        providerIdentifier: { in: ['gmb', 'youtube'] },
+        deletedAt: null,
+        id: { notIn: ['int-1', 'int-2'] },
+      },
+    });
   });
 });

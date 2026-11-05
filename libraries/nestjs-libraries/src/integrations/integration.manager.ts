@@ -141,6 +141,13 @@ export class IntegrationManager {
       .map(([from]) => from);
   }
 
+  // the providers whose revocation ends the same account grant
+  getAuthorizationGrantGroup(group: string) {
+    return socialIntegrationList.filter(
+      (p) => p.authorizationGrantGroup === group
+    );
+  }
+
   async getAllIntegrations(orgId?: string) {
     return {
       social: await Promise.all(

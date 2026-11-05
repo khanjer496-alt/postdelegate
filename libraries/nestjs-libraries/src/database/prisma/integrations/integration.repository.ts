@@ -1149,6 +1149,15 @@ export class IntegrationRepository {
     });
   }
 
+  // Live channels of these providers, in any organization and including a
+  // pending location or page choice (inBetweenSteps), still connected through
+  // the same account (rootInternalId), apart from the ones being removed
+  countLiveChannelsOnGrant(rootInternalId: string, providerIdentifiers: string[], excludeIds: string[]) {
+    return this._integration.model.integration.count({
+      where: { rootInternalId, providerIdentifier: { in: providerIdentifiers }, deletedAt: null, id: { notIn: excludeIds } },
+    });
+  }
+
   async findAuthorizationGrantCandidates(subject: string) {
     return this.decryptRows(
       await this._integration.model.integration.findMany({ where: { rootInternalId: subject }, select: authorizationSelect }),
