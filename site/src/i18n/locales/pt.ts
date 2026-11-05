@@ -171,7 +171,7 @@ const dict: Dict = {
     },
     {
       q: 'Quando Instagram, TikTok e LinkedIn estarão disponíveis?',
-      a: 'Cada rede analisa um app antes de permitir que um serviço publique por seus usuários. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest e Reddit aguardam a aprovação das plataformas. O X não está disponível no PostDelegate. Não divulgamos datas, porque os prazos dependem de cada rede. Acompanhe o <a href="/roadmap">roadmap</a> e o <a href="/platforms">status das plataformas</a>.',
+      a: 'Cada rede analisa um app antes de permitir que um serviço publique por seus usuários. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon e Google Business aguardam a aprovação das plataformas. O X não está disponível no PostDelegate. Não divulgamos datas, porque os prazos dependem de cada rede. Acompanhe o <a href="/roadmap">roadmap</a> e o <a href="/platforms">status das plataformas</a>.',
     },
     {
       q: 'Existe limite de posts?',
@@ -230,7 +230,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'O que é o PostDelegate?', a: `Um agendador de redes sociais que a sua IA pode operar. O Claude ou o ChatGPT cria os rascunhos dos posts pelo MCP, você aprova em um só calendário, e o PostDelegate publica em ${p.count} redes. Você também pode planejar e escrever tudo você mesmo.` },
       { q: 'Preciso de cartão de crédito para o teste?', a: `Não. Todo plano começa com um teste gratuito de ${p.days} dias, sem cartão. Adicione um antes do fim do teste para manter seu plano. Se não adicionar, seu espaço de trabalho fica pausado e seus posts são mantidos.` },
-      { q: 'Quais redes posso conectar?', a: `${p.count} hoje: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest e Reddit aguardam aprovação. O X não está disponível. Veja o <a href="/platforms">status das plataformas</a>.` },
+      { q: 'Quais redes posso conectar?', a: `${p.count} hoje: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon e Google Business aguardam aprovação. O X não está disponível. Veja o <a href="/platforms">status das plataformas</a>.` },
       { q: 'Quanto custa a IA?', a: 'Nada da nossa parte. Conecte pelo MCP o assistente que você já assina, ou adicione sua própria chave da OpenAI e pague direto à OpenAI. Não há créditos de IA nem sobretaxa.' },
       { q: 'Posso cancelar quando quiser?', a: 'Sim. Um administrador do espaço de trabalho cancela na página de Cobrança, e o plano continua até o fim do período que você já pagou. Veja <a href="/docs/billing">planos e cobrança</a>.' },
     ],

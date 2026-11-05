@@ -203,7 +203,7 @@ const en = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'What is PostDelegate?', a: `A social media scheduler your AI can run. Claude or ChatGPT drafts posts over MCP, you approve them on one calendar, and PostDelegate posts them to ${p.count} networks. You can also plan and write everything yourself.` },
       { q: 'Do I need a credit card for the trial?', a: `No. Every plan starts with a ${p.days}-day free trial with no card. Add one before the trial ends to keep your plan. If you don’t, your workspace pauses and your posts are kept.` },
-      { q: 'Which networks can I connect?', a: `${p.count} today: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and Reddit are waiting on approval. X is not available. See <a href="/platforms">platform status</a>.` },
+      { q: 'Which networks can I connect?', a: `${p.count} today: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon and Google Business are waiting on approval. X is not available. See <a href="/platforms">platform status</a>.` },
       { q: 'How much does the AI cost?', a: 'Nothing from us. Connect the assistant you already pay for over MCP, or add your own OpenAI key and pay OpenAI directly. There are no AI credits and no markup.' },
       { q: 'Can I cancel anytime?', a: 'Yes. A workspace admin cancels from Billing, and the plan runs to the end of the period you have paid for. See <a href="/docs/billing">plans and billing</a>.' },
     ] as QA[],
