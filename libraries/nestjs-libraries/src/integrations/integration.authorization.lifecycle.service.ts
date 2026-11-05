@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { IntegrationRepository, isOwnedIntegrationPicture } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { ProviderAuthorizationCredentials } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { ProviderAuthorizationCredentials, SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { TemporalService } from 'nestjs-temporal-core';
@@ -43,6 +43,25 @@ export class IntegrationAuthorizationLifecycleService {
     };
   }
 
+  // Providers outside the managed lifecycle that can revoke their grant: best
+  // effort, never blocks the removal and logs a failure without credentials.
+  // A grant that covers the whole account (revokesAccountGrant) stays while
+  // another live channel uses that account; removedIds go away with this one.
+  private async revokeBestEffort(
+    provider: SocialProvider,
+    row: NonNullable<Awaited<ReturnType<IntegrationRepository['getIntegrationForCleanup']>>>,
+    removedIds: string[]
+  ) {
+    try {
+      if (provider.revokesAccountGrant &&
+        (!row.rootInternalId || await this._repository.countLiveChannelsOnGrant(row.rootInternalId, removedIds))) return;
+      const result = await provider.revokeAuthorization!(this.credentials(row));
+      if (result.status !== 'revoked') console.error(`Integration ${row.id}: ${row.providerIdentifier} did not confirm the revocation`);
+    } catch {
+      console.error(`Integration ${row.id}: ${row.providerIdentifier} revocation failed`);
+    }
+  }
+
   async requestDeletion(organizationId: string, integrationId: string, expectedToken?: string): Promise<{ id: string }> {
     const row = await this._repository.getIntegrationForCleanup(organizationId, integrationId);
     if (!row) throw new HttpException('Integration not found', HttpStatus.NOT_FOUND);
@@ -56,7 +75,7 @@ export class IntegrationAuthorizationLifecycleService {
       // grant is revoked with the credentials already in memory - best
       // effort, it never blocks or delays the removal.
       const deleted = await this._repository.deleteChannel(organizationId, integrationId, true);
-      provider.revokeAuthorization(this.credentials(row)).catch(() => undefined);
+      this.revokeBestEffort(provider, row, [integrationId]);
       return deleted;
     }
     this.requireEnabled();
@@ -90,7 +109,7 @@ export class IntegrationAuthorizationLifecycleService {
       if (provider?.authorizationPolicy || !provider?.revokeAuthorization) continue;
       try {
         const full = await this._repository.getIntegrationForCleanup(organizationId, row.id);
-        if (full && (full.token || full.refreshToken)) await provider.revokeAuthorization(this.credentials(full));
+        if (full && (full.token || full.refreshToken)) await this.revokeBestEffort(provider, full, rows.map((r) => r.id));
       } catch {
         /**empty**/
       }

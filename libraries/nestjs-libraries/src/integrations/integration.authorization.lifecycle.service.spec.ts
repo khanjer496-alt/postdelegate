@@ -134,6 +134,7 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete', () => {
         rows.map(({ id, providerIdentifier }) => ({ id, providerIdentifier }))
       ),
       deleteChannel: jest.fn(async (_org: string, id: string) => ({ id })),
+      countLiveChannelsOnGrant: jest.fn(async () => 0),
     };
     const manager = { getSocialIntegration: () => provider };
     const service = new IntegrationAuthorizationLifecycleService(
@@ -214,6 +215,125 @@ describe('IntegrationAuthorizationLifecycleService revoke on delete', () => {
       []
     );
     expect(revokeAuthorization).toHaveBeenCalledTimes(1);
+    expect(repository.deleteChannel).not.toHaveBeenCalled();
+  });
+});
+
+// Providers whose revocation ends the grant of the whole account (Google
+// Business Profile): the deleted channel's tokens always go, the grant is
+// revoked only once no other live channel uses that account
+describe('IntegrationAuthorizationLifecycleService revoke on delete, account grant', () => {
+  const row = {
+    id: 'int-1',
+    organizationId: 'org-1',
+    providerIdentifier: 'gmb',
+    token: 'at',
+    refreshToken: 'rt',
+    internalId: 'accounts/1/locations/1',
+    rootInternalId: 'google-sub',
+  };
+
+  const make = (liveOnGrant: number, rows: any[] = [row]) => {
+    const revokeAuthorization = jest.fn(async () => ({ status: 'revoked' }));
+    const repository = {
+      getIntegrationForCleanup: jest.fn(async (_org: string, id: string) =>
+        rows.find((r) => r.id === id)
+      ),
+      getAuthorizationIntegrationsForOrganization: jest.fn(async () =>
+        rows.map(({ id, providerIdentifier }) => ({ id, providerIdentifier }))
+      ),
+      deleteChannel: jest.fn(async (_org: string, id: string) => ({ id })),
+      countLiveChannelsOnGrant: jest.fn(async () => liveOnGrant),
+    };
+    const manager = {
+      getSocialIntegration: () => ({
+        revokesAccountGrant: true,
+        revokeAuthorization,
+      }),
+    };
+    const service = new IntegrationAuthorizationLifecycleService(
+      repository as any,
+      manager as any,
+      {} as any
+    );
+    return { service, repository, revokeAuthorization };
+  };
+
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+  it('revokes the grant when the last channel of the account is deleted', async () => {
+    const { service, repository, revokeAuthorization } = make(0);
+
+    await expect(service.requestDeletion('org-1', 'int-1')).resolves.toEqual({
+      id: 'int-1',
+    });
+    await settle();
+
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    expect(repository.countLiveChannelsOnGrant).toHaveBeenCalledWith(
+      'google-sub',
+      ['int-1']
+    );
+    expect(revokeAuthorization).toHaveBeenCalledWith({
+      accessToken: 'at',
+      refreshToken: 'rt',
+      internalId: 'accounts/1/locations/1',
+      rootInternalId: 'google-sub',
+    });
+  });
+
+  it('deletes the tokens but keeps the grant while another channel uses the account', async () => {
+    const { service, repository, revokeAuthorization } = make(1);
+
+    await service.requestDeletion('org-1', 'int-1');
+    await settle();
+
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    expect(revokeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('never revokes a grant it cannot tie to an account', async () => {
+    const { service, repository, revokeAuthorization } = make(0, [
+      { ...row, rootInternalId: null },
+    ]);
+
+    await service.requestDeletion('org-1', 'int-1');
+    await settle();
+
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    expect(repository.countLiveChannelsOnGrant).not.toHaveBeenCalled();
+    expect(revokeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('logs a failed revocation without credentials and still deletes', async () => {
+    const { service, repository, revokeAuthorization } = make(0);
+    revokeAuthorization.mockRejectedValueOnce(new Error('token=rt'));
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(service.requestDeletion('org-1', 'int-1')).resolves.toEqual({
+      id: 'int-1',
+    });
+    await settle();
+
+    expect(repository.deleteChannel).toHaveBeenCalledWith('org-1', 'int-1', true);
+    expect(log).toHaveBeenCalledWith('Integration int-1: gmb revocation failed');
+    expect(JSON.stringify(log.mock.calls)).not.toContain('rt');
+    log.mockRestore();
+  });
+
+  it('does not count the channels an account deletion removes together', async () => {
+    const { service, repository, revokeAuthorization } = make(0, [
+      row,
+      { ...row, id: 'int-2', internalId: 'accounts/1/locations/2' },
+    ]);
+
+    await service.requestOrganizationDeletion('org-1');
+
+    expect(repository.countLiveChannelsOnGrant).toHaveBeenCalledWith(
+      'google-sub',
+      ['int-1', 'int-2']
+    );
+    expect(revokeAuthorization).toHaveBeenCalled();
     expect(repository.deleteChannel).not.toHaveBeenCalled();
   });
 });

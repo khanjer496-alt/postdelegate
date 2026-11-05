@@ -1149,6 +1149,15 @@ export class IntegrationRepository {
     });
   }
 
+  // Live channels, in any organization, still connected through the same
+  // account (rootInternalId), apart from the ones being removed. An abandoned
+  // location or page choice (inBetweenSteps) is not a channel.
+  countLiveChannelsOnGrant(rootInternalId: string, excludeIds: string[]) {
+    return this._integration.model.integration.count({
+      where: { rootInternalId, deletedAt: null, inBetweenSteps: false, id: { notIn: excludeIds } },
+    });
+  }
+
   async findAuthorizationGrantCandidates(subject: string) {
     return this.decryptRows(
       await this._integration.model.integration.findMany({ where: { rootInternalId: subject }, select: authorizationSelect }),

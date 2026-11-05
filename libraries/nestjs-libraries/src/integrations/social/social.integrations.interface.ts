@@ -309,6 +309,11 @@ export interface SocialProvider
   revokeAuthorization?(
     credentials: ProviderAuthorizationCredentials
   ): Promise<ProviderAuthorizationRevocation>;
+  // Revoking one channel's token ends the grant of the whole account (Google),
+  // not only that token: without authorizationPolicy, the deleted channel's
+  // tokens still go with it, but the grant is revoked only once no other live
+  // channel (same rootInternalId, any organization) still uses that account.
+  revokesAccountGrant?: boolean;
   getAuthorizationGrant?(
     credentials: ProviderAuthorizationCredentials
   ): Promise<ProviderAuthorizationGrant | undefined>;
