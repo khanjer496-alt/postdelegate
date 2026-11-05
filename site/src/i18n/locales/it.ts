@@ -713,7 +713,7 @@ const dict: Dict = {
       ],
       limits: [
         'PostDelegate collega account su mastodon.social. Gli account su altri server Mastodon non si possono ancora collegare.',
-        'I post vengono pubblicati come pubblici, con un limite di 500 caratteri e fino a quattro immagini o un video.',
+        'I post vengono pubblicati come pubblici, con un limite di 500 caratteri e fino a quattro immagini o un video. Metti il video nel primo post: le risposte non aspettano l’elaborazione.',
       ],
     },
   },

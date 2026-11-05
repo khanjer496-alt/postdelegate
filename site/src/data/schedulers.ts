@@ -506,7 +506,7 @@ export const SCHEDULERS: Scheduler[] = [
     intro: "Connect a mastodon.social account to PostDelegate by signing in with Mastodon, then schedule posts and threads with images or a video.",
     about: [
       "A Mastodon post is up to 500 characters with up to four images or one video. PostDelegate keeps the text and media together with the planned post, publishes it as a public post at the time you pick, and turns extra entries into a thread of replies.",
-      "You connect through Mastodon's own sign-in, so PostDelegate never sees your password. PostDelegate connects accounts on mastodon.social. When a post has a video, PostDelegate waits until Mastodon has finished processing it before the post goes out.",
+      "You connect through Mastodon's own sign-in, so PostDelegate never sees your password. PostDelegate connects accounts on mastodon.social. When a post has a video, PostDelegate waits until Mastodon has finished processing it before the post goes out. Put a video in the first post; replies don't wait for processing.",
     ],
     steps: [
       { name: "Sign in with Mastodon", text: "On the calendar page choose Add Channel, then Mastodon. Sign in to your mastodon.social account and approve the permissions PostDelegate asks for: reading your profile, publishing posts and uploading media." },

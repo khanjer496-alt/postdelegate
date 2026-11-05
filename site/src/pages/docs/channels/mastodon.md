@@ -29,7 +29,7 @@ Mastodon has no extra post settings.
 
 ## Limits
 
-- PostDelegate waits until Mastodon has finished processing a video before the post goes out, so a post with a video can appear a little after its scheduled time.
+- PostDelegate waits until Mastodon has finished processing a video before the post goes out, so a post with a video can appear a little after its scheduled time. Put a video in the first post; replies don't wait for processing.
 - If the media expires on Mastodon before the post is published, the post fails with that reason. Schedule it again.
 
 ## Troubleshooting

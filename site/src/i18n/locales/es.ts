@@ -702,7 +702,7 @@ const dict: Dict = {
       ],
     },
     'mastodon-scheduler': {
-      action: 'Programar publicaciones',
+      action: 'Programar publicaciones e hilos',
       description: `Programa publicaciones e hilos de Mastodon con imágenes o un video en mastodon.social, con inicio de sesión de Mastodon. Prueba de ${TRIAL_DAYS} días, sin tarjeta.`,
       h1: 'Programa publicaciones e hilos en Mastodon.',
       intro: 'Conecta una cuenta de mastodon.social a PostDelegate iniciando sesión con Mastodon y programa publicaciones e hilos con imágenes o un video.',
@@ -713,7 +713,7 @@ const dict: Dict = {
       ],
       limits: [
         'PostDelegate conecta cuentas de mastodon.social. Las cuentas de otros servidores de Mastodon aún no se pueden conectar.',
-        'Las publicaciones salen como públicas, con un límite de 500 caracteres y hasta cuatro imágenes o un video.',
+        'Las publicaciones salen como públicas, con un límite de 500 caracteres y hasta cuatro imágenes o un video. Pon el video en la primera publicación: las respuestas no esperan a que se procese.',
       ],
     },
   },

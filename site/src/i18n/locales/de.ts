@@ -713,7 +713,7 @@ const dict: Dict = {
       ],
       limits: [
         'PostDelegate verbindet Konten auf mastodon.social. Konten auf anderen Mastodon-Servern lassen sich noch nicht verbinden.',
-        'Beiträge werden öffentlich veröffentlicht, mit höchstens 500 Zeichen und bis zu vier Bildern oder einem Video.',
+        'Beiträge erscheinen öffentlich, mit höchstens 500 Zeichen und bis zu vier Bildern oder einem Video. Setzen Sie ein Video in den ersten Beitrag, denn Antworten warten nicht auf die Verarbeitung.',
       ],
     },
   },
