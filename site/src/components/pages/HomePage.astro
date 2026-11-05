@@ -1,19 +1,19 @@
 ---
+// The home page, kept lean: hero, how it works, networks, four features, bring your own AI,
+// pricing, compare, five questions and one closing call to action. The words live in
+// src/i18n (home); facts come from src/data so the page never drifts from the product.
 import Base from '../../layouts/Base.astro';
 import Faq from '../Faq.astro';
 import CtaBand from '../CtaBand.astro';
 import NetworkBadge from '../NetworkBadge.astro';
 import Icon from '../Icon.astro';
 import OrbitAccent from '../OrbitAccent.astro';
-import FeatureBento from '../FeatureBento.astro';
 import NetworkGrid from '../NetworkGrid.astro';
-import CompareCard from '../CompareCard.astro';
 import Testimonials from '../Testimonials.astro';
 import Pricing from '../Pricing.astro';
 import { NETWORKS, AVAILABLE_NETWORKS, WAITING_KEYS, type Network } from '../../data/networks';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
-import { AGENT_FILES } from '../../data/agent-files';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
 import '../../styles/home.css';
 interface Props { lang: Lang }
@@ -21,152 +21,147 @@ const { lang } = Astro.props;
 const t = strings(lang);
 const h = t.home;
 const href = (path: string) => localeHref(lang, path);
-const HOME_FAQ=[...t.faq,...t.buyerFaq];
-const faqLd={'@context':'https://schema.org','@type':'FAQPage',mainEntity:HOME_FAQ.map(f=>({'@type':'Question',name:f.q,acceptedAnswer:{'@type':'Answer',text:f.a}}))};
-const appLd={'@context':'https://schema.org','@type':'SoftwareApplication',name:'PostDelegate',applicationCategory:'BusinessApplication',operatingSystem:'Web',url:SITE.url,description:h.appDescription(TRIAL_DAYS),featureList:h.appFeatures,inLanguage:lang,image:new URL('/og.png',SITE.url).href,screenshot:{'@type':'ImageObject',url:new URL('/images/postdelegate-workspace.webp',SITE.url).href,width:1600,height:1000,caption:h.demoAlt},offers:{'@type':'AggregateOffer',priceCurrency:'USD',lowPrice:Math.min(...PLANS.map(p=>p.monthly)),highPrice:Math.max(...PLANS.map(p=>p.monthly)),offerCount:PLANS.length}};
-const liveCount=AVAILABLE_NETWORKS.length;
-const lowestPrice=Math.min(...PLANS.map(p=>p.monthly));
-// Hero orbit: only networks marked available sit on the bright inner rings; a few
-// networks waiting on approval sit greyed out on the dashed outer ring.
-const pick=(keys:string[])=>keys.map(k=>NETWORKS.find(n=>n.key===k)).filter((n):n is Network=>Boolean(n));
-const innerKeys=['youtube','bluesky','wordpress','devto'];
-const orbitInner=AVAILABLE_NETWORKS.filter(n=>innerKeys.includes(n.key));
-const orbitMiddle=AVAILABLE_NETWORKS.filter(n=>!innerKeys.includes(n.key));
+const liveCount = AVAILABLE_NETWORKS.length;
+const lowestPrice = Math.min(...PLANS.map((p) => p.monthly));
+const faq = h.faq({ count: liveCount, live: AVAILABLE_NETWORKS.map((n) => n.name).join(', '), days: TRIAL_DAYS, price: lowestPrice });
+const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };
+const appLd = { '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'PostDelegate', applicationCategory: 'BusinessApplication', operatingSystem: 'Web', url: SITE.url, description: h.appDescription(TRIAL_DAYS), featureList: h.appFeatures, inLanguage: lang, image: new URL('/og.png', SITE.url).href, screenshot: { '@type': 'ImageObject', url: new URL('/images/postdelegate-workspace.webp', SITE.url).href, width: 1600, height: 1000, caption: h.demoAlt }, offers: { '@type': 'AggregateOffer', priceCurrency: 'USD', lowPrice: lowestPrice, highPrice: Math.max(...PLANS.map((p) => p.monthly)), offerCount: PLANS.length } };
+// Hero orbit: live networks on the bright inner rings, networks waiting on approval greyed
+// out on the dashed outer ring.
+const innerKeys = ['youtube', 'bluesky', 'wordpress', 'devto'];
+const orbitInner = AVAILABLE_NETWORKS.filter((n) => innerKeys.includes(n.key));
+const orbitMiddle = AVAILABLE_NETWORKS.filter((n) => !innerKeys.includes(n.key));
+const orbitOuter = WAITING_KEYS.map((k) => NETWORKS.find((n) => n.key === k)).filter((n): n is Network => Boolean(n));
 // The comet sits in the gap halfway round the middle ring, whatever its size.
-const cometAngle=(Math.floor(orbitMiddle.length/2)-0.5)*360/orbitMiddle.length;
-const orbitOuter=pick(WAITING_KEYS);
-const orbitLabel=h.orbitLabel(liveCount,AVAILABLE_NETWORKS.map(n=>n.name).join(', '));
-// Hotspots on the real workspace screenshot (percent of the 1280x720 image), set on
-// the corner of each control so the pin never hides the label it points at.
-const demoPins=[{x:16,y:23.8},{x:52.9,y:27.4},{x:83.8,y:10.8},{x:22.8,y:47}].map((pin,i)=>({...pin,...h.demoPins[i]}));
-const integrations=[
- {route:'/claude-cowork',style:'claude-card'},
- {route:'/mcp',style:'chatgpt-card'},
- {route:'/codex',style:'codex-card'},
- {route:'/api',style:'automation-card'},
-].map((item,i)=>({...item,...h.integrations[i],route:href(item.route)}));
-// Content Studio (docs/studio.md). The phone on the right is an illustration, not a screenshot.
-const studioPoints=['M4 5h16v14H4zM4 9h16M9 9v10','M6 4v16M18 4v16M6 8h12M6 16h12','M4 6h16v10H8l-4 4zM8 10h3m2 0h3M8 13h6','M7 3v4m10-4v4M4 10h16M5 5h14v15H5zM9 15l2 2 4-4'].map((icon,i)=>({icon,...h.studioPoints[i]}));
-const captionWords=h.studioCaption;
-// The hosted instruction files with a body, linked to their section of /docs/mcp/agent-files.
-const agentFileAnchors:Record<string,string>={'Claude skill':'claude-skill','AGENTS.md':'agents-md','ChatGPT instructions':'chatgpt','Cursor rule':'cursor'};
-const agentFiles=AGENT_FILES.filter(f=>f.body&&agentFileAnchors[f.title]).map(f=>({title:h.agentFileTitles[f.title]??f.title,file:f.path.split('/').pop(),href:`/docs/mcp/agent-files#${agentFileAnchors[f.title]}`}));
-// Compare row: the PostDelegate vs pages first, then the head-to-head pages.
-const compareCards=[
- {href:'/compare/buffer',tools:['PostDelegate','Buffer']},
- {href:'/compare/hootsuite',tools:['PostDelegate','Hootsuite']},
- {href:'/compare/publer',tools:['PostDelegate','Publer']},
- {href:'/compare/postiz-vs-buffer',tools:['Postiz','Buffer']},
- {href:'/compare/postiz-vs-mixpost',tools:['Postiz','Mixpost']},
- {href:'/alternatives/postiz',tools:['Postiz','PostDelegate']},
-].map((card,i)=>({...card,...h.compareCards[i]}));
+const cometAngle = (Math.floor(orbitMiddle.length / 2) - 0.5) * 360 / orbitMiddle.length;
+const orbitLabel = h.orbitLabel(liveCount, AVAILABLE_NETWORKS.map((n) => n.name).join(', '));
+// Features: the calendar card carries the real workspace screenshot; the other three get a stroke icon.
+const featureMeta = [
+  { href: '/docs/posts' },
+  { href: '/docs/approvals', icon: 'M4 12.5 9 17.5 20 6.5' },
+  { href: '/docs/studio', icon: 'M7 3h10v18H7zM10 9l4 3-4 3z' },
+  { href: '/docs/bulk-import#bulk-schedule-videos', icon: 'M4 6h12v12H4zM8 3h12v12M8 10l4 2-4 2z' },
+];
+const [calendar, ...features] = h.features.map((f, i) => ({ ...f, ...featureMeta[i] }));
+// Bring your own AI: where each assistant connects.
+const aiLinks = [
+  { label: 'Claude', href: href('/claude-cowork'), icon: 'claude' },
+  { label: 'ChatGPT', href: '/docs/mcp/chatgpt', glyph: '❋' },
+  { label: 'Cursor', href: href('/codex'), icon: 'cursor' },
+  { label: 'REST API', href: href('/api'), glyph: '{ }' },
+];
 ---
-<Base title={h.title} description={h.description(TRIAL_DAYS, AVAILABLE_NETWORKS.length)} jsonLd={[appLd,faqLd]} lang={lang}>
+<Base title={h.title} description={h.description(TRIAL_DAYS, liveCount)} jsonLd={[appLd, faqLd]} lang={lang}>
   <section class="home-hero" aria-labelledby="hero-title">
     <div class="hero-sky" aria-hidden="true"><span class="hero-grid"></span><span class="hero-glow"></span></div>
     <OrbitAccent kind="planet" class="hero-star-one" />
     <div class="home-wide hero-layout">
       <div class="hero-copy">
-        <ul class="hero-proof" aria-label={h.proofLabel}>
-          <li><a href={href('/pricing')}>{h.proofTrial(TRIAL_DAYS)} <span>{h.proofTrialSub}</span></a></li>
-          <li><a href="/docs/mcp">{h.proofApi} <span>{h.proofApiSub}</span></a></li>
-          <li><a href={href('/platforms')}>{h.proofNetworks(liveCount)} <span>{h.proofNetworksSub}</span></a></li>
-        </ul>
-        <p class="eyebrow hero-eyebrow">{h.eyebrow}</p>
         <h1 id="hero-title">{h.h1}<span class="hero-mark">{h.h1Mark}<OrbitAccent kind="arc" /></span></h1>
         <p class="hero-description">{h.lead(liveCount)}</p>
         <div class="hero-actions">
           <a class="hero-cta" href={SITE.signup}><span>{t.common.ctaLabel}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
-          <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span><strong>{h.trialNote(TRIAL_DAYS)}</strong><span class="note-extra">{h.fromPrice(lowestPrice)}</span></p>
+          <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span>{h.trialNote(lowestPrice)}</p>
+          <a class="text-link hero-mcp" href={href('/mcp')}>{h.mcpLink} <span aria-hidden="true">↗</span></a>
         </div>
       </div>
       <div class="hero-visual">
         <div class="orbit" role="img" aria-label={orbitLabel}>
-          <span class="orbit-ring ring-outer" style="--r:46.5cqw">{orbitOuter.map((n,i)=><span class="orbit-slot" style={`--a:${i*360/orbitOuter.length+15}deg`}><span class="orbit-body orbit-soon"><NetworkBadge n={n} size="sm"/></span></span>)}</span>
-          <span class="orbit-ring ring-middle" style="--r:34cqw">{orbitMiddle.map((n,i)=><span class="orbit-slot" style={`--a:${i*360/orbitMiddle.length}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md"/></span></span>)}<span class="orbit-slot" style={`--a:${cometAngle}deg`}><span class="orbit-comet"></span></span></span>
-          <span class="orbit-ring ring-inner" style="--r:21.5cqw">{orbitInner.map((n,i)=><span class="orbit-slot" style={`--a:${i*90+45}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md"/></span></span>)}</span>
-          <span class="orbit-core"><img src="/mark.svg?v=orbit-slot" width="56" height="56" alt=""/><b>{h.orbitCore}</b></span>
+          <span class="orbit-ring ring-outer" style="--r:46.5cqw">{orbitOuter.map((n, i) => <span class="orbit-slot" style={`--a:${i * 360 / orbitOuter.length + 15}deg`}><span class="orbit-body orbit-soon"><NetworkBadge n={n} size="sm" /></span></span>)}</span>
+          <span class="orbit-ring ring-middle" style="--r:34cqw">{orbitMiddle.map((n, i) => <span class="orbit-slot" style={`--a:${i * 360 / orbitMiddle.length}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md" /></span></span>)}<span class="orbit-slot" style={`--a:${cometAngle}deg`}><span class="orbit-comet"></span></span></span>
+          <span class="orbit-ring ring-inner" style="--r:21.5cqw">{orbitInner.map((n, i) => <span class="orbit-slot" style={`--a:${i * 90 + 45}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md" /></span></span>)}</span>
+          <span class="orbit-core"><img src="/mark.svg?v=orbit-slot" width="56" height="56" alt="" /><b>{h.orbitCore}</b></span>
           <span class="orbit-card orbit-card-scheduled"><i class="card-check">✓</i><span><b>{h.cardScheduled}</b><small>{h.cardScheduledSub}</small></span></span>
           <span class="orbit-card orbit-card-draft"><i class="card-spark">✦</i><span><b>{h.cardDraft}</b><small>{h.cardDraftSub}</small></span></span>
         </div>
-        <p class="orbit-legend"><span><i class="legend-live" aria-hidden="true"></i>{h.legendLive}</span><span><i class="legend-soon" aria-hidden="true"></i>{h.legendSoon}</span><span class="legend-note">{h.legendNote}</span></p>
+        <p class="orbit-legend"><span><i class="legend-live" aria-hidden="true"></i>{h.legendLive}</span><span><i class="legend-soon" aria-hidden="true"></i>{h.legendSoon}</span></p>
       </div>
     </div>
   </section>
-  <section class="features-section section" id="features" aria-labelledby="features-title">
-    <div class="home-wide">
-      <div class="features-title reveal"><span class="eyebrow">{h.featuresEyebrow}</span><h2 class="section-heading" id="features-title">{h.featuresTitle(liveCount)}<span class="ink-underline">{h.featuresMark}<OrbitAccent kind="arc"/></span></h2><p class="section-intro">{h.featuresIntro}</p></div>
-      <FeatureBento lang={lang} />
-    </div>
-  </section>
-  <section class="channels-section section" id="channels" aria-labelledby="channels-title">
-    <div class="container channels-head">
-      <div class="reveal"><span class="eyebrow">{h.channelsEyebrow}</span><h2 class="section-heading" id="channels-title">{h.channelsTitle(liveCount)}</h2><p class="section-intro">{h.channelsIntro}</p></div>
-      <p class="channels-stat reveal"><b>{liveCount}</b><span>{h.channelsStat}</span></p>
-    </div>
-    <div class="container channels-body"><NetworkGrid lang={lang} /></div>
-  </section>
-  <section class="demo-section section" id="workspace" aria-labelledby="demo-title">
+
+  <section class="relay-section" aria-labelledby="steps-title">
     <div class="container">
-      <div class="demo-head reveal"><span class="eyebrow">{h.demoEyebrow}</span><h2 id="demo-title" class="section-heading">{h.demoTitle}</h2><p class="section-intro">{h.demoIntro}</p></div>
-      <figure class="demo-frame">
-        <div class="demo-browser" aria-hidden="true"><span></span><span></span><span></span><span class="demo-address">app.postdelegate.com</span><span class="demo-live"><i></i>{h.demoLive}</span></div>
-        <div class="demo-shot">
-          <img src="/images/postdelegate-workspace.webp" width="1600" height="1000" alt={h.demoAlt} loading="lazy" decoding="async"/>
-          {demoPins.map((p,i)=><span class="demo-pin" style={`left:${p.x}%;top:${p.y}%;--d:${i*0.15}s`} aria-hidden="true">{i+1}</span>)}
-        </div>
-      </figure>
-      <ol class="demo-notes">{demoPins.map((p,i)=><li class="reveal"><span class="pin-num" aria-hidden="true">{i+1}</span><div><h3>{p.title}</h3><p>{p.text}</p></div></li>)}</ol>
-      <div class="demo-cta reveal"><a class="button button-lime" href={SITE.signup}>{h.demoCta(TRIAL_DAYS)} <span aria-hidden="true">↗</span></a><p class="demo-caption">{h.demoCaption(t.common.ctaNote)}</p></div>
+      <h2 class="eyebrow relay-title" id="steps-title">{h.stepsTitle}</h2>
+      <div class="relay-wrap">
+      <span class="relay-track" aria-hidden="true"><span class="relay-comet"></span></span>
+      <ol class="relay">
+        {h.steps.map((step, i) => (
+          <li class="relay-step reveal">
+            <span class:list={['relay-icon', ['is-ai', 'is-you', 'is-pd'][i]]} aria-hidden="true">{i === 0 ? '✦' : i === 1 ? '✓' : <img src="/mark.svg" width="28" height="28" alt="" />}</span>
+            <h3>{step}</h3>
+          </li>
+        ))}
+      </ol>
+      </div>
     </div>
   </section>
-  <section class="integrations-section section" id="ai" aria-labelledby="ai-title"><div class="home-wide"><div class="section-heading-wrap reveal"><span class="eyebrow">{h.aiEyebrow}</span><h2 class="section-heading" id="ai-title">{h.aiTitleA}{' '}<br/>{h.aiTitleB}<span class="ink-circle">{h.aiMark}<OrbitAccent kind="ring"/></span></h2><p class="section-intro">{h.aiIntro}</p></div><div class="integration-grid">{integrations.map((item,i)=><article class:list={['integration-card','reveal',item.style]}><div class="integration-copy"><span class="integration-symbol">{i===0?<Icon name="claude" class="size-9"/>:i===1?'❋':i===2?'>_':<Icon name="zapier" class="size-9"/>}</span><h3>{item.name}</h3><p>{item.text}</p></div><div class="chat-preview" aria-hidden="true"><div class="chat-title"><span class="chat-dot"></span>{item.name}<small>{h.exampleWorkflow}</small></div><div class="chat-prompt">{item.prompt}</div><div class="chat-answer"><span>✦</span><p>{item.response}</p></div><div class="chat-draft"><span class="mini-tag">{h.draftIdea}</span><div></div><div></div><div></div></div></div><a href={item.route} class="integration-link">{item.label}<span aria-hidden="true">↗</span></a></article>)}</div><p class="rollout-caption">{h.aiCaption}</p><div class="agent-files-band reveal"><div class="agent-files-copy"><span class="agent-files-kicker">{h.agentFilesKicker}</span><h3>{h.agentFilesTitle}</h3><p>{h.agentFilesText}</p><a class="text-link" href="/docs/mcp/agent-files">{h.agentFilesLink} <span aria-hidden="true">↗</span></a></div><ul class="agent-files-list" aria-label={h.agentFilesLabel}>{agentFiles.map(f=><li><a href={f.href}><span class="agent-file-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5M10 15h5"/></svg></span><span><b>{f.title}</b><small>{f.file}</small></span></a></li>)}</ul></div></div></section>
-  <section class="studio-section section" id="studio" aria-labelledby="studio-title">
+
+  <section class="section networks-section" id="channels" aria-labelledby="channels-title">
+    <div class="container">
+      <div class="section-head reveal"><span class="eyebrow">{h.channelsEyebrow}</span><h2 class="section-heading" id="channels-title">{h.channelsTitle(liveCount)}</h2></div>
+      <NetworkGrid compact lang={lang} />
+    </div>
+  </section>
+
+  <section class="section features-section" id="features" aria-labelledby="features-title">
     <div class="home-wide">
-      <div class="studio-card">
-        <div class="studio-copy reveal">
-          <span class="studio-kicker"><b>{h.studioNew}</b>{h.studioKicker}</span>
-          <h2 class="section-heading" id="studio-title">{h.studioTitle}<span class="ink-underline">{h.studioMark}<OrbitAccent kind="arc"/></span></h2>
-          <p class="studio-intro">{h.studioIntro}</p>
-          <ul class="studio-points">{studioPoints.map(p=><li><span class="studio-point-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d={p.icon}/></svg></span><div><h3>{p.title}</h3><p>{p.text}</p></div></li>)}</ul>
-          <div class="studio-actions"><a class="button button-lime" href={SITE.signup}>{h.studioTry} <span aria-hidden="true">↗</span></a><a class="text-link" href="/docs/studio">{h.studioGuide} <span aria-hidden="true">↗</span></a></div>
-          <p class="studio-terms">{h.studioTerms}</p>
-        </div>
-        <div class="studio-visual reveal">
-          <div class="studio-stage" role="img" aria-label={h.studioStage}>
-            <div class="studio-templates"><span>{h.studioTemplates[0]}</span><span class="is-on">{h.studioTemplates[1]}</span></div>
-            <div class="studio-phone">
-              <div class="studio-screen">
-                <svg class="studio-scene" viewBox="0 0 270 480" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="studio-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a66"/><stop offset="1" stop-color="#120f1c"/></linearGradient><radialGradient id="studio-light" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#c8ff4d" stop-opacity=".22"/><stop offset="1" stop-color="#c8ff4d" stop-opacity="0"/></radialGradient></defs><rect width="270" height="480" fill="url(#studio-bg)"/><circle cx="205" cy="150" r="130" fill="url(#studio-light)"/><rect x="160" y="96" width="78" height="118" rx="6" fill="#ffffff0a" stroke="#ffffff1a"/><path d="M199 96v118M160 155h78" stroke="#ffffff1a"/><rect x="16" y="246" width="74" height="4" rx="2" fill="#ffffff1f"/><rect x="24" y="214" width="10" height="32" rx="2" fill="#7357ff73"/><rect x="36" y="221" width="8" height="25" rx="2" fill="#c8ff4d59"/><rect x="46" y="210" width="11" height="36" rx="2" fill="#ffffff26"/><rect x="62" y="226" width="20" height="20" rx="10" fill="#ffffff14"/><path d="M40 480c0-92 46-132 95-132s95 40 95 132z" fill="#2a2147"/><rect x="120" y="322" width="30" height="34" rx="12" fill="#2f2550"/><circle cx="135" cy="290" r="44" fill="#352a5c"/><path d="M91 284c2-30 22-46 44-46s44 16 44 46c-10-14-26-20-44-20s-34 6-44 20z" fill="#211a38"/><path d="M175 270a44 44 0 0 1 0 40" stroke="#c8ff4d" stroke-opacity=".55" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>
-                <span class="studio-hook">{h.studioHookA}<br/>{h.studioHookB}<mark>{h.studioHookMark}</mark></span>
-                <p class="studio-captions">{captionWords.map((w,i)=><span class:list={{'is-now':i===2}} style={`--i:${i}`}>{w}</span>)}</p>
-                <span class="studio-meta"><span>1080×1920</span><span>0:07 / 0:24</span></span>
-              </div>
-            </div>
-            <div class="studio-trim">
-              <div class="trim-top"><span>{h.studioTrim}</span><span class="trim-speed"><span>0.5×</span><b>1×</b><span>1.5×</span><span>2×</span></span></div>
-              <div class="trim-strip"><span class="trim-frames"></span><span class="trim-window"><i></i><i></i></span><span class="trim-playhead"></span></div>
-              <div class="trim-times"><span>0:00</span><span class="trim-kept">{h.studioKept}</span><span>0:41</span></div>
-            </div>
-            <span class="studio-float studio-float-captions"><i class="card-spark">✦</i><span><b>{h.studioFloatCaptions}</b><small>{h.studioFloatCaptionsSub}</small></span></span>
-            <span class="studio-float studio-float-compose"><i class="card-check">✓</i><span><b>{h.studioFloatRendered}</b><small>{h.studioFloatRenderedSub}</small></span></span>
+      <div class="section-head reveal"><span class="eyebrow">{h.featuresEyebrow}</span><h2 class="section-heading" id="features-title">{h.featuresTitle}</h2></div>
+      <div class="feature-grid">
+        <article class="feature-card feature-calendar reveal">
+          <div class="feature-copy">
+            <h3><a class="feature-link" href={calendar.href}>{calendar.title}</a></h3>
+            <p>{calendar.text}</p>
           </div>
-          <p class="orbit-legend studio-legend" aria-hidden="true"><span class="studio-legend-word"><i class="legend-live"></i>{h.studioLegend}</span><span class="legend-note">{h.legendNote}</span></p>
-        </div>
+          <figure class="demo-frame">
+            <div class="demo-browser" aria-hidden="true"><span></span><span></span><span></span><span class="demo-address">app.postdelegate.com</span></div>
+            <img src="/images/postdelegate-workspace.webp" width="1600" height="1000" alt={h.demoAlt} loading="lazy" decoding="async" />
+          </figure>
+        </article>
+        {features.map((f) => (
+          <article class="feature-card reveal">
+            <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d={f.icon} /></svg></span>
+            <h3><a class="feature-link" href={f.href}>{f.title}</a></h3>
+            <p>{f.text}</p>
+            <span class="feature-arrow" aria-hidden="true">↗</span>
+          </article>
+        ))}
       </div>
     </div>
   </section>
-  <CtaBand eyebrow={h.ctaEyebrow(TRIAL_DAYS)} title={h.ctaTitle} text={h.ctaText} lang={lang} />
+
   <Testimonials lang={lang} />
-  <section class="section home-pricing" id="pricing" aria-label={h.pricingLabel}><div class="container"><Pricing lang={lang} /><p class="home-pricing-trial">{h.pricingTrial}</p><p class="home-pricing-more"><a class="text-link" href={href('/pricing')}>{h.pricingMore} <span aria-hidden="true">↗</span></a></p></div></section>
-  <section class="section compare-section" id="compare" aria-labelledby="compare-title">
-    <div class="container">
-      <div class="reveal"><span class="eyebrow">{h.compareEyebrow}</span><h2 class="section-heading" id="compare-title">{h.compareTitle}</h2><p class="section-intro">{h.compareIntro}</p></div>
-      <ul class="compare-row">{compareCards.map(c=><li><CompareCard {...c} lang={lang} /></li>)}</ul>
-      <p class="compare-more"><a class="text-link" href={href('/compare')}>{h.compareMore} <span aria-hidden="true">↗</span></a></p>
-      <p class="compare-license" set:html={localizeLinks(lang,h.compareLicense)} />
+
+  <section class="section ai-section" id="ai" aria-labelledby="ai-title">
+    <div class="container ai-panel reveal">
+      <span class="eyebrow">{h.aiEyebrow}</span>
+      <h2 class="section-heading" id="ai-title">{h.aiTitleA}{' '}<br />{h.aiTitleB}<span class="ink-circle">{h.aiMark}<OrbitAccent kind="ring" /></span></h2>
+      <p class="section-intro">{h.aiIntro}</p>
+      <ul class="ai-links" aria-label={h.aiLinksLabel}>
+        {aiLinks.map((link) => <li><a href={link.href}><span class="ai-glyph" aria-hidden="true">{link.icon ? <Icon name={link.icon} class="size-4" /> : link.glyph}</span>{link.label}<span class="ai-arrow" aria-hidden="true">↗</span></a></li>)}
+      </ul>
     </div>
   </section>
-  <section class="section home-faq" id="faq" aria-labelledby="faq-title"><div class="container"><h2 class="section-heading reveal" id="faq-title">{h.faqTitle}<span class="ink-underline">{h.faqMark}<OrbitAccent kind="arc"/></span></h2><Faq items={HOME_FAQ.map(f=>({q:f.q,a:localizeLinks(lang,f.a)}))}/></div></section><CtaBand lang={lang} />
-  <a class="support-bubble" href={href('/support')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v6a3 3 0 0 1-3 3h-4M4 12v5H2v-5h2Zm16 0v5h2v-5h-2Z"/></svg>{h.supportBubble}</a>
+
+  <section class="section home-pricing" id="pricing" aria-labelledby="pricing-title">
+    <div class="container">
+      <div class="section-head reveal"><span class="eyebrow">{h.pricingEyebrow}</span><h2 class="section-heading" id="pricing-title">{h.pricingTitle}</h2></div>
+      <Pricing heading={false} compact lang={lang} />
+      <p class="home-pricing-includes">{h.pricingIncludes}</p>
+      <p class="home-pricing-more"><a class="text-link" href={href('/pricing')}>{h.pricingMore} <span aria-hidden="true">↗</span></a></p>
+    </div>
+  </section>
+
+  <section class="switch-band" aria-label={t.header.compare}>
+    <p class="container" set:html={localizeLinks(lang, h.compareLine)} />
+  </section>
+
+  <section class="section home-faq" id="faq" aria-labelledby="faq-title">
+    <div class="container">
+      <h2 class="section-heading reveal" id="faq-title">{h.faqTitle}<span class="ink-underline">{h.faqMark}<OrbitAccent kind="arc" /></span></h2>
+      <Faq items={faq.map((f) => ({ q: f.q, a: localizeLinks(lang, f.a) }))} />
+    </div>
+  </section>
+
+  <CtaBand eyebrow="" title={h.ctaTitle} text={h.ctaText(TRIAL_DAYS, lowestPrice)} trialNote={false} lang={lang} />
+  <a class="support-bubble" href={href('/support')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v6a3 3 0 0 1-3 3h-4M4 12v5H2v-5h2Zm16 0v5h2v-5h-2Z" /></svg>{h.supportBubble}</a>
 </Base>
