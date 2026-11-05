@@ -159,7 +159,7 @@ const dict: Dict = {
   faq: [
     {
       q: 'Che cos’è PostDelegate?',
-      a: 'Uno strumento per programmare i social che può gestire la tua IA. Claude o ChatGPT preparano i post tramite MCP, tu li approvi su un unico calendario e PostDelegate li pubblica su 16 social. Puoi anche pianificare e scrivere tutto da te, e l’IA è a carico tuo, quindi non te la facciamo mai pagare.',
+      a: 'Uno strumento per programmare i social che la tua IA può gestire. Claude o ChatGPT preparano i post tramite MCP, tu li approvi su un unico calendario e PostDelegate li pubblica su 16 social. Puoi anche pianificare e scrivere tutto da te, e l’IA è a carico tuo, quindi non te la facciamo mai pagare.',
     },
     {
       q: 'Serve una carta di credito per la prova gratuita?',

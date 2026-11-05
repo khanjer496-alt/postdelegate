@@ -93,7 +93,7 @@ const dict: Dict = {
   networkGrid: {
     label: 'Netzwerke, die Sie heute verbinden können',
     scheduler: '-Planer',
-    pendingTitle: '<b>Warten auf Genehmigung.</b> Keines dieser Netzwerke lässt sich bisher verbinden. X ist auf PostDelegate nicht verfügbar.',
+    pendingTitle: '<b>Warten auf Genehmigung.</b> Noch lässt sich keines dieser Netzwerke verbinden. X ist auf PostDelegate nicht verfügbar.',
     pendingLabel: 'Netzwerke, die auf Genehmigung warten',
     status: 'Plattformstatus ansehen',
   },
@@ -242,7 +242,7 @@ const dict: Dict = {
   ],
   home: {
     title: 'PostDelegate: Social-Media-Planer für Teams und KI-Agenten',
-    description: (days: number, count: number) => `Social-Media-Planer mit MCP-Server und REST API in jedem Plan. Claude oder ChatGPT entwirft, Sie geben frei, es postet auf ${count} Netzwerken. ${days} Tage gratis, ohne Karte.`,
+    description: (days: number, count: number) => `Social-Media-Planer mit MCP-Server und REST API in jedem Plan. Claude oder ChatGPT entwirft, Sie geben frei, PostDelegate postet auf ${count} Netzwerken. ${days} Tage gratis, ohne Karte.`,
     appDescription: (days: number) => `Ein Social-Media-Planer mit MCP-Server und REST API in jedem Plan. Claude, ChatGPT oder Ihre eigenen Skripte entwerfen Beiträge, Sie geben sie in einem visuellen Kalender frei, und PostDelegate veröffentlicht sie pünktlich. KI bringen Sie selbst mit: Verbinden Sie den Assistenten, für den Sie bereits bezahlen, über MCP oder hinterlegen Sie Ihren eigenen OpenAI-Schlüssel, und PostDelegate berechnet nie etwas für KI. Mit Content Studio für Hochformatvideos und Video-Massenplanung. Jeder Plan beginnt mit einer ${days}-tägigen kostenlosen Testphase, ganz ohne Kreditkarte.`,
     appFeatures: ['Visueller Content-Kalender', 'Beitragseditor mit Einstellungen pro Kanal', 'Content Studio: Hochformatvideos in 1080×1920 mit Hook-Zeile oder Wort-für-Wort-Untertiteln', 'Video-Massenplanung über Ihre Zeitfenster', 'Massenimport von Beiträgen aus CSV', 'Analyse der täglich gewonnenen Aufrufe für YouTube-Kanäle', 'YouTube: später veröffentlichen und KI-Inhaltskennzeichnung', 'Medienbibliothek', 'Arbeitsbereiche und Teammitglieder', 'MCP-Server und REST API in jedem Plan', 'Eigene KI: Claude oder ChatGPT über MCP oder Ihr eigener OpenAI-Schlüssel', 'Agent-Dateien für Claude, ChatGPT, Cursor und Coding-Agenten'],
     orbitLabel: (count: number, names: string) => `${count} Netzwerke sind heute verbindbar: ${names}. Instagram, LinkedIn, TikTok und weitere Netzwerke warten auf Genehmigung.`,
@@ -453,7 +453,7 @@ const dict: Dict = {
     waiting: 'Warten auf Genehmigung',
     liveTitle: (count: number) => `Heute live (${count})`,
     waitingTitle: (count: number) => `Warten auf Genehmigung (${count})`,
-    waitingText: 'Keines dieser Netzwerke lässt sich bisher verbinden. Jedes wird freigeschaltet, sobald die jeweilige Plattform PostDelegate genehmigt und die Verbindung aktiviert ist. Termine nennen wir nicht.',
+    waitingText: 'Noch lässt sich keines dieser Netzwerke verbinden. Jedes wird freigeschaltet, sobald die jeweilige Plattform PostDelegate genehmigt und die Verbindung aktiviert ist. Termine nennen wir nicht.',
     xTitle: 'X: nicht verfügbar',
     xText: 'PostDelegate postet nicht auf X, und Sie können kein X-Konto verbinden.',
     googleNote: 'Eine Google-Anmeldung gewährt Zugang zu PostDelegate; sie verbindet keinen YouTube-Kanal und kein Google Business Profile. Jedes Veröffentlichungsziel hat seinen eigenen Verbindungsablauf.',
