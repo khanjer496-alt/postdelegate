@@ -114,6 +114,7 @@ const dict: Dict = {
     wordpress: 'Posts ou páginas com categorias, tags e imagem destacada.',
     hashnode: 'Artigos em Markdown para uma das suas publicações.',
     listmonk: 'Campanhas de e-mail pelo seu próprio Listmonk.',
+    mastodon: 'Posts e threads no mastodon.social, com imagens ou um vídeo.',
   },
   planTaglines: {
     starter: 'Para o seu próprio conteúdo.',
@@ -171,7 +172,7 @@ const dict: Dict = {
     },
     {
       q: 'Quando Instagram, TikTok e LinkedIn estarão disponíveis?',
-      a: 'Cada rede analisa um app antes de permitir que um serviço publique por seus usuários. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon e Google Business aguardam a aprovação das plataformas. O X não está disponível no PostDelegate. Não divulgamos datas, porque os prazos dependem de cada rede. Acompanhe o <a href="/roadmap">roadmap</a> e o <a href="/platforms">status das plataformas</a>.',
+      a: 'Cada rede analisa um app antes de permitir que um serviço publique por seus usuários. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit e Google Business Profile aguardam a aprovação das plataformas. O X não está disponível no PostDelegate. Não divulgamos datas, porque os prazos dependem de cada rede. Acompanhe o <a href="/roadmap">roadmap</a> e o <a href="/platforms">status das plataformas</a>.',
     },
     {
       q: 'Existe limite de posts?',
@@ -230,7 +231,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'O que é o PostDelegate?', a: `Um agendador de redes sociais que a sua IA pode operar. O Claude ou o ChatGPT cria os rascunhos dos posts pelo MCP, você aprova em um só calendário, e o PostDelegate publica em ${p.count} redes. Você também pode planejar e escrever tudo você mesmo.` },
       { q: 'Preciso de cartão de crédito para o teste?', a: `Não. Todo plano começa com um teste gratuito de ${p.days} dias, sem cartão. Adicione um antes do fim do teste para manter seu plano. Se não adicionar, seu espaço de trabalho fica pausado e seus posts são mantidos.` },
-      { q: 'Quais redes posso conectar?', a: `${p.count} hoje: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon e Google Business aguardam aprovação. O X não está disponível. Veja o <a href="/platforms">status das plataformas</a>.` },
+      { q: 'Quais redes posso conectar?', a: `${p.count} hoje: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit e Google Business Profile aguardam aprovação. O X não está disponível. Veja o <a href="/platforms">status das plataformas</a>.` },
       { q: 'Quanto custa a IA?', a: 'Nada da nossa parte. Conecte pelo MCP o assistente que você já assina, ou adicione sua própria chave da OpenAI e pague direto à OpenAI. Não há créditos de IA nem sobretaxa.' },
       { q: 'Posso cancelar quando quiser?', a: 'Sim. Um administrador do espaço de trabalho cancela na página de Cobrança, e o plano continua até o fim do período que você já pagou. Veja <a href="/docs/billing">planos e cobrança</a>.' },
     ],
@@ -698,6 +699,21 @@ const dict: Dict = {
       limits: [
         'Publicar inicia a campanha. Quando o post sai, o PostDelegate cria uma campanha comum na lista escolhida e a coloca em execução, o que faz o envio.',
         'Use um rascunho do PostDelegate para segurar uma campanha e envie antes um teste pelo próprio Listmonk.',
+      ],
+    },
+    'mastodon-scheduler': {
+      action: 'Agendar posts e threads',
+      description: `Agende posts e threads no Mastodon com imagens ou um vídeo no mastodon.social, conectando com o login do Mastodon. Teste grátis de ${TRIAL_DAYS} dias, sem cartão.`,
+      h1: 'Agende posts e threads no Mastodon.',
+      intro: 'Conecte uma conta do mastodon.social ao PostDelegate entrando com o Mastodon e agende posts e threads com imagens ou um vídeo.',
+      plan: [
+        'Entre com o Mastodon em Adicionar canal.',
+        'Escreva até 500 caracteres com até quatro imagens ou um vídeo.',
+        'Adicione mais entradas para publicar uma thread de respostas.',
+      ],
+      limits: [
+        'O PostDelegate conecta contas do mastodon.social. Contas de outros servidores do Mastodon ainda não podem ser conectadas.',
+        'Os posts são publicados como públicos, com limite de 500 caracteres e até quatro imagens ou um vídeo. Coloque o vídeo no primeiro post: as respostas não esperam o processamento.',
       ],
     },
   },

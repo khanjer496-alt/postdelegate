@@ -6,7 +6,7 @@ description: "PostDelegate API reference for channels: list channels and custome
 
 All paths are relative to `https://app.postdelegate.com/api/public/v1`.
 
-Each channel has an `identifier` that names its network. For the networks you can connect today the identifiers are `youtube`, `bluesky`, `telegram`, `discord`, `slack`, `tumblr`, `lemmy`, `nostr`, `twitch`, `kick`, `dribbble`, `devto`, `medium`, `wordpress`, `hashnode` and `listmonk`.
+Each channel has an `identifier` that names its network. For the networks you can connect today the identifiers are `youtube`, `bluesky`, `telegram`, `discord`, `slack`, `tumblr`, `lemmy`, `nostr`, `twitch`, `kick`, `dribbble`, `devto`, `medium`, `wordpress`, `hashnode`, `listmonk` and `mastodon`.
 
 ### `GET /integrations`
 
@@ -89,7 +89,7 @@ Use the ids and labels these return in a post's `settings`. A `404` with `Tool n
 
 ### `GET /social/:integration`
 
-Starts a connection for a network that signs in on the network's own page, which today means `youtube`, `kick`, `twitch`, `tumblr`, `dribbble`, `slack` and `discord`. It returns the address to open.
+Starts a connection for a network that signs in on the network's own page, which today means `youtube`, `kick`, `twitch`, `tumblr`, `dribbble`, `slack`, `discord` and `mastodon`. It returns the address to open.
 
 ```bash
 curl https://app.postdelegate.com/api/public/v1/social/youtube \

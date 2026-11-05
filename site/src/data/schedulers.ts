@@ -30,8 +30,7 @@ export const SCHEDULERS: Scheduler[] = [
   {"slug": "tiktok-scheduler", "key": "tiktok", "pending": "TikTok completes its review of PostDelegate", "name": "TikTok", "h1": "Give your TikTok content a place in the plan.", "intro": "TikTok publishing on PostDelegate is waiting on TikTok's review of PostDelegate.", "plan": ["TikTok and TikTok Business connections are planned.", "Prepare a caption and media before choosing a schedule.", "Review the posting settings available to the connected account."], "limits": ["Account permissions, privacy choices and platform review affect publishing availability.", "A prepared or scheduled post is not proof that it has been published."], "docs": "/docs/channels/coming-soon"},
   {"slug": "threads-scheduler", "key": "threads", "pending": "Meta approves PostDelegate", "name": "Threads", "h1": "Keep your Threads ideas moving.", "intro": "Threads publishing on PostDelegate is waiting on approval. It opens once Meta approves PostDelegate for publishing.", "plan": ["Keep captions and media together while planning.", "Customize the content for its destination before scheduling.", "See Threads posts on the same calendar as your other channels."], "limits": ["Account permissions affect connection and publishing options.", "The platform validates the final post and media."], "docs": "/docs/channels/coming-soon"},
   {"slug": "pinterest-scheduler", "key": "pinterest", "pending": "Pinterest approves PostDelegate", "name": "Pinterest", "h1": "Put your next Pin in the plan.", "intro": "Pinterest publishing on PostDelegate is waiting on Pinterest's approval.", "plan": ["Prepare the caption, media and destination link together.", "Review board and post settings when the connection is available.", "Plan Pins alongside the rest of your content."], "limits": ["Board access depends on the connected Pinterest account.", "App access and publishing permissions must be confirmed."], "docs": "/docs/channels/coming-soon"},
-  {"slug": "google-business-scheduler", "key": "google_business", "pending": "the Google Business Profile connection is switched on", "name": "Google Business Profile", "h1": "Keep business updates on your calendar.", "intro": "Google Business Profile publishing on PostDelegate is not live yet. It opens once the connection is switched on.", "plan": ["Plan business content alongside the rest of your posts.", "Review the destination location when connecting and composing.", "Keep updates and their media together in the composer."], "limits": ["A Google login does not by itself connect a Business Profile.", "Business Profile API access and location permissions affect availability."], "description": "Google Business Profile scheduling on PostDelegate is not live yet. Until it is, try the networks open today: 7-day free trial, no card.", "docs": "/docs/channels/coming-soon"},
-  {"slug": "mastodon-scheduler", "key": "mastodon", "pending": "the Mastodon connection is switched on", "name": "Mastodon", "h1": "Plan content for your Mastodon community.", "intro": "Mastodon publishing on PostDelegate is not live yet. It opens once the connection is switched on.", "plan": ["Prepare a message for the instance you use.", "Keep channel-specific content with the planned post.", "Plan Mastodon posts on the same calendar as your other channels."], "limits": ["Your instance and its rules affect the connection and final post.", "Character and media rules can differ between instances."], "docs": "/docs/channels/coming-soon"},
+  {"slug": "google-business-scheduler", "key": "google_business", "pending": "Google verifies PostDelegate's Business Profile permission", "name": "Google Business Profile", "h1": "Keep business updates on your calendar.", "intro": "Google Business Profile publishing on PostDelegate is not available yet. It is waiting on Google verification, and opens once Google verifies PostDelegate's Business Profile permission.", "plan": ["Updates, events and offers for a business location you pick when connecting.", "Up to 1,500 characters with one optional image.", "An optional call-to-action button, such as Book or Learn more."], "limits": ["A Google login does not by itself connect a Business Profile.", "The Google account will need to manage a verified business location."], "docs": "/docs/channels/coming-soon"},
   {
     slug: "youtube-scheduler", key: "youtube", name: "YouTube",
     action: "Schedule YouTube Videos",
@@ -497,6 +496,30 @@ export const SCHEDULERS: Scheduler[] = [
     faq: [
       { q: "Does PostDelegate send the email itself?", a: "No. PostDelegate creates a regular campaign in your own Listmonk and sets it to running, and your Listmonk sends it. Use a draft in PostDelegate to hold a campaign back, and send a test through Listmonk first." },
       { q: "Can I attach files to a Listmonk campaign?", a: "No. Attachments are not sent. Put pictures inside the HTML content where they should appear, using images from the media library." },
+    ],
+  },
+  {
+    slug: "mastodon-scheduler", key: "mastodon", name: "Mastodon",
+    action: "Schedule Mastodon Posts",
+    description: "Schedule Mastodon posts and threads with images or a video on mastodon.social, connected with Mastodon sign-in. 7-day free trial, no credit card required.",
+    h1: "Schedule Mastodon posts and threads.",
+    intro: "Connect a mastodon.social account to PostDelegate by signing in with Mastodon, then schedule posts and threads with images or a video.",
+    about: [
+      "A Mastodon post is up to 500 characters with up to four images or one video. PostDelegate keeps the text and media together with the planned post, publishes it as a public post at the time you pick, and turns extra entries into a thread of replies.",
+      "You connect through Mastodon's own sign-in, so PostDelegate never sees your password. PostDelegate connects accounts on mastodon.social. When a post has a video, PostDelegate waits until Mastodon has finished processing it before the post goes out. Put a video in the first post; replies don't wait for processing.",
+    ],
+    steps: [
+      { name: "Sign in with Mastodon", text: "On the calendar page choose Add Channel, then Mastodon. Sign in to your mastodon.social account and approve the permissions PostDelegate asks for: reading your profile, publishing posts and uploading media." },
+      { name: "Write the post", text: "Choose Create Post and select the Mastodon channel. Write up to 500 characters and add up to four images or one video." },
+      { name: "Add a thread if you need one", text: "Use Add post in a thread to add more entries. They are published as replies to the first post." },
+      { name: "Schedule it", text: "Pick a date and time and choose Add to Calendar. Use Save as draft to hold it back, or Post now to publish right away." },
+    ],
+    plan: ["Sign in with Mastodon from Add Channel.", "Write up to 500 characters with up to four images or one video.", "Add more entries to publish a thread of replies."],
+    limits: ["PostDelegate connects accounts on mastodon.social. Accounts on other Mastodon servers cannot be connected yet.", "Posts are published as public posts, limited to 500 characters with up to four images or one video."],
+    docs: "/docs/channels/mastodon",
+    faq: [
+      { q: "Can I connect an account on another Mastodon server?", a: "Not yet. PostDelegate connects accounts on mastodon.social. Accounts on other Mastodon servers cannot be connected today." },
+      { q: "Can I schedule a Mastodon thread?", a: "Yes. Add more entries to the post with Add post in a thread, and they are published as replies to the first post." },
     ],
   },
 ];

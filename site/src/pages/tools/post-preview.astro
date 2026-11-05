@@ -19,7 +19,7 @@ const faq = [
   { q: 'Is the preview exactly what people will see?', a: 'No. The cards are deliberately plain and approximate. Each network renders posts its own way, and the point where a feed folds a long post depends on the screen, the font and the app. Use the preview to catch text that is too long or buried, then check the final post in the composer.' },
   { q: 'How many hashtags should I use?', a: 'There is no single right number, and each network treats hashtags differently. A few relevant hashtags at the end usually read better than many in the middle of a sentence. The counter here helps you keep the number consistent across posts.' },
   { q: 'Is my caption sent anywhere?', a: 'No. The preview runs in your browser. Nothing you type is uploaded or saved.' },
-  { q: 'Which of these networks can PostDelegate post to?', a: 'Bluesky can be connected today. Mastodon, Threads and LinkedIn are waiting on approval and can’t be connected yet. The <a href="/platforms">platform directory</a> shows everything you can connect right now.' },
+  { q: 'Which of these networks can PostDelegate post to?', a: 'Bluesky and Mastodon can be connected today. Threads and LinkedIn are waiting on approval and can’t be connected yet. The <a href="/platforms">platform directory</a> shows everything you can connect right now.' },
 ];
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };
 const field = 'w-full rounded-xl border border-line-hover bg-surface-1 px-4 py-3 text-ink placeholder:text-ink-3 focus:border-brand-300';

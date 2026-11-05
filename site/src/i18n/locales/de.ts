@@ -114,6 +114,7 @@ const dict: Dict = {
     wordpress: 'Beiträge oder Seiten mit Kategorien, Tags und Beitragsbild.',
     hashnode: 'Markdown-Artikel in einer Ihrer Publikationen.',
     listmonk: 'E-Mail-Kampagnen über Ihr eigenes Listmonk.',
+    mastodon: 'Beiträge und Threads auf mastodon.social, mit Bildern oder einem Video.',
   },
   planTaglines: {
     starter: 'Für Ihre eigenen Inhalte.',
@@ -171,7 +172,7 @@ const dict: Dict = {
     },
     {
       q: 'Wann sind Instagram, TikTok und LinkedIn verfügbar?',
-      a: 'Jedes Netzwerk prüft eine App, bevor es einem Dienst erlaubt, für seine Nutzer zu veröffentlichen. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon und Google Business warten auf die Genehmigung der Plattform. X ist auf PostDelegate nicht verfügbar. Wir nennen keine Termine, weil die Zeitpläne bei den Netzwerken liegen. Verfolgen Sie die <a href="/roadmap">Roadmap</a> und den <a href="/platforms">Plattformstatus</a>.',
+      a: 'Jedes Netzwerk prüft eine App, bevor es einem Dienst erlaubt, für seine Nutzer zu veröffentlichen. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit und Google Business Profile warten auf die Genehmigung der Plattform. X ist auf PostDelegate nicht verfügbar. Wir nennen keine Termine, weil die Zeitpläne bei den Netzwerken liegen. Verfolgen Sie die <a href="/roadmap">Roadmap</a> und den <a href="/platforms">Plattformstatus</a>.',
     },
     {
       q: 'Gibt es ein Limit für Beiträge?',
@@ -230,7 +231,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'Was ist PostDelegate?', a: `Ein Social-Media-Planer, den Ihre KI bedienen kann. Claude oder ChatGPT entwirft Beiträge über MCP, Sie geben sie in einem Kalender frei, und PostDelegate veröffentlicht sie auf ${p.count} Netzwerken. Sie können auch alles selbst planen und schreiben.` },
       { q: 'Brauche ich für die Testphase eine Kreditkarte?', a: `Nein. Jeder Plan beginnt mit einer ${p.days}-tägigen kostenlosen Testphase ohne Karte. Hinterlegen Sie vor Ende der Testphase eine Karte, um Ihren Plan zu behalten. Andernfalls pausiert Ihr Arbeitsbereich, und Ihre Beiträge bleiben erhalten.` },
-      { q: 'Welche Netzwerke kann ich verbinden?', a: `Heute ${p.count}: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit, Mastodon und Google Business warten auf Genehmigung. X ist nicht verfügbar. Siehe <a href="/platforms">Plattformstatus</a>.` },
+      { q: 'Welche Netzwerke kann ich verbinden?', a: `Heute ${p.count}: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit und Google Business Profile warten auf Genehmigung. X ist nicht verfügbar. Siehe <a href="/platforms">Plattformstatus</a>.` },
       { q: 'Was kostet die KI?', a: 'Bei uns nichts. Verbinden Sie den Assistenten, für den Sie bereits bezahlen, über MCP, oder hinterlegen Sie Ihren eigenen OpenAI-Schlüssel und zahlen Sie direkt an OpenAI. Es gibt keine KI-Credits und keinen Aufschlag.' },
       { q: 'Kann ich jederzeit kündigen?', a: 'Ja. Ein Admin des Arbeitsbereichs kündigt auf der Seite „Abrechnung“, und der Plan läuft bis zum Ende des bereits bezahlten Zeitraums. Siehe <a href="/docs/billing">Pläne und Abrechnung</a>.' },
     ],
@@ -698,6 +699,21 @@ const dict: Dict = {
       limits: [
         'Das Veröffentlichen startet die Kampagne. Wenn der Beitrag rausgeht, erstellt PostDelegate eine reguläre Kampagne für die gewählte Liste und setzt sie auf „läuft“, wodurch sie versendet wird.',
         'Nutzen Sie einen PostDelegate-Entwurf, um eine Kampagne zurückzuhalten, und senden Sie vorher über Listmonk selbst einen Test.',
+      ],
+    },
+    'mastodon-scheduler': {
+      action: 'Mastodon-Beiträge planen',
+      description: `Planen Sie Mastodon-Beiträge und Threads mit Bildern oder einem Video auf mastodon.social, verbunden per Mastodon-Anmeldung. ${TRIAL_DAYS} Tage kostenlos, ohne Karte.`,
+      h1: 'Mastodon-Beiträge und Threads planen.',
+      intro: 'Verbinden Sie ein Konto auf mastodon.social per Mastodon-Anmeldung mit PostDelegate und planen Sie Beiträge und Threads mit Bildern oder einem Video.',
+      plan: [
+        'Über „Kanal hinzufügen“ mit Mastodon anmelden.',
+        'Bis zu 500 Zeichen mit bis zu vier Bildern oder einem Video schreiben.',
+        'Weitere Einträge hinzufügen, um einen Thread aus Antworten zu veröffentlichen.',
+      ],
+      limits: [
+        'PostDelegate verbindet Konten auf mastodon.social. Konten auf anderen Mastodon-Servern lassen sich noch nicht verbinden.',
+        'Beiträge erscheinen öffentlich, mit höchstens 500 Zeichen und bis zu vier Bildern oder einem Video. Setzen Sie ein Video in den ersten Beitrag, denn Antworten warten nicht auf die Verarbeitung.',
       ],
     },
   },

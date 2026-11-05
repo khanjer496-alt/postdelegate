@@ -22,6 +22,6 @@ export const SOCIAL_PROFILES = [
   { name: 'YouTube', href: 'https://www.youtube.com/@postdelegate' },
   { name: 'GitHub', href: 'https://github.com/khanjer496-alt/postdelegate-app' },
 ] as const;
-// Pages kept out of search and the sitemap: networks that are not switched on yet, and X,
-// which is not available. Remove a scheduler page from here when its network goes live.
-export const NOINDEX_PATHS = ['/mastodon-scheduler', '/google-business-scheduler', '/docs/channels/x'];
+// Pages kept out of search and the sitemap: X, which is not available. A scheduler page for a
+// network that is not switched on yet goes here too, and comes out when its network goes live.
+export const NOINDEX_PATHS = ['/google-business-scheduler', '/docs/channels/x'];
