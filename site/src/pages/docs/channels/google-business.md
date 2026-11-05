@@ -1,45 +1,21 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Google Business Profile
-description: Connect a Google Business Profile location with Google sign-in and schedule updates, events and offers with one image and a call-to-action button.
+description: Google Business Profile is not available on PostDelegate yet. It is waiting on Google verification. What it will support, and what to use today.
 ---
 
-A Google Business Profile post appears on your business's listing on Google. PostDelegate publishes to the business location you pick when you connect.
+<div class="callout">
 
-## What you need
+**Not available yet.** Google Business Profile cannot be connected on PostDelegate today. It is waiting on Google verification, and opens once Google verifies PostDelegate's Business Profile permission. We do not give dates.
 
-- A Google account that manages a verified Business Profile with at least one location.
+</div>
 
-## Connect
+## What is planned
 
-1. On the calendar page choose **Add Channel**, then **Google My Business**.
-2. Sign in with Google and approve the permissions. PostDelegate asks to see your profile and email and to manage your Business Profile.
-3. Choose the business location to connect. Each location is its own channel, so add the network again to connect another one.
+- Connect with Google sign-in, then pick the business location to post to. Each location will be its own channel.
+- Standard updates, events and offers, with up to 1,500 characters and one optional image.
+- An optional call-to-action button, such as Book or Learn more.
 
-Until Google verifies PostDelegate for the Business Profile permission, you may see a "Google hasn't verified this app" screen: choose **Advanced**, then **Go to PostDelegate**.
+Signing in to PostDelegate with Google does not connect a Business Profile.
 
-Signing in to PostDelegate with Google does not connect a Business Profile. You still need this step. If no locations appear, check that the business is verified on Google.
-
-## What gets published
-
-- Text of up to 1,500 characters.
-- Text only, or text with one image. Video is not supported.
-- Single posts only. Follow-up entries in a post are not published.
-
-## Post settings
-
-| Setting | Notes |
-| --- | --- |
-| Post Type | **Standard Update**, **Event** or **Offer**. Defaults to Standard Update. |
-| Call to Action | Optional. **Book**, **Order Online**, **Shop**, **Learn More**, **Sign Up** or **Get Offer**, with the URL the button opens. **Call** adds no button, because it has no URL. |
-| Event details | Event posts only. An event title is required. Start and end dates default to the day the post goes out, and start and end times are optional. |
-| Offer details | Offer posts only. Optional coupon code, redeem online URL and terms and conditions. |
-
-## Limits
-
-- Google reviews each post. If it rejects one for its content policies, the post fails and the calendar shows the reason.
-- If a location is removed from the Business Profile, posts to it fail until you connect another location.
-
-## Troubleshooting
-
-- **The channel asks to reconnect.** Google stopped accepting the saved sign-in, or the account lost access to the location. Use **Reconnect channel** and sign in with Google again. See [Reconnecting a channel](/docs/channels#reconnecting-a-channel).
+When the connection opens it will appear under **Add Channel** in the app. Until then, see the [networks you can connect today](/docs/channels) and the other networks [waiting on approval](/docs/channels/coming-soon).

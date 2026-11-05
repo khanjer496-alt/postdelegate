@@ -115,7 +115,6 @@ const dict: Dict = {
     hashnode: 'Articoli in Markdown in una delle tue pubblicazioni.',
     listmonk: 'Campagne email tramite il tuo Listmonk.',
     mastodon: 'Post e thread su mastodon.social, con immagini o un video.',
-    google_business: 'Novità, eventi e offerte sulla sede dell’attività che scegli.',
   },
   planTaglines: {
     starter: 'Per i tuoi contenuti.',
@@ -173,7 +172,7 @@ const dict: Dict = {
     },
     {
       q: 'Quando saranno disponibili Instagram, TikTok e LinkedIn?',
-      a: 'Ogni social esamina un’app prima di permettere a un servizio di pubblicare per i suoi utenti. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest e Reddit sono in attesa dell’approvazione della piattaforma. X non è disponibile su PostDelegate. Non pubblichiamo date, perché le tempistiche dipendono da ciascun social. Segui la <a href="/roadmap">roadmap</a> e lo <a href="/platforms">stato delle piattaforme</a>.',
+      a: 'Ogni social esamina un’app prima di permettere a un servizio di pubblicare per i suoi utenti. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit e Google Business Profile sono in attesa dell’approvazione della piattaforma. X non è disponibile su PostDelegate. Non pubblichiamo date, perché le tempistiche dipendono da ciascun social. Segui la <a href="/roadmap">roadmap</a> e lo <a href="/platforms">stato delle piattaforme</a>.',
     },
     {
       q: 'C’è un limite ai post?',
@@ -232,7 +231,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'Che cos’è PostDelegate?', a: `Uno strumento per programmare i social che la tua IA può gestire. Claude o ChatGPT preparano i post tramite MCP, tu li approvi su un unico calendario e PostDelegate li pubblica su ${p.count} social. Puoi anche pianificare e scrivere tutto da te.` },
       { q: 'Serve una carta di credito per la prova?', a: `No. Ogni piano parte con una prova gratuita di ${p.days} giorni, senza carta. Aggiungine una prima della fine della prova per mantenere il tuo piano. Altrimenti il tuo workspace va in pausa e i tuoi post restano salvati.` },
-      { q: 'Quali social posso collegare?', a: `${p.count} oggi: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest e Reddit sono in attesa di approvazione. X non è disponibile. Vedi lo <a href="/platforms">stato delle piattaforme</a>.` },
+      { q: 'Quali social posso collegare?', a: `${p.count} oggi: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit e Google Business Profile sono in attesa di approvazione. X non è disponibile. Vedi lo <a href="/platforms">stato delle piattaforme</a>.` },
       { q: 'Quanto costa l’IA?', a: 'Niente, da parte nostra. Collega tramite MCP l’assistente che paghi già, oppure aggiungi la tua chiave OpenAI e paga OpenAI direttamente. Nessun credito IA e nessun ricarico.' },
       { q: 'Posso annullare quando voglio?', a: 'Sì. Un amministratore del workspace annulla dalla pagina Fatturazione, e il piano resta attivo fino alla fine del periodo già pagato. Vedi <a href="/docs/billing">piani e fatturazione</a>.' },
     ],
@@ -715,21 +714,6 @@ const dict: Dict = {
       limits: [
         'PostDelegate collega account su mastodon.social. Gli account su altri server Mastodon non si possono ancora collegare.',
         'I post vengono pubblicati come pubblici, con un limite di 500 caratteri e fino a quattro immagini o un video.',
-      ],
-    },
-    'google-business-scheduler': {
-      action: 'Programma post sul Profilo dell’attività',
-      description: `Programma novità, eventi e offerte sul Profilo dell’attività su Google, con un’immagine e un pulsante di azione. Prova gratuita di ${TRIAL_DAYS} giorni, senza carta.`,
-      h1: 'Programma post sul tuo Profilo dell’attività su Google.',
-      intro: 'Collega una sede del tuo Profilo dell’attività su Google accedendo con Google, poi programma novità, eventi e offerte insieme al resto dei tuoi post.',
-      plan: [
-        'Accedi con Google da Aggiungi canale e scegli la sede dell’attività.',
-        'Scrivi fino a 1.500 caratteri con un’immagine facoltativa.',
-        'Pubblica una novità, un evento o un’offerta, con un pulsante di azione facoltativo.',
-      ],
-      limits: [
-        'Accedere a PostDelegate con Google non collega di per sé un Profilo dell’attività. L’account Google deve gestire una sede verificata.',
-        'I post accettano testo e al massimo un’immagine. Google può rifiutare un post che viola le sue norme sui contenuti, e il calendario mostra il motivo.',
       ],
     },
   },

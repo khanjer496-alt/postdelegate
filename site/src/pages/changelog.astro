@@ -6,7 +6,6 @@ import { SITE } from '../data/site';
 const releases: { date: string; items: { title: string; text: string; href?: string }[] }[] = [
   { date: '2026-11-05', items: [
     { title: 'Mastodon is live', text: 'Sign in with a mastodon.social account and schedule posts and threads with up to four images or one video.', href: '/docs/channels/mastodon' },
-    { title: 'Google Business Profile is live', text: 'Connect a business location with Google sign-in and schedule updates, events and offers with one image and a call-to-action button.', href: '/docs/channels/google-business' },
   ] },
   { date: '2026-11-02', items: [
     { title: 'Five more Studio templates', text: 'Image slideshow, before/after, top list, quote card, and AI UGC, which writes and voices a short script on your own OpenAI key. Add your own music to your videos.', href: '/docs/studio#templates' },
@@ -36,7 +35,7 @@ const releases: { date: string; items: { title: string; text: string; href?: str
 ];
 const fmt = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 ---
-<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Mastodon and Google Business Profile, Studio templates, ownership transfer, bulk video, views analytics and more." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
+<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Mastodon, Studio templates, ownership transfer, bulk video, views analytics and more." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
   <a slot="actions" href="/roadmap" class="button button-outline">See the roadmap</a>
   {releases.map((release) => (
     <section class="release">
