@@ -3,39 +3,57 @@ import Base from '../../layouts/Base.astro';
 import NetworkBadge from '../NetworkBadge.astro';
 import PageHero from '../PageHero.astro';
 import CtaBand from '../CtaBand.astro';
-import { NETWORKS } from '../../data/networks';
+import { AVAILABLE_NETWORKS, WAITING_NETWORKS, type Network } from '../../data/networks';
 import { SITE } from '../../data/site';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = strings(lang);
 const p = t.platformsPage;
-const networks = [...NETWORKS].sort((a, b) => Number(!!b.available) - Number(!!a.available));
-const href = (network: typeof NETWORKS[number]) => localeHref(lang, network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon');
+// Live networks, then the ones waiting on approval, then one line for X. Networks that are
+// not offered at all are not listed.
+const sections = [
+  { id: 'live', title: p.liveTitle(AVAILABLE_NETWORKS.length), networks: AVAILABLE_NETWORKS, live: true },
+  { id: 'waiting', title: p.waitingTitle(WAITING_NETWORKS.length), text: p.waitingText, networks: WAITING_NETWORKS, live: false },
+];
+const href = (network: Network) => localeHref(lang, network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon');
 ---
-<Base title={p.title} description={p.description} lang={lang}>
-  <PageHero eyebrow={p.eyebrow} title={p.h1} lead={p.lead}>
+<Base title={p.title(AVAILABLE_NETWORKS.length)} description={p.description(AVAILABLE_NETWORKS.length)} lang={lang}>
+  <PageHero eyebrow={p.eyebrow} title={p.h1(AVAILABLE_NETWORKS.length)} lead={p.lead}>
     <a href={SITE.signup} class="button">{t.common.ctaLabel}</a>
     <a href={localeHref(lang, '/support')} class="button button-outline">{p.ask}</a>
   </PageHero>
   <section class="section"><div class="container">
     <p class="coverage-note muted" set:html={localizeLinks(lang, p.note)} />
-    <ul class="network-grid">
-      {networks.map((network) => (
-        <li><a href={href(network)} class="network-card">
-          <NetworkBadge n={network} size="lg" />
-          <span class="network-copy"><strong>{network.name}</strong><span>{network.available ? p.connectIt : p.notYet}</span></span>
-          <span class={network.available ? 'rollout-label is-available' : 'rollout-label'}>{network.available ? p.available : p.soon}</span>
-        </a></li>
-      ))}
-    </ul>
+    {sections.map((section) => (
+      <section class="coverage-group" aria-labelledby={`platforms-${section.id}`}>
+        <h2 id={`platforms-${section.id}`}>{section.title}</h2>
+        {section.text && <p class="coverage-text muted">{section.text}</p>}
+        <ul class="network-grid">
+          {section.networks.map((network) => (
+            <li><a href={href(network)} class="network-card">
+              <NetworkBadge n={network} size="lg" />
+              <span class="network-copy"><strong>{network.name}</strong><span>{section.live ? p.connectIt : p.notYet}</span></span>
+              <span class={section.live ? 'rollout-label is-available' : 'rollout-label'}>{section.live ? p.available : p.waiting}</span>
+            </a></li>
+          ))}
+        </ul>
+      </section>
+    ))}
+    <section class="coverage-group" aria-labelledby="platforms-x">
+      <h2 id="platforms-x">{p.xTitle}</h2>
+      <p class="coverage-text muted">{p.xText}</p>
+    </section>
     <p class="coverage-note muted">{p.googleNote}</p>
   </div></section>
   <CtaBand lang={lang} />
 </Base>
 <style>
   .coverage-note { max-width: 760px; text-align: center; margin: 0 auto 34px; font-size: 15px; line-height: 1.85; }
-  .network-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; list-style: none; padding: 0; margin: 0 0 35px; }
+  .coverage-group { margin: 0 0 44px; }
+  .coverage-group h2 { margin: 0 0 12px; font-size: clamp(24px, 3vw, 31px); font-weight: 800; letter-spacing: -.035em; line-height: 1.2; }
+  .coverage-text { max-width: 760px; margin: 0 0 20px; font-size: 15px; line-height: 1.75; }
+  .network-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; list-style: none; padding: 0; margin: 0; }
   .network-card { height: 100%; padding: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 13px; border: 1px solid #363636; border-radius: 18px; background: #171717; color: #fff; text-decoration: none; transition: border-color .2s; }
   .network-card:hover { border-color: #888; }
   .network-copy { display: flex; flex: 1; min-width: 120px; flex-direction: column; gap: 5px; }

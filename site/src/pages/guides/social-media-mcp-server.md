@@ -29,7 +29,7 @@ When an assistant creates a post it runs the same validation as the app and the 
 
 ## What an MCP server does not do
 
-It does not give an assistant access to networks you have not connected. The assistant works through your connected channels, so it can only publish where you could publish yourself. Today that means [the networks marked available](/platforms), such as YouTube, Bluesky, WordPress, Slack and DEV.to. Facebook, Instagram, LinkedIn, TikTok, X and others are coming soon and need each network's approval first.
+It does not give an assistant access to networks you have not connected. The assistant works through your connected channels, so it can only publish where you could publish yourself. Today that means [the networks marked available](/platforms), such as YouTube, Bluesky, WordPress, Slack and DEV.to. Facebook, Instagram, LinkedIn, TikTok and others are waiting on each network's approval, and X is not available.
 
 It also does not include an AI. The assistant is yours, and so are its costs. Any AI inside the PostDelegate app runs on your workspace's own OpenAI key, and PostDelegate never charges for AI.
 

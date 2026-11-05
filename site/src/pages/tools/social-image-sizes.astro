@@ -1,7 +1,7 @@
 ---
 import Doc from '../../layouts/Doc.astro';
 import Faq from '../../components/Faq.astro';
-import { NETWORKS } from '../../data/networks';
+import { NETWORKS, networkStatus } from '../../data/networks';
 import { SITE, CTA_LABEL } from '../../data/site';
 // Only sizes stated on each platform's own help or developer pages, checked in November 2026.
 // Anything a platform does not publish is left out rather than guessed.
@@ -109,7 +109,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   {rows.map((s) => (
     <>
       <h2 id={s.key}>{s.network.name} image sizes</h2>
-      <p class="status">{s.network.available ? <>You can connect {s.network.name} to PostDelegate today{s.network.scheduler ? <>: see the <a href={`/${s.network.scheduler}`}>{s.network.name} scheduler</a></> : ''}.</> : <>{s.network.name} is coming soon on PostDelegate.</>}</p>
+      <p class="status">{s.network.available ? <>You can connect {s.network.name} to PostDelegate today{s.network.scheduler ? <>: see the <a href={`/${s.network.scheduler}`}>{s.network.name} scheduler</a></> : ''}.</> : networkStatus(s.network) === 'waiting' ? <>{s.network.name} is waiting on approval and can’t be connected to PostDelegate yet.</> : <>{s.network.name} is not available on PostDelegate.</>}</p>
       <table>
         <thead><tr><th>Image</th><th>Size</th><th>Notes</th></tr></thead>
         <tbody>{s.rows.map(([item, size, notes]) => <tr><td><strong>{item}</strong></td><td>{size}</td><td>{notes || '—'}</td></tr>)}</tbody>

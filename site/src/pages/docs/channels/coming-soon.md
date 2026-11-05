@@ -1,10 +1,10 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Coming soon
-description: Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and X are coming soon to PostDelegate. Why each needs platform approval first, and what to do now.
+title: Waiting on approval
+description: Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and Reddit are waiting on platform approval at PostDelegate. Why each needs approval first, and what to do now.
 ---
 
-These networks are in preparation. **None of them can be connected on PostDelegate today.** Each network reviews apps before it lets a service publish on someone's behalf, and PostDelegate will only offer a connection once that review is done.
+These networks are not live yet. **None of them can be connected on PostDelegate today.** Each network reviews apps before it lets a service publish on someone's behalf, and PostDelegate only offers a connection once that review is done and the connection is switched on.
 
 | Network | Status |
 | --- | --- |
@@ -14,8 +14,11 @@ These networks are in preparation. **None of them can be connected on PostDelega
 | TikTok | Waiting for platform approval |
 | LinkedIn | Waiting for platform approval |
 | Pinterest | Waiting for platform approval |
-| X | Not yet available |
-| Other networks | Not yet available |
+| Reddit | Waiting for platform approval |
+| Mastodon | Not switched on yet |
+| Google Business Profile | Not switched on yet |
+
+X is not available on PostDelegate.
 
 We do not publish dates, because approval timelines belong to each network. When a connection opens it will appear under **Add Channel** in the app and get a guide here.
 

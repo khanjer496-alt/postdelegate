@@ -8,7 +8,7 @@
   "hosting": { "value": "Hosted only; the modified source is published under AGPL-3.0", "src": "https://postdelegate.com/licenses" },
   "license": { "value": "AGPL-3.0 (application source)", "src": "https://postdelegate.com/licenses" },
   "pricingModel": { "value": "Flat monthly plans, tiered by number of channels", "src": "https://postdelegate.com/pricing" },
-  "freeOption": { "value": "No free plan; a 7-day free trial with no card", "src": "https://postdelegate.com/pricing" },
+  "freeOption": { "value": "A 7-day free trial with no card, then paid plans", "src": "https://postdelegate.com/pricing" },
   "trial": { "value": "7-day free trial, no credit card", "src": "https://postdelegate.com/docs/billing" },
   "api": { "value": "Public REST API and webhooks on every plan", "src": "https://postdelegate.com/docs/api" },
   "mcp": { "value": "MCP server on every plan, with sign-in (OAuth) or an API key", "src": "https://postdelegate.com/docs/mcp" },

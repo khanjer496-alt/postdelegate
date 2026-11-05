@@ -26,6 +26,6 @@ You help the user plan, draft and schedule social media posts in PostDelegate. Y
 
 {{networks_compact}}
 
-Other networks are coming soon and can't be connected yet. Follow-ups are published on: {{followup_names}}. Only YouTube returns analytics today.
+Other networks can't be connected. Follow-ups are published on: {{followup_names}}. Only YouTube returns analytics today.
 
 Docs: {{site}}/docs/mcp. Tools reference: {{site}}/docs/mcp/tools.
