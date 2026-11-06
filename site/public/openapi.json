@@ -185,7 +185,7 @@
           "Integrations"
         ],
         "summary": "Get OAuth URL for a channel",
-        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord or Mastodon. Networks that take a pasted credential, such as Bluesky, are not.",
+        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord, Mastodon or Google Business Profile (gmb). Networks that take a pasted credential, such as Bluesky, are not.",
         "operationId": "getIntegrationUrl",
         "parameters": [
           {
@@ -1268,7 +1268,7 @@
                   }
                 },
                 "gmb": {
-                  "summary": "Google My Business",
+                  "summary": "Google Business Profile",
                   "value": {
                     "type": "schedule",
                     "date": "2024-12-14T10:00:00.000Z",
@@ -3552,12 +3552,12 @@
         }
       },
       "GmbSettings": {
-        "title": "Google My Business",
+        "title": "Google Business Profile",
         "type": "object",
         "required": [
           "__type"
         ],
-        "description": "Google My Business post settings",
+        "description": "Google Business Profile post settings. A post is up to 1,500 characters with one optional image. Videos are not supported.",
         "properties": {
           "__type": {
             "type": "string",
@@ -3591,7 +3591,7 @@
           "callToActionUrl": {
             "type": "string",
             "format": "uri",
-            "description": "URL for CTA (required if callToActionType is set)"
+            "description": "The link the button opens. The button is only added when this is set."
           },
           "eventTitle": {
             "type": "string",
@@ -3599,19 +3599,19 @@
           },
           "eventStartDate": {
             "type": "string",
-            "description": "Event start date"
+            "description": "Event start date (YYYY-MM-DD). Defaults to the day the post is published."
           },
           "eventEndDate": {
             "type": "string",
-            "description": "Event end date"
+            "description": "Event end date (YYYY-MM-DD). Defaults to the day the post is published."
           },
           "eventStartTime": {
             "type": "string",
-            "description": "Event start time"
+            "description": "Event start time (HH:mm), optional"
           },
           "eventEndTime": {
             "type": "string",
-            "description": "Event end time"
+            "description": "Event end time (HH:mm), optional"
           },
           "offerCouponCode": {
             "type": "string",

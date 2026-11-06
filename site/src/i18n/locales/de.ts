@@ -115,6 +115,7 @@ const dict: Dict = {
     hashnode: 'Markdown-Artikel in einer Ihrer Publikationen.',
     listmonk: 'E-Mail-Kampagnen über Ihr eigenes Listmonk.',
     mastodon: 'Beiträge und Threads auf mastodon.social, mit Bildern oder einem Video.',
+    google_business: 'Neuigkeiten, Events und Angebote für einen Unternehmensstandort, mit optionalem Bild.',
   },
   planTaglines: {
     starter: 'Für Ihre eigenen Inhalte.',
@@ -172,7 +173,7 @@ const dict: Dict = {
     },
     {
       q: 'Wann sind Instagram, TikTok und LinkedIn verfügbar?',
-      a: 'Jedes Netzwerk prüft eine App, bevor es einem Dienst erlaubt, für seine Nutzer zu veröffentlichen. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit und Google Business Profile warten auf die Genehmigung der Plattform. X ist auf PostDelegate nicht verfügbar. Wir nennen keine Termine, weil die Zeitpläne bei den Netzwerken liegen. Verfolgen Sie die <a href="/roadmap">Roadmap</a> und den <a href="/platforms">Plattformstatus</a>.',
+      a: 'Jedes Netzwerk prüft eine App, bevor es einem Dienst erlaubt, für seine Nutzer zu veröffentlichen. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest und Reddit warten auf die Genehmigung der Plattform. X ist auf PostDelegate nicht verfügbar. Wir nennen keine Termine, weil die Zeitpläne bei den Netzwerken liegen. Verfolgen Sie die <a href="/roadmap">Roadmap</a> und den <a href="/platforms">Plattformstatus</a>.',
     },
     {
       q: 'Gibt es ein Limit für Beiträge?',
@@ -231,7 +232,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'Was ist PostDelegate?', a: `Ein Social-Media-Planer, den Ihre KI bedienen kann. Claude oder ChatGPT entwirft Beiträge über MCP, Sie geben sie in einem Kalender frei, und PostDelegate veröffentlicht sie auf ${p.count} Netzwerken. Sie können auch alles selbst planen und schreiben.` },
       { q: 'Brauche ich für die Testphase eine Kreditkarte?', a: `Nein. Jeder Plan beginnt mit einer ${p.days}-tägigen kostenlosen Testphase ohne Karte. Hinterlegen Sie vor Ende der Testphase eine Karte, um Ihren Plan zu behalten. Andernfalls pausiert Ihr Arbeitsbereich, und Ihre Beiträge bleiben erhalten.` },
-      { q: 'Welche Netzwerke kann ich verbinden?', a: `Heute ${p.count}: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit und Google Business Profile warten auf Genehmigung. X ist nicht verfügbar. Siehe <a href="/platforms">Plattformstatus</a>.` },
+      { q: 'Welche Netzwerke kann ich verbinden?', a: `Heute ${p.count}: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest und Reddit warten auf Genehmigung. X ist nicht verfügbar. Siehe <a href="/platforms">Plattformstatus</a>.` },
       { q: 'Was kostet die KI?', a: 'Bei uns nichts. Verbinden Sie den Assistenten, für den Sie bereits bezahlen, über MCP, oder hinterlegen Sie Ihren eigenen OpenAI-Schlüssel und zahlen Sie direkt an OpenAI. Es gibt keine KI-Credits und keinen Aufschlag.' },
       { q: 'Kann ich jederzeit kündigen?', a: 'Ja. Ein Admin des Arbeitsbereichs kündigt auf der Seite „Abrechnung“, und der Plan läuft bis zum Ende des bereits bezahlten Zeitraums. Siehe <a href="/docs/billing">Pläne und Abrechnung</a>.' },
     ],
@@ -714,6 +715,21 @@ const dict: Dict = {
       limits: [
         'PostDelegate verbindet Konten auf mastodon.social. Konten auf anderen Mastodon-Servern lassen sich noch nicht verbinden.',
         'Beiträge erscheinen öffentlich, mit höchstens 500 Zeichen und bis zu vier Bildern oder einem Video. Setzen Sie ein Video in den ersten Beitrag, denn Antworten warten nicht auf die Verarbeitung.',
+      ],
+    },
+    'google-business-scheduler': {
+      action: 'Google-Business-Profile-Beiträge planen',
+      description: `Planen Sie Neuigkeiten, Events und Angebote für Ihr Google Business Profile mit Bild und Button, verbunden per Google-Anmeldung. ${TRIAL_DAYS} Tage kostenlos, ohne Karte.`,
+      h1: 'Beiträge für Ihr Google Business Profile planen.',
+      intro: 'Verbinden Sie einen Unternehmensstandort per Google-Anmeldung und planen Sie Neuigkeiten, Events und Angebote mit optionalem Bild und Button.',
+      plan: [
+        'Über „Kanal hinzufügen“ mit Google anmelden und einen Unternehmensstandort wählen.',
+        'Bis zu 1.500 Zeichen mit einem optionalen Bild schreiben.',
+        'Neuigkeit, Event oder Angebot wählen, mit optionalem Button.',
+      ],
+      limits: [
+        'Google nimmt Beiträge nur für bestätigte Standorte an, die das angemeldete Google-Konto verwaltet. Die Anmeldung bei PostDelegate mit Google verbindet kein Business Profile.',
+        'Jeder Beitrag geht an einen Standort, mit höchstens einem Bild. Videos werden nicht unterstützt, und weitere Einträge eines Beitrags werden nicht veröffentlicht.',
       ],
     },
   },

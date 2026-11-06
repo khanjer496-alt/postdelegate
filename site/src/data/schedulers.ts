@@ -30,7 +30,6 @@ export const SCHEDULERS: Scheduler[] = [
   {"slug": "tiktok-scheduler", "key": "tiktok", "pending": "TikTok completes its review of PostDelegate", "name": "TikTok", "h1": "Give your TikTok content a place in the plan.", "intro": "TikTok publishing on PostDelegate is waiting on TikTok's review of PostDelegate.", "plan": ["TikTok and TikTok Business connections are planned.", "Prepare a caption and media before choosing a schedule.", "Review the posting settings available to the connected account."], "limits": ["Account permissions, privacy choices and platform review affect publishing availability.", "A prepared or scheduled post is not proof that it has been published."], "docs": "/docs/channels/coming-soon"},
   {"slug": "threads-scheduler", "key": "threads", "pending": "Meta approves PostDelegate", "name": "Threads", "h1": "Keep your Threads ideas moving.", "intro": "Threads publishing on PostDelegate is waiting on approval. It opens once Meta approves PostDelegate for publishing.", "plan": ["Keep captions and media together while planning.", "Customize the content for its destination before scheduling.", "See Threads posts on the same calendar as your other channels."], "limits": ["Account permissions affect connection and publishing options.", "The platform validates the final post and media."], "docs": "/docs/channels/coming-soon"},
   {"slug": "pinterest-scheduler", "key": "pinterest", "pending": "Pinterest approves PostDelegate", "name": "Pinterest", "h1": "Put your next Pin in the plan.", "intro": "Pinterest publishing on PostDelegate is waiting on Pinterest's approval.", "plan": ["Prepare the caption, media and destination link together.", "Review board and post settings when the connection is available.", "Plan Pins alongside the rest of your content."], "limits": ["Board access depends on the connected Pinterest account.", "App access and publishing permissions must be confirmed."], "docs": "/docs/channels/coming-soon"},
-  {"slug": "google-business-scheduler", "key": "google_business", "pending": "Google verifies PostDelegate's Business Profile permission", "name": "Google Business Profile", "h1": "Keep business updates on your calendar.", "intro": "Google Business Profile publishing on PostDelegate is not available yet. It is waiting on Google verification, and opens once Google verifies PostDelegate's Business Profile permission.", "plan": ["Updates, events and offers for a business location you pick when connecting.", "Up to 1,500 characters with one optional image.", "An optional call-to-action button, such as Book or Learn more."], "limits": ["A Google login does not by itself connect a Business Profile.", "The Google account will need to manage a verified business location."], "docs": "/docs/channels/coming-soon"},
   {
     slug: "youtube-scheduler", key: "youtube", name: "YouTube",
     action: "Schedule YouTube Videos",
@@ -520,6 +519,37 @@ export const SCHEDULERS: Scheduler[] = [
     faq: [
       { q: "Can I connect an account on another Mastodon server?", a: "Not yet. PostDelegate connects accounts on mastodon.social. Accounts on other Mastodon servers cannot be connected today." },
       { q: "Can I schedule a Mastodon thread?", a: "Yes. Add more entries to the post with Add post in a thread, and they are published as replies to the first post." },
+    ],
+  },
+  {
+    slug: "google-business-scheduler", key: "google_business", name: "Google Business Profile",
+    action: "Schedule Google Business Profile Posts",
+    description: "Schedule Google Business Profile updates, events and offers with an image and a button, connected with Google sign-in. 7-day free trial, no card.",
+    h1: "Schedule Google Business Profile posts.",
+    intro: "Connect a business location with Google sign-in, then schedule updates, events and offers with an optional image and button.",
+    about: [
+      "A Google Business Profile post is up to 1,500 characters with one optional image. Pick a standard update, an event with a title and dates, or an offer with a coupon code, a redeem link and terms. Add an optional button, such as Book or Learn more, that opens a link you choose. Videos are not supported.",
+      "You connect through Google's own sign-in, then pick the business location to post to. Each location is its own channel, so connect each location you manage. Signing in to PostDelegate with Google does not connect a Business Profile.",
+    ],
+    steps: [
+      { name: "Sign in with Google", text: "On the calendar page choose Add Channel, then Google My Business. Sign in with the Google account that manages the Business Profile and approve the permissions PostDelegate asks for: your basic profile and email address, and managing your Business Profile." },
+      { name: "Pick the location", text: "Choose the business location to post to. To add another location, choose Add Channel again and pick it." },
+      { name: "Write the post", text: "Choose Create Post and select the location. Write up to 1,500 characters, add one image if you want, and pick the post type and an optional button." },
+      { name: "Schedule it", text: "Pick a date and time and choose Add to Calendar. Use Save as draft to hold it back, or Post now to publish right away." },
+    ],
+    plan: ["Sign in with Google from Add Channel and pick a business location.", "Write up to 1,500 characters with one optional image.", "Choose an update, an event or an offer, with an optional button."],
+    settings: [
+      { label: "Post Type", note: "Standard Update, Event or Offer. Defaults to Standard Update." },
+      { label: "Call to Action", note: "Optional button: Book, Order Online, Shop, Learn More, Sign Up or Get Offer, with the link it opens. Without a link, no button is added." },
+      { label: "Event Details", note: "For events. The event title is required. Start and end dates are optional and default to the day the post goes out. Start and end times are optional." },
+      { label: "Offer Details", note: "For offers. A coupon code, a redeem online link and terms and conditions, all optional." },
+    ],
+    limits: ["Google only accepts posts for verified locations that the Google account you sign in with manages. Signing in to PostDelegate with Google does not connect a Business Profile.", "Each post goes to one location with at most one image. Videos are not supported, and extra entries in a post are not published."],
+    docs: "/docs/channels/google-business",
+    faq: [
+      { q: "Can I connect more than one location?", a: "Yes. Each location is its own channel. Choose Add Channel, then Google My Business, once for each location you manage." },
+      { q: "Does signing in to PostDelegate with Google connect my Business Profile?", a: "No. Google sign-in only opens your PostDelegate account. Connect the Business Profile from Add Channel." },
+      { q: "Can I post a video to Google Business Profile?", a: "No. Each post takes one optional image. Videos are not supported." },
     ],
   },
 ];

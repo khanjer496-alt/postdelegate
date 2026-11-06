@@ -19,7 +19,7 @@ Signing in to PostDelegate with Google does not connect a YouTube channel. You s
 
 <div class="callout">
 
-**One Google project, several channels.** PostDelegate uses a single Google project for YouTube. Disconnecting a channel revokes this Google account's permissions for that project, which also affects your other connected YouTube channels and Google sign-in for the same account. PostDelegate removes the saved channel data and analytics. Your videos stay on YouTube, and you can reconnect afterwards.
+**One Google project, several channels.** PostDelegate uses a single Google project for YouTube. Disconnecting a channel revokes this Google account's permissions for that project, which also affects your other connected YouTube channels and Google sign-in for the same account. While a [Google Business Profile](/docs/channels/google-business) location from the same Google account is still connected, PostDelegate keeps those permissions and only removes the YouTube channel. PostDelegate removes the saved channel data and analytics. Your videos stay on YouTube, and you can reconnect afterwards.
 
 </div>
 

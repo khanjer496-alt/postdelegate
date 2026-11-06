@@ -17,7 +17,7 @@ PostDelegate is operated by Nasida Apps LLC. These are the documents that govern
 You can remove a channel yourself. Open its menu on the calendar page and choose **Delete**. Delete its posts first, because a channel with posts cannot be removed.
 
 - For networks where you paste a credential, removal clears the saved credential and the channel's saved details.
-- For networks that use the network's own sign-in, removal also starts revoking the access you granted and cleaning up the saved data and analytics. For YouTube this revokes this Google account's permissions for PostDelegate's Google project, which also affects your other connected YouTube channels from the same account. Your videos stay on YouTube.
+- For networks that use the network's own sign-in, removal also starts revoking the access you granted and cleaning up the saved data and analytics. For YouTube this revokes this Google account's permissions for PostDelegate's Google project, which also affects your other connected YouTube channels from the same account. While a Google Business Profile location from the same Google account is still connected, those permissions stay until it is removed too. Removing a Google Business Profile location asks Google to revoke access once no other location or YouTube channel uses the same Google account. Your videos stay on YouTube, and Business Profile posts stay on Google.
 - Posts already published on a network stay there. Deleting a post in PostDelegate does not take it off the network.
 
 You can also revoke access from the network's side, for example by deleting an app password. PostDelegate will then show the channel as needing a reconnect.

@@ -15,7 +15,7 @@ Two kinds of numbers appear on this page:
 - **Post counts** come from your PostDelegate calendar: how many posts were published, scheduled and failed. They cover every channel.
 - **Engagement, views and followers** come from the networks. A network only appears in these figures if it shares statistics with PostDelegate, and each network decides which numbers it shares. A count that a network does not report is left out, not shown as zero.
 
-Of the networks you can [connect today](/docs/channels), YouTube is the one that shares statistics. Google does not allow YouTube statistics to be stored, so PostDelegate reads them when you look and never saves them in the daily history. YouTube channels therefore have their own view on this page and appear in [Views](#views), but do not feed trends, top posts or insights. More networks will feed these sections as their connections open. See [Waiting on approval](/docs/channels/coming-soon).
+Of the networks you can [connect today](/docs/channels), YouTube and Google Business Profile share statistics. Google does not allow YouTube statistics to be stored, so PostDelegate reads them when you look and never saves them in the daily history. YouTube channels therefore have their own view on this page and appear in [Views](#views), but do not feed trends, top posts or insights. Google Business Profile channels have their own view with each location's website clicks, phone calls, direction requests and map views. Google does not report statistics for single posts, so they do not feed trends, top posts or insights either. More networks will feed these sections as their connections open. See [Waiting on approval](/docs/channels/coming-soon).
 
 ## Daily history
 

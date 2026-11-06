@@ -24,4 +24,4 @@ export const SOCIAL_PROFILES = [
 ] as const;
 // Pages kept out of search and the sitemap: X, which is not available. A scheduler page for a
 // network that is not switched on yet goes here too, and comes out when its network goes live.
-export const NOINDEX_PATHS = ['/google-business-scheduler', '/docs/channels/x'];
+export const NOINDEX_PATHS = ['/docs/channels/x'];
