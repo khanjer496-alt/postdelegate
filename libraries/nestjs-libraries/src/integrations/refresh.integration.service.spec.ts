@@ -40,7 +40,12 @@ const make = (refreshToken: jest.Mock) => {
       deletedAt: null,
       tokenExpiration: null,
     }),
-    persistRefreshedAuthorization: jest.fn().mockResolvedValue({ count: 1 }),
+    // the real one pins the write to the token we started from, so it writes
+    // nothing once another flow has rotated it. A mock that always reports
+    // count 1 would hide the bug this suite exists to catch
+    persistRefreshedAuthorization: jest.fn(async (int: any) =>
+      int.token === 'old' ? { count: 1 } : { count: 0 }
+    ),
     refreshNeeded: jest.fn().mockResolvedValue({ count: 1 }),
     informAboutRefreshError: jest.fn(),
   };
@@ -132,6 +137,11 @@ describe('RefreshIntegrationService concurrent refresh', () => {
       refreshToken: 'rotated',
       id: 'internal',
     });
+    // the other flow already stored them: writing again would be pinned to the
+    // token we started from, write nothing, and turn a success into a failure
+    expect(
+      integrationService.persistRefreshedAuthorization
+    ).not.toHaveBeenCalled();
     expect(integrationService.refreshNeeded).not.toHaveBeenCalled();
     expect(integrationService.informAboutRefreshError).not.toHaveBeenCalled();
   });

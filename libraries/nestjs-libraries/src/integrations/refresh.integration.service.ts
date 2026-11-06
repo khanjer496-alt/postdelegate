@@ -45,10 +45,14 @@ export class RefreshIntegrationService {
       return false as const;
     }
 
-    const updated = await this._integrationService.persistRefreshedAuthorization(integration, refresh);
+    if (refresh.stored) {
+      return refresh.tokens;
+    }
+
+    const updated = await this._integrationService.persistRefreshedAuthorization(integration, refresh.tokens);
     if (!updated.count) return false;
 
-    return refresh;
+    return refresh.tokens;
   }
 
   public async setBetweenSteps(integration: Integration, cause = '') {
@@ -85,7 +89,11 @@ export class RefreshIntegrationService {
     socialProvider: SocialProvider,
     cause = '',
     soft = false
-  ): Promise<AuthTokenDetails | false> {
+    // `stored`: another flow refreshed this channel first and its tokens are
+    // already in the database, so refresh() must not try to write them again -
+    // its write is pinned to the token we started from, which no longer
+    // matches, and the refresh would come back as a failure
+  ): Promise<{ tokens: AuthTokenDetails; stored?: true } | false> {
     let refreshError: any = undefined;
     const refresh: false | AuthTokenDetails = await socialProvider
       .refreshToken(integration.refreshToken)
@@ -112,7 +120,10 @@ export class RefreshIntegrationService {
           !stored ||
           stored.refreshNeeded ||
           stored.inBetweenSteps ||
-          stored.deletedAt
+          stored.deletedAt ||
+          // getIntegrationById does not filter this one, and every other read
+          // in this file goes through getActiveIntegrationById, which does
+          stored.disabled
         ) {
           break;
         }
@@ -126,15 +137,18 @@ export class RefreshIntegrationService {
           stored.tokenExpiration.getTime() > Date.now()
         ) {
           return {
-            id: stored.internalId,
-            name: stored.name,
-            username: stored.profile || '',
-            picture: stored.picture || '',
-            accessToken: stored.token,
-            refreshToken: stored.refreshToken,
-            expiresIn: Math.floor(
-              (stored.tokenExpiration.getTime() - Date.now()) / 1000
-            ),
+            stored: true,
+            tokens: {
+              id: stored.internalId,
+              name: stored.name,
+              username: stored.profile || '',
+              picture: stored.picture || '',
+              accessToken: stored.token,
+              refreshToken: stored.refreshToken,
+              expiresIn: Math.floor(
+                (stored.tokenExpiration.getTime() - Date.now()) / 1000
+              ),
+            },
           };
         }
         if (attempt < 2) {
@@ -150,14 +164,6 @@ export class RefreshIntegrationService {
         `Could not refresh ${integration.providerIdentifier} integration ${integration.id}${
           refreshError ? '' : ': no access token returned'
         }`
-      );
-
-      console.error(
-        `Could not refresh ${integration.providerIdentifier} integration ${integration.id}`,
-        refreshError?.response?.data ||
-          refreshError?.message ||
-          refreshError ||
-          'no access token returned'
       );
 
       // informAboutRefreshError (with the failure cause) already notifies
@@ -191,7 +197,7 @@ export class RefreshIntegrationService {
       !socialProvider.reConnect ||
       integration.rootInternalId === integration.internalId
     ) {
-      return refresh;
+      return { tokens: refresh };
     }
 
     let reConnect;
@@ -209,8 +215,10 @@ export class RefreshIntegrationService {
     }
 
     return {
-      ...refresh,
-      ...reConnect,
+      tokens: {
+        ...refresh,
+        ...reConnect,
+      },
     };
   }
 }

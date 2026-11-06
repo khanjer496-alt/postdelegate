@@ -14,7 +14,6 @@ import { GetPostsListDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import utc from 'dayjs/plugin/utc';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
@@ -23,7 +22,6 @@ import { evergreenOccurrences } from '@gitroom/nestjs-libraries/database/prisma/
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
-dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 
 @Injectable()
@@ -290,8 +288,6 @@ export class PostsRepository {
     // (spreading the accumulator on every post was quadratic and blocked the
     // event loop for seconds on large orgs), and expand repeating posts only
     // inside [startDate, endDate] instead of from their first publish date.
-    const rangeStart = dayjs.utc(startDate);
-    const rangeEnd = dayjs.utc(endDate);
     const result: any[] = [];
 
     for (const row of list) {
@@ -302,12 +298,14 @@ export class PostsRepository {
       }
 
       // evergreenOccurrences stops after the post's last share, which the
-      // plain interval walk upstream uses does not know about; the rangeStart
-      // skip it was there for is a filter here instead
-      for (const date of evergreenOccurrences(post.publishDate, post, endDate)) {
-        if (rangeStart.isAfter(dayjs.utc(date))) {
-          continue;
-        }
+      // plain interval walk upstream uses does not know about, and takes the
+      // same rangeStart skip so nothing before the window is built at all
+      for (const date of evergreenOccurrences(
+        post.publishDate,
+        post,
+        endDate,
+        startDate
+      )) {
         result.push({
           ...post,
           publishDate: date,

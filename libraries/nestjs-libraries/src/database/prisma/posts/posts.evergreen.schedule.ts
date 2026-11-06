@@ -128,16 +128,29 @@ export const applyEvergreen = <
 };
 
 // every share date from the anchor up to `rangeEnd`, for the calendar
+// `rangeStart` skips straight to the first share inside the window instead of
+// walking every interval since the anchor, which for a daily post anchored
+// years back is thousands of Dates the caller then throws away. Safe to skip
+// because evergreenAllows only ever goes from true to false as index grows.
 export const evergreenOccurrences = (
   anchor: Date | string,
   post: EvergreenFields,
-  rangeEnd: Date | string
+  rangeEnd: Date | string,
+  rangeStart?: Date | string
 ): Date[] => {
-  if (!post.intervalInDays) {
+  if (!post.intervalInDays || post.intervalInDays < 1) {
     return [new Date(anchor)];
   }
+  const first = rangeStart
+    ? Math.max(
+        0,
+        Math.ceil(
+          (time(rangeStart) - time(anchor)) / (post.intervalInDays * DAY)
+        )
+      )
+    : 0;
   const list: Date[] = [];
-  for (let index = 0; ; index++) {
+  for (let index = first; ; index++) {
     const date = evergreenShareDate(anchor, index, post.intervalInDays);
     if (time(date) > time(rangeEnd) || !evergreenAllows(anchor, index, post)) {
       break;

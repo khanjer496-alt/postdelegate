@@ -193,6 +193,10 @@ export class AuthService {
         typeof getOrg.orgId !== 'string' ||
         typeof getOrg.id !== 'string' ||
         !['USER', 'ADMIN'].includes(getOrg.role) ||
+        // the returned type promises a string, and acceptInvite turns an empty
+        // one into undefined, which drops the invited-email binding
+        typeof getOrg.email !== 'string' ||
+        !getOrg.email ||
         !getOrg.timeLimit ||
         dayjs(getOrg.timeLimit).isBefore(dayjs())
       ) {
