@@ -2328,6 +2328,8 @@
   "pinterest_create_board": "إنشاء لوحة",
   "pinterest_create_board_failed": "تعذر على Pinterest إنشاء اللوحة. يرجى المحاولة مرة أخرى.",
   "pinterest_boards_failed": "تعذر على Pinterest تحميل لوحات هذا الحساب. يرجى المحاولة لاحقًا.",
+  "pinterest_new_board": "+ لوحة جديدة",
+  "pinterest_unnamed_board": "لوحة {{id}}",
   "gmb_call_hint": "يتصل زر الاتصال برقم الهاتف الموجود في ملفك التجاري.",
   "gmb_offer_title": "عنوان العرض",
   "gmb_offer_title_placeholder": "خصم 20% هذا الأسبوع"

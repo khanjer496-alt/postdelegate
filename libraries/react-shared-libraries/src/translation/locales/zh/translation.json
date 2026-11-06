@@ -2328,6 +2328,8 @@
   "pinterest_create_board": "创建图板",
   "pinterest_create_board_failed": "Pinterest 无法创建图板，请重试。",
   "pinterest_boards_failed": "Pinterest 无法加载此账号的图板，请稍后重试。",
+  "pinterest_new_board": "+ 新图板",
+  "pinterest_unnamed_board": "图板 {{id}}",
   "gmb_call_hint": "“致电”按钮会拨打您商家资料中的电话号码。",
   "gmb_offer_title": "优惠标题",
   "gmb_offer_title_placeholder": "本周八折"

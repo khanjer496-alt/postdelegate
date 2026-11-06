@@ -36,8 +36,10 @@ export class PinterestSettingsDto {
     message: 'Board is required',
   })
   @Matches(/^\d+$/, {
-    message:
-      'Board must be the numeric board id (use the boards list of the channel to find it), not the board name',
+    // the composer picks the id for the user, so lead with what to do there,
+    // and keep the id hint an API, CLI or agent caller needs - a validation
+    // failure returns this message, never the schema description
+    message: 'Please choose a board from the list (the numeric board id)',
   })
   @JSONSchema({
     description:

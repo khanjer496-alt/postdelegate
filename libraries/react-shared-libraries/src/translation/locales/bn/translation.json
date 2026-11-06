@@ -2328,6 +2328,8 @@
   "pinterest_create_board": "বোর্ড তৈরি করুন",
   "pinterest_create_board_failed": "Pinterest বোর্ডটি তৈরি করতে পারেনি। আবার চেষ্টা করুন।",
   "pinterest_boards_failed": "Pinterest এই অ্যাকাউন্টের বোর্ডগুলো লোড করতে পারেনি। পরে আবার চেষ্টা করুন।",
+  "pinterest_new_board": "+ নতুন বোর্ড",
+  "pinterest_unnamed_board": "বোর্ড {{id}}",
   "gmb_call_hint": "কল বোতামটি আপনার বিজনেস প্রোফাইলের ফোন নম্বরে কল করে।",
   "gmb_offer_title": "অফারের শিরোনাম",
   "gmb_offer_title_placeholder": "এই সপ্তাহে ২০% ছাড়"
