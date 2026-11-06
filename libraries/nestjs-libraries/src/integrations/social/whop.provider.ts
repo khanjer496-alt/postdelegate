@@ -420,7 +420,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
       {
         id: post.id,
         postId: data.id,
-        releaseURL: `https://whop.com/experiences/${post.settings.experience}/${postId}`,
+        releaseURL: `https://whop.com/experiences/${post.settings.experience}/${data.id}`,
         status: 'success',
       },
     ];

@@ -327,16 +327,15 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   private completedResponse(
     results: RedditPendingData['results']
   ): PendingCheckResponse {
+    // both lists are read by index against each other, so they are filtered
+    // once, together: filtering them apart let a result that had only one of
+    // the two shift every later pair out of step
+    const complete = results.filter((p) => p.postId && p.releaseURL);
+
     return {
       status: 'completed',
-      postId: results
-        .map((p) => p.postId)
-        .filter(Boolean)
-        .join(','),
-      releaseURL: results
-        .map((p) => p.releaseURL)
-        .filter(Boolean)
-        .join(','),
+      postId: complete.map((p) => p.postId).join(','),
+      releaseURL: complete.map((p) => p.releaseURL).join(','),
     };
   }
 

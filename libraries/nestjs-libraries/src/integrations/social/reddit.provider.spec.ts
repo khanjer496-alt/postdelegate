@@ -428,3 +428,40 @@ describe('RedditProvider unconfirmed submit', () => {
     ).rejects.toBeInstanceOf(BadBody);
   });
 });
+
+describe('RedditProvider completed response', () => {
+  // postId and releaseURL are comma-joined lists read against each other by
+  // index, one entry per subreddit
+  const completed = (results: any[]) =>
+    (new RedditProvider() as any).completedResponse(results);
+
+  it('keeps the two lists in step when a result is missing one of them', () => {
+    // the middle result never surfaced, so it has a subreddit URL but no id
+    expect(
+      completed([
+        { postId: 'a1', releaseURL: 'https://www.reddit.com/r/one/comments/a1/' },
+        { postId: '', releaseURL: 'https://www.reddit.com/r/two' },
+        { postId: 'c3', releaseURL: 'https://www.reddit.com/r/three/comments/c3/' },
+      ])
+    ).toEqual({
+      status: 'completed',
+      postId: 'a1,c3',
+      releaseURL:
+        'https://www.reddit.com/r/one/comments/a1/,https://www.reddit.com/r/three/comments/c3/',
+    });
+  });
+
+  it('joins every result when they are all complete', () => {
+    expect(
+      completed([
+        { postId: 'a1', releaseURL: 'https://www.reddit.com/r/one/comments/a1/' },
+        { postId: 'b2', releaseURL: 'https://www.reddit.com/r/two/comments/b2/' },
+      ])
+    ).toEqual({
+      status: 'completed',
+      postId: 'a1,b2',
+      releaseURL:
+        'https://www.reddit.com/r/one/comments/a1/,https://www.reddit.com/r/two/comments/b2/',
+    });
+  });
+});

@@ -116,3 +116,30 @@ describe('KickProvider chat messages', () => {
     ).resolves.toMatchObject([{ postId: 'k-1', status: 'posted' }]);
   });
 });
+
+describe('Twitch and Kick channel links', () => {
+  // chat has no per-message permalink, so the release URL is the channel -
+  // and without a profile there is no channel to point at
+  const cases: [string, any, string][] = [
+    ['twitch', new TwitchProvider(), 'https://twitch.tv/streamer'],
+    ['kick', new KickProvider(), 'https://kick.com/streamer'],
+  ];
+
+  for (const [name, provider, expected] of cases) {
+    it(`${name} links the channel it knows`, () => {
+      expect(
+        (provider as any).channelUrl({ profile: 'streamer' })
+      ).toBe(expected);
+    });
+
+    it(`${name} links nothing rather than an unrelated channel`, () => {
+      // the old fallbacks were twitch.tv/twitch and kick.com/channel, both of
+      // which are real pages belonging to someone else
+      for (const profile of ['', null, undefined]) {
+        expect(
+          (provider as any).channelUrl({ profile, providerIdentifier: name })
+        ).toBe('');
+      }
+    });
+  }
+});
