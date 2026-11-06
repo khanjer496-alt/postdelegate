@@ -24,6 +24,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
   isBetweenSteps = false;
   scopes = [] as string[];
   editor = 'markdown' as const;
+
   // a post on a hashnode.dev subdomain is public. A publication on a domain of
   // its own gets no link: the host then comes back from the API and we cannot
   // vouch that it is a public site

@@ -123,14 +123,14 @@ export default async function Auth(
                           size="md"
                         />
                       )}
-                      {!!p.publishedLink?.url && (
+                      {!!p.publishedLink && (
                         <a
                           className="text-[14px] underline hover:text-textItemFocused whitespace-nowrap shrink-0"
-                          href={p.publishedLink.url}
+                          href={p.publishedLink}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          {p.publishedLink.label || t('open_post', 'Open Post')}
+                          {t('open_post', 'Open Post')}
                           <span className="sr-only">
                             {' '}
                             ({t('opens_in_new_tab', 'opens in a new tab')})

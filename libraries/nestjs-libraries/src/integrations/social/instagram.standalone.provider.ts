@@ -187,6 +187,11 @@ export class InstagramStandaloneProvider
     };
   }
 
+  // it publishes through the same provider, so it stores the same permalinks
+  isPublicReleaseURL(releaseURL: string, settings: Partial<InstagramDto>) {
+    return instagramProvider.isPublicReleaseURL(releaseURL, settings);
+  }
+
   async post(
     id: string,
     accessToken: string,

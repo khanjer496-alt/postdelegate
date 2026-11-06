@@ -22,6 +22,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
   scopes = [] as string[];
   editor = 'markdown' as const;
   dto = MediumSettingsDto;
+
   // a story on medium.com is public, but one submitted to a publication is
   // created as a draft for that publication's editors to publish
   isPublicReleaseURL(releaseURL: string, settings: Partial<MediumSettingsDto>) {

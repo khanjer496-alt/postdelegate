@@ -16,18 +16,12 @@ jest.mock('@gitroom/nestjs-libraries/dtos/comments/add.comment.dto', () => ({
   CreatePublicCommentDto: class {},
 }));
 jest.mock('@gitroom/helpers/auth/auth.service', () => ({ AuthService: {} }));
-jest.mock('@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator', () => ({
-  isSafePublicHttpsUrl: jest.fn(),
-}));
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing',
   () => ({ pricing: {} })
 );
 
 import { PublicController } from '@gitroom/backend/api/routes/public.controller';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-
-const safeUrl = isSafePublicHttpsUrl as jest.Mock;
 
 describe('PublicController.getPreview', () => {
   it('only exposes the fields the preview page renders', async () => {
@@ -63,7 +57,7 @@ describe('PublicController.getPreview', () => {
     ]);
     const controller = new PublicController(
       {} as any,
-      { getPostsRecursively, publicReleaseURL: jest.fn() } as any,
+      { getPostsRecursively, publicPostLink: jest.fn() } as any,
       {} as any
     );
 
@@ -90,6 +84,15 @@ describe('PublicController.getPreview', () => {
 });
 
 describe('PublicController.getPreview published link', () => {
+  const integration = {
+    id: 'int-1',
+    name: 'Acme',
+    picture: 'pic.png',
+    providerIdentifier: 'x',
+    profile: 'acme',
+    token: 'oauth-token',
+  };
+
   const row = (overrides: any = {}) => ({
     id: 'p-1',
     organizationId: 'org-A',
@@ -101,70 +104,42 @@ describe('PublicController.getPreview published link', () => {
     releaseURL: 'https://x.com/acme/status/1',
     settings: '{}',
     childrenPost: [],
-    integration: {
-      id: 'int-1',
-      name: 'Acme',
-      picture: 'pic.png',
-      providerIdentifier: 'x',
-      profile: 'acme',
-      token: 'oauth-token',
-    },
+    integration,
     ...overrides,
   });
 
   const make = (posts: any[], link: any) => {
-    const publicReleaseURL = jest.fn().mockReturnValue(link);
+    const publicPostLink = jest.fn().mockResolvedValue(link);
     const controller = new PublicController(
       {} as any,
       {
         getPostsRecursively: jest.fn().mockResolvedValue(posts),
-        publicReleaseURL,
+        publicPostLink,
       } as any,
       {} as any
     );
-    return { controller, publicReleaseURL };
+    return { controller, publicPostLink };
   };
 
-  beforeEach(() => safeUrl.mockReset());
-
-  it('links the post when the provider opted in and the URL is safe', async () => {
-    safeUrl.mockResolvedValue(true);
-    const { controller, publicReleaseURL } = make([row()], {
-      url: 'https://x.com/acme/status/1',
-    });
+  it('links the post when the service vouches for the URL', async () => {
+    const { controller, publicPostLink } = make(
+      [row()],
+      'https://x.com/acme/status/1'
+    );
 
     const [preview] = (await controller.getPreview('p-1')) as any[];
 
-    expect(preview.publishedLink).toEqual({
-      url: 'https://x.com/acme/status/1',
-    });
-    expect(safeUrl).toHaveBeenCalledWith('https://x.com/acme/status/1');
+    expect(preview.publishedLink).toBe('https://x.com/acme/status/1');
     // the decision is the service's, made from the whole stored row
-    expect(publicReleaseURL).toHaveBeenCalledWith(
+    expect(publicPostLink).toHaveBeenCalledWith(
       expect.objectContaining({ releaseURL: 'https://x.com/acme/status/1' })
     );
-  });
-
-  it("passes the provider's own link label through", async () => {
-    safeUrl.mockResolvedValue(true);
-    const { controller } = make([row()], {
-      url: 'https://x.com/acme/status/1',
-      label: 'Open on X',
-    });
-
-    const [preview] = (await controller.getPreview('p-1')) as any[];
-
-    expect(preview.publishedLink).toEqual({
-      url: 'https://x.com/acme/status/1',
-      label: 'Open on X',
-    });
   });
 
   it('never links a release URL the service kept private', async () => {
     const { controller } = make(
       [
         row({
-          providerIdentifier: 'tiktok',
           releaseURL: 'https://www.tiktok.com/messages?lang=en#7300000000',
         }),
       ],
@@ -174,45 +149,27 @@ describe('PublicController.getPreview published link', () => {
     const [preview] = (await controller.getPreview('p-1')) as any[];
 
     expect(preview).not.toHaveProperty('publishedLink');
-    // nothing to validate, so the URL check is not even reached
-    expect(safeUrl).not.toHaveBeenCalled();
+    // the raw stored URL never leaves either
+    expect(JSON.stringify(preview)).not.toContain('tiktok.com');
   });
 
-  it('drops a URL that is not a public https URL, whatever the provider said', async () => {
-    safeUrl.mockResolvedValue(false);
-    const { controller } = make(
-      [row({ releaseURL: 'https://listmonk.acme.internal/api/campaigns/4/preview' })],
-      { url: 'https://listmonk.acme.internal/api/campaigns/4/preview' }
-    );
-
-    const [preview] = (await controller.getPreview('p-1')) as any[];
-
-    expect(preview).not.toHaveProperty('publishedLink');
-    expect(safeUrl).toHaveBeenCalledWith(
-      'https://listmonk.acme.internal/api/campaigns/4/preview'
-    );
-  });
-
-  it('decides each post of a thread on its own', async () => {
-    safeUrl.mockResolvedValue(true);
-    const publicReleaseURL = jest
-      .fn()
-      .mockReturnValueOnce({ url: 'https://x.com/acme/status/1' })
-      .mockReturnValueOnce(undefined);
-    const controller = new PublicController(
-      {} as any,
-      {
-        getPostsRecursively: jest
-          .fn()
-          .mockResolvedValue([row(), row({ id: 'p-2' })]),
-        publicReleaseURL,
-      } as any,
-      {} as any
+  it('judges a thread on the channel of its first post', async () => {
+    // getPostsRecursively returns the integration only for the first post,
+    // so without this the rest of a thread could never be linked
+    const { controller, publicPostLink } = make(
+      [row(), row({ id: 'p-2', integration: undefined })],
+      'https://x.com/acme/status/1'
     );
 
     const [first, second] = (await controller.getPreview('p-1')) as any[];
 
-    expect(first.publishedLink).toEqual({ url: 'https://x.com/acme/status/1' });
-    expect(second).not.toHaveProperty('publishedLink');
+    expect(publicPostLink).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: 'p-2', integration })
+    );
+    expect(first.publishedLink).toBe('https://x.com/acme/status/1');
+    expect(second.publishedLink).toBe('https://x.com/acme/status/1');
+    // a post of a thread still carries no channel of its own in the response
+    expect(second).not.toHaveProperty('integration');
   });
 });

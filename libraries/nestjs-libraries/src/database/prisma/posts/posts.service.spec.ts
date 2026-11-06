@@ -14,9 +14,15 @@ jest.mock('@gitroom/helpers/utils/sanitize.post.content', () => ({
 jest.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
   UploadFactory: { createStorage: jest.fn() },
 }));
+jest.mock('@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator', () => ({
+  isSafePublicHttpsUrl: jest.fn(),
+}));
 
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { YoutubeSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/youtube.settings.dto';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+
+const safeUrl = isSafePublicHttpsUrl as jest.Mock;
 
 const makeService = (integrationManager: any = {}) => {
   const postRepository = {
@@ -1495,14 +1501,16 @@ describe('PostsService posting limits', () => {
   });
 });
 
-describe('PostsService.publicReleaseURL', () => {
+describe('PostsService.publicPostLink', () => {
   const publicProvider = {
     isPublicReleaseURL: (url: string) =>
       /^https:\/\/x\.com\/[^/]+\/status\/\d+$/.test(url),
   };
-  const labelledProvider = {
-    isPublicReleaseURL: () => true,
-    publishedLinkLabel: () => 'Open on Mastodon',
+  // a provider that reads a settings field to tell a public post from a
+  // members-only one, the way X does for a Community post
+  const settingsProvider = {
+    isPublicReleaseURL: (url: string, settings: any) =>
+      /^https:\/\/x\.com\//.test(url) && !settings?.community,
   };
   // a provider that stores an inbox or admin URL and never opts in, like
   // tiktok's creator inbox or listmonk's self-hosted campaign preview
@@ -1511,13 +1519,19 @@ describe('PostsService.publicReleaseURL', () => {
     isPublicReleaseURL: () => true,
     authorizationPolicy: { authorizationRealm: 'google-project:test' },
   };
+  const throwingProvider = {
+    isPublicReleaseURL: () => {
+      throw new Error('boom');
+    },
+  };
 
   const providers: Record<string, any> = {
     x: publicProvider,
-    mastodon: labelledProvider,
+    community: settingsProvider,
     tiktok: privateProvider,
     listmonk: privateProvider,
     youtube: policyProvider,
+    broken: throwingProvider,
   };
 
   const make = () =>
@@ -1533,117 +1547,149 @@ describe('PostsService.publicReleaseURL', () => {
     ...overrides,
   });
 
-  it('links the post when the provider says the release URL is public', () => {
-    expect(make().publicReleaseURL(post())).toEqual({
-      url: 'https://x.com/acme/status/1',
-      label: undefined,
-    });
+  beforeEach(() => {
+    safeUrl.mockReset();
+    safeUrl.mockResolvedValue(true);
   });
 
-  it("uses the provider's own link label when it has one", () => {
-    expect(
-      make().publicReleaseURL(
-        post({
-          releaseURL: 'https://mastodon.social/@acme/statuses/1',
-          integration: { providerIdentifier: 'mastodon' },
-        })
-      )
-    ).toEqual({
-      url: 'https://mastodon.social/@acme/statuses/1',
-      label: 'Open on Mastodon',
-    });
+  it('links the post when the provider says the release URL is public', async () => {
+    await expect(make().publicPostLink(post())).resolves.toBe(
+      'https://x.com/acme/status/1'
+    );
+    expect(safeUrl).toHaveBeenCalledWith('https://x.com/acme/status/1');
   });
 
-  it('never links a provider that did not opt in, even with a release URL', () => {
-    expect(
-      make().publicReleaseURL(
+  it('never links a provider that did not opt in, even with a release URL', async () => {
+    await expect(
+      make().publicPostLink(
         post({
           releaseURL: 'https://www.tiktok.com/messages?lang=en#7300000000',
           integration: { providerIdentifier: 'tiktok' },
         })
       )
-    ).toBeUndefined();
-    expect(
-      make().publicReleaseURL(
+    ).resolves.toBeUndefined();
+    await expect(
+      make().publicPostLink(
         post({
           releaseURL: 'https://mail.acme.internal/api/campaigns/4/preview',
           integration: { providerIdentifier: 'listmonk' },
         })
       )
-    ).toBeUndefined();
+    ).resolves.toBeUndefined();
+    // a provider that never opts in is not even asked about the URL
+    expect(safeUrl).not.toHaveBeenCalled();
   });
 
-  it('rejects a release URL the provider does not recognise as a permalink', () => {
+  it('rejects a release URL the provider does not recognise as a permalink', async () => {
     // the owner's own article list, not a post
-    expect(
-      make().publicReleaseURL(post({ releaseURL: 'https://x.com/i/articles' }))
-    ).toBeUndefined();
+    await expect(
+      make().publicPostLink(post({ releaseURL: 'https://x.com/i/articles' }))
+    ).resolves.toBeUndefined();
     // a profile page rather than the post
-    expect(
-      make().publicReleaseURL(post({ releaseURL: 'https://x.com/acme' }))
-    ).toBeUndefined();
+    await expect(
+      make().publicPostLink(post({ releaseURL: 'https://x.com/acme' }))
+    ).resolves.toBeUndefined();
   });
 
-  it('links nothing for a post that is not published', () => {
+  it('drops a URL that is not a public https URL, whatever the provider said', async () => {
+    safeUrl.mockResolvedValue(false);
+    await expect(make().publicPostLink(post())).resolves.toBeUndefined();
+    expect(safeUrl).toHaveBeenCalledWith('https://x.com/acme/status/1');
+  });
+
+  it('links nothing for a post that is not published or is deleted', async () => {
     for (const state of ['QUEUE', 'DRAFT', 'ERROR']) {
-      expect(make().publicReleaseURL(post({ state }))).toBeUndefined();
+      await expect(make().publicPostLink(post({ state }))).resolves.toBeUndefined();
     }
+    await expect(
+      make().publicPostLink(post({ deletedAt: new Date() }))
+    ).resolves.toBeUndefined();
   });
 
-  it('links nothing when the post has no release URL', () => {
-    expect(make().publicReleaseURL(post({ releaseURL: '' }))).toBeUndefined();
-    expect(make().publicReleaseURL(post({ releaseURL: null }))).toBeUndefined();
+  it('links nothing when the post has no release URL', async () => {
+    await expect(
+      make().publicPostLink(post({ releaseURL: '' }))
+    ).resolves.toBeUndefined();
+    await expect(
+      make().publicPostLink(post({ releaseURL: null }))
+    ).resolves.toBeUndefined();
   });
 
-  it('links nothing for a deleted, disabled, half-connected or reconnect-needed channel', () => {
+  it('links nothing for a deleted, disabled, half-connected or reconnect-needed channel', async () => {
     for (const broken of [
       { deletedAt: new Date() },
       { disabled: true },
       { inBetweenSteps: true },
       { refreshNeeded: true },
     ]) {
-      expect(
-        make().publicReleaseURL(
+      await expect(
+        make().publicPostLink(
           post({ integration: { providerIdentifier: 'x', ...broken } })
         )
-      ).toBeUndefined();
+      ).resolves.toBeUndefined();
     }
   });
 
-  it('links nothing for a provider under an authorizationPolicy', () => {
-    expect(
-      make().publicReleaseURL(
+  it('links nothing for a provider under an authorizationPolicy', async () => {
+    await expect(
+      make().publicPostLink(
         post({
           releaseURL: 'https://www.youtube.com/watch?v=abc',
           integration: { providerIdentifier: 'youtube' },
         })
       )
-    ).toBeUndefined();
+    ).resolves.toBeUndefined();
   });
 
-  it('links the first target when the provider comma-joins several', () => {
-    expect(
-      make().publicReleaseURL(
+  it('links the first target when the provider comma-joins several', async () => {
+    await expect(
+      make().publicPostLink(
         post({
           releaseURL:
             'https://x.com/acme/status/1,https://x.com/acme/status/2',
         })
       )
-    ).toEqual({ url: 'https://x.com/acme/status/1', label: undefined });
+    ).resolves.toBe('https://x.com/acme/status/1');
   });
 
-  it('links nothing when the post has no integration or an unknown provider', () => {
-    expect(make().publicReleaseURL(post({ integration: null }))).toBeUndefined();
-    expect(
-      make().publicReleaseURL(
-        post({ integration: { providerIdentifier: 'nope' } })
+  it('links nothing when the post has no integration or an unknown provider', async () => {
+    await expect(
+      make().publicPostLink(post({ integration: null }))
+    ).resolves.toBeUndefined();
+    await expect(
+      make().publicPostLink(post({ integration: { providerIdentifier: 'nope' } }))
+    ).resolves.toBeUndefined();
+  });
+
+  it('survives settings that are not valid json, and a provider that throws', async () => {
+    await expect(
+      make().publicPostLink(post({ settings: 'not json' }))
+    ).resolves.toBeUndefined();
+    await expect(
+      make().publicPostLink(post({ integration: { providerIdentifier: 'broken' } }))
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses settings that parse to something other than an object', async () => {
+    const communityPost = (settings: string) =>
+      post({ settings, integration: { providerIdentifier: 'community' } });
+
+    // the guard works when the settings really are an object
+    await expect(
+      make().publicPostLink(communityPost('{}'))
+    ).resolves.toBe('https://x.com/acme/status/1');
+    await expect(
+      make().publicPostLink(
+        communityPost('{"community":"https://x.com/i/communities/1"}')
       )
-    ).toBeUndefined();
-  });
+    ).resolves.toBeUndefined();
 
-  it('survives settings that are not valid json', () => {
-    expect(
-      make().publicReleaseURL(post({ settings: 'not json' }))
-    ).toBeUndefined();
+    // and anything that is not an object would read as "no community set",
+    // so it must not reach the provider at all
+    for (const settings of ['"x"', '42', 'true', 'null', '[]']) {
+      await expect(
+        make().publicPostLink(communityPost(settings))
+      ).resolves.toBeUndefined();
+    }
   });
 });

@@ -8,9 +8,11 @@ jest.mock('nostr-tools', () => ({
 
 import 'reflect-metadata';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
 import { XOwnKeyProvider } from '@gitroom/nestjs-libraries/integrations/social/x.own.key.provider';
 import { InstagramProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.provider';
+import { InstagramStandaloneProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.standalone.provider';
 import { ThreadsProvider } from '@gitroom/nestjs-libraries/integrations/social/threads.provider';
 import { FacebookProvider } from '@gitroom/nestjs-libraries/integrations/social/facebook.provider';
 import { PinterestProvider } from '@gitroom/nestjs-libraries/integrations/social/pinterest.provider';
@@ -27,6 +29,8 @@ import { MediumProvider } from '@gitroom/nestjs-libraries/integrations/social/me
 import { HashnodeProvider } from '@gitroom/nestjs-libraries/integrations/social/hashnode.provider';
 import { BlueskyProvider } from '@gitroom/nestjs-libraries/integrations/social/bluesky.provider';
 import { TiktokProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
+import { TiktokBusinessProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.business.provider';
+import { MeweProvider } from '@gitroom/nestjs-libraries/integrations/social/mewe.provider';
 import { SlackProvider } from '@gitroom/nestjs-libraries/integrations/social/slack.provider';
 import { DiscordProvider } from '@gitroom/nestjs-libraries/integrations/social/discord.provider';
 import { ListmonkProvider } from '@gitroom/nestjs-libraries/integrations/social/listmonk.provider';
@@ -35,6 +39,7 @@ import { WordpressProvider } from '@gitroom/nestjs-libraries/integrations/social
 import { LemmyProvider } from '@gitroom/nestjs-libraries/integrations/social/lemmy.provider';
 import { SkoolProvider } from '@gitroom/nestjs-libraries/integrations/social/skool.provider';
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
+import { LinkedinPageProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.page.provider';
 import { VkProvider } from '@gitroom/nestjs-libraries/integrations/social/vk.provider';
 import { KickProvider } from '@gitroom/nestjs-libraries/integrations/social/kick.provider';
 import { TwitchProvider } from '@gitroom/nestjs-libraries/integrations/social/twitch.provider';
@@ -89,6 +94,15 @@ const opted: {
     ],
   },
   {
+    name: 'instagram-standalone',
+    provider: new InstagramStandaloneProvider(),
+    accepts: ['https://www.instagram.com/p/C8sJ1kFq2sX/'],
+    refuses: [
+      'https://www.instagram.com/brand',
+      ['https://www.instagram.com/p/C8sJ1kFq2sX/', { post_type: 'story' }],
+    ],
+  },
+  {
     name: 'threads',
     provider: new ThreadsProvider(),
     accepts: [
@@ -110,6 +124,12 @@ const opted: {
       // stories are login-walled and expire within a day
       'https://www.facebook.com/stories/1234567890',
       ['https://www.facebook.com/reel/1234567890', { post_type: 'story' }],
+      // the legacy story permalink, which no /stories/ prefix test would catch
+      'https://m.facebook.com/story.php?story_fbid=1&id=2',
+      // a post inside a private group
+      'https://www.facebook.com/groups/123456/posts/789/',
+      'https://www.facebook.com/login/?next=x',
+      'https://m.facebook.com/messages/t/123',
       'https://www.facebook.com/',
       'http://www.facebook.com/reel/1234567890',
       'https://www.facebook.com.evil.test/reel/1',
@@ -137,6 +157,10 @@ const opted: {
       // the Business Profile dashboard, which only the owner can open
       'https://business.google.com/locations/12345',
       'https://google.com.evil.test/search?q=acme',
+      // owner-only pages on the very same hosts
+      'https://search.google.com/search-console/ownership?resource_id=x',
+      'https://www.google.com/maps/place/?q=acme',
+      'https://www.google.com/',
     ],
   },
   {
@@ -170,7 +194,7 @@ const opted: {
     refuses: ['https://www.moltbook.com/post/', 'https://www.moltbook.com/'],
   },
   {
-    name: 'farcaster',
+    name: 'wrapcast', // farcaster's identifier
     provider: new FarcasterProvider(),
     accepts: ['https://warpcast.com/acme/0xabc12345'],
     refuses: ['https://warpcast.com/undefined', 'https://warpcast.com/acme'],
@@ -240,6 +264,26 @@ const opted: {
   },
 ];
 
+const privateProviders: [string, SocialProvider, string][] = [
+  ['tiktok', new TiktokProvider(), "the creator's own inbox, with the internal publish id"],
+  ['slack', new SlackProvider(), 'a workspace-internal archives link'],
+  ['discord', new DiscordProvider(), 'a guild-internal channel deep link'],
+  ['listmonk', new ListmonkProvider(), 'the self-hosted campaign preview admin URL'],
+  ['mastodon', new MastodonProvider(), 'a self-hosted instance URL'],
+  ['wordpress', new WordpressProvider(), 'a self-hosted site, and the post may be a draft'],
+  ['lemmy', new LemmyProvider(), 'a customer-supplied instance URL'],
+  ['skool', new SkoolProvider(), 'an internal group id, in a members-only community'],
+  ['linkedin', new LinkedinProvider(), 'the logged-in feed route, not a public permalink'],
+  ['linkedin-page', new LinkedinPageProvider(), 'the same logged-in feed route as linkedin'],
+  ['tiktok-business', new TiktokBusinessProvider(), 'the same inbox and profile fallbacks, and a video publishes at the account default visibility'],
+  ['mewe', new MeweProvider(), 'the profile feed or the group, never the post'],
+  ['vk', new VkProvider(), 'the logged-in feed view'],
+  ['kick', new KickProvider(), 'the channel, never the message'],
+  ['twitch', new TwitchProvider(), 'the channel, never the message'],
+  ['whop', new WhopProvider(), 'a membership-gated experience'],
+  ['youtube', new YoutubeProvider(), 'platform data under an authorizationPolicy, and the video may be private or unlisted'],
+];
+
 describe('isPublicReleaseURL, per provider that opted in', () => {
   for (const { name, provider, accepts, refuses } of opted) {
     describe(name, () => {
@@ -282,26 +326,41 @@ describe('isPublicReleaseURL, per provider that opted in', () => {
 // must never opt in. Leaving the hook off is what keeps them private: the
 // generic code reads releaseURL for the preview page only through it.
 describe('providers that must stay private', () => {
-  const privateProviders: [string, SocialProvider, string][] = [
-    ['tiktok', new TiktokProvider(), "the creator's own inbox, with the internal publish id"],
-    ['slack', new SlackProvider(), 'a workspace-internal archives link'],
-    ['discord', new DiscordProvider(), 'a guild-internal channel deep link'],
-    ['listmonk', new ListmonkProvider(), 'the self-hosted campaign preview admin URL'],
-    ['mastodon', new MastodonProvider(), 'a self-hosted instance URL'],
-    ['wordpress', new WordpressProvider(), 'a self-hosted site, and the post may be a draft'],
-    ['lemmy', new LemmyProvider(), 'a customer-supplied instance URL'],
-    ['skool', new SkoolProvider(), 'an internal group id, in a members-only community'],
-    ['linkedin', new LinkedinProvider(), 'the logged-in feed route, not a public permalink'],
-    ['vk', new VkProvider(), 'the logged-in feed view'],
-    ['kick', new KickProvider(), 'the channel, never the message'],
-    ['twitch', new TwitchProvider(), 'the channel, never the message'],
-    ['whop', new WhopProvider(), 'a membership-gated experience'],
-    ['youtube', new YoutubeProvider(), 'platform data under an authorizationPolicy, and the video may be private or unlisted'],
-  ];
-
   for (const [name, provider, why] of privateProviders) {
     it(`${name} does not opt in: ${why}`, () => {
       expect(provider.isPublicReleaseURL).toBeUndefined();
     });
   }
+});
+
+// A provider added later must be ruled on, not forgotten: forgetting means it
+// opts out, which is the safe side, but it should be a decision someone wrote
+// down. This fails until the new provider is listed in one table or the other.
+describe('every provider is ruled on', () => {
+  // x-own-key is the same X provider on the customer's own keys and inherits
+  // its opt-in, which the suite above checks directly
+  const optedIdentifiers = [...opted.map((o) => o.name), 'x-own-key'];
+  const privateIdentifiers = privateProviders.map(([name]) => name);
+
+  it('lists each connectable provider as opted in or kept private', () => {
+    const ruled = new Set([...optedIdentifiers, ...privateIdentifiers]);
+
+    const missing = socialIntegrationList
+      .map((provider) => provider.identifier)
+      .filter((identifier) => !ruled.has(identifier));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('agrees with what each provider actually implements', () => {
+    const optedIn = new Set(optedIdentifiers);
+    const disagrees = socialIntegrationList
+      .filter(
+        (provider) =>
+          optedIn.has(provider.identifier) !== !!provider.isPublicReleaseURL
+      )
+      .map((provider) => provider.identifier);
+
+    expect(disagrees).toEqual([]);
+  });
 });

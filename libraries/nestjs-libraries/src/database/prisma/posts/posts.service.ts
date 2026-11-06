@@ -32,6 +32,7 @@ import {
   minifyPosts,
 } from '@gitroom/helpers/utils/posts.list.minify';
 import { getSsrfSafeAxios } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import sharp from 'sharp';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { Readable } from 'stream';
@@ -612,14 +613,17 @@ export class PostsService {
   }
 
   // The link to the published post for the shared preview page, which anyone
-  // with the link opens without logging in. Only a provider that declares the
-  // release URL it stored to be a public permalink gets one, so a release URL
-  // that is really an inbox, a self-hosted admin page or a workspace-internal
-  // link is never handed out. Deliberately works off the post row the caller
-  // already read: no provider call and no token refresh on an unauthenticated
-  // request. The caller still checks the URL itself before returning it.
-  publicReleaseURL(post: {
+  // with the link opens without logging in, or nothing when there is no URL we
+  // can vouch for. Only a provider that declares the release URL it stored to
+  // be a public permalink gets one, so a release URL that is really an inbox,
+  // a self-hosted admin page or a workspace-internal link is never handed out.
+  // This is the whole gate, the URL check included, so no caller can reach the
+  // stored URL through a half-checked answer. Deliberately works off the post
+  // row the caller already read: no provider call and no token refresh on an
+  // unauthenticated request.
+  async publicPostLink(post: {
     state: State;
+    deletedAt?: Date | null;
     releaseURL?: string | null;
     settings?: string | null;
     integration?: {
@@ -629,8 +633,13 @@ export class PostsService {
       inBetweenSteps?: boolean | null;
       refreshNeeded?: boolean | null;
     } | null;
-  }): { url: string; label?: string } | undefined {
-    if (post.state !== State.PUBLISHED || !post.releaseURL || !post.integration) {
+  }): Promise<string | undefined> {
+    if (
+      post.state !== State.PUBLISHED ||
+      post.deletedAt ||
+      !post.releaseURL ||
+      !post.integration
+    ) {
       return undefined;
     }
 
@@ -666,15 +675,33 @@ export class PostsService {
       return undefined;
     }
 
+    let settings: any;
     try {
-      const settings = JSON.parse(post.settings || '{}') || {};
-      if (!provider.isPublicReleaseURL(url, settings)) {
-        return undefined;
-      }
-      return { url, label: provider.publishedLinkLabel?.(settings) };
+      settings = JSON.parse(post.settings || '{}');
     } catch (err) {
       return undefined;
     }
+
+    // a provider reads its own fields off these settings, and every miss reads
+    // as "not set", so anything that is not an object would open the guards
+    // that keep a community or story post private
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return undefined;
+    }
+
+    try {
+      if (!provider.isPublicReleaseURL(url, settings)) {
+        return undefined;
+      }
+    } catch (err) {
+      return undefined;
+    }
+
+    // the release URL is tenant data however well the provider vouches for it,
+    // so it leaves only as a public HTTPS URL that resolves off our own
+    // network, never as something that could turn a trusted-looking page into
+    // a redirect to an internal host
+    return (await isSafePublicHttpsUrl(url)) ? url : undefined;
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto) {
