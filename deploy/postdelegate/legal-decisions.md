@@ -7,15 +7,35 @@ item here still open.
 
 ## 1. Refund window and the EU right to withdraw — CHANGED
 
-**Decided:** a full refund of a workspace's first paid invoice if asked for
-within 14 days, once per workspace, on monthly and yearly plans alike. After
-that, fees stay non-refundable.
+**Decided (7 Nov 2026, owner: "match postiz"):** the voluntary refund is now
+Postiz's own shape &mdash; **at most one month of the plan**, only if the last
+charge was within **120 days**, **once per workspace, ever**, and on a yearly
+plan that month is one twelfth of the yearly charge. We may refund more case by
+case without that becoming a rule. The statutory right below is untouched and
+is explicitly not capped by any of it.
 
-The 7-day trial takes no card, so almost nobody pays before they have used the
-product; the exposure is one month of one plan, and only for a customer who
-asked within two weeks. The old wording ("non-refundable ... except where the
-law requires otherwise") pushed every EU consumer into reading a carve-out to
-find a right they already had, which reads as if we hoped they would not look.
+Postiz publishes this in two places that contradict each other: its docs say
+"less than 60 days old", "capped at one month of your plan", "one refund per
+customer, ever" and "a yearly charge is refunded at one twelfth", while its
+terms say a 120-day window, "one month per account, at most" and "No refunds of
+annual charges". We took the terms' window (120 days, the governing document
+and the more generous reading) and the docs' yearly handling (one twelfth),
+because "no annual refunds" contradicts the one-month cap in the same section.
+
+What this replaced (6 Nov): a full refund of the first paid invoice within 14
+days, once per workspace, monthly and yearly alike. That was mid-market &mdash;
+more generous than Hootsuite, Later and Metricool, who publish no refund window
+at all, and tighter than Buffer (7 days monthly, 30 annual) and SocialBee (30
+days, both plan types) on annual plans. The one place it went beyond everyone
+was refunding a *yearly* invoice in full rather than a month of it.
+
+Note for anyone tightening this further: a one-month cap is not enforceable
+against an EU, EEA or UK consumer inside the 14-day withdrawal window, who is
+entitled to everything back. Postiz says as much in its own terms ("Nothing in
+this Refund Policy limits any non-waivable refund or withdrawal rights"). We
+set it out in full instead of relying on a carve-out sentence, because the old
+wording ("non-refundable ... except where the law requires otherwise") pushed
+every EU consumer into hunting for a right they already had.
 
 **Also added:** the EU, EEA and UK consumer right to withdraw within 14 days,
 written out, with the model form from Annex I(B) of the Consumer Rights
