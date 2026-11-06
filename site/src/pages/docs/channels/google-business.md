@@ -33,21 +33,21 @@ Signing in to PostDelegate with Google does not connect a Business Profile. You 
 | Setting | Notes |
 | --- | --- |
 | Post Type | **Standard Update**, **Event** or **Offer**. Defaults to **Standard Update**. |
-| Call to Action | Optional button: **Book**, **Order Online**, **Shop**, **Learn More**, **Sign Up** or **Get Offer**. Enter the **Call to Action URL** the button opens. Without a URL, no button is added. |
-| Event Details | For events. **Event Title** is required. **Start Date** and **End Date** are optional and default to the day the post goes out. Start and end times are optional. |
-| Offer Details | For offers. **Coupon Code**, **Redeem Online URL** and **Terms & Conditions**, all optional. |
+| Call to Action | Optional button: **Book**, **Order Online**, **Shop**, **Learn More**, **Sign Up** or **Get Offer**, with the **Call to Action URL** it opens. Without a URL, no button is added. Or **Call** (uses your business phone number), which needs no URL. |
+| Event Details | For events. **Event Title** is required. **Start Date** and **End Date** are optional and default to the day the post goes out. For an event on a later day, set both dates. Start and end times are optional. |
+| Offer Details | For offers. **Offer Title**, **Start Date** and **End Date** are required. **Coupon Code**, **Redeem Online URL** and **Terms & Conditions** are optional. |
 
 ## Analytics
 
-Each location has its own view on the **Analytics** page, with website clicks, phone calls, direction requests and map views on desktop and mobile, as Google reports them for the location. Pick the last 7, 30 or 90 days. Google does not report statistics for single posts, so Business Profile channels do not feed trends, top posts or insights. See [Analytics and reports](/docs/analytics).
+Each location has its own view on the **Analytics** page, with website clicks, phone calls, direction requests, and map views (desktop and mobile), as Google reports them for the location. Pick the last 7, 30 or 90 days. Google does not report statistics for single posts, so Business Profile channels do not feed trends, top posts or insights. See [Analytics and reports](/docs/analytics).
 
 ## Removing a location
 
-Deleting the channel removes its saved sign-in from PostDelegate. Once no other Business Profile location or YouTube channel from the same Google account is connected to PostDelegate, PostDelegate also asks Google to revoke its access. Posts already published stay on Google.
+Deleting the channel removes its saved sign-in from PostDelegate. Once no other Business Profile location or YouTube channel from the same Google account is connected to PostDelegate, PostDelegate also asks Google to revoke its access. Revoking also affects Google sign-in to PostDelegate for the same Google account. Posts already published stay on Google.
 
 ## Troubleshooting
 
 - **No locations are listed.** The Google account you signed in with does not manage a Business Profile location. Close the dialog, delete the channel, and connect again with the Google account that manages the location.
-- **Google rejected the post.** Google reviews posts and rejects ones that break its content policies. The reason appears on the calendar. Change the post and schedule it again.
+- **Google rejected the post.** Google reviews posts and rejects ones that break its content policies. The post is marked as failed on the calendar, with a note that Google rejected it. Change the post and schedule it again.
 - **Business location not found.** The location was removed from the Google account. Delete the channel, or connect the location again if it still exists.
 - **The channel asks to reconnect.** Google stopped accepting the saved sign-in, or the account lost access to the location. Use **Reconnect channel** and sign in with the Google account that manages the location. See [Reconnecting a channel](/docs/channels#reconnecting-a-channel).

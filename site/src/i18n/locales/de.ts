@@ -729,7 +729,7 @@ const dict: Dict = {
       ],
       limits: [
         'Google nimmt Beiträge nur für bestätigte Standorte an, die das angemeldete Google-Konto verwaltet. Die Anmeldung bei PostDelegate mit Google verbindet kein Business Profile.',
-        'Jeder Beitrag geht an einen Standort, mit höchstens einem Bild. Videos werden nicht unterstützt, und weitere Einträge eines Beitrags werden nicht veröffentlicht.',
+        'Jeder Standort erhält pro Beitrag höchstens ein Bild. Videos werden nicht unterstützt, und weitere Einträge eines Beitrags werden nicht veröffentlicht.',
       ],
     },
   },

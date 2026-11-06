@@ -729,7 +729,7 @@ const dict: Dict = {
       ],
       limits: [
         'Google solo acepta publicaciones de ubicaciones verificadas que gestione la cuenta de Google con la que inicias sesión. Iniciar sesión en PostDelegate con Google no conecta un Google Business Profile.',
-        'Cada publicación va a una sola ubicación, con una imagen como máximo. No se admiten videos, y las entradas adicionales de una publicación no se publican.',
+        'Cada ubicación recibe como máximo una imagen por publicación. No se admiten videos, y las entradas adicionales de una publicación no se publican.',
       ],
     },
   },

@@ -1290,6 +1290,9 @@
                           "topicType": "OFFER",
                           "callToActionType": "GET_OFFER",
                           "callToActionUrl": "https://example.com/offer",
+                          "eventTitle": "20% off this week",
+                          "eventStartDate": "2024-12-14",
+                          "eventEndDate": "2024-12-21",
                           "offerCouponCode": "SAVE20"
                         }
                       }
@@ -3557,7 +3560,7 @@
         "required": [
           "__type"
         ],
-        "description": "Google Business Profile post settings. A post is up to 1,500 characters with one optional image. Videos are not supported.",
+        "description": "Google Business Profile post settings. A post is up to 1,500 characters with one optional image. Videos are not supported. Dates are YYYY-MM-DD; event dates default to the day the post is published, and event times are HH:mm. The CALL button dials the phone number on the Business Profile and takes no URL.",
         "properties": {
           "__type": {
             "type": "string",
@@ -3591,19 +3594,19 @@
           "callToActionUrl": {
             "type": "string",
             "format": "uri",
-            "description": "The link the button opens. The button is only added when this is set."
+            "description": "URL for CTA (required if callToActionType is set, except NONE and CALL, which dials the phone number of the profile)"
           },
           "eventTitle": {
             "type": "string",
-            "description": "Event title (required for EVENT type)"
+            "description": "Event or offer title (required for EVENT and OFFER types)"
           },
           "eventStartDate": {
             "type": "string",
-            "description": "Event start date (YYYY-MM-DD). Defaults to the day the post is published."
+            "description": "Event or offer start date (required for OFFER type)"
           },
           "eventEndDate": {
             "type": "string",
-            "description": "Event end date (YYYY-MM-DD). Defaults to the day the post is published."
+            "description": "Event or offer end date (required for OFFER type)"
           },
           "eventStartTime": {
             "type": "string",

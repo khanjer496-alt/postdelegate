@@ -698,7 +698,7 @@ const dict: Dict = {
     },
     'google-business-scheduler': {
       action: 'Programmer vos posts',
-      description: `Programmez actualités, événements et offres Google Business Profile avec image et bouton, via la connexion Google. Essai gratuit de ${TRIAL_DAYS} jours, sans carte.`,
+      description: `Programmez des actualités, des événements et des offres sur Google Business Profile, avec image et bouton, via la connexion Google. Essai de ${TRIAL_DAYS} jours, sans carte.`,
       h1: 'Programmez vos posts Google Business Profile.',
       intro: 'Reliez un établissement en vous connectant avec Google, puis programmez des actualités, des événements et des offres avec une image et un bouton facultatifs.',
       plan: [
@@ -708,7 +708,7 @@ const dict: Dict = {
       ],
       limits: [
         'Google n’accepte les posts que pour les établissements validés que gère le compte Google utilisé. Se connecter à PostDelegate avec Google ne relie pas de fiche Google Business Profile.',
-        'Chaque post va à un seul établissement, avec une image au maximum. Les vidéos ne sont pas prises en charge, et les entrées supplémentaires d’un post ne sont pas publiées.',
+        'Chaque établissement reçoit au maximum une image par post. Les vidéos ne sont pas prises en charge, et les entrées supplémentaires d’un post ne sont pas publiées.',
       ],
     },
   },

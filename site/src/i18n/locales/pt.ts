@@ -729,7 +729,7 @@ const dict: Dict = {
       ],
       limits: [
         'O Google só aceita posts de locais verificados que a conta Google usada no login gerencia. Entrar no PostDelegate com o Google não conecta um Google Business Profile.',
-        'Cada post vai para um único local, com no máximo uma imagem. Vídeos não são aceitos, e entradas extras de um post não são publicadas.',
+        'Cada local recebe no máximo uma imagem por post. Vídeos não são aceitos, e entradas extras de um post não são publicadas.',
       ],
     },
   },

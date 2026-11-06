@@ -729,7 +729,7 @@ const dict: Dict = {
       ],
       limits: [
         'Google accetta post solo per sedi verificate gestite dall’account Google con cui accedi. Accedere a PostDelegate con Google non collega un Google Business Profile.',
-        'Ogni post va a una sola sede, con al massimo un’immagine. I video non sono supportati e gli elementi aggiuntivi di un post non vengono pubblicati.',
+        'Ogni sede riceve al massimo un’immagine per post. I video non sono supportati e gli elementi aggiuntivi di un post non vengono pubblicati.',
       ],
     },
   },

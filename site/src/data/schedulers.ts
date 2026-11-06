@@ -528,7 +528,7 @@ export const SCHEDULERS: Scheduler[] = [
     h1: "Schedule Google Business Profile posts.",
     intro: "Connect a business location with Google sign-in, then schedule updates, events and offers with an optional image and button.",
     about: [
-      "A Google Business Profile post is up to 1,500 characters with one optional image. Pick a standard update, an event with a title and dates, or an offer with a coupon code, a redeem link and terms. Add an optional button, such as Book or Learn more, that opens a link you choose. Videos are not supported.",
+      "A Google Business Profile post is up to 1,500 characters with one optional image. Pick a standard update, an event with a title and dates, or an offer with a title and dates, plus an optional coupon code, redeem link and terms. Add an optional button, such as Book or Learn more, that opens a link you choose, or Call (uses your business phone number). Videos are not supported.",
       "You connect through Google's own sign-in, then pick the business location to post to. Each location is its own channel, so connect each location you manage. Signing in to PostDelegate with Google does not connect a Business Profile.",
     ],
     steps: [
@@ -540,11 +540,11 @@ export const SCHEDULERS: Scheduler[] = [
     plan: ["Sign in with Google from Add Channel and pick a business location.", "Write up to 1,500 characters with one optional image.", "Choose an update, an event or an offer, with an optional button."],
     settings: [
       { label: "Post Type", note: "Standard Update, Event or Offer. Defaults to Standard Update." },
-      { label: "Call to Action", note: "Optional button: Book, Order Online, Shop, Learn More, Sign Up or Get Offer, with the link it opens. Without a link, no button is added." },
-      { label: "Event Details", note: "For events. The event title is required. Start and end dates are optional and default to the day the post goes out. Start and end times are optional." },
-      { label: "Offer Details", note: "For offers. A coupon code, a redeem online link and terms and conditions, all optional." },
+      { label: "Call to Action", note: "Optional button: Book, Order Online, Shop, Learn More, Sign Up or Get Offer, with the link it opens. Without a link, no button is added. Or Call (uses your business phone number), which needs no link." },
+      { label: "Event Details", note: "For events. The event title is required. Start and end dates are optional and default to the day the post goes out. For an event on a later day, set both dates. Start and end times are optional." },
+      { label: "Offer Details", note: "For offers. An offer title and start and end dates are required. A coupon code, a redeem online link and terms and conditions are optional." },
     ],
-    limits: ["Google only accepts posts for verified locations that the Google account you sign in with manages. Signing in to PostDelegate with Google does not connect a Business Profile.", "Each post goes to one location with at most one image. Videos are not supported, and extra entries in a post are not published."],
+    limits: ["Google only accepts posts for verified locations that the Google account you sign in with manages. Signing in to PostDelegate with Google does not connect a Business Profile.", "Each location gets at most one image per post. Videos are not supported, and extra entries in a post are not published."],
     docs: "/docs/channels/google-business",
     faq: [
       { q: "Can I connect more than one location?", a: "Yes. Each location is its own channel. Choose Add Channel, then Google My Business, once for each location you manage." },
