@@ -143,3 +143,52 @@ describe('evergreen after an edit', () => {
     expect(applyEvergreen(post, at(35), at(35)).intervalInDays).toBe(7);
   });
 });
+
+describe('evergreenOccurrences rangeStart skip', () => {
+  const anchor = at(0);
+  const daily = { intervalInDays: 1 };
+
+  it('starts at the first share inside the window, not at the anchor', () => {
+    // a calendar week three weeks after the anchor
+    expect(evergreenOccurrences(anchor, daily, at(24), at(21))).toEqual([
+      at(21),
+      at(22),
+      at(23),
+      at(24),
+    ]);
+  });
+
+  it('includes a share that lands exactly on rangeStart', () => {
+    expect(evergreenOccurrences(anchor, daily, at(21), at(21))).toEqual([
+      at(21),
+    ]);
+  });
+
+  it('skips nothing when the window opens before the anchor', () => {
+    expect(evergreenOccurrences(anchor, daily, at(2), at(-5))).toEqual([
+      at(0),
+      at(1),
+      at(2),
+    ]);
+  });
+
+  it('is the same list the unfiltered walk would have produced', () => {
+    const withSkip = evergreenOccurrences(anchor, daily, at(40), at(30));
+    const byFilter = evergreenOccurrences(anchor, daily, at(40)).filter(
+      (d) => d.getTime() >= at(30).getTime()
+    );
+    expect(withSkip).toEqual(byFilter);
+  });
+
+  it('still stops at an evergreen limit reached before the window', () => {
+    // five shares allowed, so nothing is left by day 30
+    expect(
+      evergreenOccurrences(
+        anchor,
+        { intervalInDays: 1, evergreenMaxShares: 5 },
+        at(40),
+        at(30)
+      )
+    ).toEqual([]);
+  });
+});

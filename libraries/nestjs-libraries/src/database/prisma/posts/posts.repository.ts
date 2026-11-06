@@ -14,7 +14,6 @@ import { GetPostsListDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import utc from 'dayjs/plugin/utc';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
@@ -23,7 +22,6 @@ import { evergreenOccurrences } from '@gitroom/nestjs-libraries/database/prisma/
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
-dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 
 @Injectable()
@@ -286,26 +284,37 @@ export class PostsRepository {
       },
     });
 
-    return list
-      .map((post) => ({ ...post, error: this.curatedError(post.error) }))
-      .reduce((all, post) => {
-      if (!post.intervalInDays) {
-        return [...all, post];
+    // This runs on the request thread, so keep it linear: push into one array
+    // (spreading the accumulator on every post was quadratic and blocked the
+    // event loop for seconds on large orgs), and expand repeating posts only
+    // inside [startDate, endDate] instead of from their first publish date.
+    const result: any[] = [];
+
+    for (const row of list) {
+      const post = { ...row, error: this.curatedError(row.error) };
+      if (!post.intervalInDays || post.intervalInDays < 1) {
+        result.push(post);
+        continue;
       }
 
-      // an evergreen post stops after its last share
-      const addMorePosts = evergreenOccurrences(
+      // evergreenOccurrences stops after the post's last share, which the
+      // plain interval walk upstream uses does not know about, and takes the
+      // same rangeStart skip so nothing before the window is built at all
+      for (const date of evergreenOccurrences(
         post.publishDate,
         post,
-        endDate
-      ).map((date) => ({
-        ...post,
-        publishDate: date,
-        actualDate: post.publishDate,
-      }));
+        endDate,
+        startDate
+      )) {
+        result.push({
+          ...post,
+          publishDate: date,
+          actualDate: post.publishDate,
+        });
+      }
+    }
 
-      return [...all, ...addMorePosts];
-    }, [] as any[]);
+    return result;
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto) {
