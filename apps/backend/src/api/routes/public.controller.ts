@@ -41,14 +41,22 @@ export class PublicController {
   async getPreview(@Param('id') id: string) {
     // unauthenticated: expose only what the preview page renders, never the
     // internal group/batch/settings/error fields of the stored row
-    return (await this._postsService.getPostsRecursively(id, true)).map(
-      (p) => ({
+    const posts = await this._postsService.getPostsRecursively(id, true);
+    // only the first post of the chain comes back with its channel, and a
+    // chain is one post and its children, which are pinned to that same
+    // channel when they are saved - the page already renders it for all of
+    // them - so the rest are judged on it too
+    const integration = posts[0]?.integration;
+
+    return Promise.all(
+      posts.map(async (p) => ({
         id: p.id,
         organizationId: p.organizationId,
         publishDate: p.publishDate,
         creationMethod: p.creationMethod,
         content: p.content,
         image: p.image,
+        ...(await this.publishedLink({ ...p, integration: p.integration ?? integration })),
         ...(p.integration
           ? {
               integration: {
@@ -60,8 +68,17 @@ export class PublicController {
               },
             }
           : {}),
-      })
+      }))
     );
+  }
+
+  // the link to the post on the network, for the providers whose stored
+  // release URL the service could vouch for as a public permalink
+  private async publishedLink(
+    post: Parameters<PostsService['publicPostLink']>[0]
+  ) {
+    const url = await this._postsService.publicPostLink(post);
+    return url ? { publishedLink: url } : {};
   }
 
   @Get(`/posts/:id/comments`)

@@ -18,6 +18,14 @@ export class DevToProvider extends SocialAbstract implements SocialProvider {
   isBetweenSteps = false;
   editor = 'markdown' as const;
   scopes = [] as string[];
+
+  // dev.to articles are always created published, on dev.to itself
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/dev\.to\/[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 100000;
   }

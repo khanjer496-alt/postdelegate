@@ -52,6 +52,19 @@ export class InstagramProvider
   // come from the history of each post's view count
   viewsMetric: ViewsMetric = { post: ['Views'] };
   dto = InstagramDto;
+
+  // only a /p/, /reel/ or /tv/ permalink is a public post page: the profile
+  // URL is what we store when the platform gave us no media id, and a story
+  // permalink is login-walled and gone within a day
+  isPublicReleaseURL(releaseURL: string, settings: Partial<InstagramDto>) {
+    return (
+      settings?.post_type !== 'story' &&
+      /^https:\/\/www\.instagram\.com\/(p|reel|tv)\/[A-Za-z0-9_-]+\/?$/.test(
+        releaseURL
+      )
+    );
+  }
+
   maxLength() {
     return 2200;
   }

@@ -98,6 +98,16 @@ export class XProvider extends SocialAbstract implements SocialProvider {
   editor = 'html' as const;
   dto = XDto;
 
+  // a /status/ page is public. The draft-article URL we store is the owner's
+  // own article list, and a post into a Community only its members can read
+  isPublicReleaseURL(releaseURL: string, settings: Partial<XDto>) {
+    return (
+      /^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/status\/\d+$/.test(
+        releaseURL
+      ) && !settings?.community
+    );
+  }
+
   maxLength(additionalSettings?: any, settings?: any) {
     // Articles are long-form content, the tweet character limit doesn't apply.
     if (settings?.post_type === 'article') {

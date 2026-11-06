@@ -50,6 +50,15 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   isWeb3 = true;
   scopes = [] as string[];
   editor = 'html' as const;
+
+  // t.me/<username>/<id> is a public channel message. A channel with no
+  // username gets a members-only c/<id> link or a bare numeric chat id
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{4,31}\/\d+$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 4096;
   }

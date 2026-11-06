@@ -62,6 +62,28 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     return project ? `google-project:${project}` : undefined;
   }
 
+  // only the Search URL Google returns for the post is public, and only on the
+  // two paths it uses for one. The fallback we store is the Business Profile
+  // dashboard, which only the owner can open, and the same two hosts also
+  // serve owner-only pages like Search Console
+  isPublicReleaseURL(releaseURL: string) {
+    try {
+      const { protocol, host, username, pathname } = new URL(releaseURL);
+      // `host` keeps the port, and credentials in the authority are never
+      // something we stored, so both are refused with the wrong host
+      if (protocol !== 'https:' || username) {
+        return false;
+      }
+      return (
+        (host === 'search.google.com' &&
+          /^\/local\/posts\/?$/.test(pathname)) ||
+        (host === 'www.google.com' && pathname === '/search')
+      );
+    } catch (err) {
+      return false;
+    }
+  }
+
   maxLength() {
     return 1500;
   }

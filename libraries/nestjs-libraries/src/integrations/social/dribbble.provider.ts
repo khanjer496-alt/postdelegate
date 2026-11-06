@@ -31,6 +31,12 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
   isBetweenSteps = false;
   scopes = ['public', 'upload'];
   editor = 'normal' as const;
+
+  // a shot page is public; the numeric id also screens out a missing one
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/dribbble\.com\/shots\/\d+$/.test(releaseURL);
+  }
+
   maxLength() {
     return 40000;
   }

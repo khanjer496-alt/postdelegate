@@ -109,10 +109,12 @@ export default async function Auth(
                   </div>
                   <div className="flex-1 flex flex-col gap-[8px] min-w-0">
                     <div className="flex items-center gap-[8px]">
-                      <h2 className="text-[14px] font-[600]">
+                      {/* the name and handle give way so the link to the post
+                          stays on the row at phone width */}
+                      <h2 className="text-[14px] font-[600] min-w-0 truncate">
                         {post[0].integration.name}
                       </h2>
-                      <span className="text-[14px] text-textItemBlur">
+                      <span className="text-[14px] text-textItemBlur min-w-0 truncate">
                         @{post[0].integration.profile}
                       </span>
                       {index === 0 && (
@@ -120,6 +122,20 @@ export default async function Auth(
                           creationMethod={p.creationMethod}
                           size="md"
                         />
+                      )}
+                      {!!p.publishedLink && (
+                        <a
+                          className="text-[14px] underline hover:text-textItemFocused whitespace-nowrap shrink-0"
+                          href={p.publishedLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {t('open_post', 'Open Post')}
+                          <span className="sr-only">
+                            {' '}
+                            ({t('opens_in_new_tab', 'opens in a new tab')})
+                          </span>
+                        </a>
                       )}
                     </div>
                     <div className="flex flex-col gap-[16px]">

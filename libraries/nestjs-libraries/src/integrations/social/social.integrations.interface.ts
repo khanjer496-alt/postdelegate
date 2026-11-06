@@ -331,6 +331,16 @@ export interface SocialProvider
   publishedLabel?(settings: any): string | undefined;
   // the label of the link to such a post, e.g. in the digest email
   publishedLinkLabel?(settings: any): string | undefined;
+  // Whether the release URL stored for one published post is a permalink any
+  // anonymous visitor can open, so the shared preview page may link to it.
+  // Opt-in, and answered per post: a release URL is just as often an inbox the
+  // creator alone can see, a self-hosted admin page, a workspace-internal
+  // link or a profile fallback written when the platform gave us no post id.
+  // A provider that does not implement this stays private, which is why the
+  // generic code never reads releaseURL for a public page on its own. Decide
+  // it from the stored URL and the post's settings only - this runs on an
+  // unauthenticated request, so it must do no network call and no token work.
+  isPublicReleaseURL?(releaseURL: string, settings: any): boolean;
   // what lifts the plan's monthly cap on this network
   // (provider_posts_per_month), the end of the message shown at the cap
   planLimitHint?: string;

@@ -241,6 +241,14 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
   isBetweenSteps = false;
   scopes = ['write:statuses', 'profile', 'write:media'];
   editor = 'normal' as const;
+
+  // a bsky.app post page is public, and the DID is a public identifier
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/bsky\.app\/profile\/did:(plc|web):[A-Za-z0-9._:%-]+\/post\/[a-z2-7]+$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 300;
   }

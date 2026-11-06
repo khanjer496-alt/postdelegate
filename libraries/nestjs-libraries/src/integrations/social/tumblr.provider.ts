@@ -92,6 +92,16 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
   editor = 'normal' as const;
   dto = TumblrDto;
 
+  // a <blog>.tumblr.com post page is public. The numeric id screens out the
+  // blog-feed URL we store when the response carried no post id, and the
+  // tumblr.com host screens out a blog on a domain of its own, which we
+  // cannot vouch for
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?\.tumblr\.com\/post\/\d+$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 32768;
   }
