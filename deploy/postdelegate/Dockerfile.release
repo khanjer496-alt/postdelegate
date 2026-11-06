@@ -41,6 +41,33 @@ RUN fc-cache -f \
       -f lavfi -i anullsrc=r=48000:cl=stereo \
       -t 1 -c:v libx264 -preset veryfast -c:a aac -f null -
 
+# The apps are built against the pinned image's own node_modules, and no
+# install runs for this repo's package.json, so a dependency we declare and
+# that image does not carry is absent at build time: the 6 Nov upstream sync
+# brought upstream's SES email provider, and v2.25.3 has no
+# @aws-sdk/client-sesv2, so the backend build failed on its import.
+#
+# pnpm and not npm: the tree is pnpm's (hoisted linking), and npm reconciles it
+# and dies on peer conflicts that have nothing to do with this package. Note
+# that `pnpm add -w` reconciles the workspace as well, against the BASE IMAGE's
+# package.json and lockfile - this repo's are never copied in - and upstream's
+# shipped node_modules is not a frozen install of its own lockfile, so the
+# install also re-hoists other packages to versions that lockfile already
+# carries. Keep the staging click-through for that reason.
+#
+# The version is asserted against our own pnpm-lock.yaml so it cannot drift
+# when a later upstream sync bumps it, the module must resolve the way the
+# build imports it, and pnpm's store is dropped afterwards: linking is hoisted,
+# so node_modules keeps the files and the store is 2.4 GB of dead weight in
+# the image.
+COPY pnpm-lock.yaml /tmp/pd-pnpm-lock.yaml
+RUN grep -qE "@aws-sdk/client-sesv2@3\.1003\.0'?:" /tmp/pd-pnpm-lock.yaml \
+    && pnpm add -w @aws-sdk/client-sesv2@3.1003.0 \
+    && node -e "require.resolve('@aws-sdk/client-sesv2')" \
+    && node -e "const v=require('/app/node_modules/@aws-sdk/client-sesv2/package.json').version; if (v !== '3.1003.0') { throw new Error('installed ' + v); }" \
+    && rm -rf "$(pnpm store path)" /tmp/pd-pnpm-lock.yaml \
+    && node -e "require.resolve('@aws-sdk/client-sesv2')"
+
 # The provider changes are used by both HTTP handlers and Temporal workers.
 # Rebuild all three applications with the pinned image's installed dependencies.
 # COPY only adds and overwrites, so clear the upstream sources and public
