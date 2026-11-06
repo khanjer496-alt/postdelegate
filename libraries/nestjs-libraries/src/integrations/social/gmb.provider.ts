@@ -68,12 +68,16 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
   // serve owner-only pages like Search Console
   isPublicReleaseURL(releaseURL: string) {
     try {
-      const { protocol, hostname, pathname } = new URL(releaseURL);
+      const { protocol, host, username, pathname } = new URL(releaseURL);
+      // `host` keeps the port, and credentials in the authority are never
+      // something we stored, so both are refused with the wrong host
+      if (protocol !== 'https:' || username) {
+        return false;
+      }
       return (
-        protocol === 'https:' &&
-        ((hostname === 'search.google.com' &&
-          pathname.startsWith('/local/posts')) ||
-          (hostname === 'www.google.com' && pathname === '/search'))
+        (host === 'search.google.com' &&
+          /^\/local\/posts\/?$/.test(pathname)) ||
+        (host === 'www.google.com' && pathname === '/search')
       );
     } catch (err) {
       return false;

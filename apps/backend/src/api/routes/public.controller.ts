@@ -42,9 +42,10 @@ export class PublicController {
     // unauthenticated: expose only what the preview page renders, never the
     // internal group/batch/settings/error fields of the stored row
     const posts = await this._postsService.getPostsRecursively(id, true);
-    // only the first post of a group comes back with its channel, and every
-    // post of a group goes out on that same one - the page already renders it
-    // for all of them - so the rest are judged on it too
+    // only the first post of the chain comes back with its channel, and a
+    // chain is one post and its children, which are pinned to that same
+    // channel when they are saved - the page already renders it for all of
+    // them - so the rest are judged on it too
     const integration = posts[0]?.integration;
 
     return Promise.all(

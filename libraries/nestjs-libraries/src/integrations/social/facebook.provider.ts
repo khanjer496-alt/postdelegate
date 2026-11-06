@@ -56,24 +56,33 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     post: ['Views', 'Plays', 'Impressions'],
   };
 
-  // only the permalink shapes Facebook returns for a published Page post. A
-  // story is login-walled and expires within a day, and facebook.com serves
-  // plenty of pages that are not a post at all, so the paths are listed rather
-  // than excluded
+  // only the permalink shapes Facebook returns for a post. A story is
+  // login-walled and expires within a day, and facebook.com serves plenty of
+  // pages that are not a post at all, so the paths are listed rather than
+  // excluded. A single leading segment is what keeps a group post out: that
+  // one is /groups/<group>/posts/<id>
   isPublicReleaseURL(releaseURL: string, settings: Partial<FacebookDto>) {
     if (settings?.post_type === 'story') {
       return false;
     }
     try {
-      const { protocol, hostname, pathname, searchParams } = new URL(
+      const { protocol, host, username, pathname, searchParams } = new URL(
         releaseURL
       );
-      if (protocol !== 'https:' || !/^(www|web)\.facebook\.com$/.test(hostname)) {
+      // `host` keeps the port, and credentials in the authority are never
+      // something we stored, so both are refused with the wrong host
+      if (
+        protocol !== 'https:' ||
+        username ||
+        !/^(www|web)\.facebook\.com$/.test(host)
+      ) {
         return false;
       }
       return (
         /^\/reel\/\d+\/?$/.test(pathname) ||
-        /^\/[A-Za-z0-9.]+\/(posts|videos|photos)\/[\w.-]+\/?$/.test(pathname) ||
+        /^\/[A-Za-z0-9._-]+\/(posts|videos|photos)\/[\w.-]+\/?$/.test(
+          pathname
+        ) ||
         (pathname === '/permalink.php' && !!searchParams.get('story_fbid')) ||
         (/^\/photo\/?$/.test(pathname) && !!searchParams.get('fbid'))
       );

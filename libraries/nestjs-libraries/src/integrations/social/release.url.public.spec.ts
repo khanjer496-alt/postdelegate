@@ -117,6 +117,8 @@ const opted: {
     accepts: [
       'https://www.facebook.com/reel/1234567890',
       'https://www.facebook.com/61560000000000/posts/pfbid0abc',
+      // a Page whose slug carries hyphens or underscores
+      'https://www.facebook.com/Acme-Home-Garden-123/posts/pfbid0abc',
       'https://www.facebook.com/permalink.php?story_fbid=pfbid0abc&id=615600000',
       'https://www.facebook.com/photo/?fbid=1234567890',
     ],
@@ -128,6 +130,9 @@ const opted: {
       'https://m.facebook.com/story.php?story_fbid=1&id=2',
       // a post inside a private group
       'https://www.facebook.com/groups/123456/posts/789/',
+      // credentials or a port in the authority are never what we stored
+      'https://u:p@www.facebook.com/acme/posts/1',
+      'https://www.facebook.com:8443/acme/posts/1',
       'https://www.facebook.com/login/?next=x',
       'https://m.facebook.com/messages/t/123',
       'https://www.facebook.com/',
@@ -161,6 +166,8 @@ const opted: {
       'https://search.google.com/search-console/ownership?resource_id=x',
       'https://www.google.com/maps/place/?q=acme',
       'https://www.google.com/',
+      'https://search.google.com/local/postsfoo',
+      'https://u:p@search.google.com/local/posts?q=acme',
     ],
   },
   {
@@ -293,6 +300,10 @@ describe('isPublicReleaseURL, per provider that opted in', () => {
       };
 
       it('accepts the public post pages it stores', () => {
+        // an empty table would pass every assertion below without testing
+        // anything, so opting a provider in means showing both sides
+        expect(accepts.length).toBeGreaterThan(0);
+        expect(refuses.length).toBeGreaterThan(0);
         for (const entry of accepts) {
           expect({ entry, public: call(entry) }).toEqual({
             entry,
