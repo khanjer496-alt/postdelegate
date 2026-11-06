@@ -43,7 +43,13 @@ describe('TwitchProvider chat messages', () => {
 
     await expect(
       provider.post('42', 'token', post(), integration)
-    ).resolves.toMatchObject([{ postId: 'm-1', status: 'posted' }]);
+    ).resolves.toMatchObject([
+      {
+        postId: 'm-1',
+        status: 'posted',
+        releaseURL: 'https://twitch.tv/streamer',
+      },
+    ]);
   });
 });
 
@@ -68,7 +74,9 @@ describe('TwitchProvider announcements', () => {
   };
 
   it('accepts the 204 Twitch answers on success', async () => {
-    await expect(announce(204)).resolves.toMatchObject([{ status: 'posted' }]);
+    await expect(announce(204)).resolves.toMatchObject([
+      { status: 'posted', releaseURL: 'https://twitch.tv/streamer' },
+    ]);
   });
 
   it('fails with Twitch reason when the announcement is refused', async () => {
@@ -119,27 +127,46 @@ describe('KickProvider chat messages', () => {
 
 describe('Twitch and Kick channel links', () => {
   // chat has no per-message permalink, so the release URL is the channel -
-  // and without a profile there is no channel to point at
-  const cases: [string, any, string][] = [
-    ['twitch', new TwitchProvider(), 'https://twitch.tv/streamer'],
-    ['kick', new KickProvider(), 'https://kick.com/streamer'],
-  ];
+  // and a channel we cannot name is no URL at all, never someone else's page
+  const twitch = (profile: any) => {
+    const provider = new TwitchProvider();
+    provider.fetch = jest.fn(async () =>
+      answer({ data: [{ message_id: 'm-1', is_sent: true }] })
+    ) as any;
+    return provider.post('42', 'token', post(), {
+      profile,
+      providerIdentifier: 'twitch',
+    } as any);
+  };
 
-  for (const [name, provider, expected] of cases) {
-    it(`${name} links the channel it knows`, () => {
-      expect(
-        (provider as any).channelUrl({ profile: 'streamer' })
-      ).toBe(expected);
-    });
+  const kick = (profile: any) => {
+    const provider = new KickProvider();
+    provider.fetch = jest.fn(async () =>
+      answer({ data: { message_id: 'k-1', is_sent: true } })
+    ) as any;
+    return provider.post('42', 'token', post(), {
+      profile,
+      providerIdentifier: 'kick',
+    } as any);
+  };
 
-    it(`${name} links nothing rather than an unrelated channel`, () => {
-      // the old fallbacks were twitch.tv/twitch and kick.com/channel, both of
-      // which are real pages belonging to someone else
-      for (const profile of ['', null, undefined]) {
-        expect(
-          (provider as any).channelUrl({ profile, providerIdentifier: name })
-        ).toBe('');
-      }
-    });
-  }
+  it('links the channel the post went out on', async () => {
+    await expect(twitch('streamer')).resolves.toMatchObject([
+      { releaseURL: 'https://twitch.tv/streamer' },
+    ]);
+    await expect(kick('streamer')).resolves.toMatchObject([
+      { releaseURL: 'https://kick.com/streamer' },
+    ]);
+  });
+
+  it('links nothing rather than an unrelated channel', async () => {
+    // the old fallbacks were twitch.tv/twitch and kick.com/channel, both of
+    // which are real pages belonging to someone else
+    for (const profile of ['', null, undefined]) {
+      await expect(twitch(profile)).resolves.toMatchObject([
+        { releaseURL: '' },
+      ]);
+      await expect(kick(profile)).resolves.toMatchObject([{ releaseURL: '' }]);
+    }
+  });
 });

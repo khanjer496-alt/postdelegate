@@ -327,15 +327,18 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   private completedResponse(
     results: RedditPendingData['results']
   ): PendingCheckResponse {
-    // both lists are read by index against each other, so they are filtered
-    // once, together: filtering them apart let a result that had only one of
-    // the two shift every later pair out of step
-    const complete = results.filter((p) => p.postId && p.releaseURL);
+    // both lists are read by index against each other, one entry per
+    // subreddit, so they are filtered once, together. Filtering them apart
+    // let a result with only one of the two shift every later pair out of
+    // step. The release URL is the field that is always set - a submission
+    // that never surfaced still has its subreddit URL, with no post id - so
+    // it is what decides which results are in, and no link is lost
+    const submitted = results.filter((p) => p.releaseURL);
 
     return {
       status: 'completed',
-      postId: complete.map((p) => p.postId).join(','),
-      releaseURL: complete.map((p) => p.releaseURL).join(','),
+      postId: submitted.map((p) => p.postId).join(','),
+      releaseURL: submitted.map((p) => p.releaseURL).join(','),
     };
   }
 

@@ -435,8 +435,9 @@ describe('RedditProvider completed response', () => {
   const completed = (results: any[]) =>
     (new RedditProvider() as any).completedResponse(results);
 
-  it('keeps the two lists in step when a result is missing one of them', () => {
-    // the middle result never surfaced, so it has a subreddit URL but no id
+  it('keeps the two lists in step when a result has no post id', () => {
+    // the middle submission never surfaced in the listing: Reddit accepted it,
+    // so it has its subreddit URL, but we never learned its id
     expect(
       completed([
         { postId: 'a1', releaseURL: 'https://www.reddit.com/r/one/comments/a1/' },
@@ -445,23 +446,22 @@ describe('RedditProvider completed response', () => {
       ])
     ).toEqual({
       status: 'completed',
-      postId: 'a1,c3',
+      // index 2 is still c3's, which the old two-filter version got wrong
+      postId: 'a1,,c3',
       releaseURL:
-        'https://www.reddit.com/r/one/comments/a1/,https://www.reddit.com/r/three/comments/c3/',
+        'https://www.reddit.com/r/one/comments/a1/,https://www.reddit.com/r/two,https://www.reddit.com/r/three/comments/c3/',
     });
   });
 
-  it('joins every result when they are all complete', () => {
+  it('keeps the link of a lone submission that never surfaced', () => {
+    // the common shape of the case above: one subreddit, post is live, no id.
+    // Dropping it here would take the user's only link away
     expect(
-      completed([
-        { postId: 'a1', releaseURL: 'https://www.reddit.com/r/one/comments/a1/' },
-        { postId: 'b2', releaseURL: 'https://www.reddit.com/r/two/comments/b2/' },
-      ])
+      completed([{ postId: '', releaseURL: 'https://www.reddit.com/r/one' }])
     ).toEqual({
       status: 'completed',
-      postId: 'a1,b2',
-      releaseURL:
-        'https://www.reddit.com/r/one/comments/a1/,https://www.reddit.com/r/two/comments/b2/',
+      postId: '',
+      releaseURL: 'https://www.reddit.com/r/one',
     });
   });
 });
