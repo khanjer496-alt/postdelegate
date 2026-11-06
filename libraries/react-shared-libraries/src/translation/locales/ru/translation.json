@@ -2328,6 +2328,8 @@
   "pinterest_create_board": "Создать доску",
   "pinterest_create_board_failed": "Pinterest не удалось создать доску. Попробуйте ещё раз.",
   "pinterest_boards_failed": "Pinterest не удалось загрузить доски этого аккаунта. Попробуйте позже.",
+  "pinterest_new_board": "+ Новая доска",
+  "pinterest_unnamed_board": "Доска {{id}}",
   "gmb_call_hint": "Кнопка «Позвонить» набирает номер телефона из вашего профиля компании.",
   "gmb_offer_title": "Название предложения",
   "gmb_offer_title_placeholder": "Скидка 20% на этой неделе"

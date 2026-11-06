@@ -418,9 +418,8 @@ export class PinterestProvider
     }));
   }
 
-  // Lets the composer create a board when the account has none - the only way
-  // to get a board in sandbox mode, as boards made on pinterest.com are
-  // production boards.
+  // Lets the composer create a board at any time - the only way to get one in
+  // sandbox mode, as boards made on pinterest.com are production boards.
   // A refusal comes back as { error } with Pinterest's reason, as the
   // dashboard function route answers a bare `false` for a thrown error; an
   // expired token still throws so the route refreshes it.

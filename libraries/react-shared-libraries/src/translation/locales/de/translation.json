@@ -2328,6 +2328,8 @@
   "pinterest_create_board": "Pinnwand erstellen",
   "pinterest_create_board_failed": "Pinterest konnte die Pinnwand nicht erstellen. Bitte versuche es erneut.",
   "pinterest_boards_failed": "Pinterest konnte die Pinnwände dieses Kontos nicht laden. Bitte versuche es später erneut.",
+  "pinterest_new_board": "+ Neue Pinnwand",
+  "pinterest_unnamed_board": "Pinnwand {{id}}",
   "gmb_call_hint": "Die Schaltfläche „Anrufen“ wählt die Telefonnummer deines Unternehmensprofils.",
   "gmb_offer_title": "Angebotstitel",
   "gmb_offer_title_placeholder": "20 % Rabatt diese Woche"

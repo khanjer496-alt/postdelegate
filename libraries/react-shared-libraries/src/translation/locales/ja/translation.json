@@ -2328,6 +2328,8 @@
   "pinterest_create_board": "ボードを作成",
   "pinterest_create_board_failed": "Pinterestでボードを作成できませんでした。もう一度お試しください。",
   "pinterest_boards_failed": "Pinterestでこのアカウントのボードを読み込めませんでした。しばらくしてからもう一度お試しください。",
+  "pinterest_new_board": "+ 新しいボード",
+  "pinterest_unnamed_board": "ボード {{id}}",
   "gmb_call_hint": "「電話」ボタンはビジネス プロフィールの電話番号に発信します。",
   "gmb_offer_title": "特典のタイトル",
   "gmb_offer_title_placeholder": "今週は20%オフ"
