@@ -35,6 +35,9 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     {alternates.map((alternate) => <link rel="alternate" hreflang={alternate.hreflang} href={alternate.href} />)}
     {noindex && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content="#0d0d0d" />
+    <!-- Toolradar's claim check reads this public token; it keeps our listing on
+         their Buffer and Publer alternatives pages. -->
+    <meta name="toolradar-verify" content="toolradar-verify-1lCvvc8aA5UVlE6CAObc3M" />
     <link rel="preload" href="/fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/postdelegate.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
