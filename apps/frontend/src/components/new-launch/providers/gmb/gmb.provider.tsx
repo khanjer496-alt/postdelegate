@@ -10,6 +10,7 @@ import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.v
 import { Input } from '@gitroom/react/form/input';
 import { Select } from '@gitroom/react/form/select';
 import { useWatch } from 'react-hook-form';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const topicTypes = [
   {
@@ -62,6 +63,7 @@ const callToActionTypes = [
 ];
 
 const GmbSettings: FC = () => {
+  const t = useT();
   const { register, control } = useSettings();
   const topicType = useWatch({ control, name: 'topicType' });
   const callToActionType = useWatch({ control, name: 'callToActionType' });
@@ -104,6 +106,15 @@ const GmbSettings: FC = () => {
           />
         )}
 
+      {callToActionType === 'CALL' && (
+        <div className="text-[14px] text-textItemBlur">
+          {t(
+            'gmb_call_hint',
+            'The Call button dials the phone number on your Business Profile.'
+          )}
+        </div>
+      )}
+
       {topicType === 'EVENT' && (
         <div className="flex flex-col gap-[10px] mt-[10px] p-[15px] border border-input rounded-[8px]">
           <div className="text-[14px] font-medium mb-[5px]">Event Details</div>
@@ -138,6 +149,24 @@ const GmbSettings: FC = () => {
       {topicType === 'OFFER' && (
         <div className="flex flex-col gap-[10px] mt-[10px] p-[15px] border border-input rounded-[8px]">
           <div className="text-[14px] font-medium mb-[5px]">Offer Details</div>
+          {/* Google needs a title and dates for offers, kept in the event fields */}
+          <Input
+            label={t('gmb_offer_title', 'Offer Title')}
+            placeholder={t('gmb_offer_title_placeholder', '20% off this week')}
+            {...register('eventTitle')}
+          />
+          <div className="grid grid-cols-2 gap-[10px]">
+            <Input
+              label={t('label_start_date', 'Start Date')}
+              type="date"
+              {...register('eventStartDate')}
+            />
+            <Input
+              label={t('label_end_date', 'End Date')}
+              type="date"
+              {...register('eventEndDate')}
+            />
+          </div>
           <Input
             label="Coupon Code (optional)"
             placeholder="SAVE20"
