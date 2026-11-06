@@ -63,6 +63,56 @@ export function truncateForTemporal(value: any, max: number): string {
   return `${str.slice(0, max)}… [truncated ${str.length - max} chars]`;
 }
 
+// An error we caught ourselves can be two very different things: a message the
+// platform sent back, which the customer should read, or one of our own
+// failures - a bad decrypt, a parse error quoting the bytes it tried to parse,
+// a missing file, a dropped socket - which they must never see on a post.
+// Only the first kind comes back from here; the raw text still goes into the
+// failure's json, where support can find it.
+//
+// It judges what an error IS (its class and its node code), not how its
+// message reads, because a message can say anything. It is meant for an
+// arbitrary caught error, not for the curated strings a provider's
+// handleErrors already returns - those are platform messages and should be
+// passed through as they are.
+export const platformReason = (err: unknown): string | undefined => {
+  const error = err as any;
+  const message = error?.message;
+  if (typeof message !== 'string') {
+    return undefined;
+  }
+
+  const text = message.trim();
+  // a stack trace, a page of HTML or an empty string is never a sentence for a
+  // customer
+  if (!text || text.length > 300 || text.includes('\n')) {
+    return undefined;
+  }
+
+  // thrown by our own code or by the runtime, never by a platform
+  if (
+    /^(TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|AssertionError)$/.test(
+      String(error?.name || '')
+    )
+  ) {
+    return undefined;
+  }
+
+  // node tags its filesystem, network, crypto and internal errors with a code
+  // (ENOENT, ECONNRESET, ERR_OSSL_BAD_DECRYPT, ERR_INVALID_ARG_TYPE...)
+  if (/^(E[A-Z0-9_]{2,}|ERR_)/.test(String(error?.code || ''))) {
+    return undefined;
+  }
+
+  // openssl reports a failed decryption as error:1C800064:... with no code on
+  // some node builds, and that message can be followed by what we decrypted
+  if (/^error:[0-9a-f]{8}:/i.test(text)) {
+    return undefined;
+  }
+
+  return text;
+};
+
 export class RefreshToken extends ApplicationFailure {
   constructor(identifier: string, json: string, body: BodyInit, message = '') {
     super(

@@ -9,6 +9,7 @@ import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id'
 import { setHeartbeatDetails } from '@gitroom/nestjs-libraries/temporal/temporal.heartbeat';
 import {
   BadBody,
+  platformReason,
   RefreshToken,
   SocialAbstract,
   ValidityMedia,
@@ -647,12 +648,21 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
       // this is safe and beats exhausting the check budget into a misleading
       // "check your account" warning.
       if ((pendingData.prepFailures || 0) >= 4) {
-        const reason = (err as any)?.message || String(err);
+        // Bluesky's own words when it gave any, never ours: this message is
+        // what the customer reads next to the failed post. Most of what gets
+        // suppressed here is a network fault or a broken credential, so the
+        // fallback does not send them straight to a pointless reconnect.
+        const raw = (err as any)?.message || String(err);
+        const reason = platformReason(err);
         throw new BadBody(
           'bluesky',
-          JSON.stringify({ message: reason }),
+          JSON.stringify({ message: raw, code: (err as any)?.code }),
           {} as any,
-          `Could not prepare the post for Bluesky, nothing was published: ${reason}`
+          `Could not prepare the post for Bluesky, nothing was published${
+            reason
+              ? `: ${reason}`
+              : ', please try again, and reconnect the channel if it keeps failing.'
+          }`
         );
       }
 
