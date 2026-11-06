@@ -38,6 +38,11 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
   editor = 'normal' as const;
   toolTip = 'Make sure you private a HEX key of your Nostr private key, you can get it from websites like iris.to'
 
+  // the primal.net event page is public, and the event id is ours to compute
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/primal\.net\/e\/[0-9a-f]{64}$/.test(releaseURL);
+  }
+
   maxLength() {
     return 100000;
   }

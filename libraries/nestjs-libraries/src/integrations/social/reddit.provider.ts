@@ -76,6 +76,15 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   // from one account
   postingLimits = { perDay: 5, minSpacingMinutes: 10 };
 
+  // a /r/<subreddit>/comments/<id> permalink is public. The bare subreddit URL
+  // is the fallback we store when the submission never surfaced, and a u_
+  // prefix is someone's profile rather than a subreddit
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/www\.reddit\.com\/r\/(?!u_)[A-Za-z0-9_]{2,21}\/comments\/[a-z0-9]+(\/[^/?#]*)?\/?$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 10000;
   }

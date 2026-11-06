@@ -35,6 +35,14 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
   refreshCron = true;
 
   editor = 'normal' as const;
+  // the /@user/post/<code> permalink is public; a bare profile URL is the
+  // fallback we store when the platform gave us no permalink
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/www\.threads\.(net|com)\/@[A-Za-z0-9._]+\/post\/[A-Za-z0-9_-]+\/?$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 500;
   }

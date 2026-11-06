@@ -49,6 +49,14 @@ export class FarcasterProvider
   scopes = [] as string[];
   override maxConcurrentJob = 3; // Farcaster has moderate limits
   editor = 'normal' as const;
+  // a cast page is public. One post can go to several channels, and the
+  // generic code takes the first of the comma-joined URLs
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/warpcast\.com\/[A-Za-z0-9][A-Za-z0-9._-]*\/0x[0-9a-f]+$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 800;
   }

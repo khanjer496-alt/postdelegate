@@ -41,14 +41,17 @@ export class PublicController {
   async getPreview(@Param('id') id: string) {
     // unauthenticated: expose only what the preview page renders, never the
     // internal group/batch/settings/error fields of the stored row
-    return (await this._postsService.getPostsRecursively(id, true)).map(
-      (p) => ({
+    const posts = await this._postsService.getPostsRecursively(id, true);
+
+    return Promise.all(
+      posts.map(async (p) => ({
         id: p.id,
         organizationId: p.organizationId,
         publishDate: p.publishDate,
         creationMethod: p.creationMethod,
         content: p.content,
         image: p.image,
+        ...(await this.publishedLink(p)),
         ...(p.integration
           ? {
               integration: {
@@ -60,8 +63,29 @@ export class PublicController {
               },
             }
           : {}),
-      })
+      }))
     );
+  }
+
+  // The link to the post on the network, when the provider vouches that the
+  // release URL it stored is a public permalink. That opt-in is not the last
+  // word on it: the URL is tenant data, so it leaves here only as a public
+  // HTTPS URL that resolves off our own network, never as something that could
+  // turn this trusted-looking page into a redirect to an internal host.
+  private async publishedLink(
+    post: Parameters<PostsService['publicReleaseURL']>[0]
+  ) {
+    const link = this._postsService.publicReleaseURL(post);
+    if (!link || !(await isSafePublicHttpsUrl(link.url))) {
+      return {};
+    }
+
+    return {
+      publishedLink: {
+        url: link.url,
+        ...(link.label ? { label: link.label } : {}),
+      },
+    };
   }
 
   @Get(`/posts/:id/comments`)

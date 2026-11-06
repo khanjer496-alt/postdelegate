@@ -1494,3 +1494,156 @@ describe('PostsService posting limits', () => {
     });
   });
 });
+
+describe('PostsService.publicReleaseURL', () => {
+  const publicProvider = {
+    isPublicReleaseURL: (url: string) =>
+      /^https:\/\/x\.com\/[^/]+\/status\/\d+$/.test(url),
+  };
+  const labelledProvider = {
+    isPublicReleaseURL: () => true,
+    publishedLinkLabel: () => 'Open on Mastodon',
+  };
+  // a provider that stores an inbox or admin URL and never opts in, like
+  // tiktok's creator inbox or listmonk's self-hosted campaign preview
+  const privateProvider = {};
+  const policyProvider = {
+    isPublicReleaseURL: () => true,
+    authorizationPolicy: { authorizationRealm: 'google-project:test' },
+  };
+
+  const providers: Record<string, any> = {
+    x: publicProvider,
+    mastodon: labelledProvider,
+    tiktok: privateProvider,
+    listmonk: privateProvider,
+    youtube: policyProvider,
+  };
+
+  const make = () =>
+    makeService({
+      getSocialIntegration: (identifier: string) => providers[identifier],
+    } as any).service;
+
+  const post = (overrides: any = {}) => ({
+    state: 'PUBLISHED' as any,
+    releaseURL: 'https://x.com/acme/status/1',
+    settings: '{}',
+    integration: { providerIdentifier: 'x' },
+    ...overrides,
+  });
+
+  it('links the post when the provider says the release URL is public', () => {
+    expect(make().publicReleaseURL(post())).toEqual({
+      url: 'https://x.com/acme/status/1',
+      label: undefined,
+    });
+  });
+
+  it("uses the provider's own link label when it has one", () => {
+    expect(
+      make().publicReleaseURL(
+        post({
+          releaseURL: 'https://mastodon.social/@acme/statuses/1',
+          integration: { providerIdentifier: 'mastodon' },
+        })
+      )
+    ).toEqual({
+      url: 'https://mastodon.social/@acme/statuses/1',
+      label: 'Open on Mastodon',
+    });
+  });
+
+  it('never links a provider that did not opt in, even with a release URL', () => {
+    expect(
+      make().publicReleaseURL(
+        post({
+          releaseURL: 'https://www.tiktok.com/messages?lang=en#7300000000',
+          integration: { providerIdentifier: 'tiktok' },
+        })
+      )
+    ).toBeUndefined();
+    expect(
+      make().publicReleaseURL(
+        post({
+          releaseURL: 'https://mail.acme.internal/api/campaigns/4/preview',
+          integration: { providerIdentifier: 'listmonk' },
+        })
+      )
+    ).toBeUndefined();
+  });
+
+  it('rejects a release URL the provider does not recognise as a permalink', () => {
+    // the owner's own article list, not a post
+    expect(
+      make().publicReleaseURL(post({ releaseURL: 'https://x.com/i/articles' }))
+    ).toBeUndefined();
+    // a profile page rather than the post
+    expect(
+      make().publicReleaseURL(post({ releaseURL: 'https://x.com/acme' }))
+    ).toBeUndefined();
+  });
+
+  it('links nothing for a post that is not published', () => {
+    for (const state of ['QUEUE', 'DRAFT', 'ERROR']) {
+      expect(make().publicReleaseURL(post({ state }))).toBeUndefined();
+    }
+  });
+
+  it('links nothing when the post has no release URL', () => {
+    expect(make().publicReleaseURL(post({ releaseURL: '' }))).toBeUndefined();
+    expect(make().publicReleaseURL(post({ releaseURL: null }))).toBeUndefined();
+  });
+
+  it('links nothing for a deleted, disabled, half-connected or reconnect-needed channel', () => {
+    for (const broken of [
+      { deletedAt: new Date() },
+      { disabled: true },
+      { inBetweenSteps: true },
+      { refreshNeeded: true },
+    ]) {
+      expect(
+        make().publicReleaseURL(
+          post({ integration: { providerIdentifier: 'x', ...broken } })
+        )
+      ).toBeUndefined();
+    }
+  });
+
+  it('links nothing for a provider under an authorizationPolicy', () => {
+    expect(
+      make().publicReleaseURL(
+        post({
+          releaseURL: 'https://www.youtube.com/watch?v=abc',
+          integration: { providerIdentifier: 'youtube' },
+        })
+      )
+    ).toBeUndefined();
+  });
+
+  it('links the first target when the provider comma-joins several', () => {
+    expect(
+      make().publicReleaseURL(
+        post({
+          releaseURL:
+            'https://x.com/acme/status/1,https://x.com/acme/status/2',
+        })
+      )
+    ).toEqual({ url: 'https://x.com/acme/status/1', label: undefined });
+  });
+
+  it('links nothing when the post has no integration or an unknown provider', () => {
+    expect(make().publicReleaseURL(post({ integration: null }))).toBeUndefined();
+    expect(
+      make().publicReleaseURL(
+        post({ integration: { providerIdentifier: 'nope' } })
+      )
+    ).toBeUndefined();
+  });
+
+  it('survives settings that are not valid json', () => {
+    expect(
+      make().publicReleaseURL(post({ settings: 'not json' }))
+    ).toBeUndefined();
+  });
+});

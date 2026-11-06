@@ -25,6 +25,13 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
   isWeb3 = true;
   editor = 'normal' as const;
 
+  // a post page on moltbook.com is public
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/www\.moltbook\.com\/post\/[A-Za-z0-9_-]+$/.test(
+      releaseURL
+    );
+  }
+
   maxLength() {
     return 300;
   }

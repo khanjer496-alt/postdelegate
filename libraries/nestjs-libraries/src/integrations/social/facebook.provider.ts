@@ -55,6 +55,25 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     channelDateOffset: -1,
     post: ['Views', 'Plays', 'Impressions'],
   };
+  // the permalink Facebook gives us for a Page post is public, a story is
+  // login-walled and expires within a day
+  isPublicReleaseURL(releaseURL: string, settings: Partial<FacebookDto>) {
+    if (settings?.post_type === 'story') {
+      return false;
+    }
+    try {
+      const { protocol, hostname, pathname } = new URL(releaseURL);
+      return (
+        protocol === 'https:' &&
+        /^(www|web|m)\.facebook\.com$/.test(hostname) &&
+        pathname.length > 1 &&
+        !pathname.startsWith('/stories/')
+      );
+    } catch (err) {
+      return false;
+    }
+  }
+
   maxLength() {
     return 63206;
   }

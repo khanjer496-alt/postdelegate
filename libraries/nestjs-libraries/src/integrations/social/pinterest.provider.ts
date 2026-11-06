@@ -100,6 +100,11 @@ export class PinterestProvider
     'user_accounts:read',
   ];
   override maxConcurrentJob = 10; // Pinterest limits are per user
+  // a pin page is public. Sandbox pins get no release URL at all
+  isPublicReleaseURL(releaseURL: string) {
+    return /^https:\/\/www\.pinterest\.com\/pin\/\d+\/?$/.test(releaseURL);
+  }
+
   maxLength() {
     return 500;
   }

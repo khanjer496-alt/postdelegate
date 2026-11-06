@@ -62,6 +62,19 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     return project ? `google-project:${project}` : undefined;
   }
 
+  // only the Search URL Google returns for the post is public; the fallback we
+  // store is the Business Profile dashboard, which only the owner can open
+  isPublicReleaseURL(releaseURL: string) {
+    try {
+      const { protocol, hostname } = new URL(releaseURL);
+      return (
+        protocol === 'https:' && /^(www|search)\.google\.com$/.test(hostname)
+      );
+    } catch (err) {
+      return false;
+    }
+  }
+
   maxLength() {
     return 1500;
   }

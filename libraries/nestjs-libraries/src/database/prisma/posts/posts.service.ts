@@ -611,6 +611,72 @@ export class PostsService {
     }
   }
 
+  // The link to the published post for the shared preview page, which anyone
+  // with the link opens without logging in. Only a provider that declares the
+  // release URL it stored to be a public permalink gets one, so a release URL
+  // that is really an inbox, a self-hosted admin page or a workspace-internal
+  // link is never handed out. Deliberately works off the post row the caller
+  // already read: no provider call and no token refresh on an unauthenticated
+  // request. The caller still checks the URL itself before returning it.
+  publicReleaseURL(post: {
+    state: State;
+    releaseURL?: string | null;
+    settings?: string | null;
+    integration?: {
+      providerIdentifier: string;
+      deletedAt?: Date | null;
+      disabled?: boolean | null;
+      inBetweenSteps?: boolean | null;
+      refreshNeeded?: boolean | null;
+    } | null;
+  }): { url: string; label?: string } | undefined {
+    if (post.state !== State.PUBLISHED || !post.releaseURL || !post.integration) {
+      return undefined;
+    }
+
+    // the same channel states that keep getReleaseURL from handing back
+    // provider data, plus refreshNeeded: a channel that lost its grant is
+    // never spoken for on a public page
+    if (
+      post.integration.deletedAt ||
+      post.integration.disabled ||
+      post.integration.inBetweenSteps ||
+      post.integration.refreshNeeded
+    ) {
+      return undefined;
+    }
+
+    const provider = this._integrationManager.getSocialIntegration(
+      post.integration.providerIdentifier
+    );
+    if (!provider?.isPublicReleaseURL) {
+      return undefined;
+    }
+
+    // a provider under an authorizationPolicy may only show platform data to
+    // the authorized user, so its posts get no link on an anonymous page
+    if (provider.authorizationPolicy) {
+      return undefined;
+    }
+
+    // providers that publish to several targets at once comma-join the URLs,
+    // the calendar links the first one too
+    const url = post.releaseURL.split(',')[0]?.trim();
+    if (!url) {
+      return undefined;
+    }
+
+    try {
+      const settings = JSON.parse(post.settings || '{}') || {};
+      if (!provider.isPublicReleaseURL(url, settings)) {
+        return undefined;
+      }
+      return { url, label: provider.publishedLinkLabel?.(settings) };
+    } catch (err) {
+      return undefined;
+    }
+  }
+
   async getPostsList(orgId: string, query: GetPostsListDto) {
     const list = await this._postRepository.getPostsList(orgId, query);
     return minifyPostsList({
