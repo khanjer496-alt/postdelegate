@@ -2327,5 +2327,8 @@
   "pinterest_board_name": "Nome da pasta",
   "pinterest_create_board": "Criar pasta",
   "pinterest_create_board_failed": "O Pinterest não conseguiu criar a pasta. Tente novamente.",
-  "pinterest_boards_failed": "O Pinterest não conseguiu carregar as pastas desta conta. Tente novamente mais tarde."
+  "pinterest_boards_failed": "O Pinterest não conseguiu carregar as pastas desta conta. Tente novamente mais tarde.",
+  "gmb_call_hint": "O botão Ligar disca para o número de telefone do seu Perfil da Empresa.",
+  "gmb_offer_title": "Título da oferta",
+  "gmb_offer_title_placeholder": "20% de desconto esta semana"
 }

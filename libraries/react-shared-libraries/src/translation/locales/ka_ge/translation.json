@@ -2332,5 +2332,8 @@
   "pinterest_board_name": "დაფის სახელი",
   "pinterest_create_board": "დაფის შექმნა",
   "pinterest_create_board_failed": "Pinterest-მა დაფა ვერ შექმნა. გთხოვთ, სცადოთ თავიდან.",
-  "pinterest_boards_failed": "Pinterest-მა ამ ანგარიშის დაფები ვერ ჩატვირთა. გთხოვთ, სცადოთ მოგვიანებით."
+  "pinterest_boards_failed": "Pinterest-მა ამ ანგარიშის დაფები ვერ ჩატვირთა. გთხოვთ, სცადოთ მოგვიანებით.",
+  "gmb_call_hint": "ზარის ღილაკი რეკავს თქვენი ბიზნეს პროფილის ტელეფონის ნომერზე.",
+  "gmb_offer_title": "შეთავაზების სათაური",
+  "gmb_offer_title_placeholder": "20% ფასდაკლება ამ კვირაში"
 }

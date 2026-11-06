@@ -2327,5 +2327,8 @@
   "pinterest_board_name": "Nom du tableau",
   "pinterest_create_board": "Créer un tableau",
   "pinterest_create_board_failed": "Pinterest n'a pas pu créer le tableau. Veuillez réessayer.",
-  "pinterest_boards_failed": "Pinterest n'a pas pu charger les tableaux de ce compte. Veuillez réessayer plus tard."
+  "pinterest_boards_failed": "Pinterest n'a pas pu charger les tableaux de ce compte. Veuillez réessayer plus tard.",
+  "gmb_call_hint": "Le bouton Appeler compose le numéro de téléphone de votre fiche d'établissement.",
+  "gmb_offer_title": "Titre de l'offre",
+  "gmb_offer_title_placeholder": "20 % de réduction cette semaine"
 }

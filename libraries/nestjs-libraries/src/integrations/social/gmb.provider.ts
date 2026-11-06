@@ -88,6 +88,26 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       return 'Event posts require an event title';
     }
 
+    // Offer posts carry their title and dates in the event block Google requires
+    if (settings?.topicType === 'OFFER' && !settings?.eventTitle) {
+      return 'Offer posts require an offer title';
+    }
+
+    // without dates the offer would start and end today
+    if (
+      settings?.topicType === 'OFFER' &&
+      (!settings?.eventStartDate || !settings?.eventEndDate)
+    ) {
+      return 'Offer posts require a start and an end date';
+    }
+
+    if (
+      settings?.topicType === 'OFFER' &&
+      dayjs(settings.eventEndDate).isBefore(dayjs(settings.eventStartDate))
+    ) {
+      return 'The offer end date must be on or after the start date';
+    }
+
     return true;
   }
 
@@ -467,7 +487,12 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     };
 
     // Add call to action if provided (and not NONE)
-    if (
+    if (settings?.callToActionType === 'CALL') {
+      // Google dials the phone number of the profile, the url must stay unset
+      postBody.callToAction = {
+        actionType: 'CALL',
+      };
+    } else if (
       settings?.callToActionType &&
       settings.callToActionType !== 'NONE' &&
       settings?.callToActionUrl
@@ -489,19 +514,33 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       ];
     }
 
-    // Add event details if it's an event post
-    if (settings?.topicType === 'EVENT' && settings?.eventTitle) {
+    // Add event details if it's an event post, offers need them too:
+    // Google requires the event block (title and dates) for both
+    if (
+      (settings?.topicType === 'EVENT' || settings?.topicType === 'OFFER') &&
+      settings?.eventTitle
+    ) {
+      // offers run whole days, the time inputs belong to events;
+      // Google's interval is only valid with every field set
+      const isOffer = settings.topicType === 'OFFER';
       postBody.event = {
         title: settings.eventTitle,
         schedule: {
           startDate: this.formatDate(settings.eventStartDate),
           endDate: this.formatDate(settings.eventEndDate),
-          ...(settings.eventStartTime && {
-            startTime: this.formatTime(settings.eventStartTime),
-          }),
-          ...(settings.eventEndTime && {
-            endTime: this.formatTime(settings.eventEndTime),
-          }),
+          ...(isOffer
+            ? {
+                startTime: this.formatTime('00:00'),
+                endTime: this.formatTime('23:59'),
+              }
+            : {
+                ...(settings.eventStartTime && {
+                  startTime: this.formatTime(settings.eventStartTime),
+                }),
+                ...(settings.eventEndTime && {
+                  endTime: this.formatTime(settings.eventEndTime),
+                }),
+              }),
         },
       };
     }

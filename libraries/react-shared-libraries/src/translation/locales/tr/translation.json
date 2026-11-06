@@ -2327,5 +2327,8 @@
   "pinterest_board_name": "Pano adı",
   "pinterest_create_board": "Pano oluştur",
   "pinterest_create_board_failed": "Pinterest panoyu oluşturamadı. Lütfen tekrar deneyin.",
-  "pinterest_boards_failed": "Pinterest bu hesabın panolarını yükleyemedi. Lütfen daha sonra tekrar deneyin."
+  "pinterest_boards_failed": "Pinterest bu hesabın panolarını yükleyemedi. Lütfen daha sonra tekrar deneyin.",
+  "gmb_call_hint": "Ara düğmesi, İşletme Profilinizdeki telefon numarasını arar.",
+  "gmb_offer_title": "Teklif başlığı",
+  "gmb_offer_title_placeholder": "Bu hafta %20 indirim"
 }

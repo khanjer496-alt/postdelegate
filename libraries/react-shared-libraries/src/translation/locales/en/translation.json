@@ -2327,5 +2327,8 @@
   "pinterest_board_name": "Board name",
   "pinterest_create_board": "Create board",
   "pinterest_create_board_failed": "Pinterest could not create the board. Please try again.",
-  "pinterest_boards_failed": "Pinterest could not load the boards of this account. Please try again later."
+  "pinterest_boards_failed": "Pinterest could not load the boards of this account. Please try again later.",
+  "gmb_call_hint": "The Call button dials the phone number on your Business Profile.",
+  "gmb_offer_title": "Offer Title",
+  "gmb_offer_title_placeholder": "20% off this week"
 }

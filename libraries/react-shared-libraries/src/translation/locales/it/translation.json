@@ -2327,5 +2327,8 @@
   "pinterest_board_name": "Nome della bacheca",
   "pinterest_create_board": "Crea bacheca",
   "pinterest_create_board_failed": "Pinterest non è riuscito a creare la bacheca. Riprova.",
-  "pinterest_boards_failed": "Pinterest non è riuscito a caricare le bacheche di questo account. Riprova più tardi."
+  "pinterest_boards_failed": "Pinterest non è riuscito a caricare le bacheche di questo account. Riprova più tardi.",
+  "gmb_call_hint": "Il pulsante Chiama compone il numero di telefono del tuo Profilo dell'attività.",
+  "gmb_offer_title": "Titolo dell'offerta",
+  "gmb_offer_title_placeholder": "20% di sconto questa settimana"
 }

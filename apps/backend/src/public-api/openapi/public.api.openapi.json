@@ -185,7 +185,7 @@
           "Integrations"
         ],
         "summary": "Get OAuth URL for a channel",
-        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only OAuth-based integrations are supported (integrations that require an external URL, such as Mastodon, are not available via this endpoint).",
+        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord or Mastodon. Networks that take a pasted credential, such as Bluesky, are not.",
         "operationId": "getIntegrationUrl",
         "parameters": [
           {
@@ -1290,6 +1290,9 @@
                           "topicType": "OFFER",
                           "callToActionType": "GET_OFFER",
                           "callToActionUrl": "https://example.com/offer",
+                          "eventTitle": "20% off this week",
+                          "eventStartDate": "2024-12-14",
+                          "eventEndDate": "2024-12-21",
                           "offerCouponCode": "SAVE20"
                         }
                       }
@@ -3591,19 +3594,19 @@
           "callToActionUrl": {
             "type": "string",
             "format": "uri",
-            "description": "URL for CTA (required if callToActionType is set)"
+            "description": "URL for CTA (required if callToActionType is set, except NONE and CALL, which dials the phone number of the profile)"
           },
           "eventTitle": {
             "type": "string",
-            "description": "Event title (required for EVENT type)"
+            "description": "Event or offer title (required for EVENT and OFFER types)"
           },
           "eventStartDate": {
             "type": "string",
-            "description": "Event start date"
+            "description": "Event or offer start date (required for OFFER type)"
           },
           "eventEndDate": {
             "type": "string",
-            "description": "Event end date"
+            "description": "Event or offer end date (required for OFFER type)"
           },
           "eventStartTime": {
             "type": "string",
