@@ -14,20 +14,39 @@ plan that month is one twelfth of the yearly charge. We may refund more case by
 case without that becoming a rule. The statutory right below is untouched and
 is explicitly not capped by any of it.
 
-Postiz publishes this in two places that contradict each other: its docs say
-"less than 60 days old", "capped at one month of your plan", "one refund per
-customer, ever" and "a yearly charge is refunded at one twelfth", while its
-terms say a 120-day window, "one month per account, at most" and "No refunds of
-annual charges". We took the terms' window (120 days, the governing document
-and the more generous reading) and the docs' yearly handling (one twelfth),
-because "no annual refunds" contradicts the one-month cap in the same section.
+Postiz publishes this in two places that do not agree on the window. Its docs
+say "It must be less than 60 days old", "The amount is capped at one month of
+your plan", "One refund per customer, ever" and "A yearly charge is refunded at
+one twelfth". Its terms set a 120-day window, limit a refund to a maximum of
+one month's subscription fee per account, and say charges for annual
+subscriptions are not refundable. (Those last two are consistent with each
+other - annual excluded outright, monthly capped - so the real conflict is 60
+days against 120.)
 
-What this replaced (6 Nov): a full refund of the first paid invoice within 14
-days, once per workspace, monthly and yearly alike. That was mid-market &mdash;
+We took the terms' window, because the terms are the governing document and 120
+days is the more generous reading, and the docs' yearly handling, because
+refunding one twelfth of a yearly charge is kinder than refunding nothing and
+still inside the one-month cap. So this is Postiz's shape, slightly more
+generous than their terms on yearly plans. Postiz also cancels the subscription
+as part of the refund; ours says so too, and that the workspace moves to the
+free limits when the refund is issued, because refunding a month and leaving
+the month running is not what either of us means.
+
+What this replaced (6 Nov, merged but never published - the live page was still
+the 1 November version, which said only that fees were non-refundable): a full
+refund of the first paid invoice within 14 days, once per workspace, monthly
+and yearly alike. Because that wording never reached a customer, nothing
+published was taken away; against the page it actually replaces, 7 November is
+strictly more generous. That was mid-market &mdash;
 more generous than Hootsuite, Later and Metricool, who publish no refund window
 at all, and tighter than Buffer (7 days monthly, 30 annual) and SocialBee (30
 days, both plan types) on annual plans. The one place it went beyond everyone
 was refunding a *yearly* invoice in full rather than a month of it.
+
+The limit is per workspace **and per email address**, borrowed from the trial
+clause one paragraph up. Refunds are issued by hand in Stripe, where history is
+per Stripe customer and not per workspace, so a per-workspace-only limit would
+have been invisible to the person issuing the second one.
 
 Note for anyone tightening this further: a one-month cap is not enforceable
 against an EU, EEA or UK consumer inside the 14-day withdrawal window, who is

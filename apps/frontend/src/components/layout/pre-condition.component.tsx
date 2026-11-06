@@ -15,9 +15,10 @@ export const PreConditionComponentModal: FC = () => {
         first payment is charged today instead of at the end of the trial, and
         nothing extra is added.{'\n'}
         {'\n'}
-        ** You can ask for a refund of up to one month of your plan, once per
-        workspace. Consumers in the EU, the EEA and the UK can cancel within 14
-        days and get everything back, as the{' '}
+        ** You can ask for a refund within 120 days of a charge, once per
+        workspace: at most one month of your plan, which on a yearly plan is one
+        twelfth of the yearly charge. Consumers in the EU, the EEA and the UK
+        can cancel within 14 days and get everything back, as the{' '}
         <a
           href="https://postdelegate.com/legal/terms"
           target="_blank"
