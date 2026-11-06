@@ -267,7 +267,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
         {
           id: firstPost.id,
           postId: makeId(10), // Announcements don't return a message ID
-          releaseURL: `https://twitch.tv/${integration.profile || integration.providerIdentifier}`,
+          releaseURL: this.channelUrl(integration),
           status: 'posted',
         },
       ];
@@ -280,10 +280,17 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       {
         id: firstPost.id,
         postId: result.messageId,
-        releaseURL: `https://twitch.tv/${integration.profile || integration.providerIdentifier}`,
+        releaseURL: this.channelUrl(integration),
         status: 'posted',
       },
     ];
+  }
+
+  // the channel page, which is as close to the message as Twitch chat gets.
+  // Without a profile there is no channel to point at: an empty release URL
+  // says so, where a fallback would send people to an unrelated channel
+  private channelUrl(integration: Integration) {
+    return integration.profile ? `https://twitch.tv/${integration.profile}` : '';
   }
 
   async comment(
@@ -311,7 +318,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
         {
           id: commentPost.id,
           postId: makeId(10),
-          releaseURL: `https://twitch.tv/${integration.profile || integration.providerIdentifier}`,
+          releaseURL: this.channelUrl(integration),
           status: 'posted',
         },
       ];
@@ -329,7 +336,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       {
         id: commentPost.id,
         postId: result.messageId,
-        releaseURL: `https://twitch.tv/${integration.profile || integration.providerIdentifier}`,
+        releaseURL: this.channelUrl(integration),
         status: 'posted',
       },
     ];

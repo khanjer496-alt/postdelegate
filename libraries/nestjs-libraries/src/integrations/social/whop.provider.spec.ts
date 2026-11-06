@@ -43,3 +43,24 @@ describe('WhopProvider lists', () => {
     ).resolves.toEqual([{ id: 'exp_1', name: 'Forum' }]);
   });
 });
+
+describe('WhopProvider comment link', () => {
+  it('links the comment it just created, not the post it replied to', async () => {
+    answer(200, { id: 'comment-9' });
+    const provider = new WhopProvider();
+
+    const [result] = await provider.comment(
+      'id',
+      'parent-post-1',
+      undefined,
+      'token',
+      [{ id: 'p-1', message: 'nice', settings: { experience: 'exp-1' } }] as any,
+      {} as any
+    );
+
+    expect(result.postId).toBe('comment-9');
+    expect(result.releaseURL).toBe(
+      'https://whop.com/experiences/exp-1/comment-9'
+    );
+  });
+});

@@ -428,3 +428,40 @@ describe('RedditProvider unconfirmed submit', () => {
     ).rejects.toBeInstanceOf(BadBody);
   });
 });
+
+describe('RedditProvider completed response', () => {
+  // postId and releaseURL are comma-joined lists read against each other by
+  // index, one entry per subreddit
+  const completed = (results: any[]) =>
+    (new RedditProvider() as any).completedResponse(results);
+
+  it('keeps the two lists in step when a result has no post id', () => {
+    // the middle submission never surfaced in the listing: Reddit accepted it,
+    // so it has its subreddit URL, but we never learned its id
+    expect(
+      completed([
+        { postId: 'a1', releaseURL: 'https://www.reddit.com/r/one/comments/a1/' },
+        { postId: '', releaseURL: 'https://www.reddit.com/r/two' },
+        { postId: 'c3', releaseURL: 'https://www.reddit.com/r/three/comments/c3/' },
+      ])
+    ).toEqual({
+      status: 'completed',
+      // index 2 is still c3's, which the old two-filter version got wrong
+      postId: 'a1,,c3',
+      releaseURL:
+        'https://www.reddit.com/r/one/comments/a1/,https://www.reddit.com/r/two,https://www.reddit.com/r/three/comments/c3/',
+    });
+  });
+
+  it('keeps the link of a lone submission that never surfaced', () => {
+    // the common shape of the case above: one subreddit, post is live, no id.
+    // Dropping it here would take the user's only link away
+    expect(
+      completed([{ postId: '', releaseURL: 'https://www.reddit.com/r/one' }])
+    ).toEqual({
+      status: 'completed',
+      postId: '',
+      releaseURL: 'https://www.reddit.com/r/one',
+    });
+  });
+});

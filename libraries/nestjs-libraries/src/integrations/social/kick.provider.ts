@@ -202,10 +202,17 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
       {
         id: firstPost.id,
         postId: data.data?.message_id || data.message_id || makeId(10),
-        releaseURL: `https://kick.com/${integration.profile || 'channel'}`,
+        releaseURL: this.channelUrl(integration),
         status: 'posted',
       },
     ];
+  }
+
+  // the channel page, which is as close to the message as Kick chat gets.
+  // Without a profile there is no channel to point at: an empty release URL
+  // says so, where the old fallback pointed at kick.com/channel
+  private channelUrl(integration: Integration) {
+    return integration.profile ? `https://kick.com/${integration.profile}` : '';
   }
 
   async comment(
@@ -240,7 +247,7 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
       {
         id: commentPost.id,
         postId: data.data?.message_id || data.message_id || makeId(10),
-        releaseURL: `https://kick.com/${integration.profile || 'channel'}`,
+        releaseURL: this.channelUrl(integration),
         status: 'posted',
       },
     ];
