@@ -3,6 +3,7 @@ import { EmailInterface } from '@gitroom/nestjs-libraries/emails/email.interface
 import { ResendProvider } from '@gitroom/nestjs-libraries/emails/resend.provider';
 import { EmptyProvider } from '@gitroom/nestjs-libraries/emails/empty.provider';
 import { NodeMailerProvider } from '@gitroom/nestjs-libraries/emails/node.mailer.provider';
+import { SesProvider } from '@gitroom/nestjs-libraries/emails/ses.provider';
 import { TemporalService } from 'nestjs-temporal-core';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { randomUUID } from 'crypto';
@@ -167,6 +168,8 @@ export class EmailService {
         return new ResendProvider();
       case 'nodemailer':
         return new NodeMailerProvider();
+      case 'ses':
+        return new SesProvider();
       default:
         return new EmptyProvider();
     }
@@ -209,6 +212,14 @@ export class EmailService {
       return;
     }
 
+    const settingsUrl = `${process.env.FRONTEND_URL}/settings`;
+    // Mail clients show an unsubscribe link next to the sender, it opens the
+    // settings where the email notifications can be turned off. The same link
+    // is in the layout's footer.
+    const headers = process.env.FRONTEND_URL
+      ? { 'List-Unsubscribe': `<${settingsUrl}>` }
+      : undefined;
+
     const modifiedHtml = emailLayout(subject, html);
 
     let lastErr: unknown;
@@ -220,7 +231,8 @@ export class EmailService {
           modifiedHtml,
           process.env.EMAIL_FROM_NAME,
           process.env.EMAIL_FROM_ADDRESS,
-          replyTo
+          replyTo,
+          headers
         );
         console.log(sends);
         return;

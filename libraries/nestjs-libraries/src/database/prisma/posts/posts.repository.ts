@@ -286,26 +286,37 @@ export class PostsRepository {
       },
     });
 
-    return list
-      .map((post) => ({ ...post, error: this.curatedError(post.error) }))
-      .reduce((all, post) => {
-      if (!post.intervalInDays) {
-        return [...all, post];
+    // This runs on the request thread, so keep it linear: push into one array
+    // (spreading the accumulator on every post was quadratic and blocked the
+    // event loop for seconds on large orgs), and expand repeating posts only
+    // inside [startDate, endDate] instead of from their first publish date.
+    const rangeStart = dayjs.utc(startDate);
+    const rangeEnd = dayjs.utc(endDate);
+    const result: any[] = [];
+
+    for (const row of list) {
+      const post = { ...row, error: this.curatedError(row.error) };
+      if (!post.intervalInDays || post.intervalInDays < 1) {
+        result.push(post);
+        continue;
       }
 
-      // an evergreen post stops after its last share
-      const addMorePosts = evergreenOccurrences(
-        post.publishDate,
-        post,
-        endDate
-      ).map((date) => ({
-        ...post,
-        publishDate: date,
-        actualDate: post.publishDate,
-      }));
+      // evergreenOccurrences stops after the post's last share, which the
+      // plain interval walk upstream uses does not know about; the rangeStart
+      // skip it was there for is a filter here instead
+      for (const date of evergreenOccurrences(post.publishDate, post, endDate)) {
+        if (rangeStart.isAfter(dayjs.utc(date))) {
+          continue;
+        }
+        result.push({
+          ...post,
+          publishDate: date,
+          actualDate: post.publishDate,
+        });
+      }
+    }
 
-      return [...all, ...addMorePosts];
-    }, [] as any[]);
+    return result;
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto) {

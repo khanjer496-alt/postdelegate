@@ -1,3 +1,7 @@
+jest.mock('@gitroom/helpers/utils/timer', () => ({
+  timer: jest.fn(async () => undefined),
+}));
+
 // the refresh service pulls in heavy modules that are not under test
 jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
   IntegrationManager: class {},
@@ -23,6 +27,19 @@ const integration = {
 const make = (refreshToken: jest.Mock) => {
   const integrationService = {
     getActiveIntegrationById: jest.fn().mockResolvedValue({ token: 'old' }),
+    // the concurrency wait loop reads the stored row back: the default is the
+    // same unchanged row, so no other flow looks to have refreshed and the
+    // loop falls through to flagging, which is what these tests are about
+    getIntegrationById: jest.fn().mockResolvedValue({
+      token: 'old',
+      refreshToken: 'refresh',
+      internalId: 'internal',
+      providerIdentifier: 'network',
+      refreshNeeded: false,
+      inBetweenSteps: false,
+      deletedAt: null,
+      tokenExpiration: null,
+    }),
     persistRefreshedAuthorization: jest.fn().mockResolvedValue({ count: 1 }),
     refreshNeeded: jest.fn().mockResolvedValue({ count: 1 }),
     informAboutRefreshError: jest.fn(),
@@ -81,5 +98,50 @@ describe('RefreshIntegrationService soft refresh', () => {
     expect(await service.refresh(integration)).toBe(false);
     expect(integrationService.refreshNeeded).toHaveBeenCalled();
     expect(integrationService.informAboutRefreshError).not.toHaveBeenCalled();
+  });
+});
+
+describe('RefreshIntegrationService concurrent refresh', () => {
+  // Two flows can refresh the same channel at once. A provider that rotates
+  // the refresh token rejects the second call while the first is still
+  // storing its tokens, and flagging the channel on that is wrong: the
+  // channel is fine, someone else just got there first.
+  it('reuses the tokens the other flow stored instead of flagging', async () => {
+    const { service, integrationService } = make(
+      jest.fn(async () => false as const)
+    );
+    const inOneHour = new Date(Date.now() + 3600_000);
+    integrationService.getIntegrationById.mockResolvedValue({
+      token: 'new',
+      refreshToken: 'rotated',
+      internalId: 'internal',
+      providerIdentifier: 'network',
+      name: 'Channel',
+      profile: 'handle',
+      picture: 'pic',
+      refreshNeeded: false,
+      inBetweenSteps: false,
+      deletedAt: null,
+      tokenExpiration: inOneHour,
+    });
+
+    const result = await service.refresh(integration);
+
+    expect(result).toMatchObject({
+      accessToken: 'new',
+      refreshToken: 'rotated',
+      id: 'internal',
+    });
+    expect(integrationService.refreshNeeded).not.toHaveBeenCalled();
+    expect(integrationService.informAboutRefreshError).not.toHaveBeenCalled();
+  });
+
+  it('still flags when the stored row is the one we already tried', async () => {
+    const { service, integrationService } = make(
+      jest.fn(async () => false as const)
+    );
+
+    expect(await service.refresh(integration)).toBe(false);
+    expect(integrationService.refreshNeeded).toHaveBeenCalled();
   });
 });
