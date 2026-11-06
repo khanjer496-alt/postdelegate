@@ -15,7 +15,16 @@ export const PreConditionComponentModal: FC = () => {
         first payment is charged today instead of at the end of the trial, and
         nothing extra is added.{'\n'}
         {'\n'}
-        ** Please note this payment is final and not refundable.
+        ** You can ask for this first payment back within 14 days, as the{' '}
+        <a
+          href="https://postdelegate.com/legal/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
+          Terms of Service
+        </a>{' '}
+        describe.
       </div>
       <div className="flex gap-[2px] justify-center">
         <Button
