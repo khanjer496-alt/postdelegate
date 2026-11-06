@@ -185,7 +185,7 @@
           "Integrations"
         ],
         "summary": "Get OAuth URL for a channel",
-        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only OAuth-based integrations are supported (integrations that require an external URL, such as Mastodon, are not available via this endpoint).",
+        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord or Mastodon. Networks that take a pasted credential, such as Bluesky, are not.",
         "operationId": "getIntegrationUrl",
         "parameters": [
           {

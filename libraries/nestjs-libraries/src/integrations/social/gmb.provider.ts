@@ -101,6 +101,13 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       return 'Offer posts require a start and an end date';
     }
 
+    if (
+      settings?.topicType === 'OFFER' &&
+      dayjs(settings.eventEndDate).isBefore(dayjs(settings.eventStartDate))
+    ) {
+      return 'The offer end date must be on or after the start date';
+    }
+
     return true;
   }
 
@@ -513,21 +520,27 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       (settings?.topicType === 'EVENT' || settings?.topicType === 'OFFER') &&
       settings?.eventTitle
     ) {
-      // offers only run on dates, the time inputs belong to events
-      const withTimes = settings.topicType === 'EVENT';
+      // offers run whole days, the time inputs belong to events;
+      // Google's interval is only valid with every field set
+      const isOffer = settings.topicType === 'OFFER';
       postBody.event = {
         title: settings.eventTitle,
         schedule: {
           startDate: this.formatDate(settings.eventStartDate),
           endDate: this.formatDate(settings.eventEndDate),
-          ...(withTimes &&
-            settings.eventStartTime && {
-              startTime: this.formatTime(settings.eventStartTime),
-            }),
-          ...(withTimes &&
-            settings.eventEndTime && {
-              endTime: this.formatTime(settings.eventEndTime),
-            }),
+          ...(isOffer
+            ? {
+                startTime: this.formatTime('00:00'),
+                endTime: this.formatTime('23:59'),
+              }
+            : {
+                ...(settings.eventStartTime && {
+                  startTime: this.formatTime(settings.eventStartTime),
+                }),
+                ...(settings.eventEndTime && {
+                  endTime: this.formatTime(settings.eventEndTime),
+                }),
+              }),
         },
       };
     }

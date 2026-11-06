@@ -136,9 +136,17 @@ describe('GmbProvider post', () => {
       schedule: {
         startDate: { year: 2026, month: 11, day: 10 },
         endDate: { year: 2026, month: 11, day: 16 },
+        startTime: { hours: 0, minutes: 0, seconds: 0, nanos: 0 },
+        endTime: { hours: 23, minutes: 59, seconds: 0, nanos: 0 },
       },
     });
     expect(body.offer).toEqual({ couponCode: 'SAVE20' });
+  });
+
+  it('leaves the event block out of an offer saved without a title', async () => {
+    const body = await publish({ topicType: 'OFFER' });
+
+    expect(body.event).toBeUndefined();
   });
 
   it('keeps the event times for event posts', async () => {
@@ -214,6 +222,14 @@ describe('GmbProvider checkValidity', () => {
         eventEndDate: '2026-11-16',
       })
     ).toBe(true);
+    expect(
+      await check({
+        topicType: 'OFFER',
+        eventTitle: 'Sale',
+        eventStartDate: '2026-11-16',
+        eventEndDate: '2026-11-10',
+      })
+    ).toBe('The offer end date must be on or after the start date');
     expect(await check({ topicType: 'STANDARD' })).toBe(true);
   });
 });
