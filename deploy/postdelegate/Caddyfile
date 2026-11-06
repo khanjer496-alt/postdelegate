@@ -53,8 +53,10 @@ app.postdelegate.com {
     # MCP discovery documents for directories and the ChatGPT app domain
     # check, served by the backend under /api: the protected-resource
     # metadata of /api/mcp (path-inserted only, the root stays unanswered),
-    # the server card and the OpenAI challenge.
-    @mcpWellKnown path /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
+    # the server card and the OpenAI challenge. The bare root is listed too,
+    # so the backend answers it with its own 404 JSON: unrouted it reached the
+    # frontend instead and redirected a discovery client to /auth/login.
+    @mcpWellKnown path /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
     handle @mcpWellKnown {
         rewrite * /api{uri}
         reverse_proxy postiz:5000
@@ -126,7 +128,7 @@ staging.postdelegate.com {
         rewrite * /api{uri}
         reverse_proxy postdelegate-staging-app-1:5000
     }
-    @mcpWellKnown path /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
+    @mcpWellKnown path /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
     handle @mcpWellKnown {
         rewrite * /api{uri}
         reverse_proxy postdelegate-staging-app-1:5000
