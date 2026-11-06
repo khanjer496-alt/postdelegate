@@ -26,14 +26,17 @@ export class GmbSettingsDto {
     | 'GET_OFFER'
     | 'CALL';
 
+  // CALL dials the phone number of the profile, NONE has no button
   @IsOptional()
-  @ValidateIf((o) => o.callToActionType)
+  @ValidateIf(
+    (o) => o.callToActionType && !['NONE', 'CALL'].includes(o.callToActionType)
+  )
   @IsUrl()
   callToActionUrl?: string;
 
-  // Event-specific fields
+  // Event-specific fields, offers reuse the title and dates
   @IsOptional()
-  @ValidateIf((o) => o.topicType === 'EVENT')
+  @ValidateIf((o) => o.topicType === 'EVENT' || o.topicType === 'OFFER')
   @IsString()
   eventTitle?: string;
 

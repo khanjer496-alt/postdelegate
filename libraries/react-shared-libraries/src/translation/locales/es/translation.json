@@ -2327,5 +2327,8 @@
   "pinterest_board_name": "Nombre del tablero",
   "pinterest_create_board": "Crear tablero",
   "pinterest_create_board_failed": "Pinterest no pudo crear el tablero. Inténtalo de nuevo.",
-  "pinterest_boards_failed": "Pinterest no pudo cargar los tableros de esta cuenta. Inténtalo de nuevo más tarde."
+  "pinterest_boards_failed": "Pinterest no pudo cargar los tableros de esta cuenta. Inténtalo de nuevo más tarde.",
+  "gmb_call_hint": "El botón Llamar marca el número de teléfono de tu Perfil de Empresa.",
+  "gmb_offer_title": "Título de la oferta",
+  "gmb_offer_title_placeholder": "20 % de descuento esta semana"
 }
