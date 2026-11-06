@@ -104,7 +104,7 @@ Fair use: one render at a time per workspace with up to 3 waiting, 30 videos a d
 
 {{networks}}
 
-Only these networks can be connected today. No other network can be connected. Do not offer to post to them. Follow-ups (`postsAndComments[1..]`) are published on: {{followup_names}}. Only YouTube channels return analytics today.
+Only these networks can be connected today. No other network can be connected. Do not offer to post to them. Follow-ups (`postsAndComments[1..]`) are published on: {{followup_names}}. Only YouTube and Google Business Profile channels return analytics today. Google Business Profile reports per location, not per post.
 
 ## Safety rules
 

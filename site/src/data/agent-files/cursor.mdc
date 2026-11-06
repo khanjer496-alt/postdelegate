@@ -34,7 +34,7 @@ Content is HTML: each line in `<p>`. Dates are UTC ISO 8601. REST `POST /posts` 
 
 {{networks}}
 
-Follow-ups are published on: {{followup_names}}. Only YouTube returns analytics today.
+Follow-ups are published on: {{followup_names}}. Only YouTube and Google Business Profile channels return analytics today. Google Business Profile reports per location, not per post.
 
 ## Rules
 

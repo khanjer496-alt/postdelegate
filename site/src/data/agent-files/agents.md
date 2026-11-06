@@ -98,7 +98,7 @@ A render only creates media, never a post. Fair use: one render at a time per wo
 
 {{networks}}
 
-Follow-up entries are published on: {{followup_names}}. Only YouTube channels return analytics today. Other networks cannot be connected.
+Follow-up entries are published on: {{followup_names}}. Only YouTube and Google Business Profile channels return analytics today. Google Business Profile reports per location, not per post. Other networks cannot be connected.
 
 ## Errors and limits
 

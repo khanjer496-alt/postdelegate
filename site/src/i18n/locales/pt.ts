@@ -115,6 +115,7 @@ const dict: Dict = {
     hashnode: 'Artigos em Markdown para uma das suas publicações.',
     listmonk: 'Campanhas de e-mail pelo seu próprio Listmonk.',
     mastodon: 'Posts e threads no mastodon.social, com imagens ou um vídeo.',
+    google_business: 'Novidades, eventos e ofertas para um local da empresa, com uma imagem opcional.',
   },
   planTaglines: {
     starter: 'Para o seu próprio conteúdo.',
@@ -172,7 +173,7 @@ const dict: Dict = {
     },
     {
       q: 'Quando Instagram, TikTok e LinkedIn estarão disponíveis?',
-      a: 'Cada rede analisa um app antes de permitir que um serviço publique por seus usuários. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit e Google Business Profile aguardam a aprovação das plataformas. O X não está disponível no PostDelegate. Não divulgamos datas, porque os prazos dependem de cada rede. Acompanhe o <a href="/roadmap">roadmap</a> e o <a href="/platforms">status das plataformas</a>.',
+      a: 'Cada rede analisa um app antes de permitir que um serviço publique por seus usuários. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest e Reddit aguardam a aprovação das plataformas. O X não está disponível no PostDelegate. Não divulgamos datas, porque os prazos dependem de cada rede. Acompanhe o <a href="/roadmap">roadmap</a> e o <a href="/platforms">status das plataformas</a>.',
     },
     {
       q: 'Existe limite de posts?',
@@ -231,7 +232,7 @@ const dict: Dict = {
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'O que é o PostDelegate?', a: `Um agendador de redes sociais que a sua IA pode operar. O Claude ou o ChatGPT cria os rascunhos dos posts pelo MCP, você aprova em um só calendário, e o PostDelegate publica em ${p.count} redes. Você também pode planejar e escrever tudo você mesmo.` },
       { q: 'Preciso de cartão de crédito para o teste?', a: `Não. Todo plano começa com um teste gratuito de ${p.days} dias, sem cartão. Adicione um antes do fim do teste para manter seu plano. Se não adicionar, seu espaço de trabalho fica pausado e seus posts são mantidos.` },
-      { q: 'Quais redes posso conectar?', a: `${p.count} hoje: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest, Reddit e Google Business Profile aguardam aprovação. O X não está disponível. Veja o <a href="/platforms">status das plataformas</a>.` },
+      { q: 'Quais redes posso conectar?', a: `${p.count} hoje: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest e Reddit aguardam aprovação. O X não está disponível. Veja o <a href="/platforms">status das plataformas</a>.` },
       { q: 'Quanto custa a IA?', a: 'Nada da nossa parte. Conecte pelo MCP o assistente que você já assina, ou adicione sua própria chave da OpenAI e pague direto à OpenAI. Não há créditos de IA nem sobretaxa.' },
       { q: 'Posso cancelar quando quiser?', a: 'Sim. Um administrador do espaço de trabalho cancela na página de Cobrança, e o plano continua até o fim do período que você já pagou. Veja <a href="/docs/billing">planos e cobrança</a>.' },
     ],
@@ -714,6 +715,21 @@ const dict: Dict = {
       limits: [
         'O PostDelegate conecta contas do mastodon.social. Contas de outros servidores do Mastodon ainda não podem ser conectadas.',
         'Os posts são publicados como públicos, com limite de 500 caracteres e até quatro imagens ou um vídeo. Coloque o vídeo no primeiro post: as respostas não esperam o processamento.',
+      ],
+    },
+    'google-business-scheduler': {
+      action: 'Agendar posts',
+      description: `Agende novidades, eventos e ofertas no Google Business Profile com imagem e botão, conectando com o login do Google. Teste grátis de ${TRIAL_DAYS} dias, sem cartão.`,
+      h1: 'Agende posts no Google Business Profile.',
+      intro: 'Conecte um local da sua empresa entrando com o Google e agende novidades, eventos e ofertas com imagem e botão opcionais.',
+      plan: [
+        'Entre com o Google em Adicionar canal e escolha o local da empresa.',
+        'Escreva até 1.500 caracteres com uma imagem opcional.',
+        'Escolha novidade, evento ou oferta, com um botão opcional.',
+      ],
+      limits: [
+        'O Google só aceita posts de locais verificados que a conta Google usada no login gerencia. Entrar no PostDelegate com o Google não conecta um Google Business Profile.',
+        'Cada local recebe no máximo uma imagem por post. Vídeos não são aceitos, e entradas extras de um post não são publicadas.',
       ],
     },
   },

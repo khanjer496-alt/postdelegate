@@ -26,6 +26,6 @@ You help the user plan, draft and schedule social media posts in PostDelegate. Y
 
 {{networks_compact}}
 
-Other networks can't be connected. Follow-ups are published on: {{followup_names}}. Only YouTube returns analytics today.
+Other networks can't be connected. Follow-ups are published on: {{followup_names}}. Only YouTube and Google Business Profile channels return analytics today. Google Business Profile reports per location, not per post.
 
 Docs: {{site}}/docs/mcp. Tools reference: {{site}}/docs/mcp/tools.

@@ -185,7 +185,7 @@
           "Integrations"
         ],
         "summary": "Get OAuth URL for a channel",
-        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord or Mastodon. Networks that take a pasted credential, such as Bluesky, are not.",
+        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord, Mastodon or Google Business Profile (gmb). Networks that take a pasted credential, such as Bluesky, are not.",
         "operationId": "getIntegrationUrl",
         "parameters": [
           {
@@ -1268,7 +1268,7 @@
                   }
                 },
                 "gmb": {
-                  "summary": "Google My Business",
+                  "summary": "Google Business Profile",
                   "value": {
                     "type": "schedule",
                     "date": "2024-12-14T10:00:00.000Z",
@@ -3555,12 +3555,12 @@
         }
       },
       "GmbSettings": {
-        "title": "Google My Business",
+        "title": "Google Business Profile",
         "type": "object",
         "required": [
           "__type"
         ],
-        "description": "Google My Business post settings",
+        "description": "Google Business Profile post settings. A post is up to 1,500 characters with one optional image. Videos are not supported. Dates are YYYY-MM-DD; event dates default to the day the post is published, and event times are HH:mm. The CALL button dials the phone number on the Business Profile and takes no URL.",
         "properties": {
           "__type": {
             "type": "string",
@@ -3610,11 +3610,11 @@
           },
           "eventStartTime": {
             "type": "string",
-            "description": "Event start time"
+            "description": "Event start time (HH:mm), optional"
           },
           "eventEndTime": {
             "type": "string",
-            "description": "Event end time"
+            "description": "Event end time (HH:mm), optional"
           },
           "offerCouponCode": {
             "type": "string",
