@@ -30,7 +30,7 @@ const jsonLd = [
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/guides" class="button button-outline">All guides</a>
   <div class="guide-body"><slot /></div>
-  {shot && <AppShot shot={shot} caption={shotCaption ?? ''} />}
+  {shot && shotCaption && <AppShot shot={shot} caption={shotCaption} />}
   <h2>More guides</h2>
   <ul>{more.map((guide) => <li><a href={`/guides/${guide.slug}`}>{guide.title}</a></li>)}</ul>
 </Doc>
