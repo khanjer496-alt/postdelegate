@@ -64,6 +64,10 @@ export class InfiniteWorkflowRegister implements OnModuleInit {
     if (process.env.STUDIO_CLEANUP_DISABLED !== 'true') {
       await this.startSingleton('studioCleanupWorkflowV1', 'studio-cleanup-v1');
     }
+    // Daily forward of the Search Console rows, only when a URL receives them
+    if (process.env.SEARCH_CONSOLE_FORWARD_URL) {
+      await this.startSingleton('searchConsoleForwardWorkflowV1', 'search-console-forward-v1');
+    }
   }
 
   private async startSingleton(workflowType: string, workflowId: string) {

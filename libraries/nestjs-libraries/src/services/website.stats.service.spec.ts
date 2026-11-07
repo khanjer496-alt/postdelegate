@@ -21,6 +21,7 @@ const ENV = [
   'CLOUDFLARE_WEB_ANALYTICS_SITE_TAG',
   'GOOGLE_SEARCH_CONSOLE_SITE',
   'GOOGLE_SEARCH_CONSOLE_CREDENTIALS',
+  'SEARCH_CONSOLE_FORWARD_URL',
   'FRONTEND_URL',
 ];
 
@@ -156,6 +157,7 @@ describe('WebsiteStatsService', () => {
     fetchMock = jest.fn();
     global.fetch = fetchMock as any;
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -370,5 +372,178 @@ describe('WebsiteStatsService', () => {
       error: 'Search Console could not be reached',
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe('forwardSearch', () => {
+    const FORWARD_URL = 'https://receiver.example.com/ingest?site=example';
+    const SEARCH_URL =
+      'https://searchconsole.googleapis.com/webmasters/v3/sites/sc-domain%3Apostdelegate.com/searchAnalytics/query';
+
+    // a page of Search Console rows by date, query and page
+    const searchPage = (count: number) => ({
+      rows: Array.from({ length: count }, (_, index) => ({
+        keys: [iso(3), `query ${index}`, 'https://postdelegate.com/pricing'],
+        clicks: 1,
+        impressions: 10,
+        ctr: 0.1,
+        position: 4.2,
+      })),
+    });
+
+    // Search Console answers pages of the given sizes in turn, the receiver
+    // stores what it gets
+    const answer = (pages: number[], receiver?: () => Response) => {
+      let asked = 0;
+      fetchMock.mockImplementation(
+        async (url: string, init: { body: string }) => {
+          if (url === SEARCH_URL) {
+            return new Response(
+              JSON.stringify(searchPage(pages[asked++] ?? 0))
+            );
+          }
+          if (receiver) {
+            return receiver();
+          }
+          return new Response(
+            JSON.stringify({ stored: JSON.parse(init.body).rows.length })
+          );
+        }
+      );
+    };
+    const searchCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === SEARCH_URL);
+    const forwardCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => url === FORWARD_URL);
+
+    it('does nothing without the URL', async () => {
+      connectAll();
+
+      expect(await new WebsiteStatsService().forwardSearch()).toEqual({
+        enabled: false,
+        rows: 0,
+        stored: 0,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('does nothing with an empty URL or without Search Console', async () => {
+      process.env.SEARCH_CONSOLE_FORWARD_URL = FORWARD_URL;
+      expect(await new WebsiteStatsService().forwardSearch()).toMatchObject({
+        enabled: false,
+      });
+
+      connectAll();
+      process.env.SEARCH_CONSOLE_FORWARD_URL = '';
+      expect(await new WebsiteStatsService().forwardSearch()).toMatchObject({
+        enabled: false,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('pages through Search Console and posts at most 5000 rows each', async () => {
+      connectAll();
+      process.env.SEARCH_CONSOLE_FORWARD_URL = FORWARD_URL;
+      answer([5000, 1200]);
+
+      const result = await new WebsiteStatsService().forwardSearch();
+
+      expect(result).toEqual({ enabled: true, rows: 6200, stored: 6200 });
+      expect(searchCalls().map(([, init]) => JSON.parse(init.body))).toEqual([
+        {
+          startDate: iso(4),
+          endDate: iso(2),
+          dimensions: ['date', 'query', 'page'],
+          rowLimit: 5000,
+          startRow: 0,
+        },
+        {
+          startDate: iso(4),
+          endDate: iso(2),
+          dimensions: ['date', 'query', 'page'],
+          rowLimit: 5000,
+          startRow: 5000,
+        },
+      ]);
+      const posts = forwardCalls();
+      expect(
+        posts.map(([, init]) => JSON.parse(init.body).rows.length)
+      ).toEqual([5000, 1200]);
+      const [, init] = posts[0];
+      expect(init.method).toBe('POST');
+      expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+      expect(JSON.parse(init.body).rows[0]).toEqual({
+        date: iso(3),
+        query: 'query 0',
+        page: 'https://postdelegate.com/pricing',
+        clicks: 1,
+        impressions: 10,
+        ctr: 0.1,
+        position: 4.2,
+      });
+    });
+
+    it('sends no more than 25000 rows in a run', async () => {
+      connectAll();
+      process.env.SEARCH_CONSOLE_FORWARD_URL = FORWARD_URL;
+      answer([5000, 5000, 5000, 5000, 5000, 5000, 5000]);
+
+      expect(await new WebsiteStatsService().forwardSearch()).toEqual({
+        enabled: true,
+        rows: 25000,
+        stored: 25000,
+      });
+      expect(searchCalls()).toHaveLength(5);
+      expect(forwardCalls()).toHaveLength(5);
+      expect(console.warn).toHaveBeenCalledWith(
+        'search_console_forward_capped',
+        { rows: 25000 }
+      );
+    });
+
+    it('stops at the first answer that is not a stored count', async () => {
+      connectAll();
+      process.env.SEARCH_CONSOLE_FORWARD_URL = FORWARD_URL;
+      answer([5000, 10], () => new Response('forbidden', { status: 403 }));
+
+      expect(await new WebsiteStatsService().forwardSearch()).toEqual({
+        enabled: true,
+        rows: 5010,
+        stored: 0,
+      });
+      expect(forwardCalls()).toHaveLength(1);
+      expect(console.warn).toHaveBeenCalledWith(
+        'search_console_forward_failed',
+        { status: 403 }
+      );
+    });
+
+    it('posts nothing when Search Console fails, and does not throw', async () => {
+      connectAll();
+      process.env.SEARCH_CONSOLE_FORWARD_URL = FORWARD_URL;
+      fetchMock.mockImplementation(
+        async () => new Response('{"error":"quota"}', { status: 429 })
+      );
+
+      expect(await new WebsiteStatsService().forwardSearch()).toEqual({
+        enabled: true,
+        rows: 0,
+        stored: 0,
+      });
+      expect(forwardCalls()).toHaveLength(0);
+    });
+
+    it('does not throw when the receiver cannot be reached', async () => {
+      connectAll();
+      process.env.SEARCH_CONSOLE_FORWARD_URL = FORWARD_URL;
+      answer([3], () => {
+        throw new Error('connect ECONNREFUSED');
+      });
+
+      expect(await new WebsiteStatsService().forwardSearch()).toEqual({
+        enabled: true,
+        rows: 3,
+        stored: 0,
+      });
+    });
   });
 });

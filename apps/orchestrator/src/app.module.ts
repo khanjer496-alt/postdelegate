@@ -15,6 +15,7 @@ import { AnalyticsHistoryActivity } from '@gitroom/orchestrator/activities/analy
 import { WeeklySummaryActivity } from '@gitroom/orchestrator/activities/weekly.summary.activity';
 import { TrialOnboardingActivity } from '@gitroom/orchestrator/activities/trial.onboarding.activity';
 import { StudioActivity } from '@gitroom/orchestrator/activities/studio.activity';
+import { SearchConsoleForwardActivity } from '@gitroom/orchestrator/activities/search.console.forward.activity';
 import { StudioModule } from '@gitroom/nestjs-libraries/studio/studio.module';
 
 const activities = [
@@ -30,6 +31,7 @@ const activities = [
   WeeklySummaryActivity,
   TrialOnboardingActivity,
   StudioActivity,
+  SearchConsoleForwardActivity,
 ];
 @Module({
   imports: [

@@ -59,6 +59,15 @@ const RUM_RETENTION_DAYS = 184;
 const RUM_MAX_RANGE_DAYS = 93;
 const UPSTREAM_TIMEOUT_MS = 15000;
 const SEARCH_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
+// The daily forward of Search Console rows: the days it sends, how many rows
+// one request asks for or one POST carries, and how many rows a run sends in
+// all. Search Console has the final data of a day about 2 to 3 days later, so
+// a run sends the 3 days that ended 2 to 4 days ago: each day is sent by up
+// to 3 runs, and the receiver keeps the latest row of a date, query and page
+const FORWARD_FIRST_DAY_AGO = 4;
+const FORWARD_LAST_DAY_AGO = 2;
+const FORWARD_PAGE_ROWS = 5000;
+const FORWARD_MAX_ROWS = 25000;
 
 const cacheSeconds = () =>
   !process.env.NODE_ENV || process.env.NODE_ENV === 'development' ? 1 : 900;
@@ -136,6 +145,24 @@ interface SearchApiRow {
   position: number;
 }
 
+type SearchQuery = (body: Record<string, unknown>) => Promise<SearchApiRow[]>;
+
+export interface SearchForwardRow {
+  date: string;
+  query: string;
+  page: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface SearchForwardResult {
+  enabled: boolean;
+  rows: number;
+  stored: number;
+}
+
 const searchRows = (rows: SearchApiRow[] = []): SearchRow[] =>
   rows
     .map((row) => ({
@@ -148,8 +175,56 @@ const searchRows = (rows: SearchApiRow[] = []): SearchRow[] =>
     .sort((a, b) => b.impressions - a.impressions || b.clicks - a.clicks)
     .slice(0, TOP);
 
+// The service account of GOOGLE_SEARCH_CONSOLE_CREDENTIALS, nothing when it
+// is not base64 JSON. The parse error quotes the input, which is the private
+// key, so it is never passed on
+const searchAccount = (
+  credentials: string
+): { client_email?: string; private_key?: string } | undefined => {
+  try {
+    return JSON.parse(Buffer.from(credentials, 'base64').toString('utf8'));
+  } catch {
+    return undefined;
+  }
+};
+
 @Injectable()
 export class WebsiteStatsService {
+  // Signs in as the service account once and answers searchAnalytics queries
+  // of the site with it. A query Search Console refuses throws
+  private async searchQuery(
+    site: string,
+    account: { client_email?: string; private_key?: string }
+  ): Promise<SearchQuery> {
+    const auth = new JWT({
+      email: account.client_email,
+      key: account.private_key,
+      scopes: [SEARCH_SCOPE],
+    });
+    const { token } = await auth.getAccessToken();
+
+    return async (body) => {
+      const res = await fetch(
+        `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
+          site
+        )}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        }
+      );
+      if (!res.ok) {
+        throw new Error(`Search Console answered ${res.status}`);
+      }
+      return ((await res.json()).rows || []) as SearchApiRow[];
+    };
+  }
+
   // Cached briefly per source and range, like the provider analytics. Only
   // answers are cached, a failed source is asked again next time
   private async cached<T>(
@@ -305,13 +380,8 @@ export class WebsiteStatsService {
     return this.cached<WebsiteSearch>(
       `admin:website:search:${from}:${to}`,
       async () => {
-        let account: { client_email?: string; private_key?: string };
-        try {
-          account = JSON.parse(
-            Buffer.from(credentials, 'base64').toString('utf8')
-          );
-        } catch {
-          // the parse error quotes the input, which is the private key
+        const account = searchAccount(credentials);
+        if (!account) {
           console.error('website_search_failed', {
             err: 'credentials are not base64 service-account JSON',
           });
@@ -323,38 +393,14 @@ export class WebsiteStatsService {
 
         let rows: SearchApiRow[][];
         try {
-          const auth = new JWT({
-            email: account.client_email,
-            key: account.private_key,
-            scopes: [SEARCH_SCOPE],
-          });
-          const { token } = await auth.getAccessToken();
-
-          const query = async (dimensions: string[], rowLimit: number) => {
-            const res = await fetch(
-              `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
-                site
-              )}/searchAnalytics/query`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  startDate: from,
-                  endDate: to,
-                  ...(dimensions.length ? { dimensions } : {}),
-                  rowLimit,
-                }),
-                signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-              }
-            );
-            if (!res.ok) {
-              throw new Error(`Search Console answered ${res.status}`);
-            }
-            return ((await res.json()).rows || []) as SearchApiRow[];
-          };
+          const search = await this.searchQuery(site, account);
+          const query = (dimensions: string[], rowLimit: number) =>
+            search({
+              startDate: from,
+              endDate: to,
+              ...(dimensions.length ? { dimensions } : {}),
+              rowLimit,
+            });
 
           // Search Console sorts by clicks, the top by impressions is picked
           // from a longer list
@@ -395,5 +441,99 @@ export class WebsiteStatsService {
         };
       }
     );
+  }
+
+  // Once a day the orchestrator sends the Search Console rows of the last
+  // days, by date, query and page, to SEARCH_CONSOLE_FORWARD_URL (used to
+  // feed our own search dashboard). Off without that URL or without Search
+  // Console. Never throws: a failure is logged and the run stops, the next
+  // run sends the same days again
+  async forwardSearch(): Promise<SearchForwardResult> {
+    const url = process.env.SEARCH_CONSOLE_FORWARD_URL;
+    const site = process.env.GOOGLE_SEARCH_CONSOLE_SITE;
+    const credentials = process.env.GOOGLE_SEARCH_CONSOLE_CREDENTIALS;
+    if (!url || !site || !credentials) {
+      return { enabled: false, rows: 0, stored: 0 };
+    }
+
+    const account = searchAccount(credentials);
+    if (!account) {
+      console.warn('search_console_forward_failed', {
+        err: 'credentials are not base64 service-account JSON',
+      });
+      return { enabled: true, rows: 0, stored: 0 };
+    }
+
+    const startDate = dayjs()
+      .subtract(FORWARD_FIRST_DAY_AGO, 'day')
+      .format('YYYY-MM-DD');
+    const endDate = dayjs()
+      .subtract(FORWARD_LAST_DAY_AGO, 'day')
+      .format('YYYY-MM-DD');
+
+    const rows: SearchForwardRow[] = [];
+    try {
+      const search = await this.searchQuery(site, account);
+      while (rows.length < FORWARD_MAX_ROWS) {
+        const page = await search({
+          startDate,
+          endDate,
+          dimensions: ['date', 'query', 'page'],
+          rowLimit: FORWARD_PAGE_ROWS,
+          startRow: rows.length,
+        });
+        rows.push(
+          ...page.map((row) => ({
+            date: row.keys?.[0] || '',
+            query: row.keys?.[1] || '',
+            page: row.keys?.[2] || '',
+            clicks: row.clicks,
+            impressions: row.impressions,
+            ctr: row.ctr,
+            position: row.position,
+          }))
+        );
+        if (page.length < FORWARD_PAGE_ROWS) {
+          break;
+        }
+      }
+      // Search Console answers the oldest date first, so the cap leaves out
+      // the latest day; a later run sends it again
+      if (rows.length >= FORWARD_MAX_ROWS) {
+        console.warn('search_console_forward_capped', { rows: rows.length });
+      }
+    } catch (err) {
+      console.warn('search_console_forward_failed', {
+        err: (err as Error)?.message,
+      });
+      return { enabled: true, rows: 0, stored: 0 };
+    }
+
+    let stored = 0;
+    for (let i = 0; i < rows.length; i += FORWARD_PAGE_ROWS) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: rows.slice(i, i + FORWARD_PAGE_ROWS) }),
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const body = res.status === 200 ? await res.json() : undefined;
+        if (typeof body?.stored !== 'number') {
+          console.warn('search_console_forward_failed', {
+            status: res.status,
+          });
+          break;
+        }
+        stored += body.stored;
+      } catch (err) {
+        console.warn('search_console_forward_failed', {
+          err: (err as Error)?.message,
+        });
+        break;
+      }
+    }
+
+    return { enabled: true, rows: rows.length, stored };
   }
 }
