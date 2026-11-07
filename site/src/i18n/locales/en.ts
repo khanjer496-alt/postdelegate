@@ -87,7 +87,7 @@ const en = {
     attribution: 'Referrals',
     attributionText: 'Credits whoever referred you.',
     analytics: 'Analytics',
-    analyticsText: 'Recognises return visits.',
+    analyticsText: 'Counts return visits and credits sign-ups.',
     reject: 'Reject',
     customize: 'Customize',
     accept: 'Accept',

@@ -68,7 +68,7 @@ const dict: Dict = {
     attribution: 'Inviti',
     attributionText: 'Riconosce chi ti ha invitato.',
     analytics: 'Statistiche',
-    analyticsText: 'Riconosce le visite di ritorno.',
+    analyticsText: 'Conta le visite di ritorno e attribuisce le iscrizioni.',
     reject: 'Rifiuta',
     customize: 'Personalizza',
     accept: 'Accetta',

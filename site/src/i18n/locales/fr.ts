@@ -68,7 +68,7 @@ const dict: Dict = {
     attribution: 'Parrainage',
     attributionText: 'Crédite la personne qui vous a recommandé.',
     analytics: 'Audience',
-    analyticsText: 'Reconnaît les visites récurrentes.',
+    analyticsText: 'Compte les visites récurrentes et attribue les inscriptions.',
     reject: 'Refuser',
     customize: 'Personnaliser',
     accept: 'Accepter',

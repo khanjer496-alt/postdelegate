@@ -68,7 +68,7 @@ const dict: Dict = {
     attribution: 'Recomendaciones',
     attributionText: 'Reconoce a quien te recomendó.',
     analytics: 'Analítica',
-    analyticsText: 'Reconoce las visitas que vuelven.',
+    analyticsText: 'Cuenta las visitas que vuelven y atribuye los registros.',
     reject: 'Rechazar',
     customize: 'Personalizar',
     accept: 'Aceptar',

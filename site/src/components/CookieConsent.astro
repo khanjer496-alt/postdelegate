@@ -96,6 +96,11 @@ const privacy = `${SITE.legal.privacy}#cookies`;
       document.cookie = `pd_ref=; max-age=0; path=/${domain}`;
       document.cookie = 'pd_ref=; max-age=0; path=/';
     }
+    // also when Pulse is blocked and can't delete its own cookie
+    if (choices && !choices.analytics) {
+      document.cookie = `pulse_vid=; max-age=0; path=/${domain}`;
+      document.cookie = 'pulse_vid=; max-age=0; path=/';
+    }
   };
 
   // Carry the values in this visit's own links and the sign-up links, nothing stored
