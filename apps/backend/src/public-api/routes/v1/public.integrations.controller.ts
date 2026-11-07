@@ -746,7 +746,8 @@ export class PublicIntegrationsController {
       org.id,
       id,
       body.status,
-      this.agentActor('API', oauthAppName)
+      this.agentActor('API', oauthAppName),
+      !!body.republish
     );
   }
 

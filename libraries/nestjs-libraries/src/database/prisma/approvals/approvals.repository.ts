@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ApprovalStatus, Prisma, Role, State } from '@prisma/client';
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import {
+  PrismaRepository,
+  PrismaTransaction,
+} from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 
 export interface ApprovalSettingsData {
   requireApproval: boolean;
@@ -22,7 +25,8 @@ export class ApprovalsRepository {
     private _post: PrismaRepository<'post'>,
     private _userOrg: PrismaRepository<'userOrganization'>,
     private _integration: PrismaRepository<'integration'>,
-    private _organization: PrismaRepository<'organization'>
+    private _organization: PrismaRepository<'organization'>,
+    private _transaction: PrismaTransaction
   ) {}
 
   getSettings(organizationId: string) {
@@ -108,11 +112,17 @@ export class ApprovalsRepository {
         content: true,
         agentSource: true,
         organizationId: true,
+        // what the approver saw, an approval is bound to it
+        updatedAt: true,
         integration: {
           select: {
             id: true,
             name: true,
             providerIdentifier: true,
+            // whether it can publish now, see integration.state.ts
+            disabled: true,
+            inBetweenSteps: true,
+            refreshNeeded: true,
           },
         },
       },
@@ -121,32 +131,43 @@ export class ApprovalsRepository {
 
   // A post and its comments move together, they share the group. The main
   // post is claimed first, only when it still matches `expected`, so two
-  // people acting at once can't both approve (and publish) it.
+  // people acting at once can't both approve (and publish) it. Both writes
+  // are one transaction: comments never stay behind in the old state.
   async transitionGroup(
     organizationId: string,
     post: { id: string; group: string },
     expected: Prisma.PostWhereInput,
     data: { state: State; approvalStatus: ApprovalStatus; publishDate?: Date }
   ) {
-    const claimed = await this._post.model.post.updateMany({
-      where: {
-        AND: [expected, { id: post.id, organizationId, deletedAt: null }],
-      },
-      data,
+    const write = {
+      ...data,
+      // queued again: the error and the release of an earlier attempt no
+      // longer describe it, like PostsRepository.changeDate on a reschedule
+      ...(data.state === 'QUEUE'
+        ? { error: null, releaseId: null, releaseURL: null }
+        : {}),
+    };
+    return this._transaction.model.$transaction(async (tx) => {
+      const claimed = await tx.post.updateMany({
+        where: {
+          AND: [expected, { id: post.id, organizationId, deletedAt: null }],
+        },
+        data: write,
+      });
+      if (!claimed.count) {
+        return false;
+      }
+      await tx.post.updateMany({
+        where: {
+          organizationId,
+          group: post.group,
+          deletedAt: null,
+          id: { not: post.id },
+        },
+        data: write,
+      });
+      return true;
     });
-    if (!claimed.count) {
-      return false;
-    }
-    await this._post.model.post.updateMany({
-      where: {
-        organizationId,
-        group: post.group,
-        deletedAt: null,
-        id: { not: post.id },
-      },
-      data,
-    });
-    return true;
   }
 
   getReviewQueue(organizationId: string, agentOnly: boolean) {
@@ -171,6 +192,8 @@ export class ApprovalsRepository {
         agentSource: true,
         creationMethod: true,
         createdAt: true,
+        // sent back with an approval, so it approves the version shown
+        updatedAt: true,
         integration: {
           select: {
             id: true,

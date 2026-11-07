@@ -199,6 +199,7 @@ describe('PostsService approvals on save', () => {
       }),
       holdForReview: jest.fn().mockResolvedValue({ count: 1 }),
       changeState: jest.fn().mockResolvedValue({}),
+      changeGroupState: jest.fn().mockResolvedValue({ count: 1 }),
     };
     const policy = {
       assertAgentGuardrails: jest.fn().mockResolvedValue(undefined),
@@ -366,8 +367,351 @@ describe('PostsService approvals on save', () => {
     const result = await service.changePostStatus('org-1', 'p-1', 'schedule', agent);
     expect(postRepository.holdForReview).toHaveBeenCalledWith('org-1', 'g-1');
     expect(postRepository.changeState).not.toHaveBeenCalled();
+    expect(postRepository.changeGroupState).not.toHaveBeenCalled();
     expect(policy.afterSave).toHaveBeenCalled();
     expect(result).toMatchObject({ state: 'DRAFT', approvalStatus: 'IN_REVIEW' });
+  });
+});
+
+describe('PostsService status and date changes', () => {
+  const future = () => new Date(Date.now() + 24 * 3600 * 1000);
+  const past = () => new Date(Date.now() - 3600 * 1000);
+
+  const stored = (over: Record<string, any> = {}) => ({
+    id: 'p-1',
+    group: 'g-1',
+    state: 'DRAFT',
+    approvalStatus: 'NONE',
+    publishDate: future(),
+    deletedAt: null,
+    parentPostId: null,
+    content: 'hi',
+    integrationId: 'i-1',
+    integration: { id: 'i-1', name: 'Brand X', providerIdentifier: 'linkedin-page' },
+    ...over,
+  });
+
+  const makeStateService = (decision: any = { hold: false }) => {
+    const postRepository = {
+      getPostById: jest.fn().mockResolvedValue(stored()),
+      changeGroupState: jest.fn().mockResolvedValue({ count: 2 }),
+      changeState: jest.fn().mockResolvedValue({}),
+      changeDate: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      holdForReview: jest.fn().mockResolvedValue({ count: 2 }),
+      createOrUpdatePost: jest.fn(),
+    };
+    const policy = {
+      assertAgentGuardrails: jest.fn().mockResolvedValue(undefined),
+      decide: jest.fn().mockResolvedValue(decision),
+      afterSave: jest.fn().mockResolvedValue({ submitted: !!decision?.hold }),
+      notifyApprovers: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new PostsService(
+      postRepository as any,
+      { getSocialIntegration: () => undefined } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      policy as any,
+      { recordPublished: jest.fn() } as any,
+      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
+    );
+    jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+    jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
+    return { service, postRepository, policy };
+  };
+
+  const member = { type: 'user' as const, userId: 'u-1', role: 'USER', name: 'Sam' };
+
+  describe('changePostStatus', () => {
+    it('schedules the post and its comments together and starts the workflow', async () => {
+      const { service, postRepository } = makeStateService();
+      const result = await service.changePostStatus('org-1', 'p-1', 'schedule');
+      expect(postRepository.changeGroupState).toHaveBeenCalledWith(
+        'org-1',
+        expect.objectContaining({ id: 'p-1', group: 'g-1', integrationId: 'i-1' }),
+        'QUEUE',
+        false
+      );
+      expect(postRepository.changeState).not.toHaveBeenCalled();
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
+      expect(result).toEqual({ id: 'p-1', state: 'QUEUE' });
+    });
+
+    it('does not schedule a published post again without republish', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'PUBLISHED' }));
+      await expect(
+        service.changePostStatus('org-1', 'p-1', 'schedule')
+      ).rejects.toThrow('pass republish: true');
+      await expect(
+        service.changePostStatus('org-1', 'p-1', 'draft')
+      ).rejects.toThrow('already published');
+      expect(postRepository.changeGroupState).not.toHaveBeenCalled();
+      expect(service.startWorkflow).not.toHaveBeenCalled();
+
+      await service.changePostStatus('org-1', 'p-1', 'schedule', undefined, true);
+      // republish lets the write change a published post
+      expect(postRepository.changeGroupState).toHaveBeenCalledWith(
+        'org-1',
+        expect.anything(),
+        'QUEUE',
+        true
+      );
+    });
+
+    it('does not schedule again a post that is being published, but can stop it', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(
+        stored({ state: 'QUEUE', publishDate: past() })
+      );
+      await expect(
+        service.changePostStatus('org-1', 'p-1', 'schedule')
+      ).rejects.toThrow('already being published');
+      expect(postRepository.changeGroupState).not.toHaveBeenCalled();
+      expect(service.startWorkflow).not.toHaveBeenCalled();
+
+      // a draft stops it, the safe direction
+      await service.changePostStatus('org-1', 'p-1', 'draft');
+      expect(postRepository.changeGroupState).toHaveBeenCalledWith(
+        'org-1',
+        expect.anything(),
+        'DRAFT',
+        false
+      );
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'DRAFT');
+    });
+
+    it('refuses a deleted post or a comment, and never notifies about them', async () => {
+      const agent = { type: 'agent' as const, source: 'Public API key', viaApi: true };
+      const { service, postRepository, policy } = makeStateService({
+        hold: true,
+        approvalStatus: 'IN_REVIEW',
+      });
+      postRepository.getPostById.mockResolvedValue(stored({ deletedAt: new Date() }));
+      await expect(
+        service.changePostStatus('org-1', 'p-1', 'schedule', agent)
+      ).rejects.toThrow('Post not found');
+
+      postRepository.getPostById.mockResolvedValue(stored({ parentPostId: 'p-0' }));
+      await expect(
+        service.changePostStatus('org-1', 'p-1', 'schedule', agent)
+      ).rejects.toThrow('belongs to a comment');
+
+      postRepository.getPostById.mockResolvedValue(null);
+      await expect(
+        service.changePostStatus('org-1', 'p-1', 'schedule', agent)
+      ).rejects.toThrow('Post not found');
+
+      expect(postRepository.holdForReview).not.toHaveBeenCalled();
+      expect(policy.afterSave).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('changeDate', () => {
+    it('answers a missing post with a 400 instead of crashing', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(null);
+      await expect(
+        service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update')
+      ).rejects.toMatchObject({ status: 400 });
+      expect(postRepository.changeDate).not.toHaveBeenCalled();
+    });
+
+    it('restarts the workflow of a queued post it moves, so it fires at the new time', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'QUEUE' }));
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update');
+      expect(postRepository.changeDate).toHaveBeenCalledWith(
+        'org-1',
+        'p-1',
+        '2030-01-01T10:00:00',
+        false,
+        'update'
+      );
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
+    });
+
+    it('leaves the workflow alone when a draft or a published post only moves', async () => {
+      const { service, postRepository } = makeStateService();
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update');
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'PUBLISHED' }));
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update');
+      expect(postRepository.changeDate).toHaveBeenCalledTimes(2);
+      expect(service.startWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('does not reschedule a post that is being published unless asked to publish it again', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(
+        stored({ state: 'QUEUE', publishDate: past() })
+      );
+      await expect(
+        service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule')
+      ).rejects.toThrow('already being published');
+      expect(postRepository.changeDate).not.toHaveBeenCalled();
+
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule', true);
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
+    });
+
+    it('only moves the date of a post that is being published, its workflow keeps running', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(
+        stored({ state: 'QUEUE', publishDate: past() })
+      );
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update');
+      expect(postRepository.changeDate).toHaveBeenCalledWith(
+        'org-1',
+        'p-1',
+        '2030-01-01T10:00:00',
+        false,
+        'update'
+      );
+      expect(service.startWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('tells a member that publishing a post again needs an approver', async () => {
+      const decision = { hold: true, approvalStatus: 'IN_REVIEW', previous: 'NONE' };
+      const { service, postRepository } = makeStateService(decision);
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'PUBLISHED' }));
+      await expect(
+        service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule', true, member)
+      ).rejects.toThrow('Publishing it again needs an approver');
+      expect(postRepository.changeDate).not.toHaveBeenCalled();
+      expect(postRepository.holdForReview).not.toHaveBeenCalled();
+    });
+
+    it('holds a failed post queued again by someone who cannot approve', async () => {
+      const decision = { hold: true, approvalStatus: 'IN_REVIEW', previous: 'NONE' };
+      const { service, postRepository, policy } = makeStateService(decision);
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'ERROR' }));
+      const result = await service.changeDate(
+        'org-1',
+        'p-1',
+        '2030-01-01T10:00:00',
+        'schedule',
+        false,
+        member
+      );
+      expect(policy.decide).toHaveBeenCalledWith(
+        'org-1',
+        member,
+        'schedule',
+        expect.objectContaining({ id: 'p-1', state: 'ERROR' })
+      );
+      // the new time is kept, the state is left to the hold
+      expect(postRepository.changeDate).toHaveBeenCalledWith(
+        'org-1',
+        'p-1',
+        '2030-01-01T10:00:00',
+        true,
+        'update'
+      );
+      expect(postRepository.holdForReview).toHaveBeenCalledWith('org-1', 'g-1');
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'DRAFT');
+      expect(service.startWorkflow).not.toHaveBeenCalledWith(
+        'linkedin',
+        'p-1',
+        'org-1',
+        'QUEUE'
+      );
+      expect(result).toMatchObject({ state: 'DRAFT', approvalStatus: 'IN_REVIEW' });
+    });
+
+    it('asks the approval rules only when a post is queued again', async () => {
+      const { service, postRepository, policy } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'QUEUE' }));
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule', false, member);
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update', false, member);
+      expect(policy.decide).not.toHaveBeenCalled();
+
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'ERROR' }));
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule', false, member);
+      expect(policy.decide).toHaveBeenCalledTimes(1);
+      expect(service.startWorkflow).toHaveBeenLastCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
+    });
+  });
+
+  describe('createPost with type update', () => {
+    const update = (date: string) =>
+      ({
+        type: 'update',
+        date,
+        shortLink: false,
+        tags: [],
+        posts: [
+          {
+            integration: { id: 'i-1' },
+            group: 'g-1',
+            settings: { __type: 'linkedin' },
+            value: [{ id: 'p-1', content: 'hi', image: [] }],
+          },
+        ],
+      } as any);
+
+    it('restarts the workflow of a queued post whose time it moved', async () => {
+      const { service, postRepository } = makeStateService();
+      const before = future();
+      const after = new Date(before.getTime() + 3600 * 1000);
+      postRepository.getPostById.mockResolvedValue(
+        stored({ state: 'QUEUE', publishDate: before })
+      );
+      postRepository.createOrUpdatePost.mockResolvedValue({
+        posts: [{ id: 'p-1', state: 'QUEUE', publishDate: after, content: 'hi' }],
+      });
+      await service.createPost('org-1', update(after.toISOString()), 'API');
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
+    });
+
+    it('leaves the workflow alone when the time did not change', async () => {
+      const { service, postRepository } = makeStateService();
+      const at = future();
+      postRepository.getPostById.mockResolvedValue(
+        stored({ state: 'QUEUE', publishDate: at })
+      );
+      postRepository.createOrUpdatePost.mockResolvedValue({
+        posts: [{ id: 'p-1', state: 'QUEUE', publishDate: at, content: 'hi' }],
+      });
+      await service.createPost('org-1', update(at.toISOString()), 'API');
+      expect(service.startWorkflow).not.toHaveBeenCalled();
+    });
+  });
+
+  it('logs a publish workflow that could not start instead of hiding it', async () => {
+    const temporal = {
+      client: {
+        getRawClient: () => ({
+          workflow: {
+            list: () => (async function* () {})(),
+            start: jest.fn().mockRejectedValue(new Error('temporal down')),
+          },
+        }),
+      },
+    };
+    const service = new PostsService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      temporal as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    const error = jest
+      .spyOn((service as any)._logger, 'error')
+      .mockImplementation(() => undefined);
+    await expect(
+      service.startWorkflow('linkedin', 'p-1', 'org-1', 'QUEUE')
+    ).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('p-1'));
   });
 });
 
@@ -391,6 +735,7 @@ describe('PostsService monthly cap on one network', () => {
       getPostById: jest.fn(),
       changeDate: jest.fn().mockResolvedValue({}),
       changeState: jest.fn().mockResolvedValue({}),
+      changeGroupState: jest.fn().mockResolvedValue({ count: 1 }),
     };
     const subscriptionService = {
       getProviderPostsLimits: jest
@@ -820,10 +1165,11 @@ describe('PostsService monthly cap on one network', () => {
       jest
         .spyOn(service, 'getPostsRecursively')
         .mockResolvedValue([thread('PUBLISHED')[0]] as any);
+      // republish: true, a published post is refused before the cap otherwise
       await expect(
-        service.changePostStatus('org-1', 'p-1', 'schedule')
+        service.changePostStatus('org-1', 'p-1', 'schedule', undefined, true)
       ).rejects.toMatchObject({ status: 402 });
-      expect(postRepository.changeState).not.toHaveBeenCalled();
+      expect(postRepository.changeGroupState).not.toHaveBeenCalled();
     });
 
     it('checks a reschedule that moves to a full plan month', async () => {

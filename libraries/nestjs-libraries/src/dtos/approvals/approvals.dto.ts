@@ -2,6 +2,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsIn,
   IsInt,
@@ -50,6 +51,15 @@ export class ApprovalCommentDto {
   @IsString()
   @MaxLength(2000)
   comment?: string;
+}
+
+export class ApproveDto extends ApprovalCommentDto {
+  // the updatedAt of the post as the approver saw it: an edit made since then
+  // is refused with a 409 instead of approved unseen. Optional, so API and MCP
+  // callers that don't send it keep working.
+  @IsOptional()
+  @IsDateString()
+  expectedUpdatedAt?: string;
 }
 
 export class RequestChangesDto {

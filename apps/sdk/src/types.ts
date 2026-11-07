@@ -128,6 +128,14 @@ export interface Media {
   status?: string;
 }
 
+export interface ChangePostStatusOptions {
+  /**
+   * Required to change the status of a post that was already published, or to
+   * schedule one that is being published right now: it can publish it again.
+   */
+  republish?: boolean;
+}
+
 export interface UploadOptions {
   /** Ask PostDelegate to normalize the file (video/image processing) after upload. */
   adjust?: boolean;

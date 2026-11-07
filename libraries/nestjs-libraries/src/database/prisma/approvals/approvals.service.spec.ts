@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   GoneException,
   NotFoundException,
@@ -294,6 +295,126 @@ describe('ApprovalsService transitions', () => {
     await waiting.service.submit(ORG, 'p-1', member);
     expect(waiting.repository.transitionGroup).not.toHaveBeenCalled();
     expect(waiting.policy.notifyApprovers).not.toHaveBeenCalled();
+  });
+});
+
+describe('ApprovalsService stale reads and channels', () => {
+  it('does not approve a post on a channel that cannot publish it', async () => {
+    const cases: [Record<string, any>, string, Date][] = [
+      [{ disabled: true }, 'is turned off', future()],
+      [{ inBetweenSteps: true }, 'not fully connected', future()],
+      // it would publish right away
+      [{ refreshNeeded: true }, 'needs to be reconnected', past()],
+    ];
+    for (const [flags, message, publishDate] of cases) {
+      const { service, repository, posts, policy } = makeService({
+        post: makePost({
+          publishDate,
+          integration: {
+            id: 'i-1',
+            name: 'Brand X',
+            providerIdentifier: 'linkedin-page',
+            ...flags,
+          },
+        }),
+      });
+      await expect(service.approve(ORG, 'p-1', admin)).rejects.toThrow(message);
+      expect(repository.transitionGroup).not.toHaveBeenCalled();
+      expect(posts.startWorkflow).not.toHaveBeenCalled();
+      expect(policy.notifyAuthor).not.toHaveBeenCalled();
+    }
+  });
+
+  it('approves a post for later on a channel that only needs a reconnect', async () => {
+    const { service, repository } = makeService({
+      post: makePost({
+        integration: {
+          id: 'i-1',
+          name: 'Brand X',
+          providerIdentifier: 'linkedin-page',
+          refreshNeeded: true,
+        },
+      }),
+    });
+    await service.approve(ORG, 'p-1', admin);
+    expect(repository.transitionGroup).toHaveBeenCalled();
+  });
+
+  it('refuses with a 409 a post edited after the approver opened it', async () => {
+    const seen = new Date('2026-11-01T10:00:00.000Z');
+    const { service, repository } = makeService({
+      post: makePost({ updatedAt: new Date('2026-11-01T10:05:00.000Z') }),
+    });
+    await expect(
+      service.approve(ORG, 'p-1', admin, undefined, seen.toISOString())
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.transitionGroup).not.toHaveBeenCalled();
+  });
+
+  it('approves the version the approver saw, and claims only that version', async () => {
+    const seen = new Date('2026-11-01T10:00:00.000Z');
+    const { service, repository } = makeService({
+      post: makePost({ updatedAt: seen }),
+    });
+    await service.approve(ORG, 'p-1', admin, undefined, seen.toISOString());
+    expect(moved(repository).expected).toEqual({
+      approvalStatus: { in: ['IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'] },
+      state: { not: 'PUBLISHED' },
+      updatedAt: seen,
+    });
+  });
+
+  it('answers a 409 when the post is saved between the check and the claim', async () => {
+    const seen = new Date('2026-11-01T10:00:00.000Z');
+    const { service, repository } = makeService();
+    repository.transitionGroup.mockResolvedValueOnce(false);
+    repository.getRootPost
+      .mockResolvedValueOnce(makePost({ updatedAt: seen }))
+      .mockResolvedValueOnce(makePost({ updatedAt: new Date('2026-11-01T10:01:00.000Z') }));
+    await expect(
+      service.approve(ORG, 'p-1', admin, undefined, seen.toISOString())
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('keeps approving without a version, for API callers', async () => {
+    const { service, repository } = makeService();
+    await service.approve(ORG, 'p-1', admin);
+    expect(moved(repository).expected).not.toHaveProperty('updatedAt');
+  });
+
+  it('sending back claims the post only while it is not going out', async () => {
+    const { service, repository } = makeService({
+      post: makePost({ state: 'QUEUE', approvalStatus: 'APPROVED' }),
+    });
+    await service.reject(ORG, 'p-1', admin);
+    const { expected } = moved(repository);
+    const [, claim] = expected.AND;
+    expect(claim.state).toEqual({ not: 'PUBLISHED' });
+    expect(claim.NOT[0].state).toBe('QUEUE');
+    expect(claim.NOT[0].publishDate.lt).toBeInstanceOf(Date);
+  });
+
+  it('sending back fails when the post started going out since it was read', async () => {
+    const { service, repository } = makeService({
+      post: makePost({ state: 'QUEUE', approvalStatus: 'APPROVED' }),
+    });
+    // the claim no longer matches: it is being published now
+    repository.transitionGroup.mockResolvedValueOnce(false);
+    await expect(
+      service.requestChanges(ORG, 'p-1', admin, 'shorter')
+    ).rejects.toThrow('just changed by someone else');
+  });
+
+  it('submitting claims the post only while it is not going out', async () => {
+    const { service, repository } = makeService({
+      post: makePost({ state: 'QUEUE', approvalStatus: 'NONE' }),
+    });
+    await service.submit(ORG, 'p-1', member);
+    const { expected } = moved(repository);
+    expect(expected.AND[0].NOT[0]).toMatchObject({ state: 'QUEUE' });
+    expect(expected.AND[1]).toEqual({
+      NOT: [{ state: 'DRAFT', approvalStatus: 'IN_REVIEW' }],
+    });
   });
 });
 

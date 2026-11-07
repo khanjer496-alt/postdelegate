@@ -322,6 +322,7 @@ export class PostsController {
   @Put('/:id/date')
   changeDate(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body('date') date: string,
     // 'update' is the safe default: clients that don't send an action must
@@ -329,7 +330,14 @@ export class PostsController {
     @Body('action') action: 'schedule' | 'update' = 'update',
     @Body('republish') republish = false
   ) {
-    return this._postsService.changeDate(org.id, id, date, action, republish);
+    return this._postsService.changeDate(
+      org.id,
+      id,
+      date,
+      action,
+      republish,
+      userActor(user, org as any)
+    );
   }
 
   @Post('/separate-posts')

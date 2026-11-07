@@ -17,6 +17,7 @@ import {
   ApprovalPolicyService,
   DEFAULT_APPROVAL_SETTINGS,
   decideApproval,
+  isBeingPublished,
   updateCanHold,
   userActor,
 } from './approval.policy.service';
@@ -261,6 +262,18 @@ describe('updateCanHold', () => {
     expect(updateCanHold({ state: 'DRAFT', approvalStatus: 'NONE' })).toBe(false);
     expect(updateCanHold({ state: 'QUEUE', publishDate: tomorrow })).toBe(true);
     expect(updateCanHold({ state: 'DRAFT', approvalStatus: 'REJECTED' })).toBe(true);
+  });
+});
+
+describe('isBeingPublished', () => {
+  const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
+  const hourAgo = new Date(Date.now() - 3600 * 1000);
+  it('is a scheduled post whose time came', () => {
+    expect(isBeingPublished({ state: 'QUEUE', publishDate: hourAgo })).toBe(true);
+    expect(isBeingPublished({ state: 'QUEUE', publishDate: tomorrow })).toBe(false);
+    expect(isBeingPublished({ state: 'ERROR', publishDate: hourAgo })).toBe(false);
+    expect(isBeingPublished({ state: 'DRAFT', publishDate: hourAgo })).toBe(false);
+    expect(isBeingPublished(null)).toBe(false);
   });
 });
 
