@@ -223,6 +223,51 @@ describe('WeeklySummaryService.sendDueSummaries', () => {
     }
   });
 
+  // the email is built from buildSummary, so the curation has to be wired in
+  // there and not only available as a helper
+  it('builds a failed post with the curated message, or none', async () => {
+    const { service, repo } = make();
+    const failed = (error: string) => ({
+      id: 'p-1',
+      content: 'Hiring',
+      publishDate: new Date('2026-10-30T09:00:00Z'),
+      error,
+      releaseURL: null,
+      integration: { providerIdentifier: 'x', name: 'X' },
+    });
+
+    repo.getPosts.mockImplementation(async (_o: string, state: string) =>
+      state === 'ERROR'
+        ? [
+            failed(
+              JSON.stringify({
+                cause: { type: 'bad_body', failure: { message: 'Duplicate post content' } },
+              })
+            ),
+          ]
+        : []
+    );
+    let summary = await service.buildSummary('org-a', 'Acme', mondayUtc(8), 'UTC');
+    expect(summary.failedPosts[0].error).toBe('Duplicate post content');
+
+    repo.getPosts.mockImplementation(async (_o: string, state: string) =>
+      state === 'ERROR'
+        ? [
+            failed(
+              JSON.stringify({
+                cause: {
+                  type: 'unknown',
+                  failure: { message: 'error:1C800064:Provider routines::bad decrypt' },
+                },
+              })
+            ),
+          ]
+        : []
+    );
+    summary = await service.buildSummary('org-a', 'Acme', mondayUtc(8), 'UTC');
+    expect(summary.failedPosts[0].error).toBe(undefined);
+  });
+
   it('does nothing without an email provider', async () => {
     const { service, repo, email } = make();
     email.hasProvider.mockReturnValue(false);

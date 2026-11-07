@@ -7,21 +7,16 @@
 // failures come out as null, because they can carry stack traces, decrypted
 // channel credentials or anything else the runtime put in the message.
 
-// A workflow writes a few plain strings into the column instead of a failure.
-// They are ours, so they are not shown either - except the one a customer can
-// act on and that nothing else tells them: a channel the workflow found
-// disabled is not in the "needs attention" reconnect list, which only looks at
-// channels that are still enabled.
-const SHOWN_WORKFLOW_STATES: Record<string, string> = {
-  'Channel disabled': 'Channel disabled',
-};
-
+// A workflow also writes a few plain strings into the column ('No Post',
+// 'Already posted', 'Refresh channel needed', 'Channel disabled'). They are
+// ours and they come out null too: each already has a better message
+// elsewhere - the workflow sends a translated in-app notification for a
+// disabled channel, and a channel needing a reconnect is in the "needs
+// attention" list - and the calendar has a translated fallback for a post that
+// failed with no reason to show.
 export const curatedPostError = (error?: string | null): string | null => {
   if (!error) {
     return null;
-  }
-  if (SHOWN_WORKFLOW_STATES[error.trim()]) {
-    return SHOWN_WORKFLOW_STATES[error.trim()];
   }
   try {
     const parsed = JSON.parse(error);

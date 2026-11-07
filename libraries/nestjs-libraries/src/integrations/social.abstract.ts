@@ -91,7 +91,9 @@ export const platformReason = (err: unknown): string | undefined => {
 
   // thrown by our own code or by the runtime, never by a platform.
   // TokenEncryptionError is ours and reads like a sentence - it names
-  // TOKEN_ENCRYPTION_KEY - so a class check is the only thing that stops it
+  // TOKEN_ENCRYPTION_KEY, and it carries no code - so the name is the only
+  // thing that stops it. Matching the name fails closed: an unrelated error
+  // that happened to be named this is hidden, not leaked
   if (
     /^(TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|AssertionError|TokenEncryptionError)$/.test(
       String(error?.name || '')
@@ -115,31 +117,15 @@ export const platformReason = (err: unknown): string | undefined => {
   return text;
 };
 
-// The reason a refresh failed, as a customer may read it in the "connect it
-// again" notification. A provider's own words arrive as one of our curated
-// application failures (a RefreshToken or BadBody thrown by handleErrors or by
-// a hand-written provider throw), or as the string a workflow carried back
-// from one. Everything else caught around a refresh is ours - a token that
-// could not be encrypted, a dropped socket, a bug - and a class name is not
-// enough to tell those apart (TokenEncryptionError reads like a sentence and
-// carries no code), so this accepts nothing it cannot account for.
-//
-// 'Unknown Error' is the placeholder handleErrors leaves when it could not map
-// the response at all, so it is not a message for a customer either.
+// The cause a workflow carried back from a provider's RefreshToken, as the
+// customer may read it in the "connect it again" notification. 'Unknown Error'
+// is the placeholder a provider's handleErrors leaves when it could not map
+// the response at all, so it is not a message for a customer either, and an
+// empty cause must not leave a stray space in the sentence.
 const UNMAPPED_FAILURE = 'Unknown Error';
-const CURATED_FAILURE_TYPES = ['bad_body', 'refresh_token'];
 
-export const providerReason = (value: unknown): string | undefined => {
-  const raw =
-    value instanceof ApplicationFailure
-      ? CURATED_FAILURE_TYPES.includes(String(value.type))
-        ? value.message
-        : undefined
-      : typeof value === 'string'
-      ? value
-      : undefined;
-
-  const text = (raw || '').trim();
+export const providerCause = (cause?: string | null): string | undefined => {
+  const text = (cause || '').trim();
   if (!text || text === UNMAPPED_FAILURE) {
     return undefined;
   }

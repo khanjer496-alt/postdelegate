@@ -237,10 +237,27 @@ describe('PostActivity refresh failure cause', () => {
   // whatever lands here is read out in the "connect it again" notification and
   // its email, so only a message the provider gave us may travel with it
 
-  it('passes on the message a provider failure carried', async () => {
-    // what reConnect throws after a successful refresh - the one provider
-    // message that reaches this catch, since refreshToken's own throw is
-    // swallowed inside refreshProcess
+  it('passes on the sentence a reConnect failure read', async () => {
+    // reConnect is the one thing in the try that fails with a message worth
+    // reading, and every implementation throws a plain Error - the one that
+    // matters most says reconnecting will NOT help
+    const page = make(
+      new Error(
+        'Your Facebook user has no permission to manage this page. Ask a page admin for full content access, then reconnect the channel'
+      )
+    );
+    await expect(page.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(page.refreshIntegrationService)).toBe(
+      'Your Facebook user has no permission to manage this page. Ask a page admin for full content access, then reconnect the channel'
+    );
+
+    const gone = make(new Error('Page not found in your accounts'));
+    await expect(gone.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(gone.refreshIntegrationService)).toBe(
+      'Page not found in your accounts'
+    );
+
+    // and one that arrives as a provider failure instead
     const { activity, refreshIntegrationService } = make(
       new RefreshToken('bluesky', '{}', {} as any, 'Refresh token has expired')
     );

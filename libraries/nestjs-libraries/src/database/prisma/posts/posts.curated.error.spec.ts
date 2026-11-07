@@ -54,13 +54,14 @@ describe('curatedPostError', () => {
     ).toBe(null);
   });
 
-  it('keeps the one workflow state a customer can act on', () => {
-    // nothing else tells them: a disabled channel is not in the reconnect list
-    expect(curatedPostError('Channel disabled')).toBe('Channel disabled');
-    // our own debug strings, and the ones the reconnect list already covers
+  it('drops the plain strings a workflow writes, which all read better elsewhere', () => {
+    expect(curatedPostError('Channel disabled')).toBe(null);
     expect(curatedPostError('Refresh channel needed')).toBe(null);
     expect(curatedPostError('No Post')).toBe(null);
     expect(curatedPostError('Already posted')).toBe(null);
+    // an object literal's prototype keys are truthy, and this returns a string
+    expect(curatedPostError('constructor')).toBe(null);
+    expect(curatedPostError('__proto__')).toBe(null);
   });
 
   it('drops anything that is not a serialized failure', () => {

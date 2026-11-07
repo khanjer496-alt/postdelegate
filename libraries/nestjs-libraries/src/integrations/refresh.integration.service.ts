@@ -6,7 +6,7 @@ import {
   AuthTokenDetails,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { providerReason } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { providerCause } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TemporalService } from 'nestjs-temporal-core';
 import { timer } from '@gitroom/helpers/utils/timer';
 
@@ -193,7 +193,7 @@ export class RefreshIntegrationService {
         // underlying Google error carries an axios code). cause travelled back
         // through the workflow as a plain string, so it is curated here.
         socialProvider.refreshErrorMessage?.(refreshError) ||
-          providerReason(cause) ||
+          providerCause(cause) ||
           ''
       );
 
