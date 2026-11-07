@@ -5,10 +5,11 @@ import Footer from '../components/Footer.astro';
 import CookieConsent from '../components/CookieConsent.astro';
 import { SITE, SOCIAL_PROFILES, NOINDEX_PATHS } from '../data/site';
 import { LOCALES, LANGUAGES, TRANSLATED_PATHS, localePath, splitPath, strings, type Lang } from '../i18n';
+import { OG_CARDS, ogCardFor } from '../data/og-cards.mjs';
 // markdown: path of the page's Markdown version, announced to agents with rel=alternate.
 // lang: the page's language; pages that exist in every language get hreflang alternates.
 interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string; markdown?: string; lang?: Lang }
-const { title, description, ogImage = '/og.png', jsonLd = [], type = 'website', markdown, lang = 'en' } = Astro.props;
+const { title, description, ogImage, jsonLd = [], type = 'website', markdown, lang = 'en' } = Astro.props;
 const canonicalPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const noindex = Astro.props.noindex || NOINDEX_PATHS.includes(canonicalPath);
 const canonical = new URL(canonicalPath, SITE.url).href;
@@ -18,7 +19,13 @@ const alternates = TRANSLATED_PATHS.has(englishPath)
   : [];
 const language = LANGUAGES[lang];
 const t = strings(lang);
-const og = new URL(ogImage, SITE.url).href;
+// The page's own share card when it has one (src/data/og-cards.mjs), so a
+// guide or a comparison does not unfurl as the generic brand card. Localised
+// paths are not in that list and fall back on purpose: an English card over a
+// Spanish page reads worse than the brand one.
+const card = OG_CARDS[canonicalPath];
+const og = new URL(ogImage ?? ogCardFor(canonicalPath) ?? '/og.png', SITE.url).href;
+const ogAlt = !ogImage && card ? `${card.title} — PostDelegate` : t.common.ogImageAlt;
 const logo = { '@type': 'ImageObject', '@id': `${SITE.url}/#logo`, url: new URL('/postdelegate-icon-512.png', SITE.url).href, contentUrl: new URL('/postdelegate-icon-512.png', SITE.url).href, width: 512, height: 512, caption: 'PostDelegate logo' };
 const org = { '@context': 'https://schema.org', '@type': 'Organization', '@id': `${SITE.url}/#organization`, name: 'PostDelegate', legalName: SITE.operator, url: SITE.url, logo, image: { '@id': `${SITE.url}/#logo` }, email: SITE.email, sameAs: SOCIAL_PROFILES.map((profile) => profile.href) };
 const website = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'PostDelegate', url: SITE.url };
@@ -54,12 +61,12 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content={t.common.ogImageAlt} />
+    <meta property="og:image:alt" content={ogAlt} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={og} />
-    <meta name="twitter:image:alt" content={t.common.ogImageAlt} />
+    <meta name="twitter:image:alt" content={ogAlt} />
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable product facts" />
     {markdown && <link rel="alternate" type="text/markdown" href={markdown} title="This page as Markdown" />}
     {[org, website, ...jsonLd].map((value) => <script type="application/ld+json" set:html={safeJson(value)} />)}
