@@ -1212,7 +1212,7 @@ export class PostsService {
     try {
       await this._temporalService.client
         .getRawClient()
-        ?.workflow.start('postWorkflowV112', {
+        ?.workflow.start('postWorkflowV113', {
           workflowId: `post_${postId}`,
           taskQueue: 'main',
           workflowIdConflictPolicy: 'TERMINATE_EXISTING',
@@ -2888,5 +2888,23 @@ export class PostsService {
 
   deleteTag(id: string, orgId: string) {
     return this._postRepository.deleteTag(id, orgId);
+  }
+
+  changeStateIf(
+    id: string,
+    expectedStates: State[],
+    state: State,
+    err?: any,
+    body?: any,
+    release?: { releaseId: string; releaseURL?: string }
+  ) {
+    return this._postRepository.changeStateIf(
+      id,
+      expectedStates,
+      state,
+      err,
+      body,
+      release
+    );
   }
 }

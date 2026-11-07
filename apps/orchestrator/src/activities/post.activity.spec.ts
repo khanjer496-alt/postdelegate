@@ -310,3 +310,91 @@ describe('PostActivity refresh failure cause', () => {
     expect(causeOf(unmapped.refreshIntegrationService)).toBe('');
   });
 });
+
+describe('PostActivity state writes for postWorkflowV113', () => {
+  const make = (postsService: any = {}, subscriptionService: any = {}, temporal: any = {}) =>
+    new PostActivity(
+      postsService,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      temporal,
+      subscriptionService
+    );
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it('changeStateIf passes the expected states through and reports whether it wrote', async () => {
+    const changeStateIf = jest
+      .fn()
+      .mockResolvedValueOnce({ id: 'p-1' })
+      .mockResolvedValueOnce(null);
+    const activity = make({ changeStateIf });
+    const release = { releaseId: 'x-1', releaseURL: 'https://x.com/1' };
+
+    await expect(
+      activity.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom', [], release)
+    ).resolves.toBe(true);
+    expect(changeStateIf).toHaveBeenCalledWith(
+      'p-1',
+      ['QUEUE'],
+      'ERROR',
+      'boom',
+      [],
+      release
+    );
+    await expect(
+      activity.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom')
+    ).resolves.toBe(false);
+  });
+
+  it('hasActiveSubscription tells a lapsed subscription apart', async () => {
+    delete process.env.STRIPE_SECRET_KEY;
+    const getSubscription = jest.fn().mockResolvedValue(null);
+    await expect(
+      make({}, { getSubscription }).hasActiveSubscription('org-1')
+    ).resolves.toBe(true);
+    expect(getSubscription).not.toHaveBeenCalled();
+
+    process.env.STRIPE_SECRET_KEY = 'sk_test';
+    await expect(
+      make({}, { getSubscription }).hasActiveSubscription('org-1')
+    ).resolves.toBe(false);
+    getSubscription.mockResolvedValue({ id: 'sub-1' });
+    await expect(
+      make({}, { getSubscription }).hasActiveSubscription('org-1')
+    ).resolves.toBe(true);
+  });
+
+  it('the missing-posts sweep starts the newest post workflow', async () => {
+    const signalWithStart = jest.fn().mockResolvedValue(undefined);
+    const activity = make(
+      {
+        searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
+          {
+            id: 'p-1',
+            organizationId: 'org-1',
+            integration: { providerIdentifier: 'x' },
+          },
+        ]),
+      },
+      {},
+      { client: { getRawClient: () => ({ workflow: { signalWithStart } }) } }
+    );
+
+    await activity.searchForMissingThreeHoursPosts();
+
+    expect(signalWithStart).toHaveBeenCalledWith(
+      'postWorkflowV113',
+      expect.objectContaining({
+        workflowId: 'post_p-1',
+        signal: 'poke',
+        workflowIdConflictPolicy: 'USE_EXISTING',
+      })
+    );
+  });
+});
