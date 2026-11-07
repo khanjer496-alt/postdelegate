@@ -871,7 +871,11 @@ export class OAuthService {
     return {
       id: authorization.id,
       mcpUrl: authorization.mcpUrl,
-      apiKey: readLegacySecret(authorization.apiKey, MCP_RELAY_KEY_LABEL),
+      // the column is non-nullable and always written, so this cannot be
+      // empty in practice; the fallback keeps the declared SelfHostedInstance
+      // contract (apiKey: string) honest rather than leaning on
+      // strictNullChecks being off
+      apiKey: readLegacySecret(authorization.apiKey, MCP_RELAY_KEY_LABEL) ?? '',
     };
   }
 

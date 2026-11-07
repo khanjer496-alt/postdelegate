@@ -81,11 +81,22 @@ This work extends that design to the rest. It invents nothing.
 1. No credential in the database is recoverable from `JWT_SECRET`.
 2. Pattern A secrets become **non-reversible**: a database read yields no usable
    token.
-3. Pattern B stops storing a bearer token in the clear.
+3. Pattern B stops storing a bearer token in the clear. **Lands with deploy
+   #2, not the first one:** while the lookup still accepts the stored value
+   verbatim, a database read is still enough to authenticate. See §5 of the
+   rollout runbook.
 4. Pattern C moves onto authenticated encryption with a rotatable key.
 5. **Zero customer disruption.** Every API key, OAuth token, authorization code
    and connected channel that works before the deploy works after it.
-6. `JWT_SECRET` becomes rotatable, with the one documented exception below.
+6. `JWT_SECRET` becomes rotatable, with the documented exceptions below.
+   **`TOKEN_ENCRYPTION_KEY` is rotatable only in part**, and this is a property
+   of HMACs rather than an omission: a hash cannot be recomputed without the
+   plaintext, and for an OAuth access token or client secret the plaintext is
+   held only by the customer. Those columns keep working through
+   `TOKEN_ENCRYPTION_KEY_PREVIOUS`, which therefore cannot be retired until the
+   credentials are re-issued. Everything encrypted, plus `apiKeyHash` (whose key
+   is recoverable from the encrypted copy beside it), is moved by
+   `backfill-secrets --rotate`.
 
 ## Non-goals
 

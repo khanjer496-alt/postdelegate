@@ -53,14 +53,26 @@ export class OrganizationRepository {
   // The key the customer holds. A value written before this change IS the key
   // (the random id behind it was discarded at creation), so it is returned
   // unchanged; only a value carrying the encryption prefix is decrypted.
+  //
+  // It never throws. This feeds GET /user/self, the frontend's bootstrap call,
+  // which has no error handling of its own - so a lost or emptied
+  // TOKEN_ENCRYPTION_KEY would 500 the whole app shell for every user instead
+  // of hiding one field. An unreadable copy reads as no key, which the UI
+  // already renders, and the key itself is not lost: it is still in the
+  // customer's hands and still matches apiKeyHash.
   readApiKey(org?: { apiKey?: string | null } | null): string {
     const stored = org?.apiKey;
     if (!stored) {
       return '';
     }
-    return SecretCrypto.isEncrypted(stored)
-      ? SecretCrypto.decrypt(stored, ORG_API_KEY_LABEL)
-      : stored;
+    if (!SecretCrypto.isEncrypted(stored)) {
+      return stored;
+    }
+    try {
+      return SecretCrypto.decrypt(stored, ORG_API_KEY_LABEL);
+    } catch {
+      return '';
+    }
   }
 
   async createMaxUser(

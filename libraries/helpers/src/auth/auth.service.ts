@@ -132,12 +132,18 @@ export class AuthService {
   // that has to be read back. See
   // deploy/postdelegate/secrets-at-rest-rollout.md.
   //
-  // What is left here is the lifetime-deal code format: codes.service.ts mints
-  // 10,000 codes by encrypting `<token>:<index>`, and StripeService.lifetimeDeal
-  // verifies a redemption by decrypting it. Those codes are already in
-  // customers' hands, so the scheme cannot change without invalidating them -
-  // which also makes them the one thing still coupled to JWT_SECRET, and the
-  // reason rotating it is not yet a safe operation.
+  // Two callers are left.
+  //
+  // 1. The lifetime-deal code format: codes.service.ts mints 10,000 codes by
+  //    encrypting `<token>:<index>`, and StripeService.lifetimeDeal verifies a
+  //    redemption by decrypting it. Those codes are already in customers'
+  //    hands, so the scheme cannot change without invalidating them - which
+  //    makes them the reason rotating JWT_SECRET is not yet safe.
+  // 2. skool.provider.ts pre-encrypts its cookie JSON into Integration.token,
+  //    a column the repository then encrypts again with token.encryption.ts.
+  //    Nothing reads that inner layer (getCookies reads customInstanceDetails),
+  //    so it was left rather than changing a stored format - but it does mean
+  //    rotating JWT_SECRET silently changes what Skool writes there.
   static fixedEncryption(value: string) {
     return encrypt_legacy_using_IV(value);
   }

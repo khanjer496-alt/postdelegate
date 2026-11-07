@@ -2,7 +2,10 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { ORG_API_KEY_LABEL } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { AI_CREDENTIAL_LABEL } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.repository';
 import { OAUTH_SECRET_LABELS } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
-import { SecretBackfillService } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.backfill.service';
+import {
+  NOT_ROTATABLE,
+  SecretBackfillService,
+} from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.backfill.service';
 import {
   SecretCrypto,
   SecretCryptoError,
@@ -228,6 +231,115 @@ describe('SecretBackfillService', () => {
 
       expect(rows.oAuthAuthorization[0].accessToken).toBe(hashed);
       expect(report.oAuthAuthorization.unchanged).toBe(1);
+    });
+  });
+
+  // Completing a rotation: TOKEN_ENCRYPTION_KEY_PREVIOUS cannot be retired
+  // until everything still readable only with it has been moved.
+  describe('rotation (--rotate)', () => {
+    const rotateTo = (newKey: string) => {
+      process.env.TOKEN_ENCRYPTION_KEY = newKey;
+      process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS = KEY;
+      SecretCrypto.reset();
+    };
+    const K2 = Buffer.alloc(32, 24).toString('base64');
+
+    it('re-encrypts a credential left on the retired key', async () => {
+      const underK1 = SecretCrypto.encrypt('sk-proj-key', AI_CREDENTIAL_LABEL);
+      const { repository, rows } = repositoryFake({
+        aiCredential: [{ id: 'ai-1', apiKey: underK1 }],
+      });
+      rotateTo(K2);
+
+      const report = await new SecretBackfillService(repository as any).run({
+        rotate: true,
+        only: 'credentials',
+      });
+
+      expect(rows.aiCredential[0].apiKey).not.toBe(underK1);
+      expect(SecretCrypto.needsReencryption(rows.aiCredential[0].apiKey, AI_CREDENTIAL_LABEL)).toBe(false);
+      expect(SecretCrypto.decrypt(rows.aiCredential[0].apiKey, AI_CREDENTIAL_LABEL)).toBe('sk-proj-key');
+      expect(report.aiCredential.updated).toBe(1);
+    });
+
+    it('leaves a credential already on the current key', async () => {
+      rotateTo(K2);
+      const underK2 = SecretCrypto.encrypt('sk-proj-key', AI_CREDENTIAL_LABEL);
+      const { repository, rows } = repositoryFake({
+        aiCredential: [{ id: 'ai-1', apiKey: underK2 }],
+      });
+
+      const report = await new SecretBackfillService(repository as any).run({
+        rotate: true,
+        only: 'credentials',
+      });
+
+      expect(rows.aiCredential[0].apiKey).toBe(underK2);
+      expect(report.aiCredential.unchanged).toBe(1);
+    });
+
+    // The org key is the one hashed column that CAN be rotated: its plaintext
+    // is recoverable from the encrypted copy in the same row.
+    it('re-encrypts the org key and re-hashes it under the new key', async () => {
+      const key = 'original-api-key-value';
+      const underK1 = SecretCrypto.encrypt(key, ORG_API_KEY_LABEL);
+      const hashK1 = SecretCrypto.hash(key, ORG_API_KEY_LABEL);
+      const { repository, rows } = repositoryFake({
+        organization: [{ id: 'org-1', apiKey: underK1, apiKeyHash: hashK1 }],
+      });
+      rotateTo(K2);
+
+      await new SecretBackfillService(repository as any).run({
+        rotate: true,
+        only: 'org',
+      });
+
+      expect(rows.organization[0].apiKeyHash).toBe(
+        SecretCrypto.hash(key, ORG_API_KEY_LABEL)
+      );
+      expect(rows.organization[0].apiKeyHash).not.toBe(hashK1);
+      expect(
+        SecretCrypto.decrypt(rows.organization[0].apiKey, ORG_API_KEY_LABEL)
+      ).toBe(key);
+      expect(
+        SecretCrypto.needsReencryption(rows.organization[0].apiKey, ORG_API_KEY_LABEL)
+      ).toBe(false);
+    });
+
+    // An HMAC cannot be recomputed without the plaintext, and for these the
+    // plaintext is held only by the customer. The retired key has to stay, or
+    // the credentials have to be re-issued. Silently reporting them as done
+    // would be the dangerous outcome.
+    it('does not touch, and names, the columns it cannot rotate', async () => {
+      const underK1 = SecretCrypto.hash('pos_live', OAUTH_SECRET_LABELS.accessToken);
+      const { repository, rows } = repositoryFake({
+        oAuthAuthorization: [{ id: 'auth-1', accessToken: underK1 }],
+      });
+      rotateTo(K2);
+
+      const report = await new SecretBackfillService(repository as any).run({
+        rotate: true,
+      });
+
+      expect(rows.oAuthAuthorization[0].accessToken).toBe(underK1);
+      expect(report.oAuthAuthorization).toBeUndefined();
+      expect(NOT_ROTATABLE.length).toBeGreaterThan(0);
+      expect(NOT_ROTATABLE.join(' ')).toContain('OAuthAuthorization.accessToken');
+    });
+
+    it('a normal run does not re-encrypt a retired-key value', async () => {
+      const underK1 = SecretCrypto.encrypt('sk-proj-key', AI_CREDENTIAL_LABEL);
+      const { repository, rows } = repositoryFake({
+        aiCredential: [{ id: 'ai-1', apiKey: underK1 }],
+      });
+      rotateTo(K2);
+
+      const report = await new SecretBackfillService(repository as any).run({
+        only: 'credentials',
+      });
+
+      expect(rows.aiCredential[0].apiKey).toBe(underK1);
+      expect(report.aiCredential.unchanged).toBe(1);
     });
   });
 

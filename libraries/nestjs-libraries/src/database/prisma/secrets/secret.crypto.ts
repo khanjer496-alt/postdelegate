@@ -123,6 +123,17 @@ const decryptWith = (
   );
 };
 
+// Whether this module can authenticate the value as its own ciphertext for
+// this field. Used to decide "already encrypted", which a prefix alone cannot.
+const canRead = (value: string, label: string) => {
+  try {
+    SecretCrypto.decrypt(value, label);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const SecretCrypto = {
   isEnabled(): boolean {
     return !!loadKeys().current;
@@ -138,12 +149,12 @@ export const SecretCrypto = {
     );
   },
 
-  // Already-hashed values are returned untouched, so hashing twice is harmless
-  // and a dual-write cannot corrupt a row.
+  // Always hashes what it is given, even a value that already looks like a
+  // hash. It must not short-circuit: a caller that hashes a presented
+  // credential and compares it with the stored hash would otherwise accept the
+  // stored hash itself as the credential. Idempotence belongs to the callers
+  // that need it, which guard with isHashed.
   hash(value: string, label: string): string {
-    if (SecretCrypto.isHashed(value)) {
-      return value;
-    }
     return hashWith(requireCurrent().hmac, value, label);
   },
 
@@ -169,15 +180,22 @@ export const SecretCrypto = {
     return timingSafeEqual(Buffer.from(a), Buffer.from(b));
   },
 
-  // null, undefined, '' (the erased sentinel) and already encrypted values are
-  // returned untouched. Without a key nothing is encrypted, which is the
-  // self-hosted default, matching token.encryption.ts.
+  // null, undefined and '' (the erased sentinel) are returned untouched, as is
+  // a value this module can already read back under this label, so encrypting
+  // twice is harmless. A value that merely carries the prefix is NOT trusted:
+  // the Chrome extension posts arbitrary bytes into one of these columns, and
+  // a ciphertext belonging to another field is not this field's. Both get
+  // encrypted rather than stored as they are. Without a key nothing is
+  // encrypted, which is the self-hosted default, matching token.encryption.ts.
   encrypt<T extends string | null | undefined>(value: T, label: string): T {
-    if (!value || SecretCrypto.isEncrypted(value)) {
+    if (!value) {
       return value;
     }
     const { current } = loadKeys();
     if (!current) {
+      return value;
+    }
+    if (SecretCrypto.isEncrypted(value) && canRead(value, label)) {
       return value;
     }
     const iv = randomBytes(IV_LENGTH);
@@ -203,6 +221,18 @@ export const SecretCrypto = {
     if (!SecretCrypto.isEncrypted(value)) {
       return value;
     }
+    return SecretCrypto.decryptWithInfo(value, label).value as T;
+  },
+
+  // Which key read it, so a rotation can tell what it still has to re-encrypt.
+  // Mirrors token.encryption.ts's decryptWithInfo.
+  decryptWithInfo(
+    value: string,
+    label: string
+  ): { value: string; usedCurrentKey: boolean } {
+    if (!SecretCrypto.isEncrypted(value)) {
+      return { value, usedCurrentKey: true };
+    }
     const keys = loadKeys();
     const candidates = [keys.current, ...keys.previous].filter(
       (key): key is DerivedKey => !!key
@@ -222,7 +252,10 @@ export const SecretCrypto = {
     }
     for (const key of candidates) {
       try {
-        return decryptWith(key.aead, iv, tag, data, label) as T;
+        return {
+          value: decryptWith(key.aead, iv, tag, data, label),
+          usedCurrentKey: key === keys.current,
+        };
       } catch {
         // wrong key, wrong label or a tampered value: try the next retired key
       }
@@ -230,6 +263,17 @@ export const SecretCrypto = {
     throw new SecretCryptoError(
       'A stored secret could not be decrypted: it was tampered with, belongs to another field, or TOKEN_ENCRYPTION_KEY is not the key it was encrypted with'
     );
+  },
+
+  // Encrypted with a retired key, so a rotation still has to move it. There is
+  // no equivalent for a hashed column: an HMAC cannot be recomputed without the
+  // plaintext, and for an OAuth token or client secret the plaintext is held
+  // only by the customer. See ROTATABLE_BY_BACKFILL in secret.backfill.service.
+  needsReencryption(value: string | null | undefined, label: string): boolean {
+    if (!SecretCrypto.isEncrypted(value) || !SecretCrypto.isEnabled()) {
+      return false;
+    }
+    return SecretCrypto.decryptWithInfo(value, label).usedCurrentKey === false;
   },
 
   // test hook

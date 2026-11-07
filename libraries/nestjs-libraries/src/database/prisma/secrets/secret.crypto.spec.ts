@@ -77,12 +77,72 @@ describe('SecretCrypto', () => {
     expect(SecretCrypto.decrypt('', 'a')).toBe('');
   });
 
-  // Review Focus 4
-  it('is a no-op on an already converted value', () => {
+  // Review Focus 4: encrypting a value this module can read back is a no-op,
+  // so the backfill is re-runnable and a dual-write cannot corrupt a row.
+  it('is a no-op on a value it can already read back', () => {
     const enc = SecretCrypto.encrypt('secret', 'a');
     expect(SecretCrypto.encrypt(enc, 'a')).toBe(enc);
+  });
+
+  // hash() must NOT short-circuit on an h1: input. Otherwise any caller that
+  // hashes a presented credential and compares it to the stored hash can be
+  // authenticated by presenting the stored hash itself.
+  it('hashes a value that already looks like a hash, rather than returning it', () => {
     const hashed = SecretCrypto.hash('tok', 'a');
-    expect(SecretCrypto.hash(hashed, 'a')).toBe(hashed);
+    expect(SecretCrypto.hash(hashed, 'a')).not.toBe(hashed);
+  });
+
+  // A value carrying the prefix but not produced by this module (the Chrome
+  // extension posts arbitrary bytes) must be encrypted, not stored as it is.
+  it('encrypts a prefixed value it cannot read back, rather than storing it bare', () => {
+    const foreign = 'enc:v1:not:a:real:ciphertext';
+    const stored = SecretCrypto.encrypt(foreign, 'a');
+    expect(stored).not.toBe(foreign);
+    expect(SecretCrypto.decrypt(stored, 'a')).toBe(foreign);
+  });
+
+  it('does not treat another field label\'s ciphertext as already encrypted', () => {
+    const otherField = SecretCrypto.encrypt('secret', 'b');
+    const stored = SecretCrypto.encrypt(otherField, 'a');
+    expect(stored).not.toBe(otherField);
+    expect(SecretCrypto.decrypt(stored, 'a')).toBe(otherField);
+  });
+
+  describe('key provenance, for completing a rotation', () => {
+    it('says whether a value was encrypted with the current key', () => {
+      const underCurrent = SecretCrypto.encrypt('secret', 'a');
+      expect(SecretCrypto.decryptWithInfo(underCurrent, 'a')).toEqual({
+        value: 'secret',
+        usedCurrentKey: true,
+      });
+
+      process.env.TOKEN_ENCRYPTION_KEY = OTHER_KEY;
+      process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS = KEY;
+      SecretCrypto.reset();
+
+      expect(SecretCrypto.decryptWithInfo(underCurrent, 'a')).toEqual({
+        value: 'secret',
+        usedCurrentKey: false,
+      });
+    });
+
+    it('reports a value that needs re-encrypting onto the current key', () => {
+      const underOldKey = SecretCrypto.encrypt('secret', 'a');
+      expect(SecretCrypto.needsReencryption(underOldKey, 'a')).toBe(false);
+
+      process.env.TOKEN_ENCRYPTION_KEY = OTHER_KEY;
+      process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS = KEY;
+      SecretCrypto.reset();
+
+      expect(SecretCrypto.needsReencryption(underOldKey, 'a')).toBe(true);
+      expect(
+        SecretCrypto.needsReencryption(SecretCrypto.encrypt('secret', 'a'), 'a')
+      ).toBe(false);
+      expect(SecretCrypto.needsReencryption(null, 'a')).toBe(false);
+      expect(SecretCrypto.needsReencryption('legacy-not-prefixed', 'a')).toBe(
+        false
+      );
+    });
   });
 
   // Review Focus 3

@@ -44,7 +44,25 @@ type Plan = {
   // the values to write, or null when the row is already current. Throws when
   // the stored value cannot be read, which the caller counts as unreadable.
   convert(row: Record<string, any>): Record<string, string | null> | null;
+  // moves a row that is still readable only with a retired key onto the
+  // current one. Absent when the column cannot be rotated at all.
+  rotate?(row: Record<string, any>): Record<string, string | null> | null;
 };
+
+// Why some columns cannot be rotated: an HMAC cannot be recomputed without the
+// plaintext, and for these the plaintext is held only by the customer. So
+// retiring a TOKEN_ENCRYPTION_KEY that any of these were hashed with means
+// either keeping it in TOKEN_ENCRYPTION_KEY_PREVIOUS until the credentials are
+// re-issued, or deliberately invalidating them - which forces every connected
+// app to authorise again. The rotation command prints this list.
+//
+// Organization.apiKeyHash is NOT here: its plaintext is recoverable from the
+// encrypted copy in the same row, so it can be re-hashed.
+export const NOT_ROTATABLE = [
+  'OAuthAuthorization.accessToken',
+  'OAuthApp.clientSecret',
+  'OAuthSelfHostedAuthorization.accessToken',
+];
 
 // The legacy plaintext behind a value written by an earlier release. Throws
 // when it is not a legacy value at all, so a row nobody can read is reported
@@ -63,6 +81,20 @@ const toHash = (value: string | null, label: string) => {
     return null;
   }
   return SecretCrypto.hash(legacyPlaintext(value), label);
+};
+
+// Moves a ciphertext from a retired key onto the current one. null when it is
+// already current, or is not this module's ciphertext at all.
+const reCipher = (value: string | null, label: string) => {
+  if (!value || !SecretCrypto.needsReencryption(value, label)) {
+    return null;
+  }
+  const plaintext = SecretCrypto.decrypt(value, label);
+  const encrypted = SecretCrypto.encrypt(plaintext, label);
+  if (SecretCrypto.decrypt(encrypted, label) !== plaintext) {
+    throw new SecretCryptoError('Re-encrypted value does not round-trip');
+  }
+  return encrypted;
 };
 
 // A secret that has to be read back: store authenticated ciphertext, and never
@@ -91,6 +123,10 @@ const cipherPlan = (
   columns: [column],
   convert: (row) => {
     const next = toCipher(row[column], label);
+    return next ? { [column]: next } : null;
+  },
+  rotate: (row) => {
+    const next = reCipher(row[column], label);
     return next ? { [column]: next } : null;
   },
 });
@@ -151,6 +187,23 @@ export class SecretBackfillService {
           }
           return { apiKey, apiKeyHash };
         },
+        // The one hashed column that can be rotated: the key is recoverable
+        // from the encrypted copy beside it, so the hash can be recomputed.
+        rotate: (row) => {
+          if (!row.apiKey || !SecretCrypto.isEncrypted(row.apiKey)) {
+            return null;
+          }
+          const key = SecretCrypto.decrypt(row.apiKey, ORG_API_KEY_LABEL);
+          const apiKey = reCipher(row.apiKey, ORG_API_KEY_LABEL) ?? row.apiKey;
+          const apiKeyHash = SecretCrypto.hash(key, ORG_API_KEY_LABEL);
+          if (apiKey === row.apiKey && apiKeyHash === row.apiKeyHash) {
+            return null;
+          }
+          if (SecretCrypto.decrypt(apiKey, ORG_API_KEY_LABEL) !== key) {
+            throw new SecretCryptoError('Re-encrypted value does not round-trip');
+          }
+          return { apiKey, apiKeyHash };
+        },
       },
       hashPlan(
         'oAuthAuthorization',
@@ -182,6 +235,12 @@ export class SecretBackfillService {
             ...(apiKey ? { apiKey } : {}),
           };
         },
+        // accessToken is an HMAC and cannot be re-hashed; only the relay key
+        // moves. See NOT_ROTATABLE.
+        rotate: (row) => {
+          const apiKey = reCipher(row.apiKey, MCP_RELAY_KEY_LABEL);
+          return apiKey ? { apiKey } : null;
+        },
       },
       cipherPlan('aiCredential', 'credentials', 'apiKey', AI_CREDENTIAL_LABEL),
       cipherPlan('thirdParty', 'credentials', 'apiKey', THIRD_PARTY_KEY_LABEL),
@@ -199,6 +258,9 @@ export class SecretBackfillService {
       batchSize?: number;
       dryRun?: boolean;
       only?: SecretBackfillGroup;
+      // move rows off a retired TOKEN_ENCRYPTION_KEY_PREVIOUS instead of
+      // converting legacy values. Only the columns that can be rotated run.
+      rotate?: boolean;
       onProgress?: (report: SecretBackfillReport) => void;
     } = {}
   ): Promise<Record<string, SecretBackfillReport>> {
@@ -210,9 +272,9 @@ export class SecretBackfillService {
 
     const batchSize = Math.max(1, options.batchSize ?? 200);
     const dryRun = !!options.dryRun;
-    const plans = this.plans().filter(
-      (plan) => !options.only || plan.group === options.only
-    );
+    const plans = this.plans()
+      .filter((plan) => !options.only || plan.group === options.only)
+      .filter((plan) => !options.rotate || !!plan.rotate);
     const reports: Record<string, SecretBackfillReport> = {};
 
     for (const plan of plans) {
@@ -239,7 +301,9 @@ export class SecretBackfillService {
           report.scanned++;
           let next: Record<string, string | null> | null;
           try {
-            next = plan.convert(row);
+            next = options.rotate
+              ? plan.rotate!(row)
+              : plan.convert(row);
           } catch (err) {
             report.unreadable++;
             // the row id, never the value

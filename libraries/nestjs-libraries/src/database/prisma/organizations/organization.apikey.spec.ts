@@ -172,6 +172,28 @@ describe('Organization API keys', () => {
       );
     });
 
+    // A lost or emptied TOKEN_ENCRYPTION_KEY must not take down the app shell.
+    // This value feeds GET /user/self, the frontend's bootstrap call, which has
+    // no try/catch - a throw here 500s it for every user. The UI already
+    // handles an empty publicApi, so key loss degrades to "key not shown".
+    it('reads as empty, not an exception, when the key is gone', () => {
+      const { repository } = setup();
+      const { stored } = repository.issueApiKey();
+
+      delete process.env.TOKEN_ENCRYPTION_KEY;
+      SecretCrypto.reset();
+
+      expect(repository.readApiKey({ apiKey: stored } as any)).toBe('');
+    });
+
+    it('reads as empty, not an exception, when the stored copy is unreadable', () => {
+      const { repository } = setup();
+      const { stored } = repository.issueApiKey();
+      const tampered = stored.slice(0, -2) + (stored.endsWith('xy') ? 'ab' : 'xy');
+
+      expect(repository.readApiKey({ apiKey: tampered } as any)).toBe('');
+    });
+
     it('reads null and the empty string as an empty key', () => {
       const { repository } = setup();
       expect(repository.readApiKey({ apiKey: null } as any)).toBe('');

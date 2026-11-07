@@ -7,6 +7,7 @@ import {
 } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { SecretBackfillRepository } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.backfill.repository';
 import {
+  NOT_ROTATABLE,
   SecretBackfillGroup,
   SecretBackfillService,
 } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.backfill.service';
@@ -17,6 +18,10 @@ import {
 // container (see deploy/postdelegate/secrets-at-rest-rollout.md):
 //
 //   backfill-secrets [--dry-run] [--only=org|oauth|credentials|integrations] [--batch-size=200]
+//
+// With --rotate it instead moves rows off a retired TOKEN_ENCRYPTION_KEY_PREVIOUS
+// onto the current key. Only the columns that can be rotated run; it prints the
+// ones that cannot.
 //
 // The release image wraps it under that name, as it does erase-account.
 @Module({
@@ -56,10 +61,19 @@ async function bootstrap() {
     { logger: ['error'] }
   );
   try {
+    const rotate = args.includes('--rotate');
+    if (rotate) {
+      console.log(
+        `rotate: these columns cannot be re-keyed, because an HMAC cannot be recomputed without the plaintext and the customer holds it: ${NOT_ROTATABLE.join(
+          ', '
+        )}. Keep TOKEN_ENCRYPTION_KEY_PREVIOUS until those credentials are re-issued.`
+      );
+    }
     const reports = await app.get(SecretBackfillService).run({
       batchSize: Number.isFinite(batchSize) ? batchSize : 200,
       dryRun: args.includes('--dry-run'),
       only,
+      rotate,
       onProgress: (progress) =>
         console.log(`progress ${JSON.stringify(progress)}`),
     });
