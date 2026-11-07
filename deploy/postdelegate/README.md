@@ -54,6 +54,7 @@ R2 usage is billed under the account's existing allowances/pricing; this is not 
 - Daily local backups: `postiz-backup.timer`, with output under `/var/backups/postiz`.
 - Manual backup: `sudo backup-postiz`.
 - Off-site encrypted backups and health alerts: `offsite-backup-postiz`, `postiz-healthcheck`, installed with `install-ops.sh`; see [Operations: off-site backups and alerts](#operations-off-site-backups-and-alerts).
+- Removing the channel credentials older releases stored in `Errors.body`: `scrub-error-bodies`, shipped in the release image; see [error-body-scrub.md](error-body-scrub.md).
 
 Treat application logs as potentially sensitive; do not paste raw logs/configuration into public issues. The base image remains pinned, and the custom image tag records its source revision. Upgrades require an intentional release change followed by acceptance checks.
 

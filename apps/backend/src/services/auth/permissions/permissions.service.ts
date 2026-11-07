@@ -51,8 +51,9 @@ export class PermissionsService {
   }
 
   // A full plan that sells extra channels adds them instead of upgrading.
-  // Only a paid, active Stripe subscription can buy them: not a trial or a
-  // past_due one (the webhooks store isTrailing for any status but active), a
+  // Only a paid, active Stripe subscription can buy them: not a trial
+  // (isTrailing), a past_due one (its stored status; a row stored before the
+  // status was kept has none and is judged by isTrailing alone, as before), a
   // store subscription, a lifetime deal or an admin-granted plan (no Stripe
   // customer)
   async extraChannelsOffer(org: {
@@ -70,6 +71,7 @@ export class PermissionsService {
       !subscription ||
       subscription.provider !== STRIPE_PROVIDER ||
       subscription.isLifetime ||
+      (!!subscription.status && subscription.status !== 'active') ||
       !allowsExtraChannels(subscription.subscriptionTier)
     ) {
       return null;

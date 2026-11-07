@@ -49,7 +49,7 @@ Whichever kind it is, you start from **Add Channel** on the calendar page.
 
 You can connect several accounts from the same network, such as two YouTube channels, three Bluesky profiles or a Slack workspace for each client. Each account is its own channel, with its own settings, time slots and posts. To add another one, choose **Add Channel** and pick the network again.
 
-**Every connected account counts as one channel on your plan.** There is no separate limit per network, so you can mix networks however you like up to your plan's total. See [pricing](/pricing) for how many channels each plan includes. A disabled channel still uses a slot. Delete a channel you no longer need to free its slot.
+**Every connected account counts as one channel on your plan.** There is no separate limit per network, so you can mix networks however you like up to your plan's total. See [pricing](/pricing) for how many channels each plan includes. A channel that is turned off does not use a slot, and turning it back on needs room on your plan. Channels a downgrade locked unlock by themselves when you upgrade, oldest first, as many as the new plan has room for. Channels you turned off yourself stay off until you turn them on.
 
 **Connecting the same account twice updates it.** If you connect an account that is already in the workspace, PostDelegate refreshes the existing channel instead of adding a copy.
 

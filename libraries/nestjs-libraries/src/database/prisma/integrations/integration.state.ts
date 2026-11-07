@@ -32,9 +32,23 @@ export type ChannelState =
 export type ChannelFlags = {
   deletedAt?: Date | string | null;
   disabled?: boolean | null;
+  disabledReason?: string | null;
   inBetweenSteps?: boolean | null;
   refreshNeeded?: boolean | null;
 };
+
+// Why a channel is 'off', stored next to `disabled` in disabledReason. It
+// never changes what 'off' means (the channel is off either way), only who
+// can turn it back on: the customer turned it off themselves (USER), or a
+// downgrade turned it off because the plan has no room for it (PLAN_LIMIT),
+// and only those an upgrade turns back on. Null is a channel turned off
+// before the reason was recorded: it is never turned back on by itself, the
+// customer does that from the channel's menu. A removed channel (and the
+// disconnected tombstone) keeps the reason it had: nothing reads it there,
+// and every write that brings the row back (a reconnect, a page pick) clears
+// it along with `disabled`.
+export const DISABLED_BY_USER = 'USER';
+export const DISABLED_BY_PLAN = 'PLAN_LIMIT';
 
 // Ordered by what the customer has to do about it, most final first: a deleted
 // channel is gone whatever its other flags say, one they turned off is theirs
@@ -61,6 +75,14 @@ export const isChannelConnected = (channel: ChannelFlags) =>
 
 export const isChannelReady = (channel: ChannelFlags) =>
   channelState(channel) === 'ready';
+
+// Off because the plan has no room for it: the customer upgrades, or turns
+// off another channel and turns this one on. The same channels as
+// CHANNEL_LOCKED_BY_PLAN, the ones an upgrade turns back on
+export const isChannelLockedByPlan = (channel: ChannelFlags) =>
+  channelState(channel) === 'off' &&
+  !channel.inBetweenSteps &&
+  channel.disabledReason === DISABLED_BY_PLAN;
 
 // The channels a plan's channel limit counts: the connected ones. Every limit
 // check - connecting, picking a page, enabling, a downgrade turning channels
@@ -96,6 +118,15 @@ export const CHANNEL_CONNECTED: Prisma.IntegrationWhereInput = {
 export const CHANNEL_READY: Prisma.IntegrationWhereInput = {
   ...CHANNEL_CONNECTED,
   refreshNeeded: false,
+};
+
+// The channels a downgrade locked (isChannelLockedByPlan), the only ones an
+// upgrade turns back on
+export const CHANNEL_LOCKED_BY_PLAN: Prisma.IntegrationWhereInput = {
+  deletedAt: null,
+  disabled: true,
+  disabledReason: DISABLED_BY_PLAN,
+  inBetweenSteps: false,
 };
 
 // A channel they turned off themselves is not in here: they know, and nothing

@@ -20,6 +20,7 @@ import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dt
 import { decryptIntegrationOf } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
 import { evergreenOccurrences } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
 import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
+import { auditErrorBody } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.audit.body';
 import { CHANNEL_READY } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 dayjs.extend(isoWeek);
@@ -578,13 +579,24 @@ export class PostsRepository {
     return this.writeState(id, state, err, body);
   }
 
-  getErrorsByPostIds(postIds: string[]) {
-    return this._errors.model.errors.findMany({
+  async getErrorsByPostIds(postIds: string[]) {
+    const errors = await this._errors.model.errors.findMany({
       where: {
         postId: { in: postIds },
       },
+      select: {
+        message: true,
+        platform: true,
+        body: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
+    // rows written before the allowlist can still hold whole post rows
+    return errors.map((error) => ({
+      ...error,
+      body: auditErrorBody(error.body),
+    }));
   }
 
   async changeDate(
@@ -1127,8 +1139,8 @@ export class PostsRepository {
     } as const;
   }
 
-  getPostTimeline(id: string, org: string) {
-    return this._post.model.post.findFirst({
+  async getPostTimeline(id: string, org: string) {
+    const timeline = await this._post.model.post.findFirst({
       where: {
         id,
         organizationId: org,
@@ -1161,6 +1173,17 @@ export class PostsRepository {
         },
       },
     });
+    if (!timeline) {
+      return timeline;
+    }
+    // rows written before the allowlist can still hold whole post rows
+    return {
+      ...timeline,
+      errors: timeline.errors.map((error) => ({
+        ...error,
+        body: auditErrorBody(error.body),
+      })),
+    };
   }
 
   findAllExistingCategories() {
@@ -1594,10 +1617,7 @@ export class PostsRepository {
           true,
           {
             message: typeof err === 'string' ? err : JSON.stringify(err),
-            body:
-              typeof body === 'string'
-                ? body
-                : JSON.stringify(this.auditBody(body)),
+            body: auditErrorBody(body),
           }
         );
       } catch {
@@ -1605,38 +1625,5 @@ export class PostsRepository {
       }
     }
     return updated;
-  }
-
-  // Errors.body is a debug snapshot, read by the admin errors view and the
-  // post debug export. The workflows pass the posts they were publishing, and
-  // those carry the decrypted integration (token, refreshToken,
-  // customInstanceDetails) - never store it: keep only what names the channel,
-  // and drop anything else that looks like a credential.
-  private auditBody(body: any): any {
-    const strip = (item: any) => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) {
-        return item;
-      }
-
-      const { integration, submittedForOrder, ...rest } = item;
-      return {
-        ...Object.fromEntries(
-          Object.entries(rest).filter(
-            ([key]) => !/token|secret|password/i.test(key)
-          )
-        ),
-        ...(integration && typeof integration === 'object'
-          ? {
-              integration: {
-                id: integration.id,
-                name: integration.name,
-                providerIdentifier: integration.providerIdentifier,
-              },
-            }
-          : {}),
-      };
-    };
-
-    return Array.isArray(body) ? body.map(strip) : strip(body);
   }
 }

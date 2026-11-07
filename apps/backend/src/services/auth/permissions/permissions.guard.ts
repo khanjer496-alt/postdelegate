@@ -15,6 +15,9 @@ import { Sections, SubscriptionException } from './permission.exception.class';
 // Routes that run before there is an organization on the request. Matched on
 // whole path segments from the start, a path that merely contains one of
 // these (/oauth/authorize, /whatever/auth/x) is still checked.
+// /integrations/social-connect is the OAuth callback: it has no session, the
+// connect binding of its state decides who may finish it (connect.binding)
+// and the controller checks the plan's channel limit itself.
 // /integrations/provider (the page pick that ends a connect) has an
 // organization, but whether it adds a channel depends on the page picked - a
 // page that already is a connected channel adds none - so the plan's channel

@@ -522,24 +522,77 @@ describe('IntegrationRepository channel lifecycle on (re)connect', () => {
 
   it('a reconnected deleted channel comes back on, also from a revoked tombstone', async () => {
     const { repo, rows } = makeStore([
-      row({ deletedAt: new Date(), disabled: true, refreshNeeded: true }),
+      row({
+        deletedAt: new Date(),
+        disabled: true,
+        disabledReason: 'PLAN_LIMIT',
+        refreshNeeded: true,
+      }),
     ]);
     await repo.createOrUpdateIntegration(
       undefined, false, 'org-1', 'N', undefined, 'social', 'ext-1', 'x', 'tok'
     );
+    // back on, so no longer a reason to be off
     expect(rows[0]).toMatchObject({
       deletedAt: null,
       disabled: false,
+      disabledReason: null,
       refreshNeeded: false,
     });
   });
 
-  it('a reconnected live channel that was turned off stays off', async () => {
-    const { repo, rows } = makeStore([row({ disabled: true })]);
-    await repo.createOrUpdateIntegration(
-      undefined, false, 'org-1', 'N', undefined, 'social', 'ext-1', 'x', 'tok'
-    );
-    expect(rows[0].disabled).toBe(true);
+  it('a reconnected live channel that was turned off stays off, for the same reason', async () => {
+    for (const disabledReason of ['USER', 'PLAN_LIMIT', null]) {
+      const { repo, rows } = makeStore([
+        row({ disabled: true, disabledReason }),
+      ]);
+      await repo.createOrUpdateIntegration(
+        undefined, false, 'org-1', 'N', undefined, 'social', 'ext-1', 'x', 'tok'
+      );
+      expect(rows[0]).toMatchObject({ disabled: true, disabledReason });
+    }
+  });
+
+  it('a page pick turns the channel on and clears why it was off, in both write paths', async () => {
+    for (const newDeletedGeneration of [false, true]) {
+      const { repo, rows } = makeStore([
+        row({
+          id: 'page',
+          internalId: 'p',
+          token: 'x',
+          disabled: true,
+          disabledReason: 'PLAN_LIMIT',
+        }),
+      ]);
+      await repo.updateIntegration(
+        'page',
+        { token: 'page-token', organizationId: 'org-1', internalId: 'p' },
+        newDeletedGeneration
+      );
+      expect(rows[0]).toMatchObject({ disabled: false, disabledReason: null });
+    }
+  });
+
+  it('an upgrade turns back on only the channels the plan locked, never one the customer turned off', async () => {
+    const { repo, rows } = makeStore([
+      row({ id: 'plan-1', internalId: 'a', disabled: true, disabledReason: 'PLAN_LIMIT' }),
+      row({ id: 'user', internalId: 'b', disabled: true, disabledReason: 'USER' }),
+      row({ id: 'legacy', internalId: 'c', disabled: true, disabledReason: null }),
+      row({ id: 'plan-2', internalId: 'd', disabled: true, disabledReason: 'PLAN_LIMIT' }),
+      row({ id: 'removed', internalId: 'e', disabled: true, disabledReason: 'PLAN_LIMIT', deletedAt: new Date() }),
+      row({ id: 'other-org', organizationId: 'org-2', internalId: 'f', disabled: true, disabledReason: 'PLAN_LIMIT' }),
+    ]);
+
+    // room for one: a partial unlock
+    expect((await repo.enablePlanLockedIntegrations('org-1', 1)).count).toBe(1);
+    const on = () => rows.filter((r) => !r.disabled).map((r) => r.id);
+    expect(on()).toEqual(['plan-1']);
+
+    expect((await repo.enablePlanLockedIntegrations('org-1', 10)).count).toBe(1);
+    expect(on()).toEqual(['plan-1', 'plan-2']);
+    expect(rows.find((r) => r.id === 'plan-2')!.disabledReason).toBeNull();
+    expect(rows.find((r) => r.id === 'user')!.disabledReason).toBe('USER');
+    expect(rows.find((r) => r.id === 'legacy')!.disabled).toBe(true);
   });
 
   it('a verified reconnect finishes a channel a failed refresh left between steps', async () => {

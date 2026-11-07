@@ -16,6 +16,9 @@ import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/pris
 import {
   CHANNEL_CONNECTED,
   CHANNEL_DISCONNECTED,
+  CHANNEL_LOCKED_BY_PLAN,
+  DISABLED_BY_PLAN,
+  DISABLED_BY_USER,
   isChannelDisconnected,
 } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import {
@@ -319,7 +322,7 @@ export class IntegrationRepository {
       }
       return tx.integration.update({
         where: { id: existing?.id || id, deletedAt: null },
-        data: { ...params, rootInternalId: source.rootInternalId, refreshToken: source.refreshToken, tokenExpiration: source.tokenExpiration, disabled: false, deletedAt: null, refreshNeeded: false },
+        data: { ...params, rootInternalId: source.rootInternalId, refreshToken: source.refreshToken, tokenExpiration: source.tokenExpiration, disabled: false, disabledReason: null, deletedAt: null, refreshNeeded: false },
       });
     });
     if (
@@ -403,6 +406,7 @@ export class IntegrationRepository {
           ? { tokenExpiration: fresh.tokenExpiration }
           : {}),
         disabled: false,
+        disabledReason: null,
         deletedAt: null,
         refreshNeeded: false,
       },
@@ -606,13 +610,14 @@ export class IntegrationRepository {
         refreshNeeded: false,
       },
     };
-    // A reconnect of a live channel keeps its `disabled`: turning a channel
-    // back on goes through enableChannel and the plan's limit, a reconnect
-    // never does. A deleted row that comes back is a new channel to the plan
-    // - the connect checked the limit for it, the channel was not in the
-    // workspace - so it comes back on, like a page pick (writeIntegration)
-    // and the transaction path (a fresh row) do. Before, a revoked channel,
-    // whose tombstone is also disabled, stayed off after it was reconnected.
+    // A reconnect of a live channel keeps its `disabled` and disabledReason:
+    // turning a channel back on goes through enableChannel and the plan's
+    // limit, a reconnect never does. A deleted row that comes back is a new
+    // channel to the plan - the connect checked the limit for it, the channel
+    // was not in the workspace - so it comes back on with no reason, like a
+    // page pick (writeIntegration) and the transaction path (a fresh row)
+    // do. Before, a revoked channel, whose tombstone is also disabled, stayed
+    // off after it was reconnected.
     const upsert = newDeletedGeneration
       ? await this._transaction.model.$transaction(async (tx) => {
           await this.lockAuthorizationGrant(tx, provider, internalId);
@@ -635,7 +640,7 @@ export class IntegrationRepository {
                 select: { deletedAt: true },
               })
             )?.deletedAt
-              ? { disabled: false }
+              ? { disabled: false, disabledReason: null }
               : {}),
           },
         });
@@ -1041,12 +1046,41 @@ export class IntegrationRepository {
     });
   }
 
-  disableChannel(org: string, id: string) {
-    return this.updateLiveChannel(org, id, { disabled: true });
+  // the customer turned it off: only the customer turns it back on, an
+  // upgrade leaves it off (enablePlanLockedIntegrations). Only a channel that
+  // is on is written, in one statement, so one already off keeps why it is
+  // off (a plan lock still comes back on an upgrade); a removed or unknown
+  // channel answers 404, like updateLiveChannel
+  async disableChannel(org: string, id: string) {
+    const { count } = await this._integration.model.integration.updateMany({
+      where: {
+        id,
+        organizationId: org,
+        deletedAt: null,
+        disabled: false,
+      },
+      data: {
+        disabled: true,
+        disabledReason: DISABLED_BY_USER,
+      },
+    });
+    if (
+      !count &&
+      !(await this._integration.model.integration.findFirst({
+        where: { id, organizationId: org, deletedAt: null },
+        select: { id: true },
+      }))
+    ) {
+      throw new NotFoundException('Integration not found');
+    }
+    return { id };
   }
 
   enableChannel(org: string, id: string) {
-    return this.updateLiveChannel(org, id, { disabled: false });
+    return this.updateLiveChannel(org, id, {
+      disabled: false,
+      disabledReason: null,
+    });
   }
 
   getPostsForChannel(org: string, id: string) {
@@ -1318,27 +1352,61 @@ export class IntegrationRepository {
       },
     });
 
-    for (const channel of getChannels) {
-      await this._integration.model.integration.update({
-        where: {
-          id: channel.id,
-        },
-        data: {
-          disabled: true,
-        },
-      });
+    if (!getChannels.length) {
+      return;
     }
+
+    // locked by the plan, so an upgrade knows which ones it may turn back on.
+    // The write matches the read again: a channel the customer turned off in
+    // between keeps their reason
+    await this._integration.model.integration.updateMany({
+      where: {
+        ...CHANNEL_CONNECTED,
+        organizationId: org,
+        id: { in: getChannels.map((channel) => channel.id) },
+      },
+      data: {
+        disabled: true,
+        disabledReason: DISABLED_BY_PLAN,
+      },
+    });
   }
 
-  enableAllIntegrations(org: string) {
+  // An upgrade turns back on the channels a downgrade locked, as many as the
+  // new plan has room for, oldest channel first (a downgrade keeps the
+  // channels the workspace had first, so they are also the first back). A
+  // channel the customer turned off, or one turned off before the reason was
+  // recorded, stays off.
+  async enablePlanLockedIntegrations(org: string, room: number) {
+    if (room <= 0) {
+      return { count: 0 };
+    }
+
+    const locked = await this._integration.model.integration.findMany({
+      where: {
+        ...CHANNEL_LOCKED_BY_PLAN,
+        organizationId: org,
+      },
+      orderBy: { createdAt: 'asc' },
+      take: room,
+      select: {
+        id: true,
+      },
+    });
+
+    if (!locked.length) {
+      return { count: 0 };
+    }
+
     return this._integration.model.integration.updateMany({
       where: {
+        ...CHANNEL_LOCKED_BY_PLAN,
         organizationId: org,
-        disabled: true,
-        deletedAt: null,
+        id: { in: locked.map((channel) => channel.id) },
       },
       data: {
         disabled: false,
+        disabledReason: null,
       },
     });
   }

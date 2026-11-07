@@ -122,7 +122,7 @@ describe('SubscriptionService plan writes', () => {
     const integrations = {
       getIntegrationsList: jest.fn().mockResolvedValue(channels),
       disableIntegrations: jest.fn(),
-      enableAllIntegrations: jest.fn(),
+      enablePlanLockedIntegrations: jest.fn(),
       changeActiveCron: jest.fn(),
     };
     const organizations = { disableOrEnableNonSuperAdminUsers: jest.fn() };
@@ -210,6 +210,78 @@ describe('SubscriptionService plan writes', () => {
     expect(integrations.disableIntegrations).toHaveBeenCalledWith('org_1', 1);
   });
 
+  describe('channels a plan locked', () => {
+    const channels = [
+      { id: 'on-1' },
+      { id: 'on-2' },
+      { id: 'locked', disabled: true, disabledReason: 'PLAN_LIMIT' },
+      { id: 'mine', disabled: true, disabledReason: 'USER' },
+      { id: 'legacy', disabled: true },
+    ];
+
+    it('a downgrade locks the excess and turns nothing back on', async () => {
+      const { service, integrations } = make(
+        { provider: 'stripe', subscriptionTier: 'TEAM', totalChannels: 10 },
+        channels
+      );
+      await service.modifySubscription('cus_1', 1, 'STANDARD');
+      // the newest one, the order is the repository's (createdAt desc)
+      expect(integrations.disableIntegrations).toHaveBeenCalledWith('org_1', 1);
+      expect(integrations.enablePlanLockedIntegrations).not.toHaveBeenCalled();
+    });
+
+    it('an upgrade unlocks as many as the new limit has room for next to the channels on', async () => {
+      const { service, integrations } = make(
+        { provider: 'stripe', subscriptionTier: 'STANDARD', totalChannels: 2 },
+        channels
+      );
+      await service.modifySubscription('cus_1', 3, 'TEAM');
+      expect(integrations.disableIntegrations).not.toHaveBeenCalled();
+      // which ones (PLAN_LIMIT only, oldest first) is the repository's
+      expect(integrations.enablePlanLockedIntegrations).toHaveBeenCalledWith(
+        'org_1',
+        1
+      );
+    });
+
+    it('a renewal, a same-limit update or a move to FREE never turns a channel on', async () => {
+      const same = make(
+        { provider: 'stripe', subscriptionTier: 'TEAM', totalChannels: 10 },
+        channels
+      );
+      await same.service.modifySubscription('cus_1', 10, 'TEAM');
+      expect(same.integrations.enablePlanLockedIntegrations).not.toHaveBeenCalled();
+
+      const free = make(null, channels);
+      await free.service.modifySubscriptionByOrg('org_1', 10, 'FREE');
+      expect(free.integrations.enablePlanLockedIntegrations).not.toHaveBeenCalled();
+
+      // the limit grew, but the channels on already fill it
+      const full = make(
+        { provider: 'stripe', subscriptionTier: 'STANDARD', totalChannels: 1 },
+        channels
+      );
+      await full.service.modifySubscription('cus_1', 2, 'STANDARD');
+      expect(full.integrations.enablePlanLockedIntegrations).not.toHaveBeenCalled();
+    });
+
+    it('stores the plan when turning channels back on fails, never throwing to the webhook', async () => {
+      const { service, repository, integrations } = make(
+        { provider: 'stripe', subscriptionTier: 'STANDARD', totalChannels: 2 },
+        channels
+      );
+      integrations.enablePlanLockedIntegrations.mockRejectedValue(
+        new Error('db down')
+      );
+      expect(
+        await service.createOrUpdateSubscription(
+          'stripe', false, 'u1', 'cus_1', 10, 'TEAM', 'MONTHLY', null
+        )
+      ).toBeUndefined();
+      expect(repository.createOrUpdateSubscription).toHaveBeenCalled();
+    });
+  });
+
   it('tells the admin why a lifetime or another provider plan was left alone', async () => {
     const lifetime = make({ provider: 'stripe', isLifetime: true });
     expect(
@@ -239,15 +311,80 @@ describe('SubscriptionService plan writes', () => {
       'MONTHLY',
       null,
       undefined,
-      { id: 'org_1' }
+      { id: 'org_1' },
+      // an admin plan has no provider status
+      undefined
     );
   });
 
+  it('stores the provider status with the plan, and the trial flag it was given', async () => {
+    const { service, repository } = make({
+      provider: 'stripe',
+      subscriptionTier: 'PRO',
+    });
+    const state = {
+      status: 'past_due',
+      trialEndsAt: null,
+      currentPeriodEnd: new Date('2026-12-01T00:00:00Z'),
+    };
+    expect(
+      await service.createOrUpdateSubscription(
+        'stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null,
+        undefined, undefined, state
+      )
+    ).toBeUndefined();
+    expect(repository.createOrUpdateSubscription).toHaveBeenCalledWith(
+      'stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null,
+      undefined, undefined, state
+    );
+  });
+
+  it('stores the provider status of a store subscription keyed by the workspace', async () => {
+    const { service, repository } = make({
+      provider: 'revenuecat',
+      subscriptionTier: 'PRO',
+    });
+    const state = {
+      status: 'trialing',
+      trialEndsAt: new Date('2026-11-15T00:00:00Z'),
+      currentPeriodEnd: new Date('2026-11-15T00:00:00Z'),
+    };
+    await service.createOrUpdateSubscriptionByOrg(
+      true, 'org_1', 'revenuecat', 'com.app.pro.monthly', 30, 'PRO', 'MONTHLY', null,
+      state
+    );
+    expect(repository.createOrUpdateSubscription).toHaveBeenCalledWith(
+      'revenuecat', true, 'com.app.pro.monthly', '', 30, 'PRO', 'MONTHLY', null,
+      undefined, { id: 'org_1' }, state
+    );
+  });
+
+  it('removes the plan, and asks for a retry instead of throwing', async () => {
+    const { service, repository } = make({
+      provider: 'stripe',
+      subscriptionTier: 'PRO',
+      totalChannels: 30,
+    });
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({
+      count: 1,
+    });
+    expect(repository.deleteSubscriptionByCustomerId).toHaveBeenCalledWith(
+      'cus_1',
+      'stripe'
+    );
+
+    repository.getSubscriptionByCustomerId.mockRejectedValue(new Error('db'));
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({
+      count: 0,
+      retry: true,
+    });
+  });
+
   describe('lifetime codes', () => {
-    it('turns back on the channels a lapse turned off, like an upgrade', async () => {
+    it('turns back on the channels a downgrade locked, like an upgrade', async () => {
       const { service, repository, integrations } = make(null, [
         { id: 'a' },
-        { id: 'off', disabled: true },
+        { id: 'off', disabled: true, disabledReason: 'PLAN_LIMIT' },
       ]);
       expect(
         await service.createOrUpdateSubscription(
@@ -258,7 +395,11 @@ describe('SubscriptionService plan writes', () => {
       expect(
         repository.createOrUpdateLifetimeSubscription
       ).toHaveBeenCalledWith('stripe', 'id', 5, 'STANDARD', 'MONTHLY', 'code', 'org_1');
-      expect(integrations.enableAllIntegrations).toHaveBeenCalledWith('org_1');
+      // room for the 4 channels the 5-channel plan has next to the one on
+      expect(integrations.enablePlanLockedIntegrations).toHaveBeenCalledWith(
+        'org_1',
+        4
+      );
     });
 
     it('says when the code was spent by another redeem first', async () => {
@@ -270,7 +411,7 @@ describe('SubscriptionService plan writes', () => {
           'code', 'org_1'
         )
       ).toEqual({ codeUsed: true });
-      expect(integrations.enableAllIntegrations).not.toHaveBeenCalled();
+      expect(integrations.enablePlanLockedIntegrations).not.toHaveBeenCalled();
     });
   });
 });

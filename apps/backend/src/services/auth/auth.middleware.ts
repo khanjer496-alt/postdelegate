@@ -19,6 +19,55 @@ export const removeAuth = (res: Response) => {
   res.header('logout', 'true');
 };
 
+// The user behind a session token, with every check an authenticated request
+// gets. Only a session token is a login: reset, activation and invite links
+// are signed with the same secret and rejected here. The claims are never
+// trusted for authorization (isSuperAdmin, activated, ...), the user is
+// always re-resolved from the database using the id. null for anything that
+// is not a live session, it never throws
+export const getSessionUser = async (
+  usersService: UsersService,
+  auth: string
+): Promise<User | null> => {
+  try {
+    const payload = AuthService.verifyTypedJWT<{
+      id: string;
+      pv: string;
+      sv?: number;
+    }>(auth, 'session');
+
+    if (!payload?.id || typeof payload.id !== 'string') {
+      return null;
+    }
+
+    const user = (await usersService.getUserById(payload.id)) as User | null;
+
+    if (!user) {
+      return null;
+    }
+
+    // a password change signs out every session issued before it
+    if (payload.pv !== AuthService.passwordFingerprint(user.password)) {
+      return null;
+    }
+
+    // and so does "sign out of all devices". A session issued before this
+    // claim existed carries no sv and is read as 0, which is where every
+    // user starts, so the deploy signs nobody out.
+    if ((payload.sv ?? 0) !== (user.sessionVersion ?? 0)) {
+      return null;
+    }
+
+    if (!user.activated) {
+      return null;
+    }
+
+    return user;
+  } catch (err) {
+    return null;
+  }
+};
+
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(
@@ -37,40 +86,11 @@ export class AuthMiddleware implements NestMiddleware {
     }
 
     try {
-      // Only a session token is a login: reset, activation and invite links
-      // are signed with the same secret and rejected here. The claims are
-      // never trusted for authorization (isSuperAdmin, activated, ...), the
-      // user is always re-resolved from the database using the id.
-      const payload = AuthService.verifyTypedJWT<{
-        id: string;
-        pv: string;
-        sv?: number;
-      }>(auth as string, 'session');
       const orgHeader = req.cookies.showorg || req.headers.showorg;
 
-      if (!payload?.id || typeof payload.id !== 'string') {
-        throw new HttpForbiddenException();
-      }
-
-      let user = (await this._userService.getUserById(payload.id)) as User | null;
+      let user = await getSessionUser(this._userService, auth as string);
 
       if (!user) {
-        throw new HttpForbiddenException();
-      }
-
-      // a password change signs out every session issued before it
-      if (payload.pv !== AuthService.passwordFingerprint(user.password)) {
-        throw new HttpForbiddenException();
-      }
-
-      // and so does "sign out of all devices". A session issued before this
-      // claim existed carries no sv and is read as 0, which is where every
-      // user starts, so the deploy signs nobody out.
-      if ((payload.sv ?? 0) !== (user.sessionVersion ?? 0)) {
-        throw new HttpForbiddenException();
-      }
-
-      if (!user.activated) {
         throw new HttpForbiddenException();
       }
 

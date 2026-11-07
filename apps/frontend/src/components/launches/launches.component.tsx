@@ -39,6 +39,10 @@ import { NeedsAttention } from '@gitroom/frontend/components/activation/needs.at
 import { FirstRunChecklist } from '@gitroom/frontend/components/activation/first.run.checklist';
 import { ChannelHealthBadge } from '@gitroom/frontend/components/activation/channel.health.badge';
 import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
+import {
+  DISABLED_BY_USER,
+  isChannelLockedByPlan,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 export const SVGLine = () => {
   return (
@@ -348,6 +352,18 @@ export const MenuComponent: FC<
   } = props;
   const user = useUser();
   const t = useT();
+  // why the channel is off decides who can turn it back on: a channel the
+  // plan locked needs room on the plan, one the customer turned off is theirs
+  // to turn on, and one turned off before the reason was recorded says only
+  // that it is off
+  const disabledTooltip = isChannelLockedByPlan(integration)
+    ? t(
+        'channel_locked_by_plan',
+        'Locked by your plan. Upgrade or turn off another channel to use it.'
+      )
+    : integration.disabledReason === DISABLED_BY_USER
+    ? t('channel_turned_off_by_you', 'You turned this channel off.')
+    : t('channel_turned_off', 'This channel is turned off.');
   const [collected, drag, dragPreview] = useDrag(() => ({
     type: 'menu',
     item: {
@@ -432,14 +448,10 @@ export const MenuComponent: FC<
       <div
         // @ts-ignore
         ref={drag}
-        {...(integration.disabled &&
-        totalNonDisabledChannels === user?.totalChannels
+        {...(integration.disabled
           ? {
               'data-tooltip-id': 'tooltip',
-              'data-tooltip-content': t(
-                'channel_disabled_upgrade_plan',
-                'This channel is disabled, please upgrade your plan to enable it.'
-              ),
+              'data-tooltip-content': disabledTooltip,
             }
           : {})}
         role="Handle"
@@ -682,7 +694,7 @@ export const LaunchesComponent = () => {
   return (
     <DNDProvider>
       <Onboarding />
-      <ChannelsAfterPayment integrations={integrations} />
+      <ChannelsAfterPayment integrations={integrations} reload={mutate} />
       <CalendarWeekProvider integrations={sortedIntegrations}>
         {channelsOpen && (
           <div

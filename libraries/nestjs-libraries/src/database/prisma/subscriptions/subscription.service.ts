@@ -3,16 +3,16 @@ import {
   pricing,
   providerPostsLimitsOf,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
-import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
+import {
+  SubscriptionProviderState,
+  SubscriptionRepository,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { Organization } from '@prisma/client';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import {
-  channelState,
-  countPlanChannels,
-} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import { countPlanChannels } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 type Tier = 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
 
@@ -210,10 +210,11 @@ export class SubscriptionService {
   }
 
   // What moving from the `current` plan to `billing` does to the workspace:
-  // channels over the new limit are turned off (newest first), channels a
-  // lapse turned off come back when the new plan holds them all, team members
-  // follow the plan, and a plan without AutoPost stops it. Channels are
-  // counted with countPlanChannels, like every other limit check
+  // channels over the new limit are locked (turned off, newest first),
+  // channels a downgrade locked come back when the limit grew, as many as it
+  // has room for, team members follow the plan, and a plan without AutoPost
+  // stops it. Channels are counted with countPlanChannels, like every other
+  // limit check
   private async applyPlanChange(
     organizationId: string,
     current: { subscriptionTier: Tier; totalChannels: number } | null,
@@ -223,15 +224,9 @@ export class SubscriptionService {
     const from = pricing[current?.subscriptionTier || 'FREE'];
     const to = pricing[billing];
 
-    const allChannels = await this._integrationService.getIntegrationsList(
-      organizationId
+    const activeChannels = countPlanChannels(
+      await this._integrationService.getIntegrationsList(organizationId)
     );
-    const activeChannels = countPlanChannels(allChannels);
-    // every channel the workspace has, on or off, but not the temporary row
-    // of a connect that still has a page to pick
-    const keptChannels = allChannels.filter(
-      (f) => channelState(f) !== 'incomplete'
-    ).length;
 
     if (activeChannels > totalChannels) {
       await this._integrationService.disableIntegrations(
@@ -240,18 +235,21 @@ export class SubscriptionService {
       );
     }
 
-    // channels are auto-disabled when a subscription lapses; once the new plan
-    // can hold all of them and the limit grew, enable everything back (partial
-    // enabling or same-plan updates would risk enabling channels the user
-    // disabled on purpose)
+    // only the channels a downgrade locked (DISABLED_BY_PLAN) come back, and
+    // only when the limit grew: a same-plan update or a renewal never turns a
+    // channel on. As many come back as the new limit has room for next to the
+    // channels already on, so a partial unlock is fine. One the customer
+    // turned off, or one turned off before the reason was recorded, stays off
     if (
       billing !== 'FREE' &&
-      activeChannels < keptChannels &&
-      keptChannels <= totalChannels &&
-      totalChannels > (current?.totalChannels || 0)
+      totalChannels > (current?.totalChannels || 0) &&
+      totalChannels > activeChannels
     ) {
       try {
-        await this._integrationService.enableAllIntegrations(organizationId);
+        await this._integrationService.enablePlanLockedIntegrations(
+          organizationId,
+          totalChannels - activeChannels
+        );
       } catch (err) {
         console.error(
           'Error enabling channels after subscription change:',
@@ -279,7 +277,11 @@ export class SubscriptionService {
     }
   }
 
-  // Reached from payment webhooks: never throws, see SubscriptionWriteResult
+  // Reached from payment webhooks: never throws, see SubscriptionWriteResult.
+  // isTrailing: the provider has the subscription in its trial (Stripe:
+  // isTrialOf, never a past_due renewal). `state`: the provider's own status
+  // and dates, stored as they come; none for a plan without one (lifetime,
+  // admin)
   async createOrUpdateSubscription(
     provider: string,
     isTrailing: boolean,
@@ -290,7 +292,8 @@ export class SubscriptionService {
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
-    org?: string
+    org?: string,
+    state?: SubscriptionProviderState
   ): Promise<SubscriptionWriteResult> {
     if (code) {
       return this.redeemLifetimeCode(
@@ -338,7 +341,8 @@ export class SubscriptionService {
         period,
         cancelAt,
         undefined,
-        org ? { id: org } : undefined
+        org ? { id: org } : undefined,
+        state
       );
       return undefined;
     } catch (e) {
@@ -349,8 +353,8 @@ export class SubscriptionService {
 
   // The code is checked and spent in the same transaction as the plan is
   // written, so two redeems of one code can't both win. The workspace then
-  // gets what any upgrade gives it (applyPlanChange): channels a lapse turned
-  // off come back when the plan holds them, team members are enabled
+  // gets what any upgrade gives it (applyPlanChange): channels a downgrade
+  // locked come back as far as the plan has room, team members are enabled
   private async redeemLifetimeCode(
     provider: string,
     identifier: string,
@@ -399,6 +403,7 @@ export class SubscriptionService {
   }
 
   // Reached from payment webhooks: never throws, see SubscriptionWriteResult
+  // and createOrUpdateSubscription for isTrailing and `state`
   async createOrUpdateSubscriptionByOrg(
     isTrailing: boolean,
     organizationId: string,
@@ -407,7 +412,8 @@ export class SubscriptionService {
     totalChannels: number,
     billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
     period: 'MONTHLY' | 'YEARLY',
-    cancelAt: number | null
+    cancelAt: number | null,
+    state?: SubscriptionProviderState
   ): Promise<SubscriptionWriteResult> {
     try {
       const current =
@@ -447,7 +453,8 @@ export class SubscriptionService {
         period,
         cancelAt,
         undefined,
-        { id: organizationId }
+        { id: organizationId },
+        state
       );
       return undefined;
     } catch (e) {
@@ -525,9 +532,9 @@ export class SubscriptionService {
   // The plan's monthly caps on single networks (provider_posts_per_month) and
   // the anchor of its months (planMonth), the subscription's start like
   // posts_per_month. A workspace marked isTrailing also gets the trial caps:
-  // they only apply once the payment provider confirms a real trial (the flag
-  // is also set for a paid renewal being retried). Without billing there are
-  // no plans to cap
+  // they only apply once the payment provider confirms the trial live (the
+  // stored flag can lag behind a webhook still on its way). Without billing
+  // there are no plans to cap
   async getProviderPostsLimits(organizationId: string) {
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
       return null;

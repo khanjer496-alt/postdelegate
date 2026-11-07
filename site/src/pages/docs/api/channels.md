@@ -29,13 +29,14 @@ curl https://app.postdelegate.com/api/public/v1/integrations \
     "identifier": "bluesky",
     "picture": "https://…",
     "disabled": false,
+    "disabledReason": null,
     "profile": "name.bsky.social",
     "customer": { "id": "cm3x6p0aa0000cust", "name": "Acme" }
   }
 ]
 ```
 
-`customer` is left out for channels that are not in a group. Use `id` as `integration.id` when [creating a post](/docs/api/posts#post-posts). A channel with `disabled: true` is paused.
+`customer` is left out for channels that are not in a group. Use `id` as `integration.id` when [creating a post](/docs/api/posts#post-posts). A channel with `disabled: true` is paused. `disabledReason` says why: `USER` (turned off in the app), `PLAN_LIMIT` (locked because your plan has no room for it, it comes back when you upgrade) or `null` (not paused, or paused before the reason was recorded).
 
 ### `GET /groups`
 

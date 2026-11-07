@@ -6,6 +6,7 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { saveConnectBinding } from '@gitroom/nestjs-libraries/integrations/connect.binding';
 
 @ApiTags('Enterprise')
 @Controller('/enterprise')
@@ -100,14 +101,21 @@ export class EnterpriseController {
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl();
 
+      // opened in the partner's customer's browser, never ours: the person
+      // confirms the workspace, once (see connect.binding)
+      const { ttl } = await saveConnectBinding(state, {
+        type: 'enterprise',
+        orgId: org.id,
+      });
+
       if (load.refreshId) {
-        await ioRedis.set(`refresh:${state}`, load.refreshId, 'EX', 3600);
+        await ioRedis.set(`refresh:${state}`, load.refreshId, 'EX', ttl);
       }
 
-      await ioRedis.set(`webhookUrl:${state}`, load.webhookUrl, 'EX', 3600);
-      await ioRedis.set(`redirect:${state}`, load.redirectUrl, 'EX', 3600);
-      await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);
-      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', 3600);
+      await ioRedis.set(`webhookUrl:${state}`, load.webhookUrl, 'EX', ttl);
+      await ioRedis.set(`redirect:${state}`, load.redirectUrl, 'EX', ttl);
+      await ioRedis.set(`organization:${state}`, org.id, 'EX', ttl);
+      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', ttl);
 
       return url;
     } catch (err) {}

@@ -9,6 +9,7 @@ import {
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { SubscriptionProviderState } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 
 import { REVENUECAT_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/payment.providers';
 
@@ -22,6 +23,28 @@ interface RevenueCatSubscription {
   store: string;
   period_type: string;
 }
+
+// The store subscription in Stripe's words, so every provider stores one
+// vocabulary: an intro trial is trialing, a renewal the store is still
+// retrying (its grace period) is past_due, anything else that has not
+// expired is active
+const subscriptionStateOf = (
+  subscription: RevenueCatSubscription
+): SubscriptionProviderState => {
+  const expires = subscription.expires_date
+    ? dayjs(subscription.expires_date).toDate()
+    : null;
+  const trialing = subscription.period_type === 'trial';
+  return {
+    status: trialing
+      ? 'trialing'
+      : subscription.billing_issues_detected_at
+      ? 'past_due'
+      : 'active',
+    trialEndsAt: trialing ? expires : null,
+    currentPeriodEnd: expires,
+  };
+};
 
 // RevenueCat is the source of truth for App Store / Google Play subscriptions.
 // The webhook and the app only tell us *which* subscriber to re-check; we always
@@ -99,10 +122,20 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
 
     const active = await this.getActiveSubscription(organizationId);
     if (!active) {
-      await this._subscriptionService.deleteSubscriptionByOrgId(
-        organizationId,
-        REVENUECAT_PROVIDER
-      );
+      // reached from the webhook: a failed write asks for the event again
+      // instead of throwing
+      try {
+        await this._subscriptionService.deleteSubscriptionByOrgId(
+          organizationId,
+          REVENUECAT_PROVIDER
+        );
+      } catch (err) {
+        console.error('revenuecat_subscription_delete_failed', {
+          organization_id: organizationId,
+          err: (err as Error)?.message,
+        });
+        return { active: false, retry: true };
+      }
       return { active: false };
     }
 
@@ -120,7 +153,8 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
       active.subscription.unsubscribe_detected_at &&
         active.subscription.expires_date
         ? dayjs(active.subscription.expires_date).unix()
-        : null
+        : null,
+      subscriptionStateOf(active.subscription)
     );
     // the plan could not be stored, never reported as active
     if (result?.retry) {
@@ -128,6 +162,32 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
     }
 
     return { active: true };
+  }
+
+  // In its intro trial right now, from what the last sync stored: the
+  // subscriber is not fetched again for every check. A row stored before the
+  // status was kept falls back to the workspace flag, which RevenueCat has
+  // always set from the trial alone. A trial past its end is not one anymore,
+  // even before the webhook that says so arrived
+  override async isTrialing(organizationId: string) {
+    const subscription =
+      await this._subscriptionService.getSubscriptionByOrganizationId(
+        organizationId
+      );
+    if (!subscription || subscription.provider !== REVENUECAT_PROVIDER) {
+      return false;
+    }
+    if (!subscription.status) {
+      const organization = await this._organizationService.getOrgById(
+        organizationId
+      );
+      return !!organization?.isTrailing;
+    }
+    return (
+      subscription.status === 'trialing' &&
+      (!subscription.trialEndsAt ||
+        dayjs(subscription.trialEndsAt).isAfter(dayjs()))
+    );
   }
 
   private async getActiveSubscription(organizationId: string) {

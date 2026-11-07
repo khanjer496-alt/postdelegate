@@ -6,6 +6,26 @@ import {
 import dayjs from 'dayjs';
 import { Organization, Prisma } from '@prisma/client';
 
+// What the payment provider says about a subscription right now, stored on
+// the row as it comes: its own status (Stripe's trialing, active, past_due,
+// paused...), when its trial ends and when the period being paid ends
+export type SubscriptionProviderState = {
+  status: string;
+  trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
+};
+
+// A plan with no provider status (a lifetime code, an admin plan) stores none
+const providerStateOf = (state?: SubscriptionProviderState) => ({
+  status: state?.status ?? null,
+  trialEndsAt: state?.trialEndsAt ?? null,
+  currentPeriodEnd: state?.currentPeriodEnd ?? null,
+});
+
+// Thrown inside the status sync's transaction to roll back a half-done
+// compare-and-swap, never outside this file
+class ChangedSince extends Error {}
+
 @Injectable()
 export class SubscriptionRepository {
   constructor(
@@ -89,25 +109,55 @@ export class SubscriptionRepository {
     });
   }
 
-  // a lifetime plan is never removed by a customer-keyed cancellation
+  // a lifetime plan is never removed by a customer-keyed cancellation. A
+  // workspace whose subscription ended is no longer in a trial: the flag is
+  // cleared with it, only when a subscription was removed (a workspace that
+  // never subscribed keeps the one it signed up with)
   deleteSubscriptionByCustomerId(customerId: string, provider: string) {
-    return this._subscription.model.subscription.deleteMany({
-      where: {
-        provider,
-        isLifetime: false,
-        organization: {
-          paymentId: customerId,
+    return this._transaction.model.$transaction(async (tx) => {
+      const deleted = await tx.subscription.deleteMany({
+        where: {
+          provider,
+          isLifetime: false,
+          organization: {
+            paymentId: customerId,
+          },
         },
-      },
+      });
+      if (deleted.count) {
+        await tx.organization.updateMany({
+          where: {
+            paymentId: customerId,
+          },
+          data: {
+            isTrailing: false,
+          },
+        });
+      }
+      return deleted;
     });
   }
 
   deleteSubscriptionByOrgId(organizationId: string, provider: string) {
-    return this._subscription.model.subscription.deleteMany({
-      where: {
-        organizationId,
-        provider,
-      },
+    return this._transaction.model.$transaction(async (tx) => {
+      const deleted = await tx.subscription.deleteMany({
+        where: {
+          organizationId,
+          provider,
+        },
+      });
+      if (deleted.count) {
+        await tx.organization.update({
+          where: {
+            id: organizationId,
+          },
+          data: {
+            isTrailing: false,
+          },
+          select: { id: true },
+        });
+      }
+      return deleted;
     });
   }
 
@@ -170,7 +220,8 @@ export class SubscriptionRepository {
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
-    org?: { id: string }
+    org?: { id: string },
+    state?: SubscriptionProviderState
   ) {
     const findOrg =
       org || (await this.getOrganizationByCustomerId(customerId))!;
@@ -198,6 +249,7 @@ export class SubscriptionRepository {
         identifier,
         isLifetime: !!code,
         cancelAt: cancelAt ? new Date(cancelAt * 1000) : null,
+        ...providerStateOf(state),
         deletedAt: null,
       },
       create: {
@@ -208,6 +260,7 @@ export class SubscriptionRepository {
         totalChannels,
         period,
         cancelAt: cancelAt ? new Date(cancelAt * 1000) : null,
+        ...providerStateOf(state),
         identifier,
         deletedAt: null,
       },
@@ -269,6 +322,7 @@ export class SubscriptionRepository {
             identifier,
             isLifetime: true,
             cancelAt: null,
+            ...providerStateOf(),
             deletedAt: null,
           },
           create: {
@@ -279,6 +333,7 @@ export class SubscriptionRepository {
             totalChannels,
             period,
             cancelAt: null,
+            ...providerStateOf(),
             identifier,
             deletedAt: null,
           },
@@ -418,6 +473,122 @@ export class SubscriptionRepository {
         createdAt: {
           gte: from.toDate(),
         },
+      },
+    });
+  }
+
+  // The plans the status sync (sync-subscription-status) walks: the ones
+  // billed by `provider` on a Stripe customer, a page at a time in id order
+  // so a run can resume. A lifetime plan has no subscription behind it
+  getProviderSubscriptionsPage(
+    provider: string,
+    take: number,
+    cursor?: string
+  ) {
+    return this._subscription.model.subscription.findMany({
+      where: {
+        provider,
+        deletedAt: null,
+        isLifetime: false,
+        organization: {
+          paymentId: {
+            startsWith: 'cus_',
+          },
+        },
+        ...(cursor ? { id: { gt: cursor } } : {}),
+      },
+      orderBy: {
+        id: 'asc',
+      },
+      take,
+      select: {
+        id: true,
+        organizationId: true,
+        identifier: true,
+        status: true,
+        trialEndsAt: true,
+        currentPeriodEnd: true,
+        updatedAt: true,
+        organization: {
+          select: {
+            paymentId: true,
+            isTrailing: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Stores the provider state and the trial flag only while the plan and the
+  // workspace still hold what the status sync read: a webhook that stored
+  // the plan since (updatedAt moved) or changed the flag wins, and nothing is
+  // written. Both are written or neither. false: changed since
+  async setProviderStateIfUnchanged(
+    subscription: { id: string; organizationId: string; updatedAt: Date },
+    isTrailing: { from: boolean; to: boolean },
+    state: SubscriptionProviderState
+  ) {
+    try {
+      return await this._transaction.model.$transaction(async (tx) => {
+        const plan = await tx.subscription.updateMany({
+          where: {
+            id: subscription.id,
+            updatedAt: subscription.updatedAt,
+          },
+          data: providerStateOf(state),
+        });
+        if (!plan.count) {
+          throw new ChangedSince();
+        }
+        const organization = await tx.organization.updateMany({
+          where: {
+            id: subscription.organizationId,
+            isTrailing: isTrailing.from,
+          },
+          data: {
+            isTrailing: isTrailing.to,
+          },
+        });
+        if (!organization.count) {
+          throw new ChangedSince();
+        }
+        return true;
+      });
+    } catch (err) {
+      if (err instanceof ChangedSince) {
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  // Workspaces still marked as trialing whose subscription ended before an
+  // ended one cleared the flag: no subscription, and allowTrial off, which
+  // only a stored subscription turns off (a workspace that never subscribed
+  // keeps allowTrial and the flag it signed up with)
+  private endedTrialFlags() {
+    return {
+      isTrailing: true,
+      allowTrial: false,
+      subscription: {
+        is: null,
+      },
+    };
+  }
+
+  countEndedTrialFlags() {
+    return this._organization.model.organization.count({
+      where: this.endedTrialFlags(),
+    });
+  }
+
+  // the filter is the compare-and-swap: a workspace that subscribed since
+  // has a subscription and is left alone
+  clearEndedTrialFlags() {
+    return this._organization.model.organization.updateMany({
+      where: this.endedTrialFlags(),
+      data: {
+        isTrailing: false,
       },
     });
   }

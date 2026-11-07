@@ -368,6 +368,7 @@ describe('PostsRepository state writes', () => {
         id: 'p-1',
         content: 'hello',
         accessToken: 'leak',
+        submittedForOrder: { id: 'o-1', seller: { apiKey: 'order-secret' } },
         integration: {
           id: 'int-1',
           name: 'X account',
@@ -389,6 +390,116 @@ describe('PostsRepository state writes', () => {
     ]);
     expect(body).not.toContain('secret');
     expect(body).not.toContain('leak');
+  });
+
+  it('applies the same allowlist to the child posts of a thread', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await repo.changeState('p-1', 'ERROR', 'boom', [
+      {
+        id: 'p-1',
+        content: 'first',
+        childrenPost: [
+          {
+            id: 'p-2',
+            content: 'second',
+            parentPostId: 'p-1',
+            integration: { id: 'int-1', token: 'child-secret' },
+          },
+        ],
+      },
+    ]);
+
+    const { body } = tx.errors.create.mock.calls[0][0].data;
+    expect(JSON.parse(body)).toEqual([
+      {
+        id: 'p-1',
+        content: 'first',
+        childrenPost: [
+          {
+            id: 'p-2',
+            parentPostId: 'p-1',
+            content: 'second',
+            integration: { id: 'int-1' },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('allowlists a body handed over as a JSON string, and drops one it cannot read', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await repo.changeState(
+      'p-1',
+      'ERROR',
+      'boom',
+      JSON.stringify([{ id: 'p-1', integration: { token: 'string-secret' } }])
+    );
+    await repo.changeState('p-1', 'ERROR', 'boom', 'token=not-json-secret');
+
+    const [first, second] = tx.errors.create.mock.calls.map(
+      ([args]: any) => args.data.body
+    );
+    expect(JSON.parse(first)).toEqual([{ id: 'p-1', integration: {} }]);
+    expect(second).toBe('{}');
+  });
+
+  it('allowlists the stored bodies the debug export reads', async () => {
+    const errors = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          message: 'boom',
+          platform: 'x',
+          body: JSON.stringify([
+            { id: 'p-1', integration: { id: 'int-1', token: 'old-secret' } },
+          ]),
+          createdAt: new Date(0),
+        },
+      ]),
+    };
+    const repo = new PostsRepository(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { model: { errors } } as any,
+      {} as any,
+      {} as any
+    );
+
+    const [row] = await repo.getErrorsByPostIds(['p-1']);
+
+    expect(errors.findMany.mock.calls[0][0].select).toEqual({
+      message: true,
+      platform: true,
+      body: true,
+      createdAt: true,
+    });
+    expect(JSON.parse(row.body)).toEqual([
+      { id: 'p-1', integration: { id: 'int-1' } },
+    ]);
+  });
+
+  it('allowlists the stored bodies the debug timeline reads', async () => {
+    const { repo, post } = makeStateRepo();
+    post.findFirst.mockResolvedValue({
+      id: 'p-1',
+      errors: [
+        {
+          id: 'e-1',
+          body: JSON.stringify([{ id: 'p-1', integration: { token: 'old-secret' } }]),
+        },
+      ],
+    });
+
+    const timeline = await repo.getPostTimeline('p-1', 'org-1');
+
+    expect(timeline!.errors[0].body).not.toContain('secret');
+    expect(JSON.parse(timeline!.errors[0].body)).toEqual([
+      { id: 'p-1', integration: {} },
+    ]);
   });
 
   it('clears the last error when a post is queued again or moved to draft', async () => {
