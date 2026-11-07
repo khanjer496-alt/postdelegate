@@ -3,7 +3,10 @@ import {
   pricing,
   providerPostsLimitsOf,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
-import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
+import {
+  SubscriptionProviderState,
+  SubscriptionRepository,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { Organization } from '@prisma/client';
@@ -279,7 +282,10 @@ export class SubscriptionService {
     }
   }
 
-  // Reached from payment webhooks: never throws, see SubscriptionWriteResult
+  // Reached from payment webhooks: never throws, see SubscriptionWriteResult.
+  // isTrailing: the provider has the subscription in its trial (Stripe:
+  // status trialing, never past_due). `state`: the provider's own status and
+  // dates, stored as they come; none for a plan without one (lifetime, admin)
   async createOrUpdateSubscription(
     provider: string,
     isTrailing: boolean,
@@ -290,7 +296,8 @@ export class SubscriptionService {
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
-    org?: string
+    org?: string,
+    state?: SubscriptionProviderState
   ): Promise<SubscriptionWriteResult> {
     if (code) {
       return this.redeemLifetimeCode(
@@ -338,7 +345,8 @@ export class SubscriptionService {
         period,
         cancelAt,
         undefined,
-        org ? { id: org } : undefined
+        org ? { id: org } : undefined,
+        state
       );
       return undefined;
     } catch (e) {
@@ -399,6 +407,7 @@ export class SubscriptionService {
   }
 
   // Reached from payment webhooks: never throws, see SubscriptionWriteResult
+  // and createOrUpdateSubscription for isTrailing and `state`
   async createOrUpdateSubscriptionByOrg(
     isTrailing: boolean,
     organizationId: string,
@@ -407,7 +416,8 @@ export class SubscriptionService {
     totalChannels: number,
     billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
     period: 'MONTHLY' | 'YEARLY',
-    cancelAt: number | null
+    cancelAt: number | null,
+    state?: SubscriptionProviderState
   ): Promise<SubscriptionWriteResult> {
     try {
       const current =
@@ -447,7 +457,8 @@ export class SubscriptionService {
         period,
         cancelAt,
         undefined,
-        { id: organizationId }
+        { id: organizationId },
+        state
       );
       return undefined;
     } catch (e) {
@@ -525,9 +536,9 @@ export class SubscriptionService {
   // The plan's monthly caps on single networks (provider_posts_per_month) and
   // the anchor of its months (planMonth), the subscription's start like
   // posts_per_month. A workspace marked isTrailing also gets the trial caps:
-  // they only apply once the payment provider confirms a real trial (the flag
-  // is also set for a paid renewal being retried). Without billing there are
-  // no plans to cap
+  // they only apply once the payment provider confirms the trial live (the
+  // stored flag can lag behind a webhook still on its way). Without billing
+  // there are no plans to cap
   async getProviderPostsLimits(organizationId: string) {
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
       return null;

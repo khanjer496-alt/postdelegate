@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { BadRequestException } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { SubscriptionProviderState } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.subscribe.dto';
@@ -252,11 +253,15 @@ const EVENTS_WITHOUT_SERVICE_METADATA: string[] = [
   'charge.dispute.created',
 ];
 
-// Subscription statuses that must not keep granting a paid tier
+// Subscription statuses that must not keep granting a paid tier. paused is
+// a subscription Stripe stopped billing (a trial that ended without a card
+// on a pause end behavior): no payment, no plan. Unlike canceled it can be
+// resumed, and its updated event then stores the plan again
 const NOT_ENTITLED_STATUSES: Stripe.Subscription.Status[] = [
   'unpaid',
   'canceled',
   'incomplete_expired',
+  'paused',
 ];
 
 // Statuses after which a subscription never comes back: a late or replayed
@@ -273,6 +278,63 @@ export const stripeCustomerOf = (paymentId?: string | null) =>
   paymentId?.startsWith('cus_') ? paymentId : undefined;
 
 export const TRIAL_DAYS = 7;
+
+// A subscription that is still running or being retried: never one that
+// ended or whose first payment never went through
+const isLiveSubscription = (subscription: Stripe.Subscription) =>
+  subscription.status !== 'canceled' &&
+  subscription.status !== 'incomplete' &&
+  subscription.status !== 'incomplete_expired';
+
+// What the stored plan keeps of the subscription as Stripe has it now: its
+// raw status, the end of its trial and of the period being paid. Only a
+// trialing subscription is a trial, past_due is a paid plan being retried
+export const subscriptionStateOf = (
+  subscription: Stripe.Subscription
+): SubscriptionProviderState => {
+  const periodEnd = planItemOf(subscription)?.current_period_end;
+  return {
+    status: subscription.status,
+    trialEndsAt: subscription.trial_end
+      ? new Date(subscription.trial_end * 1000)
+      : null,
+    currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
+  };
+};
+
+// The subscription a customer's plan follows, picked like the webhooks pick
+// it: a live one (getLiveSubscriptions) that still grants the plan
+// (deleteSubscription's survivor), the one the stored plan came from first.
+// Without one it is the subscription that stopped granting it, or none.
+// `entitled`: whether that subscription still grants a plan
+export const currentSubscriptionOf = (
+  subscriptions: Stripe.Subscription[],
+  uniqueId?: string | null
+) => {
+  const live = subscriptions.filter(isLiveSubscription);
+  const entitled = live.filter(
+    (f) => !NOT_ENTITLED_STATUSES.includes(f.status)
+  );
+  const current =
+    entitled.find((f) => !!uniqueId && f.metadata?.uniqueId === uniqueId) ||
+    entitled[0];
+  if (current) {
+    return { subscription: current, entitled: true };
+  }
+  return { subscription: live[0] || subscriptions[0], entitled: false };
+};
+
+// Every subscription of a customer as Stripe has it now. For the status sync
+// (sync-subscription-status), which runs outside the API without the
+// StripeService and its dependencies
+export const customerSubscriptionsOf = async (customer: string) =>
+  (
+    await stripe.subscriptions.list({
+      customer,
+      status: 'all',
+      limit: 100,
+    })
+  ).data;
 
 const DECLINED_EXTRA_CHANNELS =
   'We could not charge your card. Update your payment method and try again.';
@@ -714,13 +776,16 @@ export class StripeService extends PaymentProviderAbstract {
 
     const result = await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      current.status !== 'active',
+      current.status === 'trialing',
       currentPlan.uniqueId || uniqueId,
       event.data.object.customer as string,
       totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
       currentPlan.billing || billing,
       currentPlan.period || period,
-      current.cancel_at
+      current.cancel_at,
+      undefined,
+      undefined,
+      subscriptionStateOf(current)
     );
     // not stored: Stripe sends the event again, the notices go out then
     if (result?.retry) {
@@ -786,13 +851,16 @@ export class StripeService extends PaymentProviderAbstract {
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      current.status !== 'active',
+      current.status === 'trialing',
       currentPlan.uniqueId || uniqueId,
       event.data.object.customer as string,
       totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
       currentPlan.billing || billing,
       currentPlan.period || period,
-      current.cancel_at
+      current.cancel_at,
+      undefined,
+      undefined,
+      subscriptionStateOf(current)
     );
   }
 
@@ -802,7 +870,21 @@ export class StripeService extends PaymentProviderAbstract {
       | Stripe.CustomerSubscriptionUpdatedEvent
   ) {
     const customer = event.data.object.customer as string;
-    const [survivor] = (await this.getLiveSubscriptions(customer)).filter(
+    // nothing is written before this read: a failed one asks Stripe for the
+    // event again instead of throwing
+    let live: Stripe.Subscription[];
+    try {
+      live = await this.getLiveSubscriptions(customer);
+    } catch (err) {
+      console.error('stripe_subscription_list_failed', {
+        stripe_event_type: event.type,
+        stripe_event_id: event.id,
+        stripe_subscription_id: event.data.object.id,
+        err,
+      });
+      return { retry: true };
+    }
+    const [survivor] = live.filter(
       (f) =>
         f.id !== event.data.object.id &&
         !NOT_ENTITLED_STATUSES.includes(f.status)
@@ -845,14 +927,17 @@ export class StripeService extends PaymentProviderAbstract {
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      survivor.status !== 'active',
+      survivor.status === 'trialing',
       uniqueId,
       customer,
       // the survivor comes from a fresh list, not from the event
       totalChannelsOf(billing, extraChannelsOf(survivor)),
       billing,
       period,
-      survivor.cancel_at
+      survivor.cancel_at,
+      undefined,
+      undefined,
+      subscriptionStateOf(survivor)
     );
   }
 
@@ -1264,12 +1349,7 @@ export class StripeService extends PaymentProviderAbstract {
         status: 'all',
         expand: ['data.latest_invoice'],
       })
-    ).data.filter(
-      (f) =>
-        f.status !== 'canceled' &&
-        f.status !== 'incomplete' &&
-        f.status !== 'incomplete_expired'
-    );
+    ).data.filter(isLiveSubscription);
   }
 
   // `intent` says what the customer asked for, and every subscription of the
@@ -1401,8 +1481,8 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
-  // A subscription Stripe still has in its trial, not a past_due one: the
-  // stored isTrailing is set for both
+  // A subscription Stripe still has in its trial, read live: the stored
+  // isTrailing can lag behind a webhook that has not arrived yet
   override async isTrialing(organizationId: string) {
     const live = await this.getLiveSubscriptions(
       await this.getCustomerByOrganizationId(organizationId)
@@ -2388,13 +2468,16 @@ export class StripeService extends PaymentProviderAbstract {
 
     await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      updated.status !== 'active',
+      updated.status === 'trialing',
       uniqueId,
       customer,
       totalChannelsOf(billing, extraChannelsOf(updated)),
       billing,
       storedPeriod,
-      updated.cancel_at
+      updated.cancel_at,
+      undefined,
+      undefined,
+      subscriptionStateOf(updated)
     );
 
     return {

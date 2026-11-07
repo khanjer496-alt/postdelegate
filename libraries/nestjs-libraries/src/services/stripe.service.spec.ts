@@ -50,6 +50,7 @@ jest.mock(
 );
 
 import {
+  currentSubscriptionOf,
   extraChannelsOf,
   growthStatsOf,
   monthlyAmountOf,
@@ -198,7 +199,7 @@ describe('StripeService failed payments', () => {
     mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
   });
 
-  it.each(['unpaid', 'canceled', 'incomplete_expired'])(
+  it.each(['unpaid', 'canceled', 'incomplete_expired', 'paused'])(
     'drops the paid tier when a subscription becomes %s',
     async (status) => {
       await service.processWebhook(event(status));
@@ -261,8 +262,70 @@ describe('StripeService failed payments', () => {
       expect.any(Number),
       'PRO',
       'MONTHLY',
-      null
+      null,
+      undefined,
+      undefined,
+      expect.objectContaining({ status: 'active' })
     );
+  });
+
+  it('keeps a past_due survivor as a paid plan, not a trial', async () => {
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: [
+        { id: 'sub_1', status: 'unpaid', metadata: {} },
+        {
+          id: 'sub_2',
+          status: 'past_due',
+          cancel_at: null,
+          metadata: { billing: 'PRO', period: 'MONTHLY', uniqueId: 'u2' },
+        },
+      ],
+    });
+
+    await service.processWebhook(event('unpaid'));
+
+    const call = subscriptionService.createOrUpdateSubscription.mock.calls[0];
+    expect(call[1]).toBe(false);
+    expect(call[10]).toEqual(expect.objectContaining({ status: 'past_due' }));
+  });
+
+  it('does not keep a paused sibling as a survivor', async () => {
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: [
+        { id: 'sub_1', status: 'unpaid', metadata: {} },
+        {
+          id: 'sub_2',
+          status: 'paused',
+          metadata: { billing: 'PRO', period: 'MONTHLY', uniqueId: 'u2' },
+        },
+      ],
+    });
+
+    await service.processWebhook(event('unpaid'));
+
+    expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
+      'cus_1',
+      'stripe'
+    );
+    expect(
+      subscriptionService.createOrUpdateSubscription
+    ).not.toHaveBeenCalled();
+  });
+
+  it('asks Stripe for the event again when the subscriptions cannot be listed, never throwing', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockStripe.subscriptions.list.mockRejectedValue(new Error('down'));
+
+    await expect(service.processWebhook(event('paused'))).resolves.toEqual({
+      retry: true,
+    });
+    await expect(
+      service.processWebhook({
+        ...event('canceled'),
+        type: 'customer.subscription.deleted',
+      })
+    ).resolves.toEqual({ retry: true });
+    expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
   });
 });
 
@@ -775,7 +838,14 @@ describe('StripeService cardless trial', () => {
       expect.any(Number),
       'STANDARD',
       'MONTHLY',
-      null
+      null,
+      undefined,
+      undefined,
+      {
+        status: 'trialing',
+        trialEndsAt: new Date(1793664000 * 1000),
+        currentPeriodEnd: null,
+      }
     );
   });
 
@@ -1333,6 +1403,44 @@ describe('isTrialing', () => {
   });
 });
 
+describe('currentSubscriptionOf', () => {
+  const sub = (id: string, status: string, uniqueId?: string) =>
+    ({ id, status, metadata: { uniqueId } } as any);
+
+  it('picks the live subscription that grants the plan, the stored one first', () => {
+    expect(
+      currentSubscriptionOf(
+        [
+          sub('sub_new', 'active', 'other'),
+          sub('sub_old', 'past_due', 'u1'),
+        ],
+        'u1'
+      )
+    ).toEqual({ subscription: sub('sub_old', 'past_due', 'u1'), entitled: true });
+    expect(
+      currentSubscriptionOf([sub('sub_1', 'canceled'), sub('sub_2', 'trialing')])
+        .subscription.id
+    ).toBe('sub_2');
+  });
+
+  it.each(['unpaid', 'paused', 'incomplete', 'canceled', 'incomplete_expired'])(
+    'says a %s subscription grants no plan',
+    (status) => {
+      expect(currentSubscriptionOf([sub('sub_1', status)])).toEqual({
+        subscription: sub('sub_1', status),
+        entitled: false,
+      });
+    }
+  );
+
+  it('has no subscription for a customer without one', () => {
+    expect(currentSubscriptionOf([])).toEqual({
+      subscription: undefined,
+      entitled: false,
+    });
+  });
+});
+
 describe('trialEndsSoonDetails', () => {
   it('shows the plan of the trial and every paid plan from the pricing', () => {
     const html = trialEndsSoonDetails(
@@ -1543,7 +1651,10 @@ describe('extra channels', () => {
         125,
         'ULTIMATE',
         'MONTHLY',
-        null
+        null,
+        undefined,
+        undefined,
+        { status: 'active', trialEndsAt: null, currentPeriodEnd: null }
       );
     });
 
@@ -1568,6 +1679,7 @@ describe('extra channels', () => {
         stripeSubscription({
           status: 'past_due',
           cancel_at: 1900000000,
+          trial_end: 1800000000,
           metadata: {
             service: 'gitroom',
             billing: 'ULTIMATE',
@@ -1583,14 +1695,94 @@ describe('extra channels', () => {
         subscriptionService.createOrUpdateSubscription
       ).toHaveBeenCalledWith(
         'stripe',
-        true,
+        // a renewal Stripe retries keeps the plan and is no trial
+        false,
         'u1',
         'cus_1',
         102,
         'ULTIMATE',
         'YEARLY',
-        1900000000
+        1900000000,
+        undefined,
+        undefined,
+        {
+          status: 'past_due',
+          // the trial it once had, as Stripe keeps it
+          trialEndsAt: new Date(1800000000 * 1000),
+          currentPeriodEnd: null,
+        }
       );
+    });
+
+    it.each([
+      ['trialing', true],
+      ['active', false],
+      ['past_due', false],
+    ])(
+      'stores a %s subscription with its status, a trial only while trialing',
+      async (status, trial) => {
+        mockStripe.subscriptions.retrieve.mockResolvedValue(
+          stripeSubscription({
+            status,
+            items: {
+              data: [{ ...planItem(), current_period_end: 1900000000 }],
+            },
+          })
+        );
+        await service.processWebhook(updated(stripeSubscription()));
+
+        const call =
+          subscriptionService.createOrUpdateSubscription.mock.calls[0];
+        expect(call[1]).toBe(trial);
+        expect(call[10]).toEqual(
+          expect.objectContaining({
+            status,
+            currentPeriodEnd: new Date(1900000000 * 1000),
+          })
+        );
+        expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
+      }
+    );
+
+    it('drops the plan of a paused subscription like an unpaid one', async () => {
+      mockStripe.subscriptions.retrieve.mockResolvedValue(
+        stripeSubscription({ status: 'paused' })
+      );
+      mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+      await service.processWebhook(updated(stripeSubscription()));
+
+      expect(
+        subscriptionService.createOrUpdateSubscription
+      ).not.toHaveBeenCalled();
+      expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
+        'cus_1',
+        'stripe'
+      );
+    });
+
+    it('stores the plan again when a paused subscription is resumed', async () => {
+      mockStripe.subscriptions.retrieve.mockResolvedValue(
+        stripeSubscription({ status: 'active' })
+      );
+      await service.processWebhook(updated(stripeSubscription()));
+
+      expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalled();
+    });
+
+    it('never stores an incomplete subscription', async () => {
+      mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+      await service.processWebhook(
+        updated(stripeSubscription({ status: 'incomplete' }))
+      );
+      await service.processWebhook({
+        type: 'customer.subscription.created',
+        data: { object: stripeSubscription({ status: 'incomplete' }) },
+      } as any);
+
+      expect(
+        subscriptionService.createOrUpdateSubscription
+      ).not.toHaveBeenCalled();
+      expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
     });
 
     it.each(['canceled', 'incomplete_expired'])(
@@ -1797,7 +1989,10 @@ describe('extra channels', () => {
         110,
         'ULTIMATE',
         'MONTHLY',
-        null
+        null,
+        undefined,
+        undefined,
+        { status: 'active', trialEndsAt: null, currentPeriodEnd: null }
       );
     });
 
