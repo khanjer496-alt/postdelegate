@@ -37,7 +37,10 @@ export const AfterActivate = () => {
       if (response.headers.get('onboarding')) {
         return;
       }
-      const { can, reason } = await response.json();
+      // an unreadable answer shows the "not valid" text, never a loader forever
+      const { can, reason } = await response
+        .json()
+        .catch(() => ({ can: false, reason: undefined }));
       if (!can) {
         setReason(reason);
         setShowLoader(false);

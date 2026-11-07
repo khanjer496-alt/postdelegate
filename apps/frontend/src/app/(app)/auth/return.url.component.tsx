@@ -5,7 +5,7 @@ import { FC, useCallback, useEffect } from 'react';
 
 // Only an address on this app, so signing in can never send someone to
 // another site or run a javascript: URL
-const sameOriginUrl = (url: string | null) => {
+export const sameOriginUrl = (url: string | null) => {
   if (!url) {
     return null;
   }

@@ -11,6 +11,7 @@ import {
 } from '@gitroom/frontend/components/media/media.component';
 import copy from 'copy-to-clipboard';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 
 const useOAuthApp = () => {
   const fetch = useFetch();
@@ -122,17 +123,24 @@ export const DeveloperComponent: FC = () => {
       return;
     }
     try {
-      const result = await (
-        await fetch('/user/oauth-app', {
-          method: 'POST',
-          body: JSON.stringify({
-            name,
-            description,
-            redirectUrl,
-            pictureId,
-          }),
-        })
-      ).json();
+      const response = await fetch('/user/oauth-app', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          description,
+          redirectUrl,
+          pictureId,
+        }),
+      });
+      // the form stays open with what was typed
+      if (!response.ok) {
+        toaster.show(
+          await errorMessage(response, 'Failed to create app'),
+          'warning'
+        );
+        return;
+      }
+      const result = await response.json();
 
       if (result.clientSecret) {
         setPlaintextSecret(result.clientSecret);
@@ -150,7 +158,7 @@ export const DeveloperComponent: FC = () => {
 
   const updateApp = useCallback(async () => {
     try {
-      await fetch('/user/oauth-app', {
+      const response = await fetch('/user/oauth-app', {
         method: 'PUT',
         body: JSON.stringify({
           name,
@@ -159,6 +167,13 @@ export const DeveloperComponent: FC = () => {
           pictureId,
         }),
       });
+      if (!response.ok) {
+        toaster.show(
+          await errorMessage(response, 'Failed to update app'),
+          'warning'
+        );
+        return;
+      }
       toaster.show('App updated', 'success');
       setEditing(false);
       mutate();
@@ -177,9 +192,17 @@ export const DeveloperComponent: FC = () => {
     });
     if (!approved) return;
     try {
-      const result = await (
-        await fetch('/user/oauth-app/rotate-secret', { method: 'POST' })
-      ).json();
+      const response = await fetch('/user/oauth-app/rotate-secret', {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        toaster.show(
+          await errorMessage(response, 'Failed to rotate secret'),
+          'warning'
+        );
+        return;
+      }
+      const result = await response.json();
       if (result.clientSecret) {
         setPlaintextSecret(result.clientSecret);
         toaster.show(
@@ -203,7 +226,14 @@ export const DeveloperComponent: FC = () => {
     });
     if (!approved) return;
     try {
-      await fetch('/user/oauth-app', { method: 'DELETE' });
+      const response = await fetch('/user/oauth-app', { method: 'DELETE' });
+      if (!response.ok) {
+        toaster.show(
+          await errorMessage(response, 'Failed to delete app'),
+          'warning'
+        );
+        return;
+      }
       toaster.show('OAuth app deleted', 'success');
       setPlaintextSecret(null);
       mutate();

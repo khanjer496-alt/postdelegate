@@ -2097,6 +2097,7 @@
   "resend_activation_email": "重新发送激活邮件",
   "failed_to_resend": "重新发送激活邮件失败",
   "error_occurred": "发生错误。请重试。",
+  "too_many_attempts": "尝试次数过多。请等待几分钟后重试。",
   "didnt_receive_email": "没有收到邮件？",
   "activation_email_sent": "激活邮件已发送！请查看你的收件箱。",
   "resend_available_in": "重新发送倒计时",

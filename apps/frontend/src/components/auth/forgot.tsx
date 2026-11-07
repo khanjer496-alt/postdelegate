@@ -25,15 +25,35 @@ export function Forgot() {
   const fetchData = useFetch();
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
-    await fetchData('/auth/forgot', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...data,
-        provider: 'LOCAL',
-      }),
-    });
-    setState(true);
-    setLoading(false);
+    try {
+      const response = await fetchData('/auth/forgot', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          provider: 'LOCAL',
+        }),
+      });
+      // "sent" only when the request was taken, never on a refusal
+      if (!response.ok) {
+        form.setError('email', {
+          message:
+            response.status === 429
+              ? t(
+                  'too_many_attempts',
+                  'Too many attempts. Please wait a few minutes and try again.'
+                )
+              : t('error_occurred', 'An error occurred. Please try again.'),
+        });
+        return;
+      }
+      setState(true);
+    } catch (e) {
+      form.setError('email', {
+        message: t('error_occurred', 'An error occurred. Please try again.'),
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div className="flex flex-1 flex-col">

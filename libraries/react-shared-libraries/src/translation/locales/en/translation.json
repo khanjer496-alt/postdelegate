@@ -2100,6 +2100,7 @@
   "resend_activation_email": "Resend Activation Email",
   "failed_to_resend": "Failed to resend activation email",
   "error_occurred": "An error occurred. Please try again.",
+  "too_many_attempts": "Too many attempts. Please wait a few minutes and try again.",
   "didnt_receive_email": "Didn't receive the email?",
   "activation_email_sent": "Activation email has been sent! Please check your inbox.",
   "resend_available_in": "You can resend in",

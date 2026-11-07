@@ -14,6 +14,7 @@ import { Select } from '@gitroom/react/form/select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 export const SignaturesComponent: FC<{
   appendSignature?: (value: string) => void;
 }> = (props) => {
@@ -47,9 +48,16 @@ export const SignaturesComponent: FC<{
           )
         )
       ) {
-        await fetch(`/signatures/${data.id}`, {
+        const response = await fetch(`/signatures/${data.id}`, {
           method: 'DELETE',
         });
+        if (!response.ok) {
+          toaster.show(
+            await errorMessage(response, 'Could not delete the signature'),
+            'warning'
+          );
+          return;
+        }
         mutate();
         toaster.show('Signature deleted successfully', 'success');
       }
@@ -184,10 +192,21 @@ const AddOrRemoveSignature: FC<{
   const modal = useModals();
   const callBack = useCallback(
     async (values: any) => {
-      await fetch(data?.id ? `/signatures/${data.id}` : '/signatures', {
-        method: data?.id ? 'PUT' : 'POST',
-        body: JSON.stringify(values),
-      });
+      const response = await fetch(
+        data?.id ? `/signatures/${data.id}` : '/signatures',
+        {
+          method: data?.id ? 'PUT' : 'POST',
+          body: JSON.stringify(values),
+        }
+      );
+      // the modal stays open with the text, so it can be saved again
+      if (!response.ok) {
+        toast.show(
+          await errorMessage(response, 'Could not save the signature'),
+          'warning'
+        );
+        return;
+      }
       toast.show(
         data?.id
           ? 'Signature updated successfully'

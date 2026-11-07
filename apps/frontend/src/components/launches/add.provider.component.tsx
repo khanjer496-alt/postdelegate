@@ -19,6 +19,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
+import { putExtensionCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
 const resolver = classValidatorResolver(ApiKeyDto);
 
 export const useAddProvider = (update?: () => void, invite?: boolean) => {
@@ -436,7 +437,19 @@ export const AddProviderComponent: FC<{
           if (response.status === 402) {
             return;
           }
-          const { url } = await response.json();
+          const { url } = response.ok
+            ? await response.json().catch(() => ({} as any))
+            : ({} as any);
+          if (!url) {
+            toaster.show(
+              t(
+                'could_not_connect_to_platform',
+                'Could not connect to the platform'
+              ),
+              'warning'
+            );
+            return;
+          }
           modal.openModal({
             title: `Add ${capitalize(identifier)}`,
             withCloseButton: true,
@@ -450,7 +463,7 @@ export const AddProviderComponent: FC<{
               >
                 <Web3Providers
                   onComplete={(code, newState) => {
-                    window.location.href = `/integrations/social/${identifier}?code=${encodeURIComponent(code)}&state=${newState}${
+                    window.location.href = `/integrations/social/${identifier}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(newState)}${
                       onboarding ? '&onboarding=true' : ''
                     }`;
                   }}
@@ -481,8 +494,10 @@ export const AddProviderComponent: FC<{
           if (response.status === 402) {
             return;
           }
-          const { url, err } = await response.json();
-          if (err) {
+          const { url, err } = response.ok
+            ? await response.json().catch(() => ({ err: true }))
+            : { url: undefined, err: true };
+          if (err || !url) {
             toaster.show(
               t(
                 'could_not_connect_to_platform',
@@ -616,11 +631,33 @@ export const AddProviderComponent: FC<{
             if (response.status === 402) {
               return;
             }
-            const { url } = await response.json();
-            modal.closeAll();
-            window.location.href = `/integrations/social/${identifier}?state=${url}&code=${Buffer.from(
+            const { url } = response.ok
+              ? await response.json().catch(() => ({} as any))
+              : ({} as any);
+            if (!url) {
+              toaster.show(
+                t(
+                  'could_not_connect_to_platform',
+                  'Could not connect to the platform'
+                ),
+                'warning'
+              );
+              return;
+            }
+            const code = Buffer.from(
               JSON.stringify(cookieResponse.cookies)
-            ).toString('base64')}${onboarding ? '&onboarding=true' : ''}`;
+            ).toString('base64');
+            // the session cookies go to the connect page through this tab's
+            // sessionStorage, not the URL (history, logs, referrers)
+            // storage blocked (private mode): fall back to the URL
+            const codeInUrl = !putExtensionCode(url, code);
+            const params = new URLSearchParams({
+              state: url,
+              ...(codeInUrl ? { code } : {}),
+              ...(onboarding ? { onboarding: 'true' } : {}),
+            });
+            modal.closeAll();
+            window.location.href = `/integrations/social/${identifier}?${params.toString()}`;
           } catch {
             toaster.show(
               t(
