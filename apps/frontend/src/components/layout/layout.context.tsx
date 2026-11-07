@@ -1,7 +1,9 @@
 'use client';
 
 import { ReactNode, useCallback } from 'react';
+import { SWRConfig } from 'swr';
 import { FetchWrapperComponent } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { areYouSure } from '@gitroom/frontend/components/layout/new-modal';
 import { useReturnUrl } from '@gitroom/frontend/app/(app)/auth/return.url.component';
@@ -14,6 +16,18 @@ export default function LayoutContext(params: { children: ReactNode }) {
   }
   return <></>;
 }
+// a request whose dialog already answered it (trial, billing) is not retried,
+// a retry would only open the same dialog again
+const swrConfig = {
+  onErrorRetry: (
+    ...args: Parameters<typeof SWRConfig.defaultValue.onErrorRetry>
+  ) => {
+    if (args[0] instanceof HandledResponseError) {
+      return;
+    }
+    SWRConfig.defaultValue.onErrorRetry(...args);
+  },
+};
 export function setCookie(cname: string, cvalue: string, exdays: number) {
   if (typeof document === 'undefined') {
     return;
@@ -169,11 +183,13 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
       return true;
     },
-    [t]
+    [t, returnUrl, isGeneral, isSecured]
   );
   return (
-    <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>
-      {params?.children || <></>}
-    </FetchWrapperComponent>
+    <SWRConfig value={swrConfig}>
+      <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>
+        {params?.children || <></>}
+      </FetchWrapperComponent>
+    </SWRConfig>
   );
 }

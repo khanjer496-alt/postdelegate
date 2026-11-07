@@ -3,6 +3,8 @@ import React, { FC, useCallback, useState } from 'react';
 import clsx from 'clsx';
 import Loading from '@gitroom/frontend/components/layout/loading';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
+import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import useSWR from 'swr';
@@ -38,16 +40,29 @@ export const Modal: FC<{
   const { data } = useSWR('copilot-credits', loadCredits);
 
   const generate = useCallback(async () => {
-    await fetch(`/media/generate-video/${type.identifier}/allowed`);
-    setLoading(true);
-    close();
-    setLocked(true);
-
-    const customParams = form.getValues();
+    // a form that is not ready stays open, so it can be fixed
     if (!(await form.trigger())) {
       toaster.show('Please fill all required fields', 'warning');
       return;
     }
+
+    const allowed = await fetch(
+      `/media/generate-video/${type.identifier}/allowed`
+    );
+    if (!allowed.ok) {
+      // a plan limit already showed its own dialog
+      if (allowed.status !== 402) {
+        toaster.show('Video generation failed', 'warning');
+      }
+      return;
+    }
+
+    const customParams = form.getValues();
+    // every generation holds its own lock of the composer
+    const lockOwner = makeId(10);
+    setLoading(true);
+    close();
+    setLocked(true, lockOwner);
     try {
       const image = await fetch(`/media/generate-video`, {
         method: 'POST',
@@ -60,18 +75,21 @@ export const Modal: FC<{
 
       if (image.status == 200 || image.status == 201) {
         onChange(await image.json());
-      } else {
+      } else if (image.status !== 402) {
         toaster.show('Video generation failed', 'warning');
       }
     } catch (e) {
-      toaster.show(
-        'Video generation failed or timed out — if it completes, it will appear in your media library',
-        'warning'
-      );
+      // a dialog already told the user why it stopped
+      if (!(e instanceof HandledResponseError)) {
+        toaster.show(
+          'Video generation failed or timed out — if it completes, it will appear in your media library',
+          'warning'
+        );
+      }
+    } finally {
+      setLocked(false, lockOwner);
+      setLoading(false);
     }
-
-    setLocked(false);
-    setLoading(false);
   }, [type, position]);
 
   return (

@@ -311,7 +311,8 @@ export const MediaComponentInner: FC<{
     | undefined;
 }> = (props) => {
   const { onClose, onSelect, media } = props;
-  const setActivateExitButton = useLaunchStore((e) => e.setActivateExitButton);
+  const blockExit = useLaunchStore((e) => e.blockExit);
+  const releaseExit = useLaunchStore((e) => e.releaseExit);
   const newFetch = useFetch();
   const modals = useModals();
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
@@ -326,9 +327,9 @@ export const MediaComponentInner: FC<{
   );
 
   useEffect(() => {
-    setActivateExitButton(false);
+    blockExit();
     return () => {
-      setActivateExitButton(true);
+      releaseExit();
     };
   }, []);
 

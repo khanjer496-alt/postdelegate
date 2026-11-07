@@ -37,6 +37,7 @@ import localizedFormat from 'dayjs/plugin/localizedFormat';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import clsx from 'clsx';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { useDrag, useDrop } from 'react-dnd';
 import { Integration, Post, State, Tags } from '@prisma/client';
@@ -293,16 +294,25 @@ export const usePostActions = (onMutate?: () => void) => {
         return;
       }
 
-      await fetch(`/posts/${post.group}`, {
+      const response = await fetch(`/posts/${post.group}`, {
         method: 'DELETE',
       });
+      mutate();
+
+      if (!response.ok) {
+        const { message } = await response.json().catch(() => ({}));
+        toaster.show(
+          (typeof message === 'string' && message) ||
+            t('post_delete_failed', 'Could not delete the post'),
+          'warning'
+        );
+        return;
+      }
 
       toaster.show(
         t('post_deleted_successfully', 'Post deleted successfully'),
         'success'
       );
-
-      mutate();
     },
     [toaster, t, fetch, mutate]
   );
@@ -800,6 +810,7 @@ export const CalendarColumn: FC<{
   } = useCalendar();
   const modal = useModals();
   const fetch = useFetch();
+  const toaster = useToaster();
 
   // Use shared post actions hook
   const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPost } = usePostActions();
@@ -857,6 +868,7 @@ export const CalendarColumn: FC<{
         const whatToDo = await new Promise<'schedule' | 'update' | 'cancel'>(
           (resolve) => {
             modal.openModal({
+              id: 'republish-dropped-post',
               title: t('what_do_you_want_to_do', 'What do you want to do?'),
               children: (
                 <div className="flex flex-col">
@@ -882,7 +894,7 @@ export const CalendarColumn: FC<{
                         type="button"
                         className="flex-1"
                         onClick={() => {
-                          modal.closeAll();
+                          modal.closeById('republish-dropped-post');
                           resolve('update');
                         }}
                       >
@@ -894,7 +906,7 @@ export const CalendarColumn: FC<{
                         type="button"
                         className="flex-1"
                         onClick={() => {
-                          modal.closeAll();
+                          modal.closeById('republish-dropped-post');
                           resolve('schedule');
                         }}
                       >
@@ -918,22 +930,50 @@ export const CalendarColumn: FC<{
       if (!item.interval) {
         changeDate(item.id, getDate);
       }
-      const { status } = await fetch(`/posts/${item.id}/date`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          date: getDate.utc().format('YYYY-MM-DDTHH:mm:ss'),
-          action,
-          // published posts always confirm via the modal before reaching here;
-          // for QUEUE posts the flag is a no-op on the server
-          ...(action === 'schedule' ? { republish: true } : {}),
-        }),
-      });
-      if (status !== 500) {
-        if (item.interval || action === 'schedule') {
-          reloadCalendarView();
+      // a move that fails puts the post back where it was
+      const rollback = () => {
+        if (!item.interval && post) {
+          changeDate(item.id, dayjs.utc(post.publishDate));
+        }
+        reloadCalendarView();
+      };
+      try {
+        const response = await fetch(`/posts/${item.id}/date`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            date: getDate.utc().format('YYYY-MM-DDTHH:mm:ss'),
+            action,
+            // published posts always confirm via the modal before reaching here;
+            // for QUEUE posts the flag is a no-op on the server
+            ...(action === 'schedule' ? { republish: true } : {}),
+          }),
+        });
+        if (!response.ok) {
+          rollback();
+          // a plan limit already showed its own dialog
+          if (response.status !== 402) {
+            const { message } = await response.json().catch(() => ({}));
+            toaster.show(
+              (typeof message === 'string' && message) ||
+                t('post_move_failed', 'Could not move the post'),
+              'warning'
+            );
+          }
           return;
         }
+      } catch (e) {
+        rollback();
+        // a dialog already told the user why it stopped
+        if (!(e instanceof HandledResponseError)) {
+          toaster.show(
+            t('post_move_failed', 'Could not move the post'),
+            'warning'
+          );
+        }
         return;
+      }
+      if (item.interval || action === 'schedule') {
+        reloadCalendarView();
       }
     },
     collect: (monitor) => ({

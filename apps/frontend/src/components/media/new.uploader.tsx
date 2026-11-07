@@ -9,6 +9,7 @@ import React, {
 import Uppy, { BasePlugin, UploadResult, UppyFile } from '@uppy/core';
 // @ts-ignore
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import {
   getUppyUploadPlugin,
   WaitForMediaProcessing,
@@ -22,6 +23,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import { uniqBy } from 'lodash';
+import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
 // The server keeps pictures up to 10 MB (getMaxSize). The types compressed
 // here before the upload shrink well under it, so they may start larger.
@@ -120,6 +122,16 @@ export function useUppyUploader(props: {
         maxFileSize: 1000000000, // Default 1GB, but we'll override with custom validation
       },
     });
+
+    // this uploader holds its own lock of the composer, released once none of
+    // its uploads still runs or still saves its files
+    const lockOwner = makeId(10);
+    let saving = 0;
+    const unlock = () => {
+      if (!saving && !Object.keys(uppy2.getState().currentUploads).length) {
+        setLocked(false, lockOwner);
+      }
+    };
 
     // check for valid file types it can be something like this image/*,video/mp4.
     // If it's an image, I need to replace image/* with image/png, image/jpeg, image/jpeg, image/gif (separately)
@@ -282,7 +294,7 @@ export function useUppyUploader(props: {
     }
     // Set additional metadata when a file is added
     uppy2.on('file-added', (file) => {
-      setLocked(true);
+      setLocked(true, lockOwner);
       uppy2.setFileMeta(file.id, {
         useCloudflare: storageProvider === 'cloudflare' ? 'true' : 'false', // Example of adding a custom field
         addedOrder: fileOrderIndex++, // Track original order for sorting after upload
@@ -295,9 +307,14 @@ export function useUppyUploader(props: {
         return;
       }
       uppy2.cancelAll();
-      setLocked(false);
+      unlock();
       props.onEnd();
       fileOrderIndex = 0;
+    });
+    // a closed window cancels its uploads, nothing finishes them anymore
+    uppy2.on('cancel-all', () => {
+      saving = 0;
+      setLocked(false, lockOwner);
     });
     uppy2.on('upload-start', () => {
       props.onStart();
@@ -326,58 +343,78 @@ export function useUppyUploader(props: {
         return orderA - orderB;
       });
 
-      if (storageProvider === 'local') {
-        setLocked(false);
-        fileOrderIndex = 0;
-        onUploadSuccess(sortedSuccessful.map((p) => p.response.body));
-        return;
-      }
+      try {
+        if (storageProvider === 'local') {
+          onUploadSuccess(sortedSuccessful.map((p) => p.response.body));
+          return;
+        }
 
-      if (useTransloadit) {
-        // @ts-ignore
-        const allRes = result.transloadit[0].results;
-        const toSave = uniqBy<{ name: string; originalName: string; order: number }>(
-          // @ts-ignore
-          Object.values(allRes).flatMap((p: any[]) => {
-            return p.flatMap((item) => ({
-              name: item.url.split('/').pop(),
-              originalName: item.name || '',
-              order: +item.user_meta.addedOrder,
-            }));
-          }),
-          (item) => item.name
-        );
+        if (useTransloadit) {
+          saving++;
+          try {
+            // @ts-ignore
+            const allRes = result.transloadit[0].results;
+            const toSave = uniqBy<{
+              name: string;
+              originalName: string;
+              order: number;
+            }>(
+              // @ts-ignore
+              Object.values(allRes).flatMap((p: any[]) => {
+                return p.flatMap((item) => ({
+                  name: item.url.split('/').pop(),
+                  originalName: item.name || '',
+                  order: +item.user_meta.addedOrder,
+                }));
+              }),
+              (item) => item.name
+            );
 
-        const loadAllMedia = (
-          await Promise.all(
-            toSave.map(async ({ name, originalName, order }) => ({
-              file: await (
-                await fetch('/media/save-media', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    name,
-                    originalName,
-                  }),
+            const loadAllMedia = (
+              await Promise.all(
+                toSave.map(async ({ name, originalName, order }) => {
+                  const saved = await fetch('/media/save-media', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      name,
+                      originalName,
+                    }),
+                  });
+                  if (!saved.ok) {
+                    throw new Error(`save-media answered ${saved.status}`);
+                  }
+                  return { file: await saved.json(), order };
                 })
-              ).json(),
-              order,
-            }))
-          )
-        )
-          .sort((a, b) => {
-            return a.order - b.order;
-          })
-          .map((p) => p.file);
+              )
+            )
+              .sort((a, b) => {
+                return a.order - b.order;
+              })
+              .map((p) => p.file);
 
-        setLocked(false);
+            onUploadSuccess(loadAllMedia);
+          } finally {
+            saving = Math.max(0, saving - 1);
+          }
+          return;
+        }
+
+        onUploadSuccess(sortedSuccessful.map((p) => p.response.body.saved));
+      } catch (e) {
+        // a dialog already told the user why it stopped
+        if (!(e instanceof HandledResponseError)) {
+          toast.show(
+            t(
+              'some_files_failed_to_upload',
+              'Some files failed to upload, please try again'
+            ),
+            'warning'
+          );
+        }
+      } finally {
         fileOrderIndex = 0;
-        onUploadSuccess(loadAllMedia);
-        return;
+        unlock();
       }
-
-      setLocked(false);
-      fileOrderIndex = 0;
-      onUploadSuccess(sortedSuccessful.map((p) => p.response.body.saved));
     });
     uppy2.on('upload-success', (file, response) => {
       const current = uppy2.getState().files[file.id];

@@ -32,6 +32,7 @@ import { TagsComponent } from '@gitroom/frontend/components/launches/tags.compon
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { capitalize, uniq } from 'lodash';
@@ -96,6 +97,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const ref = useRef(null);
   const existingData = useExistingData();
   const [loading, setLoading] = useState(false);
+  // set before the first await, so a second click can't start a second save
+  // or delete while the dialogs of the first are still open
+  const busy = useRef(false);
   const toaster = useToaster();
   const modal = useModals();
   const [showSettings, setShowSettings] = useState(false);
@@ -150,7 +154,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       locked: state.locked,
       publishBlocked: state.publishBlocked,
       publishBlockedReason: state.publishBlockedReason,
-      activateExitButton: state.activateExitButton,
+      activateExitButton: state.exitBlockers === 0,
     }))
   );
   // the other channels of an existing post show and move only their own date
@@ -277,96 +281,132 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   }, [activateExitButton, dummy]);
 
   const deletePost = useCallback(async () => {
+    if (busy.current) {
+      return;
+    }
+    busy.current = true;
     setLoading(true);
-    if (existingData.siblings?.length) {
-      const groups = await new Promise<string[]>((resolve) => {
-        modal.openModal({
-          id: 'delete-post-channels',
-          title: t('delete_post', 'Delete Post'),
-          onClose: () => resolve([]),
-          children: (
-            <div className="flex flex-col">
-              <div className="text-[20px] mb-[20px]">
-                {t(
-                  'delete_post_from_all_channels_question',
-                  'This post was created for more than one channel. Do you want to delete it from all of them?'
-                )}
-              </div>
-              <div className="flex w-full gap-[10px]">
-                <div className="flex-1 flex">
-                  <Button
-                    type="button"
-                    className="flex-1"
-                    onClick={() => {
-                      modal.closeById('delete-post-channels');
-                      resolve(existingPosts.map((p) => p.group!));
-                    }}
-                  >
-                    {t('delete_from_all_channels', 'Delete from all channels')}
-                  </Button>
+    try {
+      const groups = existingData.siblings?.length
+        ? await new Promise<string[]>((resolve) => {
+            modal.openModal({
+              id: 'delete-post-channels',
+              title: t('delete_post', 'Delete Post'),
+              onClose: () => resolve([]),
+              children: (
+                <div className="flex flex-col">
+                  <div className="text-[20px] mb-[20px]">
+                    {t(
+                      'delete_post_from_all_channels_question',
+                      'This post was created for more than one channel. Do you want to delete it from all of them?'
+                    )}
+                  </div>
+                  <div className="flex w-full gap-[10px]">
+                    <div className="flex-1 flex">
+                      <Button
+                        type="button"
+                        className="flex-1"
+                        onClick={() => {
+                          modal.closeById('delete-post-channels');
+                          resolve(existingPosts.map((p) => p.group!));
+                        }}
+                      >
+                        {t(
+                          'delete_from_all_channels',
+                          'Delete from all channels'
+                        )}
+                      </Button>
+                    </div>
+                    <div className="flex-1 flex">
+                      <Button
+                        type="button"
+                        secondary
+                        className="flex-1"
+                        onClick={() => {
+                          modal.closeById('delete-post-channels');
+                          resolve([channel.group!]);
+                        }}
+                      >
+                        {t('delete_only_from', 'Only from')}{' '}
+                        {
+                          integrations.find(
+                            (p) => p.id === channel.integration
+                          )?.name
+                        }
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 flex">
-                  <Button
-                    type="button"
-                    secondary
-                    className="flex-1"
-                    onClick={() => {
-                      modal.closeById('delete-post-channels');
-                      resolve([channel.group!]);
-                    }}
-                  >
-                    {t('delete_only_from', 'Only from')}{' '}
-                    {
-                      integrations.find((p) => p.id === channel.integration)
-                        ?.name
-                    }
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ),
-        });
-      });
+              ),
+            });
+          })
+        : (await deleteDialog(
+            t(
+              'are_you_sure_you_want_to_delete_post',
+              'Are you sure you want to delete this post?'
+            ),
+            t('yes_delete_it', 'Yes, delete it!')
+          ))
+        ? [existingData.group!]
+        : [];
 
       if (!groups.length) {
-        setLoading(false);
         return;
       }
 
-      await Promise.all(
+      const responses = await Promise.all(
         groups.map((group) =>
           fetch(`/posts/${group}`, {
             method: 'DELETE',
           })
         )
       );
+      // the channels deleted before a failure leave the calendar either way
       mutate();
-      modal.closeAll();
-      return;
-    }
 
-    if (
-      !(await deleteDialog(
-        t(
-          'are_you_sure_you_want_to_delete_post',
-          'Are you sure you want to delete this post?'
-        ),
-        t('yes_delete_it', 'Yes, delete it!')
-      ))
-    ) {
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const { message } = await failed.json().catch(() => ({}));
+        toaster.show(
+          firstErrorMessage(message) ||
+            t('post_delete_failed', 'Could not delete the post'),
+          'warning'
+        );
+        return;
+      }
+
+      modal.closeAll();
+    } catch (e) {
+      // a dialog already told the user why it stopped
+      if (!(e instanceof HandledResponseError)) {
+        toaster.show(
+          t('post_delete_failed', 'Could not delete the post'),
+          'warning'
+        );
+      }
+    } finally {
+      busy.current = false;
       setLoading(false);
-      return;
     }
-    await fetch(`/posts/${existingData.group}`, {
-      method: 'DELETE',
-    });
-    mutate();
-    modal.closeAll();
-    return;
   }, [existingData, mutate, modal, current, integrations]);
 
-  const schedule = useCallback(
-    (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
+  // the save closes the composer, the frame of the standalone page closes
+  // itself once the toast had time to show
+  const closeComposer = useCallback(() => {
+    if (customClose) {
+      setTimeout(() => {
+        customClose();
+      }, 2000);
+      return;
+    }
+    modal.closeAll();
+  }, [customClose, modal]);
+
+  // answers true when the composer closed after saving
+  const runSchedule = useCallback(
+    async (
+      type: 'draft' | 'now' | 'schedule' | 'update'
+    ): Promise<boolean> => {
       // Provider checks can change after the action was rendered, so re-read
       // the store before starting a publishing request. Drafts remain editable.
       const state = useLaunchStore.getState();
@@ -394,7 +434,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               state.selectedIntegrations.map(({ integration }) => integration.id)
             ))
       ) {
-        return;
+        return false;
       }
 
       // another channel whose date already passed would go out right away, it
@@ -522,7 +562,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         });
 
         if (!whichChannels) {
-          return;
+          return false;
         }
 
         if (whichChannels === 'only') {
@@ -617,7 +657,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         });
 
         if (!whatToDo) {
-          return;
+          return false;
         }
 
         if (whatToDo === 'update') {
@@ -644,10 +684,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             .map(({ integration }) => integration.id)
         )
       ) {
-        return;
+        return false;
       }
-
-      setLoading(true);
 
       // Pull the local values to build the payload, but rely on the server
       // (`/posts/valid`) for the actual validation — checkValidity now lives
@@ -711,8 +749,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               'warning'
             );
           }
-          setLoading(false);
-          return;
+          return false;
         }
 
         const checkAllValid = await validResponse.json();
@@ -733,9 +770,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               ),
             'warning'
           );
-          setLoading(false);
           focus(item.id, 'preview');
-          return;
+          return false;
         }
 
         // a channel saved as a draft gets these checks once it's scheduled
@@ -753,9 +789,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               'warning'
             );
             focus(item.id, 'fix');
-            setLoading(false);
             setShowSettings(true);
-            return;
+            return false;
           }
 
           if (item.errors !== true) {
@@ -766,9 +801,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               'warning'
             );
             focus(item.id, 'preview');
-            setLoading(false);
             setShowSettings(false);
-            return;
+            return false;
           }
 
           if (item.tooLong) {
@@ -780,8 +814,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               'warning'
             );
             focus(item.id, 'preview');
-            setLoading(false);
-            return;
+            return false;
           }
         }
       }
@@ -846,8 +879,6 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           closeOnEscape: true,
           closeOnClickOutside: true,
         });
-
-        setLoading(false);
       }
 
       if (!dummy) {
@@ -888,8 +919,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               if (saved) {
                 mutate();
               }
-              setLoading(false);
-              return;
+              return false;
             }
             saved = true;
             const output = await response.json().catch(() => []);
@@ -908,13 +938,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 'Sent for review. It will publish once an approver approves it.'
               )
             );
-            if (customClose) {
-              setTimeout(() => {
-                customClose();
-              }, 2000);
-            }
-            modal.closeAll();
-            return;
+            closeComposer();
+            return true;
           }
         }
 
@@ -956,16 +981,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               : savedMessage
           );
         }
-        if (customClose) {
-          setTimeout(() => {
-            customClose();
-          }, 2000);
-        }
-
         if (!addEditSets) {
-          modal.closeAll();
+          closeComposer();
+          return true;
         }
       }
+      return false;
     },
     [
       ref,
@@ -979,7 +1000,37 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       addEditSets,
       dummy,
       shortlinkPreferenceData,
+      closeComposer,
     ]
+  );
+
+  const schedule = useCallback(
+    (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
+      if (busy.current) {
+        return;
+      }
+      busy.current = true;
+      setLoading(true);
+      let closed = false;
+      try {
+        closed = await runSchedule(type);
+      } catch (e) {
+        // a dialog already told the user why it stopped
+        if (!(e instanceof HandledResponseError)) {
+          toaster.show(
+            t('post_save_failed', 'Could not save the post'),
+            'warning'
+          );
+        }
+      } finally {
+        // a closing composer stays busy, so nothing is saved twice meanwhile
+        if (!closed) {
+          busy.current = false;
+          setLoading(false);
+        }
+      }
+    },
+    [runSchedule]
   );
 
   // Cmd/Ctrl + Enter runs the primary action, like the main button would
@@ -1390,8 +1441,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           <div className="pe-[20px] flex items-center justify-end gap-[8px]">
             {existingData?.integration && (
               <button
+                type="button"
+                disabled={loading}
                 onClick={deletePost}
-                className="cursor-pointer flex text-[#FF3F3F] gap-[8px] items-center text-[15px] font-[600]"
+                className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex text-[#FF3F3F] gap-[8px] items-center text-[15px] font-[600]"
               >
                 <div>
                   <TrashIcon />
@@ -1591,7 +1644,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             {existingData?.integration && (
               <div
                 onClick={deletePost}
-                className="flex items-center gap-[12px] py-[8px] cursor-pointer text-[#FF3F3F]"
+                aria-disabled={loading}
+                className={clsx(
+                  'flex items-center gap-[12px] py-[8px] cursor-pointer text-[#FF3F3F]',
+                  loading && 'opacity-50 pointer-events-none'
+                )}
               >
                 <TrashIcon size={24} />
                 <div className="text-[15px] font-[600]">

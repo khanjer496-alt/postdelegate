@@ -501,7 +501,12 @@ export const areYouSure = ({
 export const DecisionEverywhere: FC = () => {
   const decision = useDecisionModal();
   useEffect(() => {
-    decisionModalEmitter.on('open', decision.open);
+    const open = decision.open;
+    decisionModalEmitter.on('open', open);
+    // a remount adds its own listener, the old one would open a second dialog
+    return () => {
+      decisionModalEmitter.off('open', open);
+    };
   }, []);
   return null;
 };
@@ -519,16 +524,22 @@ export const useDecisionModal = () => {
       newRes = undefined as any,
     } = {}) => {
       return new Promise<boolean>((res) => {
+        // areYouSure awaits newRes, so both settle, the X, Escape and a click
+        // outside answer like the cancel button
+        const resolution = (value: boolean) => {
+          newRes?.(value);
+          res(value);
+        };
         modals.openModal({
           title,
           askClose: false,
           destructive,
-          onClose: () => res(false),
+          onClose: () => resolution(false),
           children: (
             <DecisionModal
               onlyApprove={onlyApprove}
               destructive={destructive}
-              resolution={(value) => (newRes ? newRes(value) : res(value))}
+              resolution={resolution}
               description={description}
               approveLabel={approveLabel}
               cancelLabel={cancelLabel}
