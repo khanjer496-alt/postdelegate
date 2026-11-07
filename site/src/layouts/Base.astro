@@ -55,6 +55,7 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
          An earlier "yes" is queued before the tracker loads, so Pulse applies it
          before its first pageview; public/_headers allows both scripts. -->
     <script is:inline>
+      // v1: keep in step with CONSENT_VERSION in libraries/helpers/src/consent/consent.cookie.ts
       if (/(?:^|; )pd_consent=v1\|(?:[^;|]*\|)*analytics:1(?:[|;]|$)/.test(document.cookie))
         (window.pulse = window.pulse || function () { (window.pulse.q = window.pulse.q || []).push(arguments); })('consent', true);
     </script>
@@ -95,7 +96,8 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     
       // Pulse's visitor id rides along in this visit's links to the app's sign-up
       // and sign-in, and the app saves it on the Stripe checkout (pulse_vid) so
-      // the revenue is credited to the visit. Nothing is stored on the device.
+      // the revenue is credited to the visit. With Analytics consent the id is
+      // derived from Pulse's pulse_vid cookie; without it, it is that day's cookie-free id.
       // Without Pulse (blocked, or no visitor id to give) the links stay as they
       // are.
       type Pulse = { visitorId?: () => Promise<string> };
