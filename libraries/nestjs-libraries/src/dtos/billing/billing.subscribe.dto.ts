@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class BillingSubscribeDto {
@@ -7,13 +7,6 @@ export class BillingSubscribeDto {
 
   @IsIn(['STANDARD', 'PRO', 'TEAM', 'ULTIMATE'])
   billing: 'STANDARD' | 'PRO' | 'TEAM' | 'ULTIMATE';
-
-  // A buyer who wants to start paying today rather than take the 7 free days.
-  // It can only ever remove a trial, never grant one: see allowTrialFor.
-  @IsOptional()
-  @IsBoolean()
-  @Transform(({ value }) => value === true || value === 'true')
-  skipTrial?: boolean;
 
   utm: string;
 

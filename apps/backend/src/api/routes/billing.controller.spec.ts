@@ -71,8 +71,13 @@ describe('allowTrialFor', () => {
     expect(allowTrialFor(false, { skipTrial: true })).toBe(false);
   });
 
+  // only a real boolean true declines it: the string "false" is truthy in
+  // JavaScript, and this codebase has shipped that bug before
   it('treats anything other than a true opt-out as not opting out', () => {
     expect(allowTrialFor(true, { skipTrial: undefined })).toBe(true);
     expect(allowTrialFor(true, {} as any)).toBe(true);
+    expect(allowTrialFor(true, { skipTrial: 'false' })).toBe(true);
+    expect(allowTrialFor(true, { skipTrial: 'true' })).toBe(true);
+    expect(allowTrialFor(true, { skipTrial: 0 })).toBe(true);
   });
 });

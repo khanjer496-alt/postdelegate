@@ -28,15 +28,18 @@ import {
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
-@ApiTags('Billing')
 // Whether this checkout gets the free trial. Deliberately one-way: a request
 // may decline the trial, but cannot grant one to an organisation that has
 // already used its own - canStartTrial stays the authority.
+// Strict on purpose: only a real boolean true declines the trial. This
+// codebase has been bitten before by the string "false" being truthy, and a
+// buyer silently losing their free trial to a stray string is the same bug.
 export const allowTrialFor = (
   canStartTrial: boolean,
-  body: { skipTrial?: boolean }
-) => canStartTrial && !body?.skipTrial;
+  body: { skipTrial?: unknown }
+) => canStartTrial && body?.skipTrial !== true;
 
+@ApiTags('Billing')
 @Controller('/billing')
 export class BillingController {
   constructor(
@@ -114,6 +117,9 @@ export class BillingController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Body() body: BillingSubscribeDto,
+    // read beside the DTO, never on it: the DTO is spread into Stripe
+    // metadata, which only accepts strings
+    @Body('skipTrial') skipTrial: unknown,
     @Req() req: Request
   ) {
     if (await this.assertNoOtherSubscribedAccount(user)) {
@@ -126,7 +132,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      allowTrialFor(await this._usersService.canStartTrial(org), body)
+      allowTrialFor(await this._usersService.canStartTrial(org), { skipTrial })
     );
   }
 
@@ -136,6 +142,9 @@ export class BillingController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Body() body: BillingSubscribeDto,
+    // read beside the DTO, never on it: the DTO is spread into Stripe
+    // metadata, which only accepts strings
+    @Body('skipTrial') skipTrial: unknown,
     @Req() req: Request
   ) {
     if (await this.assertNoOtherSubscribedAccount(user)) {
@@ -148,7 +157,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      allowTrialFor(await this._usersService.canStartTrial(org), body)
+      allowTrialFor(await this._usersService.canStartTrial(org), { skipTrial })
     );
   }
 
@@ -158,6 +167,9 @@ export class BillingController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Body() body: BillingSubscribeDto,
+    // read beside the DTO, never on it: the DTO is spread into Stripe
+    // metadata, which only accepts strings
+    @Body('skipTrial') skipTrial: unknown,
     @Req() req: Request
   ) {
     if (await this.assertNoOtherSubscribedAccount(user)) {
