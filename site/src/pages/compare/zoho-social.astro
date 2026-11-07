@@ -85,7 +85,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Zoho Social alternative: PostDelegate vs Zoho Social compared" description="PostDelegate vs Zoho Social: a $15 entry plan with per-brand channel caps against flat channel bands, AI credits, approvals, and no MCP server." h1="PostDelegate vs Zoho Social." eyebrow="Compare" lead="Zoho Social is the cheapest serious scheduler on this list to start with, at $15 a month. The catch is the brand model: channels are capped per brand, and extra brands are only sold on the dearer plans." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Zoho Social</a>
 
   <h2>At a glance</h2>

@@ -35,7 +35,9 @@ const icons: Record<string, string> = {
       <p class="muted">{p.intro(TRIAL_DAYS)}</p>
     </div>
   )}
-  <fieldset class="billing-toggle">
+  {/* pricing_viewed fires when half of it is on screen: the switch right above
+      the plans, since half of the whole block never fits on a phone */}
+  <fieldset class="billing-toggle" data-pulse-scroll="pricing_viewed">
     <legend class="sr-only">{p.billingPeriod}</legend>
     <input type="radio" name="billing-period" id="billing-monthly" value="monthly" checked />
     <label for="billing-monthly">{p.monthly}</label>
@@ -54,7 +56,7 @@ const icons: Record<string, string> = {
         <p class="plan-yearly price-monthly">{p.orYearly(num(plan.yearly), num(plan.monthly * 12 - plan.yearly))}</p>
         <p class="plan-price price-yearly"><strong>${perMonth(plan.yearly)}</strong><span>{p.perMonth}</span></p>
         <p class="plan-yearly price-yearly">{p.billedYearly(num(plan.yearly), num(plan.monthly * 12 - plan.yearly))}</p>
-        <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]}>{p.startTrial}</a>
+        <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]} data-pulse-goal="checkout_started" data-pulse-goal-plan={plan.slug}>{p.startTrial}</a>
         <p class="plan-trial">{p.trialNote(TRIAL_DAYS)}</p>
         <div class="plan-channels">
           <p><strong>{plan.channels}</strong> {p.channels}{plan.extraChannelMonthly && <span class="plan-extra price-monthly">{p.extraMonthly(num(plan.extraChannelMonthly), num(plan.maxChannels || plan.channels))}</span>}{plan.extraChannelYearly && <span class="plan-extra price-yearly">{p.extraYearly(num(plan.extraChannelYearly, 2), num(plan.maxChannels || plan.channels))}</span>}</p>

@@ -84,6 +84,42 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <main id="main"><slot /></main>
     <Footer lang={lang} />
     <!--/email_off-->
+    <script>
+      import { SITE } from '../data/site';
+    
+      // Pulse's visitor id rides along in this visit's links to the app's sign-up
+      // and sign-in, and the app saves it on the Stripe checkout (pulse_vid) so
+      // the revenue is credited to the visit. Nothing is stored on the device.
+      // Without Pulse (blocked, or no visitor id to give) the links stay as they
+      // are.
+      type Pulse = { visitorId?: () => Promise<string> };
+      const VISITOR = /^[0-9a-f]{32}$/;
+      const app = new URL(SITE.app).origin;
+    
+      const pulse = () => (window as Window & { pulse?: Pulse }).pulse;
+      const carry = () => {
+        const tracker = pulse();
+        if (typeof tracker?.visitorId !== 'function') return;
+        Promise.resolve()
+          .then(() => tracker.visitorId!())
+          .then((id) => {
+            if (!VISITOR.test(id)) return;
+            document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((link) => {
+              const url = new URL(link.href, location.href);
+              // the app's home sends a signed-out visitor to /auth with the same query
+              if (url.origin !== app || !(url.pathname === '/' || url.pathname.startsWith('/auth'))) return;
+              url.searchParams.set('pulse_vid', id);
+              link.href = url.href;
+            });
+          })
+          .catch(() => {});
+      };
+    
+      // the tracker is a deferred script, it is there once the page has loaded
+      if (typeof pulse()?.visitorId === 'function' || document.readyState === 'complete') carry();
+      else addEventListener('load', carry, { once: true });
+    </script>
   </body>
 </html>
+
 <style>.skip-link{position:fixed;top:12px;inset-inline-start:16px;z-index:100;transform:translateY(-180%);padding:12px 18px;background:#fff;border-radius:999px;color:#111;font-size:13px;font-weight:600;text-decoration:none}.skip-link:focus{transform:translateY(0);outline:2px solid var(--accent,#7357ff);outline-offset:4px}</style>

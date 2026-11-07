@@ -38,7 +38,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Textarea } from '@gitroom/react/form/textarea';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
-import { useUtmUrl } from '@gitroom/helpers/utils/utm.saver';
+import { usePulseVisitor, useUtmUrl } from '@gitroom/helpers/utils/utm.saver';
 import { hasConsent } from '@gitroom/helpers/consent/consent.cookie';
 import { useTrack } from '@gitroom/react/helpers/use.track';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
@@ -524,6 +524,7 @@ export const MainBillingComponent: FC<{
   const modal = useModals();
   const router = useRouter();
   const utm = useUtmUrl();
+  const pulse_vid = usePulseVisitor();
   const track = useTrack();
   const t = useT();
   const queryParams = useSearchParams();
@@ -913,6 +914,7 @@ export const MainBillingComponent: FC<{
                 ...(dub ? { dub } : {}),
                 ...(fbc && hasConsent('analytics') ? { fbc } : {}),
                 ...(fbp && hasConsent('analytics') ? { fbp } : {}),
+              ...(pulse_vid ? { pulse_vid } : {}),
               }),
             })
           ).json();
@@ -1015,6 +1017,7 @@ export const MainBillingComponent: FC<{
       subscription,
       user,
       utm,
+      pulse_vid,
       paymentAction,
       startTrial,
       addPaymentMethod,

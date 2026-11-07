@@ -1569,6 +1569,21 @@ export class StripeService extends PaymentProviderAbstract {
     } catch (err) {}
   }
 
+  // The site analytics read the visit a checkout came from on the session
+  // (the subscription gets the whole body), nothing is added without one
+  private checkoutSessionMetadata(body: BillingSubscribeDto) {
+    const metadata = {
+      ...(body.datafast_session_id && body.datafast_visitor_id
+        ? {
+            datafast_visitor_id: body.datafast_visitor_id,
+            datafast_session_id: body.datafast_session_id,
+          }
+        : {}),
+      ...(body.pulse_vid ? { pulse_vid: body.pulse_vid } : {}),
+    };
+    return Object.keys(metadata).length ? { metadata } : {};
+  }
+
   private async createEmbeddedCheckout(
     ud: string,
     uniqueId: string,
@@ -1604,14 +1619,7 @@ export class StripeService extends PaymentProviderAbstract {
           ud,
         },
       },
-      ...(body.datafast_session_id && body.datafast_visitor_id
-        ? {
-            metadata: {
-              datafast_visitor_id: body.datafast_visitor_id,
-              datafast_session_id: body.datafast_session_id,
-            },
-          }
-        : {}),
+      ...this.checkoutSessionMetadata(body),
       allow_promotion_codes: body.period === 'MONTHLY',
       line_items: [
         {
@@ -1665,6 +1673,7 @@ export class StripeService extends PaymentProviderAbstract {
           ud,
         },
       },
+      ...this.checkoutSessionMetadata(body),
       allow_promotion_codes: body.period === 'MONTHLY',
       line_items: [
         {

@@ -85,7 +85,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Typefully alternative: PostDelegate vs Typefully compared" description="PostDelegate vs Typefully: a writing tool for X and LinkedIn against a multi-network scheduler, social sets versus channels, and annual-only billing." h1="PostDelegate vs Typefully." eyebrow="Compare" lead="Typefully is a writing tool that publishes. PostDelegate is a scheduler that happens to have a good editor. If your work is threads on X and posts on LinkedIn, these are not really the same product." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Typefully</a>
 
   <h2>At a glance</h2>
