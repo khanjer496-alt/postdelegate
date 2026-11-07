@@ -75,6 +75,7 @@ import {
   TRIAL_POSTS_CAP_TIER,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 import {
   AuthorizationActions,
   Sections,
@@ -968,6 +969,9 @@ export class PostsService {
       posts: await Promise.all(
         (posts || []).map(async ({ integration, ...post }) => ({
           ...post,
+          // the raw column is the serialized workflow failure; the editor and
+          // the approvals inbox get the same curated message as the calendar
+          error: curatedPostError(post.error),
           ...(integration
             ? {
                 integration: {

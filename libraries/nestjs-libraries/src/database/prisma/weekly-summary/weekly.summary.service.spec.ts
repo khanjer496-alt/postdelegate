@@ -11,6 +11,7 @@ import {
   engagementFromAnalytics,
   isEmptySummary,
   isWeeklySummaryDue,
+  summaryPostError,
   weeklySummaryEmail,
   weeklySummaryWindow,
 } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.service';
@@ -41,6 +42,31 @@ const data = (extra: Partial<WeeklySummaryData> = {}): WeeklySummaryData => ({
   ],
   reconnect: [{ name: 'Instagram' }],
   ...extra,
+});
+
+describe('the failure the summary email shows', () => {
+  const failure = (type: string, message: string) =>
+    JSON.stringify({ cause: { type, failure: { message } } });
+
+  it('shows a provider message, shortened', () => {
+    expect(
+      summaryPostError(failure('bad_body', 'Your video is longer than 60 seconds'))
+    ).toBe('Your video is longer than 60 seconds');
+    expect(
+      summaryPostError(failure('bad_body', 'a'.repeat(300)))?.length
+    ).toBe(200);
+  });
+
+  it('shows nothing for a failure of ours', () => {
+    // what the email printed in full before: the serialized failure, here the
+    // openssl string a key mismatch produces
+    expect(
+      summaryPostError(
+        failure('unknown', 'error:1C800064:Provider routines::bad decrypt')
+      )
+    ).toBe(undefined);
+    expect(summaryPostError(null)).toBe(undefined);
+  });
 });
 
 describe('weekly summary schedule', () => {
@@ -195,6 +221,51 @@ describe('WeeklySummaryService.sendDueSummaries', () => {
     for (const call of repo.countPosts.mock.calls) {
       expect(call[0]).toBe('org-a');
     }
+  });
+
+  // the email is built from buildSummary, so the curation has to be wired in
+  // there and not only available as a helper
+  it('builds a failed post with the curated message, or none', async () => {
+    const { service, repo } = make();
+    const failed = (error: string) => ({
+      id: 'p-1',
+      content: 'Hiring',
+      publishDate: new Date('2026-10-30T09:00:00Z'),
+      error,
+      releaseURL: null,
+      integration: { providerIdentifier: 'x', name: 'X' },
+    });
+
+    repo.getPosts.mockImplementation(async (_o: string, state: string) =>
+      state === 'ERROR'
+        ? [
+            failed(
+              JSON.stringify({
+                cause: { type: 'bad_body', failure: { message: 'Duplicate post content' } },
+              })
+            ),
+          ]
+        : []
+    );
+    let summary = await service.buildSummary('org-a', 'Acme', mondayUtc(8), 'UTC');
+    expect(summary.failedPosts[0].error).toBe('Duplicate post content');
+
+    repo.getPosts.mockImplementation(async (_o: string, state: string) =>
+      state === 'ERROR'
+        ? [
+            failed(
+              JSON.stringify({
+                cause: {
+                  type: 'unknown',
+                  failure: { message: 'error:1C800064:Provider routines::bad decrypt' },
+                },
+              })
+            ),
+          ]
+        : []
+    );
+    summary = await service.buildSummary('org-a', 'Acme', mondayUtc(8), 'UTC');
+    expect(summary.failedPosts[0].error).toBe(undefined);
   });
 
   it('does nothing without an email provider', async () => {

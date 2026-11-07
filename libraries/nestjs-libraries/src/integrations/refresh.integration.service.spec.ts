@@ -94,6 +94,25 @@ describe('RefreshIntegrationService soft refresh', () => {
     expect(integrationService.informAboutRefreshError).toHaveBeenCalled();
   });
 
+  // the cause is read out in the notification and its email
+  it.each([
+    ['a workflow cause', 'Please re-authenticate your YouTube account', 'Please re-authenticate your YouTube account'],
+    // the placeholder handleErrors leaves when it could not map the response
+    ['the unmapped placeholder', 'Unknown Error', ''],
+    ['no cause at all', '', ''],
+  ])('notifies with %s', async (_, cause, expected) => {
+    const { service, integrationService } = make(
+      jest.fn().mockRejectedValue(new Error('revoked'))
+    );
+
+    expect(await service.refresh(integration, cause)).toBe(false);
+    expect(integrationService.informAboutRefreshError).toHaveBeenCalledWith(
+      'org-A',
+      expect.anything(),
+      expected
+    );
+  });
+
   it('does not notify again when the channel was already flagged', async () => {
     const { service, integrationService } = make(
       jest.fn().mockResolvedValue({ accessToken: '' })

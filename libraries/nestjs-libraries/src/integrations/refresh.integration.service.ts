@@ -6,6 +6,7 @@ import {
   AuthTokenDetails,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { providerCause } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TemporalService } from 'nestjs-temporal-core';
 import { timer } from '@gitroom/helpers/utils/timer';
 
@@ -187,7 +188,13 @@ export class RefreshIntegrationService {
       await this._integrationService.informAboutRefreshError(
         integration.organizationId,
         integration,
-        socialProvider.refreshErrorMessage?.(refreshError) || cause
+        // refreshErrorMessage is a sentence we wrote for this provider, so it
+        // is passed on as it is and must stay off the curation path (the
+        // underlying Google error carries an axios code). cause travelled back
+        // through the workflow as a plain string, so it is curated here.
+        socialProvider.refreshErrorMessage?.(refreshError) ||
+          providerCause(cause) ||
+          ''
       );
 
       return false;

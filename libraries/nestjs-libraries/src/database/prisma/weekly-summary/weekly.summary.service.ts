@@ -13,6 +13,7 @@ import {
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -122,6 +123,14 @@ const snippet = (html: string, length = 140) => {
     .replace(/\s+/g, ' ')
     .trim();
   return text.length > length ? `${text.slice(0, length - 1)}…` : text;
+};
+
+// The same curation the calendar and the public API use: the raw column holds
+// the serialized workflow failure, which can carry anything the runtime put in
+// the message.
+export const summaryPostError = (error?: string | null) => {
+  const curated = curatedPostError(error);
+  return curated ? snippet(curated, 200) : undefined;
 };
 
 const formatDate = (date: Date, tz: string, withTime = true) =>
@@ -394,7 +403,7 @@ export class WeeklySummaryService {
       icon: channel.icon,
       text: snippet(post.content),
       date: post.publishDate,
-      error: post.error ? snippet(post.error, 200) : undefined,
+      error: summaryPostError(post.error),
     };
   }
 

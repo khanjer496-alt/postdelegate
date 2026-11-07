@@ -436,15 +436,18 @@ export class IntegrationService {
     );
   }
 
+  // err is a reason the platform gave us, already curated by the caller - an
+  // error of our own is passed in empty rather than shown to the customer
   async informAboutRefreshError(
     orgId: string,
     integration: Integration,
     err = ''
   ) {
+    const reason = err.trim() ? ` ${err.trim()}` : '';
     await this._notificationService.inAppNotification(
       orgId,
       `Could not refresh your ${integration.providerIdentifier} channel`,
-      `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/launches`,
+      `Could not refresh your ${integration.providerIdentifier} channel${reason}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/launches`,
       true,
       false,
       'info',

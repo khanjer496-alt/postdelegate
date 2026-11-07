@@ -13,6 +13,18 @@ describe('platformReason', () => {
     );
   });
 
+  it('hides a failure of ours whose message reads like a sentence', () => {
+    // TokenEncryptionError carries no node code and its message names an
+    // internal environment variable
+    const ours = Object.assign(
+      new Error(
+        'TOKEN_ENCRYPTION_KEY must be 32 bytes encoded as base64 (generate one with: openssl rand -base64 32)'
+      ),
+      { name: 'TokenEncryptionError' }
+    );
+    expect(platformReason(ours)).toBe(undefined);
+  });
+
   it('hides a failed decryption, which can be followed by what we decrypted', () => {
     // a JWT_SECRET or TOKEN_ENCRYPTION_KEY mismatch in production
     expect(

@@ -27,6 +27,10 @@ const setup = () => {
   return { service, repository };
 };
 
+// Post.error holds the serialized workflow failure, not a bare sentence
+const failure = (type: string, message: string) =>
+  JSON.stringify({ cause: { type, failure: { message } } });
+
 describe('ActivationService checklist', () => {
   it('reads every fact of the organization', async () => {
     const { service, repository } = setup();
@@ -163,7 +167,7 @@ describe('ActivationService needs attention', () => {
         group: 'g1',
         publishDate,
         content: `<p>Hello <strong>world</strong></p><p>${'a'.repeat(300)}</p>`,
-        error: 'Token expired',
+        error: failure('bad_body', 'Token expired'),
         integration: {
           id: 'i1',
           name: 'Original',
@@ -194,6 +198,35 @@ describe('ActivationService needs attention', () => {
     expect(post.excerpt).not.toContain('<');
     expect(post.excerpt.length).toBeLessThanOrEqual(120);
     expect(post.excerpt.endsWith('…')).toBe(true);
+  });
+
+  it('shows no reason when the failure was not a provider message', async () => {
+    const { service, repository } = setup();
+    repository.getFailedPosts.mockResolvedValue([
+      {
+        id: 'p1',
+        group: 'g1',
+        publishDate: new Date(NOW.getTime() - DAY),
+        content: 'Hello',
+        // what a failure of ours serializes to, which the panel used to print
+        error: failure(
+          'unknown',
+          'error:1C800064:Provider routines::bad decrypt'
+        ),
+        integration: {
+          id: 'i1',
+          name: 'X',
+          customName: null,
+          picture: null,
+          providerIdentifier: 'x',
+        },
+      },
+    ]);
+    repository.countFailedPosts.mockResolvedValue(1);
+
+    const [post] = (await service.getNeedsAttention('org1')).failedPosts;
+    expect(post.error).toBe(null);
+    expect(post.excerpt).toBe('Hello');
   });
 
   it('labels each channel with the reason it needs attention', async () => {

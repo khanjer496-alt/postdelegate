@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import dayjs from 'dayjs';
 import { ActivationRepository } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.repository';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 
 // Failed posts older than this are not raised any more
 export const ATTENTION_FAILED_POSTS_DAYS = 30;
@@ -141,22 +142,28 @@ export class ActivationService {
     ]);
 
     return {
-      failedPosts: failedPosts.map((post) => ({
-        id: post.id,
-        group: post.group,
-        publishDate: post.publishDate,
-        excerpt: shorten(
-          stripHtmlValidation('none', post.content || ''),
-          EXCERPT_LENGTH
-        ),
-        error: post.error ? shorten(post.error, EXCERPT_LENGTH) : null,
-        integration: {
-          id: post.integration.id,
-          name: post.integration.customName || post.integration.name,
-          picture: post.integration.picture,
-          identifier: post.integration.providerIdentifier,
-        },
-      })),
+      failedPosts: failedPosts.map((post) => {
+        const curated = curatedPostError(post.error);
+        return {
+          id: post.id,
+          group: post.group,
+          publishDate: post.publishDate,
+          excerpt: shorten(
+            stripHtmlValidation('none', post.content || ''),
+            EXCERPT_LENGTH
+          ),
+          // the raw column holds the serialized workflow failure, which can
+          // carry a stack trace or decrypted channel credentials: only the
+          // curated provider message is shown, as on the calendar
+          error: curated ? shorten(curated, EXCERPT_LENGTH) : null,
+          integration: {
+            id: post.integration.id,
+            name: post.integration.customName || post.integration.name,
+            picture: post.integration.picture,
+            identifier: post.integration.providerIdentifier,
+          },
+        };
+      }),
       failedPostsTotal,
       channels: channels.map((channel) => ({
         id: channel.id,

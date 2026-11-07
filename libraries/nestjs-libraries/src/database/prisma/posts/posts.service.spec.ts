@@ -1693,3 +1693,38 @@ describe('PostsService.publicPostLink', () => {
     }
   });
 });
+
+describe('PostsService.getPost error curation', () => {
+  const failure = (type: string, message: string) =>
+    JSON.stringify({ cause: { type, failure: { message } } });
+
+  const load = async (error: string | null) => {
+    const { service, postRepository } = makeService();
+    postRepository.getPost.mockResolvedValue({
+      id: 'p-1',
+      group: 'g-1',
+      content: 'hello',
+      childrenPost: [],
+      error,
+      integration: { id: 'i-1', name: 'X', providerIdentifier: 'x' },
+    });
+    const { posts } = await service.getPost('org-1', 'p-1');
+    return posts[0];
+  };
+
+  // the editor and the approvals inbox are served this payload to any member
+  // of the workspace, so it carries the same curated message as the calendar
+  it('keeps a provider message and drops a failure of ours', async () => {
+    expect((await load(failure('bad_body', 'Duplicate post content'))).error).toBe(
+      'Duplicate post content'
+    );
+    expect(
+      (
+        await load(
+          failure('unknown', 'error:1C800064:Provider routines::bad decrypt')
+        )
+      ).error
+    ).toBe(null);
+    expect((await load(null)).error).toBe(null);
+  });
+});

@@ -18,7 +18,11 @@ jest.mock('@gitroom/nestjs-libraries/temporal/temporal.heartbeat', () => ({
 }));
 
 import { PostActivity } from './post.activity';
-import { BadBody } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import {
+  BadBody,
+  RefreshToken,
+} from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { TokenEncryptionError } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
 
 describe('PostActivity posting limits backstop', () => {
   const integration = {
@@ -192,5 +196,117 @@ describe('PostActivity monthly cap backstop', () => {
     await expect(
       activity.postSocialPending(integration, posts)
     ).resolves.toEqual([{ id: 'p-1', status: 'pending' }]);
+  });
+});
+
+describe('PostActivity refresh failure cause', () => {
+  const integration = {
+    id: 'i-1',
+    organizationId: 'org-1',
+    providerIdentifier: 'bluesky',
+    token: 'token',
+  } as any;
+
+  const make = (thrown: unknown) => {
+    const refreshIntegrationService = {
+      refresh: jest.fn().mockRejectedValue(thrown),
+      setBetweenSteps: jest.fn().mockResolvedValue(undefined),
+    };
+    const integrationService = {
+      getIntegrationById: jest.fn().mockResolvedValue(integration),
+    };
+    const integrationManager = {
+      getSocialIntegration: jest.fn().mockReturnValue({ refreshWait: false }),
+    };
+    const activity = new PostActivity(
+      {} as any,
+      {} as any,
+      integrationManager as any,
+      integrationService as any,
+      refreshIntegrationService as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { activity, refreshIntegrationService };
+  };
+
+  const causeOf = (r: { setBetweenSteps: jest.Mock }) =>
+    r.setBetweenSteps.mock.calls[0]?.[1];
+
+  // whatever lands here is read out in the "connect it again" notification and
+  // its email, so only a message the provider gave us may travel with it
+
+  it('passes on the sentence a reConnect failure read', async () => {
+    // reConnect is the one thing in the try that fails with a message worth
+    // reading, and every implementation throws a plain Error - the one that
+    // matters most says reconnecting will NOT help
+    const page = make(
+      new Error(
+        'Your Facebook user has no permission to manage this page. Ask a page admin for full content access, then reconnect the channel'
+      )
+    );
+    await expect(page.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(page.refreshIntegrationService)).toBe(
+      'Your Facebook user has no permission to manage this page. Ask a page admin for full content access, then reconnect the channel'
+    );
+
+    const gone = make(new Error('Page not found in your accounts'));
+    await expect(gone.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(gone.refreshIntegrationService)).toBe(
+      'Page not found in your accounts'
+    );
+
+    // and one that arrives as a provider failure instead
+    const { activity, refreshIntegrationService } = make(
+      new RefreshToken('bluesky', '{}', {} as any, 'Refresh token has expired')
+    );
+    await expect(activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(refreshIntegrationService)).toBe('Refresh token has expired');
+  });
+
+  it('drops a failure of our own, whatever its message says', async () => {
+    // the real shape of a decrypt failure: TokenEncryption catches openssl's
+    // own error and rethrows this, and the message names an internal env var
+    const encryption = make(
+      new TokenEncryptionError(
+        'A stored token could not be decrypted: it was tampered with or TOKEN_ENCRYPTION_KEY is not the key it was encrypted with'
+      )
+    );
+    await expect(encryption.activity.refreshToken(integration)).resolves.toBe(
+      false
+    );
+    expect(causeOf(encryption.refreshIntegrationService)).toBe('');
+
+    const typed = make(new TypeError('Cannot read properties of null'));
+    await expect(typed.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(typed.refreshIntegrationService)).toBe('');
+
+    const socket = make(
+      Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' })
+    );
+    await expect(socket.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(socket.refreshIntegrationService)).toBe('');
+  });
+
+  it('keeps the workflow cause, except the unmapped placeholder', async () => {
+    const kept = make(new TypeError('Cannot read properties of null'));
+    await expect(
+      kept.activity.refreshTokenWithCause(
+        integration,
+        'Please re-authenticate your YouTube account'
+      )
+    ).resolves.toBe(false);
+    expect(causeOf(kept.refreshIntegrationService)).toBe(
+      'Please re-authenticate your YouTube account'
+    );
+
+    // lemmy rebuilds its RefreshToken with handleErrors' placeholder when it
+    // could not map the response at all
+    const unmapped = make(new TypeError('Cannot read properties of null'));
+    await expect(
+      unmapped.activity.refreshTokenWithCause(integration, 'Unknown Error')
+    ).resolves.toBe(false);
+    expect(causeOf(unmapped.refreshIntegrationService)).toBe('');
   });
 });

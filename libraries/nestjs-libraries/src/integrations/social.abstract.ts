@@ -89,9 +89,13 @@ export const platformReason = (err: unknown): string | undefined => {
     return undefined;
   }
 
-  // thrown by our own code or by the runtime, never by a platform
+  // thrown by our own code or by the runtime, never by a platform.
+  // TokenEncryptionError is ours and reads like a sentence - it names
+  // TOKEN_ENCRYPTION_KEY, and it carries no code - so the name is the only
+  // thing that stops it. Matching the name fails closed: an unrelated error
+  // that happened to be named this is hidden, not leaked
   if (
-    /^(TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|AssertionError)$/.test(
+    /^(TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|AssertionError|TokenEncryptionError)$/.test(
       String(error?.name || '')
     )
   ) {
@@ -107,6 +111,22 @@ export const platformReason = (err: unknown): string | undefined => {
   // openssl reports a failed decryption as error:1C800064:... with no code on
   // some node builds, and that message can be followed by what we decrypted
   if (/^error:[0-9a-f]{8}:/i.test(text)) {
+    return undefined;
+  }
+
+  return text;
+};
+
+// The cause a workflow carried back from a provider's RefreshToken, as the
+// customer may read it in the "connect it again" notification. 'Unknown Error'
+// is the placeholder a provider's handleErrors leaves when it could not map
+// the response at all, so it is not a message for a customer either, and an
+// empty cause must not leave a stray space in the sentence.
+const UNMAPPED_FAILURE = 'Unknown Error';
+
+export const providerCause = (cause?: string | null): string | undefined => {
+  const text = (cause || '').trim();
+  if (!text || text === UNMAPPED_FAILURE) {
     return undefined;
   }
 
