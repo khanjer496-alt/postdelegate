@@ -187,7 +187,10 @@ export const CheckPaymentInner: FC<{
 
 export const ChannelsAfterPayment: FC<{
   integrations: ChannelFlags[];
-}> = ({ integrations }) => {
+  // reloads the channel list and answers it, the list rendered first can be
+  // from before the payment turned channels back on
+  reload: () => Promise<ChannelFlags[] | undefined>;
+}> = ({ integrations, reload }) => {
   const searchParams = useSearchParams();
   // read once: CheckPayment takes the param off the address after this mounts
   const [check] = useState(() => searchParams.get('check'));
@@ -212,9 +215,15 @@ export const ChannelsAfterPayment: FC<{
       if (status !== 2) {
         return;
       }
+      let channels = integrations;
+      try {
+        channels = (await reload()) || integrations;
+      } catch (err) {
+        // keep the list already shown
+      }
       // only the channels the plan locked are the plan's business: one the
       // customer turned off stays off after a payment, and says so itself
-      if (integrations.some(isChannelLockedByPlan)) {
+      if (channels.some(isChannelLockedByPlan)) {
         modal.open({
           title: t('channels_still_locked', 'Some channels are still locked'),
           onlyApprove: true,
@@ -228,7 +237,7 @@ export const ChannelsAfterPayment: FC<{
       }
       // turned off before the reason was recorded: it may have been the plan,
       // and it does not come back by itself, so say where to enable it
-      if (integrations.some((p) => p.disabled && !p.disabledReason)) {
+      if (channels.some((p) => p.disabled && !p.disabledReason)) {
         modal.open({
           title: t('channels_turned_off', 'Some channels are turned off'),
           onlyApprove: true,
@@ -241,7 +250,7 @@ export const ChannelsAfterPayment: FC<{
         return;
       }
       // the rest are off because the customer turned them off
-      if (integrations.some((p) => p.disabled)) {
+      if (channels.some((p) => p.disabled)) {
         return;
       }
       modal.open({

@@ -1047,12 +1047,33 @@ export class IntegrationRepository {
   }
 
   // the customer turned it off: only the customer turns it back on, an
-  // upgrade leaves it off (enablePlanLockedIntegrations)
-  disableChannel(org: string, id: string) {
-    return this.updateLiveChannel(org, id, {
-      disabled: true,
-      disabledReason: DISABLED_BY_USER,
+  // upgrade leaves it off (enablePlanLockedIntegrations). Only a channel that
+  // is on is written, in one statement, so one already off keeps why it is
+  // off (a plan lock still comes back on an upgrade); a removed or unknown
+  // channel answers 404, like updateLiveChannel
+  async disableChannel(org: string, id: string) {
+    const { count } = await this._integration.model.integration.updateMany({
+      where: {
+        id,
+        organizationId: org,
+        deletedAt: null,
+        disabled: false,
+      },
+      data: {
+        disabled: true,
+        disabledReason: DISABLED_BY_USER,
+      },
     });
+    if (
+      !count &&
+      !(await this._integration.model.integration.findFirst({
+        where: { id, organizationId: org, deletedAt: null },
+        select: { id: true },
+      }))
+    ) {
+      throw new NotFoundException('Integration not found');
+    }
+    return { id };
   }
 
   enableChannel(org: string, id: string) {
@@ -1331,19 +1352,24 @@ export class IntegrationRepository {
       },
     });
 
-    // locked by the plan, so an upgrade knows which ones it may turn back on
-    for (const channel of getChannels) {
-      await this._integration.model.integration.update({
-        where: {
-          id: channel.id,
-        },
-        data: {
-          disabled: true,
-          disabledReason: DISABLED_BY_PLAN,
-        },
-        select: { id: true },
-      });
+    if (!getChannels.length) {
+      return;
     }
+
+    // locked by the plan, so an upgrade knows which ones it may turn back on.
+    // The write matches the read again: a channel the customer turned off in
+    // between keeps their reason
+    await this._integration.model.integration.updateMany({
+      where: {
+        ...CHANNEL_CONNECTED,
+        organizationId: org,
+        id: { in: getChannels.map((channel) => channel.id) },
+      },
+      data: {
+        disabled: true,
+        disabledReason: DISABLED_BY_PLAN,
+      },
+    });
   }
 
   // An upgrade turns back on the channels a downgrade locked, as many as the

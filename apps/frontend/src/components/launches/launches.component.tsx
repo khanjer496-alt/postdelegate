@@ -694,7 +694,7 @@ export const LaunchesComponent = () => {
   return (
     <DNDProvider>
       <Onboarding />
-      <ChannelsAfterPayment integrations={integrations} />
+      <ChannelsAfterPayment integrations={integrations} reload={mutate} />
       <CalendarWeekProvider integrations={sortedIntegrations}>
         {channelsOpen && (
           <div

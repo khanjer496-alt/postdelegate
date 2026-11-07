@@ -77,9 +77,11 @@ export const isChannelReady = (channel: ChannelFlags) =>
   channelState(channel) === 'ready';
 
 // Off because the plan has no room for it: the customer upgrades, or turns
-// off another channel and turns this one on
+// off another channel and turns this one on. The same channels as
+// CHANNEL_LOCKED_BY_PLAN, the ones an upgrade turns back on
 export const isChannelLockedByPlan = (channel: ChannelFlags) =>
   channelState(channel) === 'off' &&
+  !channel.inBetweenSteps &&
   channel.disabledReason === DISABLED_BY_PLAN;
 
 // The channels a plan's channel limit counts: the connected ones. Every limit

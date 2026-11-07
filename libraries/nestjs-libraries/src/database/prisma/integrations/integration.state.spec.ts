@@ -192,6 +192,13 @@ describe('isChannelLockedByPlan', () => {
       isChannelLockedByPlan(channel({ disabled: true, disabledReason: 'USER' }))
     ).toBe(false);
     expect(isChannelLockedByPlan(channel({ disabled: true }))).toBe(false);
+    // half-connected: an upgrade does not turn it back on either
+    // (CHANNEL_LOCKED_BY_PLAN)
+    expect(
+      isChannelLockedByPlan(
+        channel({ disabled: true, disabledReason: 'PLAN_LIMIT', inBetweenSteps: true })
+      )
+    ).toBe(false);
     // on again, or removed: the reason left on the row means nothing
     expect(
       isChannelLockedByPlan(channel({ disabledReason: 'PLAN_LIMIT' }))

@@ -502,16 +502,8 @@ export class IntegrationService {
   }
 
   // turned off by the customer (DISABLED_BY_USER): an upgrade never turns it
-  // back on, only enableChannel does. A channel already off keeps why it is
-  // off, so one the plan locked still comes back on an upgrade
+  // back on, only enableChannel does
   async disableChannel(org: string, id: string) {
-    const channel = (
-      await this._integrationRepository.getIntegrationsList(org)
-    ).find((f) => f.id === id);
-    if (channel?.disabled) {
-      return { id };
-    }
-
     return this._integrationRepository.disableChannel(org, id);
   }
 

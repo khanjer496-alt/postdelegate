@@ -207,12 +207,6 @@ describe('IntegrationService.enableChannel', () => {
     expect(repository.disableChannel).toHaveBeenCalledWith('org', 'i0');
   });
 
-  it('keeps why a channel already off is off, so a plan lock is not taken over by the customer', async () => {
-    const { service, repository } = makeEnableService(1, 'PLAN_LIMIT');
-    expect(await service.disableChannel('org', 'i9')).toEqual({ id: 'i9' });
-    expect(repository.disableChannel).not.toHaveBeenCalled();
-  });
-
   it('leaves a channel that is already on alone, even at the limit', async () => {
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
     const { service, repository } = makeEnableService(3);
