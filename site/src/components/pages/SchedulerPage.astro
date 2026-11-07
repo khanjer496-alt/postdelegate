@@ -10,6 +10,7 @@ import LogoStack from '../LogoStack.astro';
 import NetworkGrid from '../NetworkGrid.astro';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
 import { SCHEDULER_SOON as soon } from '../../i18n/locales/en';
+import { AGENTS, NETWORK_ASKS, agentGuideHref } from '../../data/agent-guides';
 // One network's page. English pages exist for every network in schedulers.ts; the other
 // languages only for live networks, with the translated fields from their locale file and
 // without the English-only how-to, settings and network-specific FAQ.
@@ -85,6 +86,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
     <p set:html={localizeLinks(lang, c.planText(s.name))} />
     <h2>{c.aiTitle(s.name)}</h2>
     <p set:html={localizeLinks(lang, c.aiText(s.name))} />
+    {network && NETWORK_ASKS[network.key] && <p>{c.fromAgents(s.name)} {AGENTS.map((agent, i) => <>{i > 0 && ' · '}<a href={agentGuideHref(agent, network)}>{agent.name}</a></>)}</p>}
   </>}
   <h2>{c.reviewTitle}</h2>
   <p>{c.reviewText}</p>

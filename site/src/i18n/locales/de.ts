@@ -316,6 +316,9 @@ const dict: Dict = {
     h1: 'Ihr Workflow. Ihr Kalender.',
     lead: 'Nutzen Sie den Assistenten, den Sie schon haben. PostDelegate bietet einen MCP-Server und eine REST API, damit Ihre Tools Inhalte vorbereiten, während Sie das letzte Wort behalten.',
     readDocs: 'Zur Dokumentation',
+    // links to the English /<assistant>/<network> guides
+    byNetworkTitle: 'Anleitungen nach Assistent und Netzwerk',
+    byNetworkLead: 'Einrichtung und Beispielanfragen für jeden Assistenten auf jedem Live-Netzwerk (auf Englisch).',
     guides: [
       { title: 'MCP-Verbindungen', text: 'Wie kompatible KI-Clients sich mit PostDelegate verbinden und was sie tun können.' },
       { title: 'Die REST API', text: 'Die Entwicklerschnittstelle hinter Entwürfen, Medien und Veröffentlichungs-Workflows.' },
@@ -461,6 +464,7 @@ const dict: Dict = {
     planText: (name: string) => `${name} steht im selben Kalender wie jeder andere Kanal, den Sie verbinden. In einem Beitrag können Sie mehrere Kanäle wählen, den Inhalt einmal schreiben und für jeden anpassen, und jeder Kanal behält seine eigenen Einstellungen. Speichern Sie einen Entwurf, um einen Beitrag zuerst zu prüfen, wählen Sie „Zum Kalender hinzufügen“, um ihn zu planen, oder „Jetzt posten“, um ihn sofort zu senden. Die <a href="/docs/posts">Planungsanleitung</a> erklärt Entwürfe, Wiederholungen, Vorschauen und Zeitfenster.`,
     aiTitle: (name: string) => `Claude oder ChatGPT mit ${name} nutzen`,
     aiText: (name: string) => `PostDelegate betreibt einen MCP-Server, sodass ein Assistent, den Sie bereits nutzen, Ihren ${name}-Kanal ansehen, seine Regeln lesen und einen Entwurf zur Prüfung für Sie erstellen kann. KI bringen Sie selbst mit, und PostDelegate berechnet nie etwas dafür. Einrichtungsanleitungen: <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> und <a href="/guides/social-media-mcp-server">was ein Social-Media-MCP-Server ist</a>.`,
+    fromAgents: (name: string) => `Schritt-für-Schritt-Anleitungen für ${name} (auf Englisch):`,
     reviewTitle: 'Den ganzen Beitrag prüfen',
     reviewText: 'Prüfen Sie Ziel, Wortlaut, Medien und Uhrzeit, bevor Sie planen. Sehen Sie sich das Ergebnis nach der Veröffentlichung in Ihrem Arbeitsbereich an; ein Eintrag in der Warteschlange ist keine Bestätigung, dass der Beitrag veröffentlicht wurde.',
     faqTitle: 'Häufig gestellte Fragen',

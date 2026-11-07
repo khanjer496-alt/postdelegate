@@ -316,6 +316,9 @@ const dict: Dict = {
     h1: 'Porta il tuo workflow. Tieni il tuo calendario.',
     lead: 'Usa l’assistente che hai già. PostDelegate offre un server MCP e un’API REST, così i tuoi strumenti preparano i contenuti mentre l’ultima parola resta a te.',
     readDocs: 'Leggi la documentazione',
+    // links to the English /<assistant>/<network> guides
+    byNetworkTitle: 'Guide per assistente e social',
+    byNetworkLead: 'Configurazione ed esempi di richieste per ogni assistente su ogni social attivo (in inglese).',
     guides: [
       { title: 'Collegamenti MCP', text: 'Come i client IA compatibili si collegano a PostDelegate e cosa possono fare.' },
       { title: 'L’API REST', text: 'L’interfaccia per sviluppatori dietro bozze, media e workflow di pubblicazione.' },
@@ -461,6 +464,7 @@ const dict: Dict = {
     planText: (name: string) => `${name} sta sullo stesso calendario di tutti gli altri canali che colleghi. In un solo post puoi scegliere più canali, scrivere il contenuto una volta e adattarlo per ciascuno, e ogni canale mantiene le sue impostazioni. Salva come bozza per rivedere prima un post, scegli Aggiungi al calendario per programmarlo, oppure Pubblica ora per inviarlo subito. La <a href="/docs/posts">guida alla programmazione</a> spiega bozze, ripetizioni, anteprime e fasce orarie.`,
     aiTitle: (name: string) => `Usa Claude o ChatGPT con ${name}`,
     aiText: (name: string) => `PostDelegate ha un server MCP, quindi un assistente che usi già può guardare il tuo canale ${name}, leggerne le regole e creare una bozza da farti rivedere. L’IA è a carico tuo, con il tuo account, e PostDelegate non la fa mai pagare. Guide di configurazione: <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> e <a href="/guides/social-media-mcp-server">cos’è un server MCP per i social</a>.`,
+    fromAgents: (name: string) => `Guide passo passo per ${name} (in inglese):`,
     reviewTitle: 'Rivedi tutto il post',
     reviewText: 'Controlla destinazione, testo, media e orario prima di programmare. Dopo la pubblicazione, verifica il risultato nel tuo workspace: un elemento in coda non conferma che il post sia stato pubblicato.',
     faqTitle: 'Domande frequenti',
