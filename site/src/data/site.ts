@@ -25,3 +25,15 @@ export const SOCIAL_PROFILES = [
 // Pages kept out of search and the sitemap: X, which is not available. A scheduler page for a
 // network that is not switched on yet goes here too, and comes out when its network goes live.
 export const NOINDEX_PATHS = ['/docs/channels/x'];
+
+// The page's own path, from Astro.url.pathname, as the site writes URLs:
+// no .html, no trailing slash, "/" for the home page.
+//
+// Built with build.format 'file', so every page is a file: /pricing.html, and
+// the home page is /index.html. Astro 5 reported the home page's pathname as
+// "/", Astro 7 reports "/index.html" - which turned the home page's canonical
+// and og:url into https://postdelegate.com/index and dropped its hreflang
+// alternates, because the path no longer matched TRANSLATED_PATHS. Hence the
+// /index step, and hence one helper rather than the copy in each layout.
+export const pagePath = (url: URL): string =>
+  url.pathname.replace(/\.html$/, '').replace(/\/index$/, '/').replace(/\/+$/, '') || '/';
