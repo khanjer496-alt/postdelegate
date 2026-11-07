@@ -29,6 +29,14 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 @ApiTags('Billing')
+// Whether this checkout gets the free trial. Deliberately one-way: a request
+// may decline the trial, but cannot grant one to an organisation that has
+// already used its own - canStartTrial stays the authority.
+export const allowTrialFor = (
+  canStartTrial: boolean,
+  body: { skipTrial?: boolean }
+) => canStartTrial && !body?.skipTrial;
+
 @Controller('/billing')
 export class BillingController {
   constructor(
@@ -118,7 +126,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      await this._usersService.canStartTrial(org)
+      allowTrialFor(await this._usersService.canStartTrial(org), body)
     );
   }
 
@@ -140,7 +148,7 @@ export class BillingController {
       org.id,
       user.id,
       body,
-      await this._usersService.canStartTrial(org)
+      allowTrialFor(await this._usersService.canStartTrial(org), body)
     );
   }
 

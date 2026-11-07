@@ -569,6 +569,10 @@ export const MainBillingComponent: FC<{
   const [period, setPeriod] = useState<'MONTHLY' | 'YEARLY'>(
     subscription?.period || 'MONTHLY'
   );
+  // Someone entitled to the 7-day trial who would rather start paying today.
+  // Only offered while a trial is actually on offer; the server treats it as a
+  // one-way opt-out and can never be talked into granting a trial.
+  const [skipTrial, setSkipTrial] = useState(false);
   const [monthlyOrYearly, setMonthlyOrYearly] = useState<'on' | 'off'>(
     period === 'MONTHLY' ? 'off' : 'on'
   );
@@ -825,6 +829,7 @@ export const MainBillingComponent: FC<{
               period: monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY',
               utm,
               billing,
+              ...(skipTrial ? { skipTrial: true } : {}),
               ...(dub ? { dub } : {}),
               ...(fbc && hasConsent('analytics') ? { fbc } : {}),
               ...(fbp && hasConsent('analytics') ? { fbp } : {}),
@@ -1058,6 +1063,22 @@ export const MainBillingComponent: FC<{
           </div>
         </div>
       </div>
+      {user?.allowTrial && (
+        <label className="flex items-center gap-[10px] text-[14px] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="w-[16px] h-[16px] accent-btnCta cursor-pointer"
+            checked={skipTrial}
+            onChange={(e) => setSkipTrial(e.target.checked)}
+          />
+          <span>
+            {t(
+              'billing_skip_trial',
+              'Start paying today instead of the 7-day free trial'
+            )}
+          </span>
+        </label>
+      )}
       {subscription?.cancelAt && isGeneral && (
         <div className="flex items-center gap-[12px] rounded-[12px] border border-[#FFAC30]/30 bg-[#FFAC30]/10 px-[16px] py-[12px] text-[14px]">
           <div className="w-[8px] h-[8px] rounded-full bg-[#FFAC30] shrink-0" />
