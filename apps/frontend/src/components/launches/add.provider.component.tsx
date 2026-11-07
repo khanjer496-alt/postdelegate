@@ -19,7 +19,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
-import { extensionCodeKey } from '@gitroom/frontend/components/launches/continue.integration';
+import { putExtensionCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
 const resolver = classValidatorResolver(ApiKeyDto);
 
 export const useAddProvider = (update?: () => void, invite?: boolean) => {
@@ -649,13 +649,8 @@ export const AddProviderComponent: FC<{
             ).toString('base64');
             // the session cookies go to the connect page through this tab's
             // sessionStorage, not the URL (history, logs, referrers)
-            let codeInUrl = false;
-            try {
-              sessionStorage.setItem(extensionCodeKey(url), code);
-            } catch (e) {
-              // storage blocked (private mode): fall back to the URL
-              codeInUrl = true;
-            }
+            // storage blocked (private mode): fall back to the URL
+            const codeInUrl = !putExtensionCode(url, code);
             const params = new URLSearchParams({
               state: url,
               ...(codeInUrl ? { code } : {}),

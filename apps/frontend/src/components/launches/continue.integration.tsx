@@ -11,6 +11,11 @@ import { IntegrationContext } from '@gitroom/frontend/components/launches/helper
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { sameOriginUrl } from '@gitroom/frontend/app/(app)/auth/return.url.component';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
+import {
+  clearExtensionCode,
+  readExtensionCode,
+} from '@gitroom/frontend/components/launches/helpers/extension.code';
 
 interface TwoStepState {
   integrationId: string;
@@ -26,23 +31,6 @@ type ConnectState =
   | { status: 'saving'; step: TwoStepState }
   | { status: 'error'; message?: string }
   | { status: 'done'; message: string };
-
-// The browser extension hands its session cookies to this page through the
-// tab's sessionStorage, so they never sit in a URL (history, logs, referrers)
-export const extensionCodeKey = (state: string) => `extension-code:${state}`;
-
-const takeExtensionCode = (state?: string) => {
-  if (!state || typeof window === 'undefined') {
-    return undefined;
-  }
-  try {
-    const code = sessionStorage.getItem(extensionCodeKey(state));
-    sessionStorage.removeItem(extensionCodeKey(state));
-    return code || undefined;
-  } catch (e) {
-    return undefined;
-  }
-};
 
 // The return address is stored with the connect request: an address on this
 // app, a partner app (enterprise connect) or the mobile app's own link. Never
@@ -64,15 +52,6 @@ const safeReturnUrl = (url?: string) => {
   } catch {
     return null;
   }
-};
-
-const readMessage = async (response: Response) => {
-  const body = await response.json().catch(() => ({} as any));
-  const message = body?.message || body?.msg;
-  if (Array.isArray(message)) {
-    return typeof message[0] === 'string' ? message[0] : undefined;
-  }
-  return typeof message === 'string' && message ? message : undefined;
 };
 
 export const ContinueIntegration: FC<{
@@ -178,7 +157,7 @@ export const ContinueIntegration: FC<{
 
   const connect = useCallback(async () => {
     const timezone = String(newDayjs().utcOffset());
-    const extensionCode = takeExtensionCode(modifiedParams.state);
+    const extensionCode = readExtensionCode(modifiedParams.state);
     const body = JSON.stringify({
       ...modifiedParams,
       ...(extensionCode ? { code: extensionCode } : {}),
@@ -209,6 +188,9 @@ export const ContinueIntegration: FC<{
       }
     }
 
+    // the backend answered: the cookies were used (or refused), drop them
+    clearExtensionCode(modifiedParams.state);
+
     if (data.status === HttpStatusCode.PreconditionFailed) {
       const { returnURL } = await data.json().catch(() => ({}));
       navigateOrShow(
@@ -236,7 +218,10 @@ export const ContinueIntegration: FC<{
     }
 
     if (!data.ok) {
-      setState({ status: 'error', message: await readMessage(data) });
+      setState({
+        status: 'error',
+        message: (await errorMessage(data, '')) || undefined,
+      });
       return;
     }
 
@@ -345,8 +330,10 @@ export const ContinueIntegration: FC<{
             status: 'picking',
             step,
             saveError:
-              (await readMessage(response)) ||
-              t('error_occurred', 'An error occurred. Please try again.'),
+              await errorMessage(
+                response,
+                t('error_occurred', 'An error occurred. Please try again.')
+              ),
           });
           return;
         }

@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 type Inputs = {
   password: string;
   repeatPassword: string;
@@ -40,13 +41,17 @@ export function ForgotReturn({ token }: { token: string }) {
       if (!response.ok) {
         form.setError('password', {
           type: 'manual',
+          // a 400 carries the password rule that failed
           message:
             response.status === 429
               ? t(
                   'too_many_attempts',
                   'Too many attempts. Please wait a few minutes and try again.'
                 )
-              : t('error_occurred', 'An error occurred. Please try again.'),
+              : await errorMessage(
+                  response,
+                  t('error_occurred', 'An error occurred. Please try again.')
+                ),
         });
         return false;
       }
