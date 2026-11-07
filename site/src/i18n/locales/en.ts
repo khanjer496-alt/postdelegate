@@ -287,6 +287,9 @@ const en = {
     h1: 'Bring your workflow. Keep your calendar.',
     lead: 'Use the assistant you already have. PostDelegate offers an MCP server and a REST API so your tools can prepare content while you keep the final say.',
     readDocs: 'Read the docs',
+    // links to the English /<assistant>/<network> guides
+    byNetworkTitle: 'Guides by assistant and network',
+    byNetworkLead: 'Setup steps and example asks for each assistant on each live network.',
     // same order as the cards in AgentsPage.astro: /mcp, /api, /claude-cowork, /codex
     guides: [
       { title: 'MCP connections', text: 'How compatible AI clients connect to PostDelegate and what they can do.' },
@@ -438,6 +441,7 @@ const en = {
     planText: (name: string) => `${name} sits on the same calendar as every other channel you connect. In one post you can pick several channels, write the content once and adjust it for each, and every channel keeps its own settings. Save a draft to review a post first, choose Add to Calendar to schedule it, or choose Post now to send it immediately. The <a href="/docs/posts">scheduling guide</a> covers drafts, repeats, previews and time slots.`,
     aiTitle: (name: string) => `Use Claude or ChatGPT with ${name}`,
     aiText: (name: string) => `PostDelegate runs an MCP server, so an assistant you already use can look at your ${name} channel, read its rules and create a draft for you to review. AI is bring-your-own, and PostDelegate never charges for it. Setup guides: <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a>, and <a href="/guides/social-media-mcp-server">what a social media MCP server is</a>.`,
+    fromAgents: (name: string) => `Step-by-step guides for ${name}:`,
     reviewTitle: 'Review the whole post',
     reviewText: 'Check the destination, wording, media and time before scheduling. Look at the result in your workspace after publication; a queued item is not a published-post confirmation.',
     faqTitle: 'Frequently asked questions',
