@@ -11,7 +11,7 @@ description: "PostDelegate plans from $19 to $79 a month: channels, team members
 | Monthly price | $19 | $29 | $39 | $79 |
 | Yearly price | $180 | $276 | $372 | $756 |
 | Channels | 5 | 10 | 30 | 100, then $1/month per extra channel, up to 1,000 |
-| Posts per month | No practical limit | No practical limit | No practical limit | No practical limit |
+| Posts per month | Unlimited | Unlimited | Unlimited | Unlimited |
 | Team members | No | Yes | Yes | Yes |
 | Public API and MCP | Yes | Yes | Yes | Yes |
 | Webhooks | 2 | 10 | 30 | 10,000 |

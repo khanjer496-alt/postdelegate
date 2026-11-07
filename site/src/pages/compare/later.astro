@@ -13,7 +13,7 @@ const rows = [
   { feature: 'Yearly billing', us: `${PLANS.map((p) => `${p.name} $${p.yearly}`).join(', ')} a year, about 20% off`, them: 'Prices are shown billed yearly; monthly-billing prices are not listed on the pricing page' },
   { feature: 'Free trial', us: `${TRIAL_DAYS} days on every plan, no credit card needed`, them: '14-day free trial; no free plan listed' },
   { feature: 'Channels', us: `${PLANS.map((p) => p.channels).join(' / ')} channels, any mix of networks`, them: 'Social sets of one profile per platform: 1 set (8 profiles), 2 sets (16) or 6 sets (48)' },
-  { feature: 'Posts', us: 'No practical limit on posts', them: '30 per profile on Starter, 180 on Growth, unlimited on Scale' },
+  { feature: 'Posts', us: 'Unlimited posts per month', them: '30 per profile on Starter, 180 on Growth, unlimited on Scale' },
   { feature: 'Users', us: 'Just you on Starter; team members on Team, Pro and Ultimate', them: '1 user on Starter, 2 on Growth, 4 on Scale; extra users on Growth and Scale for a fee' },
   { feature: 'Networks', us: `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn, TikTok, Threads and Pinterest are waiting on platform approval`, them: 'Instagram, Facebook, TikTok, Threads, YouTube, Pinterest, LinkedIn and Snapchat' },
   { feature: 'AI approach', us: 'Bring your own: AI writing, the Agent and AI images run on your workspace’s own OpenAI API key. PostDelegate never charges for AI', them: 'Monthly AI credits: 5 on Starter, 50 on Growth, 100 on Scale; more credits for a fee' },
@@ -39,7 +39,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 
   <h2>Pricing and trial</h2>
   <p>Later lists three plans, billed yearly: Starter at $18.75 a month, Growth at $37.50 and Scale at $82.50. Each plan is built from social sets, where a set is one profile on each supported platform, so it suits one brand per set. Starter has one set, one user and a limit of 30 posts per profile. Growth has two sets, two users and 180 posts per profile. Scale has six sets, four users and no post limit.</p>
-  <p>PostDelegate plans count channels instead of sets, and any mix of networks counts towards the total. {starter.name} is ${starter.monthly} a month for {starter.channels} channels, {team.name} ${team.monthly} for {team.channels} channels with team members, and {pro.name} ${pro.monthly} for {pro.channels} channels. Yearly billing brings {starter.name} to about ${perMonth(starter.yearly)} a month and {team.name} to about ${perMonth(team.yearly)}. There is no practical limit on posts on any plan, and team plans are not priced per person.</p>
+  <p>PostDelegate plans count channels instead of sets, and any mix of networks counts towards the total. {starter.name} is ${starter.monthly} a month for {starter.channels} channels, {team.name} ${team.monthly} for {team.channels} channels with team members, and {pro.name} ${pro.monthly} for {pro.channels} channels. Yearly billing brings {starter.name} to about ${perMonth(starter.yearly)} a month and {team.name} to about ${perMonth(team.yearly)}. Every plan includes unlimited posts per month, and team plans are not priced per person.</p>
   <p>Later offers a 14-day free trial and does not list a free plan. PostDelegate has a {TRIAL_DAYS}-day free trial on every plan that needs no credit card. Add a card before the trial ends to keep your plan. See the <a href="/pricing">pricing page</a> for the full plan details.</p>
 
   <h2>AI</h2>
