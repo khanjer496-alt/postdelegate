@@ -4,6 +4,7 @@ import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prism
 import {
   currentSubscriptionOf,
   customerSubscriptionsOf,
+  isTrialOf,
   subscriptionStateOf,
 } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/payment.providers';
@@ -22,7 +23,8 @@ export interface SubscriptionStatusSyncReport {
   // workspaces whose live subscription grants no plan (or that have none):
   // never acted on, the webhooks or a person decide
   needsAttention: { organizationId: string; status: string }[];
-  // workspaces Stripe could not be read for, never modified
+  // workspaces Stripe could not be read for or that could not be stored,
+  // never modified
   failed: string[];
   // workspaces with no subscription anymore that were still marked as
   // trialing, cleared (or that a dry run would clear)
@@ -34,8 +36,9 @@ const sameDate = (a: Date | null, b: Date | null) =>
 
 // Fills the provider status (Subscription.status, trialEndsAt,
 // currentPeriodEnd) of the plans stored before it was kept, and sets
-// Organization.isTrailing from it: only a trialing subscription is a trial,
-// which used to be set for every status but active (past_due included).
+// Organization.isTrailing from it (isTrialOf): a trialing subscription, or
+// one whose first charge after the trial is being retried. It used to be set
+// for every status but active, a past_due renewal included.
 // Then clears the flag of workspaces whose subscription ended, which a
 // deleted subscription never did.
 // Reads Stripe live for each customer, picks the subscription the way the
@@ -121,7 +124,7 @@ export class SubscriptionStatusSyncService {
         }
 
         const state = subscriptionStateOf(live.subscription);
-        const isTrailing = state.status === 'trialing';
+        const isTrailing = isTrialOf(live.subscription);
         if (
           row.status === state.status &&
           sameDate(row.trialEndsAt, state.trialEndsAt) &&
@@ -136,11 +139,21 @@ export class SubscriptionStatusSyncService {
           continue;
         }
 
-        const written = await this._repository.setProviderStateIfUnchanged(
-          row,
-          { from: row.organization.isTrailing, to: isTrailing },
-          state
-        );
+        let written: boolean;
+        try {
+          written = await this._repository.setProviderStateIfUnchanged(
+            row,
+            { from: row.organization.isTrailing, to: isTrailing },
+            state
+          );
+        } catch (err) {
+          report.failed.push(row.organizationId);
+          // the workspace only, never the query
+          console.error(
+            `organization ${row.organizationId}: could not be stored`
+          );
+          continue;
+        }
         if (written) {
           report.updated++;
         } else {

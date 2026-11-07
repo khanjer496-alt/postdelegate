@@ -284,8 +284,9 @@ export class SubscriptionService {
 
   // Reached from payment webhooks: never throws, see SubscriptionWriteResult.
   // isTrailing: the provider has the subscription in its trial (Stripe:
-  // status trialing, never past_due). `state`: the provider's own status and
-  // dates, stored as they come; none for a plan without one (lifetime, admin)
+  // isTrialOf, never a past_due renewal). `state`: the provider's own status
+  // and dates, stored as they come; none for a plan without one (lifetime,
+  // admin)
   async createOrUpdateSubscription(
     provider: string,
     isTrailing: boolean,

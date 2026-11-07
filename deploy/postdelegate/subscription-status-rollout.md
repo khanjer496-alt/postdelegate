@@ -13,7 +13,8 @@ from it:
 |---|---|---|
 | `trialing` | plan, trial | plan, trial |
 | `active` | plan | plan |
-| `past_due` | plan, **trial** | plan, not a trial (Stripe's retries are the grace period; the failed-renewal email still goes out from `invoice.payment_failed`) |
+| `past_due`, a renewal of a plan that paid before | plan, **trial** | plan, not a trial (Stripe's retries are the grace period; the failed-renewal email still goes out from `invoice.payment_failed`) |
+| `past_due`, the first charge after the trial (the period started at `trial_end`) | plan, trial | plan, still a trial while Stripe retries: it has never paid |
 | `paused` | plan, **trial** | dropped to FREE, like `unpaid` (comes back on resume) |
 | `incomplete` | not stored | not stored |
 | `unpaid`, `canceled`, `incomplete_expired` | dropped to FREE, flag left set | dropped to FREE, flag cleared |
@@ -64,7 +65,7 @@ Release as usual: staging first, click through Billing on a trial workspace
 and on a paid one, then production.
 
 From now on every Stripe webhook stores the status, and a past_due workspace
-stops being a trial as soon as its next webhook arrives.
+that paid before stops being a trial as soon as its next webhook arrives.
 
 ## 4. Dry run
 
@@ -90,7 +91,8 @@ the `done` line:
   subscription is changed or deleted. Look each one up in Stripe; normally its
   webhook was missed, and replaying the latest `customer.subscription.*` event
   from the Stripe dashboard applies it,
-- `failed`: workspaces Stripe could not be read for, listed as `not read`.
+- `failed`: workspaces Stripe could not be read for, or whose plan could not
+  be stored (a database error), listed as `not read`. Never modified.
 
 It prints counts and workspace ids only, never a key or a customer id.
 
@@ -115,9 +117,11 @@ SELECT count(*) FROM "Subscription" s JOIN "Organization" o ON o.id = s."organiz
     AND o."paymentId" LIKE 'cus\_%' AND s.identifier NOT LIKE 'admin\_%'
     AND s.status IS NULL;
 
--- a trial flag without a trialing subscription: should be 0
+-- a trial flag on neither a trialing subscription nor a first charge being
+-- retried: should be 0
 SELECT count(*) FROM "Organization" o JOIN "Subscription" s ON s."organizationId" = o.id
-  WHERE o."isTrailing" = true AND s.status IS NOT NULL AND s.status <> 'trialing';
+  WHERE o."isTrailing" = true AND s.status IS NOT NULL
+    AND s.status NOT IN ('trialing', 'past_due');
 ```
 
 RevenueCat plans are not synced from here: their next webhook or app sync

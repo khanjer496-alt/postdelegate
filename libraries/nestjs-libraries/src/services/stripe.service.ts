@@ -287,8 +287,7 @@ const isLiveSubscription = (subscription: Stripe.Subscription) =>
   subscription.status !== 'incomplete_expired';
 
 // What the stored plan keeps of the subscription as Stripe has it now: its
-// raw status, the end of its trial and of the period being paid. Only a
-// trialing subscription is a trial, past_due is a paid plan being retried
+// raw status, the end of its trial and of the period being paid
 export const subscriptionStateOf = (
   subscription: Stripe.Subscription
 ): SubscriptionProviderState => {
@@ -301,6 +300,17 @@ export const subscriptionStateOf = (
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
   };
 };
+
+// In a trial for the workspace: Stripe has it trialing, or the first charge
+// after the trial failed and Stripe is retrying it (past_due in the period
+// that started when the trial ended), so it has never paid. A past_due
+// renewal of a subscription that paid before is a paid plan being retried
+export const isTrialOf = (subscription: Stripe.Subscription) =>
+  subscription.status === 'trialing' ||
+  (subscription.status === 'past_due' &&
+    !!subscription.trial_end &&
+    planItemOf(subscription)?.current_period_start ===
+      subscription.trial_end);
 
 // The subscription a customer's plan follows, picked like the webhooks pick
 // it: a live one (getLiveSubscriptions) that still grants the plan
@@ -776,7 +786,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     const result = await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      current.status === 'trialing',
+      isTrialOf(current),
       currentPlan.uniqueId || uniqueId,
       event.data.object.customer as string,
       totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
@@ -815,12 +825,6 @@ export class StripeService extends PaymentProviderAbstract {
     return result;
   }
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
-    // Stripe keeps past_due while it retries a failed renewal (the grace period),
-    // but unpaid / canceled / incomplete_expired mean the dunning is over
-    if (NOT_ENTITLED_STATUSES.includes(event.data.object.status)) {
-      return this.deleteSubscription(event);
-    }
-
     const { uniqueId, billing, period } = event.data.object.metadata as {
       billing: 'STANDARD' | 'PRO';
       period: 'MONTHLY' | 'YEARLY';
@@ -832,15 +836,20 @@ export class StripeService extends PaymentProviderAbstract {
       return { ok: false };
     }
 
-    const current = await this.currentSubscription(event.data.object);
+    const fresh = await this.liveSubscription(event.data.object.id);
+    const current = fresh || event.data.object;
     // A late or replayed update of a subscription that has ended since: its
     // deleted event already removed the plan, storing it again would bring a
     // canceled plan back
     if (ENDED_STATUSES.includes(current.status)) {
       return { ok: true };
     }
+    // Stripe keeps past_due while it retries a failed renewal (the grace
+    // period), but unpaid / paused mean no payment. Only the subscription as
+    // it is now decides: a late or retried event can say unpaid of one that
+    // has paid since, so without the re-read Stripe sends it again instead
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
-      return this.deleteSubscription(event);
+      return fresh ? this.deleteSubscription(event) : { retry: true };
     }
     const currentPlan = (current.metadata || {}) as Partial<
       typeof event.data.object.metadata & {
@@ -851,7 +860,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      current.status === 'trialing',
+      isTrialOf(current),
       currentPlan.uniqueId || uniqueId,
       event.data.object.customer as string,
       totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
@@ -927,7 +936,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      survivor.status === 'trialing',
+      isTrialOf(survivor),
       uniqueId,
       customer,
       // the survivor comes from a fresh list, not from the event
@@ -2223,15 +2232,21 @@ export class StripeService extends PaymentProviderAbstract {
   // before a cancellation must not bring the canceled plan back.
   // Never throws: a failed read keeps the event's subscription
   private async currentSubscription(subscription: Stripe.Subscription) {
+    return (await this.liveSubscription(subscription.id)) || subscription;
+  }
+
+  // The subscription as Stripe has it now, undefined when it cannot be read.
+  // Never throws
+  private async liveSubscription(id: string) {
     try {
-      const fresh = await stripe.subscriptions.retrieve(subscription.id);
-      return fresh?.id ? fresh : subscription;
+      const fresh = await stripe.subscriptions.retrieve(id);
+      return fresh?.id ? fresh : undefined;
     } catch (err) {
       console.error('stripe_subscription_refetch_failed', {
-        stripe_subscription_id: subscription.id,
+        stripe_subscription_id: id,
         err,
       });
-      return subscription;
+      return undefined;
     }
   }
 
@@ -2468,7 +2483,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
-      updated.status === 'trialing',
+      isTrialOf(updated),
       uniqueId,
       customer,
       totalChannelsOf(billing, extraChannelsOf(updated)),

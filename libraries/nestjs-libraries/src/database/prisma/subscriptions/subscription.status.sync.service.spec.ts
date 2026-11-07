@@ -115,6 +115,53 @@ describe('SubscriptionStatusSyncService', () => {
     }
   );
 
+  it('keeps the trial of a first charge after it that Stripe is retrying', async () => {
+    const { service, repository } = make([plan()]);
+    live(
+      stripeSubscription('past_due', {
+        trial_end: 1800000000,
+        items: {
+          data: [
+            {
+              id: 'si_1',
+              current_period_start: 1800000000,
+              current_period_end: periodEnd,
+            },
+          ],
+        },
+      })
+    );
+
+    await service.run({ delayMs: 0 });
+
+    expect(repository.setProviderStateIfUnchanged).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'sub_row_1' }),
+      { from: true, to: true },
+      expect.objectContaining({ status: 'past_due' })
+    );
+  });
+
+  it('counts a plan that cannot be stored as failed and goes on', async () => {
+    const { service, repository } = make([
+      plan({ id: 'a', organizationId: 'org_db' }),
+      plan({ id: 'b', organizationId: 'org_ok' }),
+    ]);
+    mockStripe.subscriptions.list.mockResolvedValue({
+      data: [stripeSubscription('active')],
+    });
+    repository.setProviderStateIfUnchanged
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValueOnce(true);
+
+    const report = await service.run({ delayMs: 0 });
+
+    expect(report.failed).toEqual(['org_db']);
+    expect(report.updated).toBe(1);
+    expect(console.error).toHaveBeenCalledWith(
+      'organization org_db: could not be stored'
+    );
+  });
+
   it.each(['unpaid', 'paused', 'incomplete', 'canceled'])(
     'reports a %s subscription as needing attention and never acts on it',
     async (status) => {

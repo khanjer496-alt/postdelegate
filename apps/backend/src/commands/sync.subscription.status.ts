@@ -12,7 +12,8 @@ import {
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.status.sync.service';
 
 // Stores Stripe's live status on every Stripe-billed plan and sets the trial
-// flag from it (only a trialing subscription is a trial). Idempotent, so it
+// flag from it (a trialing subscription, or one whose first charge after the
+// trial is being retried, is a trial). Idempotent, so it
 // can be re-run. It never changes a tier or a channel and never deletes:
 // workspaces whose live subscription grants no plan are listed and the exit
 // code is 2. Built with the backend, run inside the container (see

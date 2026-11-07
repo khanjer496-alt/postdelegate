@@ -174,32 +174,80 @@ describe('StripeService failed payments', () => {
     {} as any
   );
 
-  const event = (status: string, id = 'sub_1') =>
-    ({
-      type: 'customer.subscription.updated',
-      data: {
-        object: {
-          id,
-          status,
-          customer: 'cus_1',
-          cancel_at: null,
-          metadata: {
-            service: 'gitroom',
-            billing: 'STANDARD',
-            period: 'MONTHLY',
-            uniqueId: 'u1',
-          },
-        },
+  // the re-read returns the subscription of the latest event, unless a test
+  // says Stripe has it otherwise now
+  let latest: any;
+  const event = (status: string, id = 'sub_1') => {
+    latest = {
+      id,
+      status,
+      customer: 'cus_1',
+      cancel_at: null,
+      metadata: {
+        service: 'gitroom',
+        billing: 'STANDARD',
+        period: 'MONTHLY',
+        uniqueId: 'u1',
       },
-    } as any);
+    };
+    return {
+      type: 'customer.subscription.updated',
+      data: { object: latest },
+    } as any;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+    mockStripe.subscriptions.retrieve.mockImplementation(async () => latest);
+  });
+  afterAll(() => {
+    mockStripe.subscriptions.retrieve.mockReset();
   });
 
-  it.each(['unpaid', 'canceled', 'incomplete_expired', 'paused'])(
+  it('drops the paid tier when the subscription ended with customer.subscription.deleted', async () => {
+    await service.processWebhook({
+      ...event('canceled'),
+      type: 'customer.subscription.deleted',
+    });
+
+    expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
+      'cus_1',
+      'stripe'
+    );
+  });
+
+  it('does not drop a customer that has paid since a late unpaid or paused event', async () => {
+    for (const status of ['unpaid', 'paused']) {
+      const late = event(status);
+      mockStripe.subscriptions.retrieve.mockResolvedValueOnce({
+        ...latest,
+        status: 'active',
+      });
+      await service.processWebhook(late);
+    }
+
+    expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
+    expect(
+      subscriptionService.createOrUpdateSubscription
+    ).toHaveBeenCalledTimes(2);
+  });
+
+  it('never drops the plan on the event alone when the subscription cannot be re-read', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockStripe.subscriptions.retrieve.mockRejectedValue(new Error('down'));
+
+    expect(await service.processWebhook(event('unpaid'))).toEqual({
+      retry: true,
+    });
+    expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
+    expect(
+      subscriptionService.createOrUpdateSubscription
+    ).not.toHaveBeenCalled();
+  });
+
+  it.each(['unpaid', 'paused'])(
     'drops the paid tier when a subscription becomes %s',
     async (status) => {
       await service.processWebhook(event(status));
@@ -1712,6 +1760,42 @@ describe('extra channels', () => {
           currentPeriodEnd: null,
         }
       );
+    });
+
+    it('keeps the trial while Stripe retries the first charge after it', async () => {
+      // the period the failed charge is for started when the trial ended
+      mockStripe.subscriptions.retrieve.mockResolvedValue(
+        stripeSubscription({
+          status: 'past_due',
+          trial_end: 1800000000,
+          items: {
+            data: [{ ...planItem(), current_period_start: 1800000000 }],
+          },
+        })
+      );
+      await service.processWebhook(updated(stripeSubscription()));
+
+      const call = subscriptionService.createOrUpdateSubscription.mock.calls[0];
+      expect(call[1]).toBe(true);
+      expect(call[10]).toEqual(expect.objectContaining({ status: 'past_due' }));
+    });
+
+    it('treats a past_due renewal of a subscription that paid before as the full plan', async () => {
+      // the trial ended a period ago, this period was paid for once already
+      mockStripe.subscriptions.retrieve.mockResolvedValue(
+        stripeSubscription({
+          status: 'past_due',
+          trial_end: 1800000000,
+          items: {
+            data: [{ ...planItem(), current_period_start: 1802592000 }],
+          },
+        })
+      );
+      await service.processWebhook(updated(stripeSubscription()));
+
+      expect(
+        subscriptionService.createOrUpdateSubscription.mock.calls[0][1]
+      ).toBe(false);
     });
 
     it.each([

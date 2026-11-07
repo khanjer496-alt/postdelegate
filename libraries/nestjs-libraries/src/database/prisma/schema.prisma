@@ -22,8 +22,9 @@ model Organization {
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
   allowTrial          Boolean              @default(false)
-  // In a trial right now: the subscription's provider status is trialing
-  // (RevenueCat: an intro trial). A past_due renewal is not a trial. New
+  // In a trial right now: the subscription is trialing, or its first charge
+  // after the trial is being retried (RevenueCat: an intro trial). A past_due
+  // renewal of a plan that paid before is not a trial. New
   // workspaces start with it set until they subscribe, and a workspace whose
   // subscription ended has it cleared
   isTrailing          Boolean              @default(false)
