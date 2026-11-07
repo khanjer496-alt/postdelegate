@@ -316,6 +316,9 @@ const dict: Dict = {
     h1: 'Traga seu fluxo. Mantenha seu calendário.',
     lead: 'Use o assistente que você já tem. O PostDelegate oferece um servidor MCP e uma API REST para que suas ferramentas preparem o conteúdo enquanto a palavra final continua sendo sua.',
     readDocs: 'Ler a documentação',
+    // links to the English /<assistant>/<network> guides
+    byNetworkTitle: 'Guias por assistente e rede',
+    byNetworkLead: 'Configuração e exemplos de pedidos para cada assistente em cada rede disponível (em inglês).',
     guides: [
       { title: 'Conexões MCP', text: 'Como clientes de IA compatíveis se conectam ao PostDelegate e o que podem fazer.' },
       { title: 'A API REST', text: 'A interface para desenvolvedores por trás de rascunhos, mídias e fluxos de publicação.' },
@@ -380,6 +383,7 @@ const dict: Dict = {
     postBridgeCta: 'Comparar a abordagem',
     pairsTitle: 'Comparações diretas',
     pairsIntro: 'Duas outras ferramentas lado a lado, com preços tirados da página de preços de cada fornecedor e uma nota à parte sobre onde o PostDelegate se encaixa.',
+    morePairsTitle: 'Mais comparações diretas (em inglês)',
     pairs: [
       { title: 'Postiz vs Buffer', text: 'Planos fixos ou preço por canal, custos calculados para 3, 10 e 30 contas, self-hosting, API e MCP.' },
       { title: 'Postiz vs Mixpost', text: 'Dois agendadores self-hosted: AGPL ou MIT e licenças vitalícias, stack de servidor, custo em 12 meses e redes.' },
@@ -461,6 +465,7 @@ const dict: Dict = {
     planText: (name: string) => `${name} fica no mesmo calendário que todos os outros canais que você conectar. Em um só post você pode escolher vários canais, escrever o conteúdo uma vez e ajustá-lo para cada um, e cada canal mantém suas próprias configurações. Use Salvar como rascunho para revisar um post antes, escolha Adicionar ao calendário para agendá-lo ou Publicar agora para enviá-lo na hora. O <a href="/docs/posts">guia de agendamento</a> explica rascunhos, repetições, pré-visualizações e horários.`,
     aiTitle: (name: string) => `Use o Claude ou o ChatGPT com ${name}`,
     aiText: (name: string) => `O PostDelegate tem um servidor MCP, então um assistente que você já usa pode ver seu canal em ${name}, ler as regras e criar um rascunho para você revisar. A IA é por sua conta, e o PostDelegate nunca cobra por ela. Guias de configuração: <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> e <a href="/guides/social-media-mcp-server">o que é um servidor MCP para redes sociais</a>.`,
+    fromAgents: (name: string) => `Guias passo a passo para ${name} (em inglês):`,
     reviewTitle: 'Revise o post inteiro',
     reviewText: 'Confira o destino, o texto, a mídia e o horário antes de agendar. Veja o resultado no seu espaço de trabalho depois da publicação; um item na fila não é a confirmação de um post publicado.',
     faqTitle: 'Perguntas frequentes',

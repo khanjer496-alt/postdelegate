@@ -90,12 +90,12 @@ const field = 'w-full rounded-xl border border-line-hover bg-surface-1 px-4 py-3
       </ul>
       <p>Ready to schedule it? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
     </div>
+    <AppShot
+      shot="composer"
+      caption="The same preview inside PostDelegate, next to the post as you write it."
+    />
   </div></section>
   <CtaBand title="Write it once, plan it everywhere." text="Draft a post, adjust it for each channel and schedule it on one calendar. Try PostDelegate free for 7 days, no card needed." />
-  <AppShot
-    shot="composer"
-    caption="The same preview inside PostDelegate, next to the post as you write it."
-  />
 </Base>
 <script>
   import { captionLength, TOKEN_START, type Rule } from '../../scripts/caption-count';

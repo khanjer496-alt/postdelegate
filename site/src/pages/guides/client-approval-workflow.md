@@ -4,6 +4,8 @@ title: "Social media approval workflow for agencies and clients"
 metaTitle: "Social Media Approval Workflow for Agencies | PostDelegate"
 description: "Keep each client's channels separate, send approval links that need no account, and schedule a social media post only after the client has approved it."
 date: "2026-11-01"
+shot: "calendar"
+shotCaption: "The month view: what is scheduled, for which channel and when, which is the view a client is approving."
 ---
 
 The riskiest moment in social media management is the gap between "the client said it looked fine" and "it went out". A post that was never approved, or that was approved in one version and published in another, is how agencies lose trust. An approval workflow closes that gap: keep every client's channels apart, hold every post until someone approves it, let the client approve the post itself, and keep a record of who said yes.

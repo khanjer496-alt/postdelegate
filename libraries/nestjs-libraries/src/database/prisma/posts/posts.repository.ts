@@ -26,6 +26,19 @@ dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
 dayjs.extend(utc);
 
+// Who a post read is for. A real organization id scopes the read to that
+// tenant; PUBLIC_PREVIEW is the one deliberate exception - the shared preview
+// page, which anyone holding the link may open. It is a visible argument rather
+// than an omitted one, so a reader of any call site can tell which it is, and
+// `grep PUBLIC_PREVIEW` lists every cross-tenant read in the codebase.
+//
+// The literal can never collide with a real organization id, which is a uuid.
+export const PUBLIC_PREVIEW = '__public_preview__' as const;
+export type OrgScope = string | typeof PUBLIC_PREVIEW;
+
+export const orgFilter = (scope: OrgScope) =>
+  scope === PUBLIC_PREVIEW ? {} : { organizationId: scope };
+
 @Injectable()
 export class PostsRepository {
   constructor(
@@ -476,16 +489,20 @@ export class PostsRepository {
     });
   }
 
+  // The organization is required, not optional: it is the tenant boundary, and
+  // an optional security parameter is one a future caller forgets. A read that
+  // deliberately crosses tenants passes PUBLIC_PREVIEW, so it says so at the
+  // call site instead of omitting an argument.
   async getPost(
     id: string,
     includeIntegration = false,
-    orgId?: string,
+    orgId: OrgScope,
     isFirst?: boolean
   ) {
     const post = await this._post.model.post.findUnique({
       where: {
         id,
-        ...(orgId ? { organizationId: orgId } : {}),
+        ...orgFilter(orgId),
         deletedAt: null,
       },
       include: {
@@ -1034,11 +1051,12 @@ export class PostsRepository {
     });
   }
 
-  async getPostById(id: string, org?: string) {
+  // The organization is required: see getPost above.
+  async getPostById(id: string, org: OrgScope) {
     const post = await this._post.model.post.findUnique({
       where: {
         id,
-        ...(org ? { organizationId: org } : {}),
+        ...orgFilter(org),
       },
       include: {
         integration: true,

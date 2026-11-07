@@ -295,6 +295,9 @@ const dict: Dict = {
     h1: 'Apportez votre workflow. Gardez votre calendrier.',
     lead: 'Utilisez l’assistant que vous avez déjà. PostDelegate propose un serveur MCP et une API REST pour que vos outils préparent les contenus pendant que vous gardez le dernier mot.',
     readDocs: 'Lire la documentation',
+    // links to the English /<assistant>/<network> guides
+    byNetworkTitle: 'Guides par assistant et par réseau',
+    byNetworkLead: 'Configuration et exemples de demandes pour chaque assistant sur chaque réseau disponible (en anglais).',
     guides: [
       { title: 'Connexions MCP', text: 'Comment les clients IA compatibles se connectent à PostDelegate et ce qu’ils peuvent faire.' },
       { title: 'L’API REST', text: 'L’interface développeur derrière les brouillons, les médias et les workflows de publication.' },
@@ -359,6 +362,7 @@ const dict: Dict = {
     postBridgeCta: 'Comparer les approches',
     pairsTitle: 'Comparaisons en face à face',
     pairsIntro: 'Deux autres outils côte à côte, avec des prix relevés sur la page tarifs de chaque éditeur, et une note à part sur la place de PostDelegate.',
+    morePairsTitle: 'Autres comparatifs directs (en anglais)',
     pairs: [
       { title: 'Postiz vs Buffer', text: 'Forfaits fixes ou prix par canal, coûts calculés pour 3, 10 et 30 comptes, auto-hébergement, API et MCP.' },
       { title: 'Postiz vs Mixpost', text: 'Deux outils auto-hébergés : AGPL ou MIT et licences à paiement unique, stack serveur, coût sur 12 mois et réseaux.' },
@@ -440,6 +444,7 @@ const dict: Dict = {
     planText: (name: string) => `${name} figure sur le même calendrier que tous les autres canaux que vous connectez. Dans une même publication, vous pouvez choisir plusieurs canaux, rédiger le contenu une fois et l’adapter à chacun, et chaque canal conserve ses propres paramètres. Enregistrez un brouillon pour relire une publication d’abord, choisissez Ajouter au calendrier pour la programmer, ou Publier maintenant pour l’envoyer immédiatement. Le <a href="/docs/posts">guide de programmation</a> couvre les brouillons, les répétitions, les aperçus et les créneaux horaires.`,
     aiTitle: (name: string) => `Utilisez Claude ou ChatGPT avec ${name}`,
     aiText: (name: string) => `PostDelegate fait tourner un serveur MCP : un assistant que vous utilisez déjà peut consulter votre canal ${name}, lire ses règles et créer un brouillon que vous relirez. Vous utilisez votre propre IA, et PostDelegate ne la facture jamais. Guides de configuration : <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a>, et <a href="/guides/social-media-mcp-server">ce qu’est un serveur MCP pour les réseaux sociaux</a>.`,
+    fromAgents: (name: string) => `Guides pas à pas pour ${name} (en anglais) :`,
     reviewTitle: 'Relisez la publication en entier',
     reviewText: 'Vérifiez la destination, le texte, les médias et l’horaire avant de programmer. Contrôlez le résultat dans votre espace de travail après publication ; un élément en file d’attente ne confirme pas que la publication est en ligne.',
     faqTitle: 'Questions fréquentes',

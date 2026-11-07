@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ThirdPartyRepository } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.repository';
+import {
+  THIRD_PARTY_KEY_LABEL,
+  ThirdPartyRepository,
+} from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.repository';
+import {
+  readLegacySecret,
+} from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
 
 @Injectable()
 export class ThirdPartyService {
@@ -11,6 +17,12 @@ export class ThirdPartyService {
 
   deleteIntegration(org: string, id: string) {
     return this._thirdPartyRepository.deleteIntegration(org, id);
+  }
+
+  // The key to send to the third party, whichever scheme stored it. Callers
+  // get a readable key and never see the stored form.
+  readApiKey(thirdParty?: { apiKey?: string | null } | null): string {
+    return readLegacySecret(thirdParty?.apiKey, THIRD_PARTY_KEY_LABEL) || '';
   }
 
   getIntegrationById(org: string, id: string) {

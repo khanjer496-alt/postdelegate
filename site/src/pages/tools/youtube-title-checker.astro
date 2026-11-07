@@ -82,12 +82,12 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
       </ul>
       <p>Ready to plan your uploads? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
     </div>
+    <AppShot
+      shot="composer"
+      caption="Writing the post in PostDelegate, with the per-network limit counted as you type."
+    />
   </div></section>
   <CtaBand title="Plan your next upload." text="Write the title and description, then schedule the video on one calendar. Try PostDelegate free for 7 days, no card needed." />
-  <AppShot
-    shot="composer"
-    caption="Writing the post in PostDelegate, with the per-network limit counted as you type."
-  />
 </Base>
 <script>
   import { captionLength } from '../../scripts/caption-count';

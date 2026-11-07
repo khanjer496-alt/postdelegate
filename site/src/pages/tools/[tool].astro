@@ -1,0 +1,13 @@
+---
+import NetworkToolPage from '../../components/pages/NetworkToolPage.astro';
+import { COUNTER_NETWORKS, RESIZER_NETWORKS, counterHref, resizerHref } from '../../data/network-tools';
+export function getStaticPaths() {
+  const leaf = (href: string) => href.replace('/tools/', '');
+  return [
+    ...COUNTER_NETWORKS.map((network) => ({ params: { tool: leaf(counterHref(network)) }, props: { kind: 'counter' as const, network } })),
+    ...RESIZER_NETWORKS.map((network) => ({ params: { tool: leaf(resizerHref(network)) }, props: { kind: 'resizer' as const, network } })),
+  ];
+}
+const { kind, network } = Astro.props;
+---
+<NetworkToolPage kind={kind} network={network} />

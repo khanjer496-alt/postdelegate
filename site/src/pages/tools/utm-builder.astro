@@ -20,12 +20,12 @@ const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name:
       <p id="msg" class="mt-2 min-h-5 text-sm text-ink-3" aria-live="polite"></p>
     </div>
     <div class="prose-pd mt-10"><h2>Good to know</h2><ul><li>The rest of your link, including other query parameters and the URL fragment, is kept exactly as you typed it.</li><li>An existing utm_source, utm_medium or utm_campaign is replaced by the value you enter. Leave a field empty to keep that parameter as it is.</li><li>Your analytics tool must support UTM attribution to report these visits.</li></ul></div>
+    <AppShot
+      shot="composer"
+      caption="Where the link ends up: a post being written in PostDelegate, with the preview of it beside the editor."
+    />
   </div></section>
   <CtaBand />
-  <AppShot
-    shot="composer"
-    caption="The finished link in a post in PostDelegate, previewed before it goes out."
-  />
 </Base>
 <script>
   const $ = (id: string) => document.getElementById(id) as HTMLInputElement;

@@ -3,21 +3,10 @@ import Base from '../../layouts/Base.astro';
 import PageHero from '../../components/PageHero.astro';
 import CtaBand from '../../components/CtaBand.astro';
 import Faq from '../../components/Faq.astro';
+import ImageResizer from '../../components/ImageResizer.astro';
+import { RESIZER_GROUPS } from '../../data/image-sizes';
 import { SITE, CTA_LABEL } from '../../data/site';
 import AppShot from '../../components/AppShot.astro';
-// Sizes follow the official pages listed on /tools/social-image-sizes where a platform publishes one.
-// Dribbble sizes are the two the PostDelegate Dribbble connection posts at. X and Bluesky publish no
-// post image size, so those presets use common shapes.
-const groups = [
-  { label: 'Posts', items: [
-    ['bluesky', 'Bluesky square', 1000, 1000], ['ig-square', 'Instagram square', 1080, 1080], ['ig-portrait', 'Instagram portrait 4:5', 1080, 1350],
-    ['ig-tall', 'Instagram portrait 3:4', 1080, 1440], ['x', 'X landscape 16:9', 1600, 900], ['pinterest', 'Pinterest pin 2:3', 1000, 1500],
-    ['dribbble-800', 'Dribbble shot', 800, 600], ['dribbble-400', 'Dribbble shot, small', 400, 300]] },
-  { label: 'Video', items: [['yt-thumb', 'YouTube thumbnail', 1280, 720], ['yt-thumb-4k', 'YouTube thumbnail, full resolution', 3840, 2160]] },
-  { label: 'Link previews', items: [['og', 'Open Graph link image', 1200, 630], ['linkedin', 'LinkedIn link image', 1200, 627]] },
-  { label: 'Profiles and banners', items: [['yt-banner', 'YouTube channel banner', 2560, 1440], ['x-header', 'X header', 1500, 500], ['mastodon-header', 'Mastodon header', 1500, 500],
-    ['linkedin-bg', 'LinkedIn profile background', 1584, 396], ['twitch-banner', 'Twitch profile banner', 1200, 480]] },
-] as const;
 const url = `${SITE.url}/tools/image-resizer`;
 const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'Social media image resizer', applicationCategory: 'MultimediaApplication', operatingSystem: 'Any', offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, url };
 const faq = [
@@ -28,69 +17,11 @@ const faq = [
   { q: 'Where do these sizes come from?', a: 'Where a platform publishes a size on its own help pages, the preset uses it; the <a href="/tools/social-image-sizes">social media image sizes</a> page lists each one with its source. X and Bluesky do not publish a size for images in posts, so those presets use common shapes.' },
 ];
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };
-const field = 'w-full rounded-xl border border-line-hover bg-surface-1 px-4 py-3 text-ink placeholder:text-ink-3 focus:border-brand-300';
-const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-surface-1 px-4 py-3 text-sm font-semibold has-[:checked]:border-brand-300';
 ---
 <Base title="Social media image resizer: free and private | PostDelegate" description="Resize an image for YouTube thumbnails, Instagram, Bluesky, Pinterest, LinkedIn or Dribbble. It runs in your browser, so the image never leaves your device." jsonLd={[app, faqLd]}>
   <PageHero eyebrow="Free tool" title="Social media image resizer" lead="Resize an image to a social media size and save it as PNG or JPEG. Everything happens in your browser: the image never leaves your device." />
   <section class="section"><div class="container-x max-w-5xl">
-    <div class="grid gap-10 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-      <form id="controls" class="grid content-start gap-5">
-        <div>
-          <p class="mb-2 text-sm font-bold">Image</p>
-          <input id="file" type="file" accept="image/*" class="peer sr-only" aria-describedby="privacy" />
-          <label id="drop" for="file" class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-line-hover bg-surface-1 px-4 py-8 text-center text-sm text-ink-2 hover:border-brand-300 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-lime">
-            <span class="font-bold text-ink">Choose an image</span><span>or drop one here</span>
-          </label>
-          <p id="privacy" class="mt-2 text-xs text-ink-3">Your image stays on this device. It is not uploaded.</p>
-        </div>
-        <div>
-          <label for="preset" class="mb-2 block text-sm font-bold">Size</label>
-          <select id="preset" class={field}>
-            {groups.map((g) => <optgroup label={g.label}>{g.items.map(([value, label, w, h]) => <option value={value} data-w={w} data-h={h}>{label} · {w}×{h}</option>)}</optgroup>)}
-            <option value="custom">Custom size</option>
-          </select>
-        </div>
-        <div id="custom" class="grid grid-cols-2 gap-3" hidden>
-          <div><label for="cw" class="mb-2 block text-sm font-bold">Width (px)</label><input id="cw" type="number" inputmode="numeric" min="16" max="4096" value="1200" aria-describedby="size-note" class={field} /></div>
-          <div><label for="ch" class="mb-2 block text-sm font-bold">Height (px)</label><input id="ch" type="number" inputmode="numeric" min="16" max="4096" value="1200" aria-describedby="size-note" class={field} /></div>
-          <p id="size-note" class="col-span-2 min-h-5 text-sm text-amber-300" aria-live="polite"></p>
-        </div>
-        <fieldset>
-          <legend class="mb-2 text-sm font-bold">Fit</legend>
-          <div class="grid grid-cols-2 gap-3">
-            <label class={radio}><input type="radio" name="fit" value="cover" checked class="accent-[#7357ff]" /> Cover (crop)</label>
-            <label class={radio}><input type="radio" name="fit" value="contain" class="accent-[#7357ff]" /> Contain (fit)</label>
-          </div>
-        </fieldset>
-        <div id="pos-wrap"><label for="pos" class="mb-2 block text-sm font-bold">Keep in view</label>
-          <select id="pos" class={field}><option value="center">Centre</option><option value="top">Top</option><option value="bottom">Bottom</option><option value="left">Left</option><option value="right">Right</option></select>
-        </div>
-        <div id="bg-wrap" class="grid grid-cols-[auto_1fr] items-center gap-3" hidden>
-          <input id="bg" type="color" value="#ffffff" class="h-12 w-14 cursor-pointer rounded-xl border border-line-hover bg-surface-1 p-1" />
-          <label for="bg" class="text-sm font-bold">Background colour</label>
-          <label id="transparent-wrap" class="col-span-2 flex items-center gap-3 text-sm font-semibold"><input id="transparent" type="checkbox" class="size-5 accent-[#7357ff]" /> Transparent background (PNG only)</label>
-        </div>
-        <fieldset>
-          <legend class="mb-2 text-sm font-bold">Format</legend>
-          <div class="grid grid-cols-2 gap-3">
-            <label class={radio}><input type="radio" name="format" value="image/jpeg" checked class="accent-[#7357ff]" /> JPEG</label>
-            <label class={radio}><input type="radio" name="format" value="image/png" class="accent-[#7357ff]" /> PNG</label>
-          </div>
-        </fieldset>
-        <div id="q-wrap"><label for="quality" class="mb-2 flex text-sm font-bold">JPEG quality <output id="q-out" for="quality" class="ml-auto font-normal tabular-nums text-ink-3">90</output></label><input id="quality" type="range" min="50" max="100" value="90" class="w-full accent-[#7357ff]" /></div>
-        <button id="save" type="button" class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50" disabled>Download image</button>
-      </form>
-      <div class="min-w-0">
-        <h2 class="text-sm font-bold">Preview</h2>
-        <div class="mt-3 flex min-h-[260px] items-center justify-center rounded-2xl border border-line bg-[repeating-conic-gradient(#1c1c1c_0_25%,#141414_0_50%)] bg-[length:20px_20px] p-4">
-          <canvas id="canvas" class="hidden h-auto max-h-[70vh] max-w-full object-contain shadow-2xl" role="img" aria-label="Resized image preview"></canvas>
-          <p id="empty" class="text-sm text-ink-3">Choose an image to see it here.</p>
-        </div>
-        <p id="info" class="mt-3 text-sm text-ink-2" aria-live="polite"></p>
-        <p id="warn" class="mt-1 text-sm text-amber-300" aria-live="polite"></p>
-      </div>
-    </div>
+    <ImageResizer groups={RESIZER_GROUPS} />
 
     <div class="prose-pd mt-14 max-w-3xl">
       <h2>How to use the image resizer</h2>
@@ -117,155 +48,10 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
       </ul>
       <p>Ready to schedule the post that goes with it? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
     </div>
+    <AppShot
+      shot="composer"
+      caption="Composing a post in PostDelegate. Insert Media puts the resized image on the post, and the preview beside it is what goes out."
+    />
   </div></section>
   <CtaBand title="Put your images to work." text="Keep images in the media library and schedule them with your posts on one calendar. Try PostDelegate free for 7 days, no card needed." />
-  <AppShot
-    shot="composer"
-    caption="Composing a post in PostDelegate, where the resized picture is attached and previewed per network."
-  />
 </Base>
-<script>
-  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-  const file = $<HTMLInputElement>('file'), drop = $('drop'), preset = $<HTMLSelectElement>('preset'), form = $<HTMLFormElement>('controls');
-  const cw = $<HTMLInputElement>('cw'), ch = $<HTMLInputElement>('ch'), pos = $<HTMLSelectElement>('pos'), bg = $<HTMLInputElement>('bg'), transparent = $<HTMLInputElement>('transparent'), quality = $<HTMLInputElement>('quality');
-  const canvas = $<HTMLCanvasElement>('canvas'), empty = $('empty'), info = $('info'), warn = $('warn'), save = $<HTMLButtonElement>('save');
-  let source: ImageBitmap | HTMLImageElement | null = null;
-  let name = 'image';
-  let blob: Blob | null = null;
-  let version = 0;
-  let sourceId = 0;
-  // The last downscaled copy, reused while the image and the number of halving steps stay the same.
-  let scaled: { id: number; steps: number; img: HTMLCanvasElement } | null = null;
-
-  const value = (n: string) => (form.querySelector(`input[name="${n}"]:checked`) as HTMLInputElement).value;
-  const clamp = (v: string) => Math.min(4096, Math.max(16, Math.round(Number(v)) || 16));
-  // Out-of-range custom sizes are clamped, with a note saying which size is used.
-  // Leaving the field puts the size used into it, and the note stays until the next edit.
-  const side = (input: HTMLInputElement, label: string) => {
-    const v = Math.round(Number(input.value)), use = clamp(input.value);
-    const note = !input.value.trim() || !Number.isFinite(v) ? `Enter a ${label} from 16 to 4,096 px; ${use} px is used for now.`
-      : v < 16 ? `The smallest ${label} is 16 px, so 16 px is used.`
-      : v > 4096 ? `The largest ${label} is 4,096 px, so 4,096 px is used.` : '';
-    return { use, note };
-  };
-  let adjusted = '';
-  const sizeNote = () => {
-    const note = preset.value === 'custom' ? [side(cw, 'width'), side(ch, 'height')].map((s) => s.note).filter(Boolean).join(' ') || adjusted : '';
-    if ($('size-note').textContent !== note) $('size-note').textContent = note;
-  };
-  const target = () => {
-    if (preset.value === 'custom') return { w: clamp(cw.value), h: clamp(ch.value) };
-    const o = preset.selectedOptions[0];
-    return { w: Number(o.dataset.w), h: Number(o.dataset.h) };
-  };
-
-  // Read the file locally. createImageBitmap needs no URL, so nothing touches the network.
-  const read = async (f: File): Promise<ImageBitmap | HTMLImageElement> => {
-    if ('createImageBitmap' in window) { try { return await createImageBitmap(f); } catch { /* fall back below */ } }
-    const data = await new Promise<string>((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = fail; r.readAsDataURL(f); });
-    const img = new Image(); img.src = data; await img.decode(); return img;
-  };
-
-  const release = () => {
-    if (source && 'close' in source) source.close();
-    if (scaled) scaled.img.width = 0;
-    source = null; scaled = null;
-  };
-  const clear = (message: string) => {
-    release(); version++; blob = null; save.disabled = true;
-    canvas.classList.add('hidden'); canvas.width = 0; empty.hidden = false;
-    info.textContent = ''; warn.textContent = message;
-    drop.querySelector('span')!.textContent = 'Choose an image';
-  };
-
-  const load = async (f: File | undefined) => {
-    if (!f) return;
-    if (!f.type.startsWith('image/')) { clear('That file is not an image. Choose a JPEG, PNG, WebP or GIF.'); return; }
-    let next: ImageBitmap | HTMLImageElement;
-    try { next = await read(f); } catch { clear('This browser could not open that image. Try a JPEG or PNG.'); return; }
-    release(); source = next; sourceId++;
-    name = f.name.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 60) || 'image';
-    drop.querySelector('span')!.textContent = f.name;
-    render();
-  };
-
-  const render = () => {
-    const toggles = value('fit') === 'contain';
-    $('pos-wrap').hidden = toggles; $('bg-wrap').hidden = !toggles;
-    $('custom').hidden = preset.value !== 'custom';
-    const jpeg = value('format') === 'image/jpeg';
-    $('q-wrap').hidden = !jpeg; $('transparent-wrap').hidden = jpeg;
-    $('q-out').textContent = quality.value;
-    sizeNote();
-    if (!source) return;
-    const { w, h } = target();
-    const sw = source.width, sh = source.height;
-    const cover = value('fit') === 'cover';
-    const scale = cover ? Math.max(w / sw, h / sh) : Math.min(w / sw, h / sh);
-    const dw = sw * scale, dh = sh * scale;
-    let dx = (w - dw) / 2, dy = (h - dh) / 2;
-    if (cover) {
-      if (pos.value === 'top') dy = 0; else if (pos.value === 'bottom') dy = h - dh;
-      else if (pos.value === 'left') dx = 0; else if (pos.value === 'right') dx = w - dw;
-    }
-    // Halve large images in steps first; one big downscale looks jagged in some browsers.
-    let steps = 0;
-    for (let iw = sw, ih = sh; iw / 2 >= dw && ih / 2 >= dh; iw /= 2, ih /= 2) steps++;
-    let img: CanvasImageSource = source;
-    if (steps && scaled?.id === sourceId && scaled.steps === steps) img = scaled.img;
-    else if (steps) {
-      if (scaled) scaled.img.width = 0;
-      let from: CanvasImageSource = source, iw = sw, ih = sh;
-      for (let i = 0; i < steps; i++) {
-        const step = document.createElement('canvas'); step.width = Math.round(iw / 2); step.height = Math.round(ih / 2);
-        const sctx = step.getContext('2d')!; sctx.imageSmoothingQuality = 'high'; sctx.drawImage(from, 0, 0, step.width, step.height);
-        if (from instanceof HTMLCanvasElement) from.width = 0;
-        from = step; iw = step.width; ih = step.height;
-      }
-      scaled = { id: sourceId, steps, img: from as HTMLCanvasElement };
-      img = from;
-    }
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, w, h);
-    if (jpeg || (!cover && !transparent.checked)) { ctx.fillStyle = cover ? '#ffffff' : bg.value; ctx.fillRect(0, 0, w, h); }
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, dx, dy, dw, dh);
-    canvas.classList.remove('hidden'); empty.hidden = true;
-    warn.textContent = scale > 1.05 ? `Your image is ${sw}×${sh}, smaller than this size, so it is enlarged and may look soft.` : '';
-    const fit = cover ? (dw > w + 0.5 || dh > h + 0.5 ? 'cropped to fill' : 'fills exactly') : (dw < w - 0.5 || dh < h - 0.5 ? 'fitted with a background' : 'fits exactly');
-    const mime = value('format');
-    const mine = ++version;
-    save.disabled = true; blob = null;
-    info.textContent = `${sw}×${sh} → ${w}×${h}, ${fit}.`;
-    canvas.toBlob((b) => {
-      if (mine !== version) return;
-      blob = b; save.disabled = !b;
-      info.textContent = b ? `${sw}×${sh} → ${w}×${h}, ${fit}. ${mime === 'image/png' ? 'PNG' : 'JPEG'} file: ${b.size >= 1048576 ? (b.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b.size / 1024)) + ' KB'}.` : 'This browser could not create the file.';
-    }, mime, Number(quality.value) / 100);
-  };
-
-  let timer = 0;
-  const later = () => { clearTimeout(timer); timer = window.setTimeout(render, 150); };
-  file.addEventListener('change', () => load(file.files?.[0]));
-  ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('border-brand-300'); }));
-  ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('border-brand-300')));
-  drop.addEventListener('drop', (e) => { e.preventDefault(); load((e as DragEvent).dataTransfer?.files[0]); });
-  form.addEventListener('submit', (e) => e.preventDefault());
-  form.addEventListener('change', (e) => { if (e.target === preset) adjusted = ''; render(); });
-  [cw, ch, quality, bg].forEach((el) => el.addEventListener('input', later));
-  [cw, ch].forEach((el) => {
-    el.addEventListener('input', () => { adjusted = ''; sizeNote(); });
-    el.addEventListener('change', () => { const label = el === cw ? 'width' : 'height'; const { use, note } = side(el, label); if (note) { el.value = String(use); adjusted = `The ${label} must be 16 to 4,096 px, so it was set to ${use} px.`; } });
-  });
-  save.addEventListener('click', () => {
-    if (!blob) return;
-    const { w, h } = target();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${name}-${w}x${h}.${value('format') === 'image/png' ? 'png' : 'jpg'}`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  });
-  render();
-</script>

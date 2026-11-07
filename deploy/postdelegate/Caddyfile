@@ -8,7 +8,15 @@ app.postdelegate.com {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         # Nothing embeds the app; refuse framing so the login page cannot be clickjacked.
         X-Frame-Options SAMEORIGIN
-        Content-Security-Policy "frame-ancestors 'self'"
+        # base-uri and object-src cost nothing and remove two levers an
+        # injected tag would otherwise have. A script-src is the real XSS
+        # mitigation and needs nonces threaded through Next, so it is its own
+        # job rather than a header edit. Cross-Origin-Opener-Policy is
+        # deliberately absent: the social connect popups talk back through
+        # window.opener and same-origin COOP severs that.
+        Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+        # the app asks for none of these
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
     }
     # Only Cloudflare may reach the origin, so CF-Connecting-IP (used for
     # per-visitor rate limits, TRUST_CF_CONNECTING_IP) cannot be forged.
@@ -118,7 +126,15 @@ staging.postdelegate.com {
         Referrer-Policy strict-origin-when-cross-origin
         Strict-Transport-Security "max-age=31536000"
         X-Frame-Options SAMEORIGIN
-        Content-Security-Policy "frame-ancestors 'self'"
+        # base-uri and object-src cost nothing and remove two levers an
+        # injected tag would otherwise have. A script-src is the real XSS
+        # mitigation and needs nonces threaded through Next, so it is its own
+        # job rather than a header edit. Cross-Origin-Opener-Policy is
+        # deliberately absent: the social connect popups talk back through
+        # window.opener and same-origin COOP severs that.
+        Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+        # the app asks for none of these
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
         X-Robots-Tag "noindex, nofollow"
     }
     # Only Cloudflare may reach the origin (same ranges as app.postdelegate.com).

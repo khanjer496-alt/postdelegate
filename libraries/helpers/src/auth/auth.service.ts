@@ -60,8 +60,15 @@ export const jwtLifetimes: Record<JwtType, SignOptions['expiresIn']> = {
 };
 
 export class AuthService {
+  // Cost 12. Existing hashes stay at whatever cost they were made with and are
+  // upgraded when the password next changes: bcrypt reads the cost from the
+  // hash, so comparePassword keeps working either way.
+  //
+  // Deliberately NOT rehashed on successful login. passwordFingerprint is
+  // derived from the stored hash, so rehashing would change the fingerprint
+  // and sign the user out of every other device for no reason they could see.
   static hashPassword(password: string) {
-    return hashSync(password, 10);
+    return hashSync(password, 12);
   }
   static comparePassword(password: string, hash: string) {
     return compareSync(password, hash);
@@ -121,6 +128,29 @@ export class AuthService {
       .slice(0, 16);
   }
 
+  // DO NOT USE FOR NEW STORAGE. AES-256-CBC with both the key and the IV
+  // derived from JWT_SECRET by MD5: reversible with nothing but that secret,
+  // deterministic (equal plaintexts give equal ciphertext), and unauthenticated
+  // (a decrypt cannot tell tampering from a wrong key).
+  //
+  // Credentials at rest belong in
+  // nestjs-libraries/database/prisma/secrets/secret.crypto.ts - hash() for a
+  // secret that is only ever matched, writeSecret()/readLegacySecret() for one
+  // that has to be read back. See
+  // deploy/postdelegate/secrets-at-rest-rollout.md.
+  //
+  // Two callers are left.
+  //
+  // 1. The lifetime-deal code format: codes.service.ts mints 10,000 codes by
+  //    encrypting `<token>:<index>`, and StripeService.lifetimeDeal verifies a
+  //    redemption by decrypting it. Those codes are already in customers'
+  //    hands, so the scheme cannot change without invalidating them - which
+  //    makes them the reason rotating JWT_SECRET is not yet safe.
+  // 2. skool.provider.ts pre-encrypts its cookie JSON into Integration.token,
+  //    a column the repository then encrypts again with token.encryption.ts.
+  //    Nothing reads that inner layer (getCookies reads customInstanceDetails),
+  //    so it was left rather than changing a stored format - but it does mean
+  //    rotating JWT_SECRET silently changes what Skool writes there.
   static fixedEncryption(value: string) {
     return encrypt_legacy_using_IV(value);
   }

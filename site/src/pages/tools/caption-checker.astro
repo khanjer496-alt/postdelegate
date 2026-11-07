@@ -5,6 +5,7 @@ import CtaBand from '../../components/CtaBand.astro';
 import NetworkBadge from '../../components/NetworkBadge.astro';
 import { NETWORKS } from '../../data/networks';
 import AppShot from '../../components/AppShot.astro';
+import { COUNTER_NETWORKS, counterHref, toolName } from '../../data/network-tools';
 const assessedNetworks = NETWORKS.filter((network) => network.limit > 0);
 const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'Social media caption checker', applicationCategory: 'UtilitiesApplication', operatingSystem: 'Any', offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, url: 'https://postdelegate.com/tools/caption-checker' };
 ---
@@ -33,14 +34,15 @@ const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name:
         <li><strong>YouTube</strong> and <strong>Farcaster estimates</strong> count UTF-8 bytes, so non-Latin text uses more.</li>
         <li><strong>Mastodon estimate</strong> counts every link as 23 and a remote mention as just @user.</li>
       </ul>
+      <p>For one network at a time, with its rules explained: {COUNTER_NETWORKS.map((n, i) => <>{i > 0 && ' · '}<a href={counterHref(n)}>{toolName(n)} character counter</a></>)}.</p>
       <p>These are planning estimates, not a guarantee of current platform validation or parity with the PostDelegate composer. Networks without an assessed rule are omitted. Confirm the actual post in the publishing composer before it goes out.</p>
     </div>
+    <AppShot
+      shot="composer"
+      caption="The same count inside PostDelegate: the composer follows the network you picked, here 205 of Bluesky's 300 characters."
+    />
   </div></section>
   <CtaBand title="Give your content a place in the plan." text="Plan, schedule and publish from one calendar. Try PostDelegate free for 7 days." />
-  <AppShot
-    shot="composer"
-    caption="The same count inside PostDelegate: the composer follows the network you picked, here 205 of Bluesky's 300 characters."
-  />
 </Base>
 <script>
   import { captionLength } from '../../scripts/caption-count';

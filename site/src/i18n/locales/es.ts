@@ -316,6 +316,9 @@ const dict: Dict = {
     h1: 'Trae tu flujo de trabajo. Conserva tu calendario.',
     lead: 'Usa el asistente que ya tienes. PostDelegate ofrece un servidor MCP y una API REST para que tus herramientas preparen contenido mientras tú tienes la última palabra.',
     readDocs: 'Lee la documentación',
+    // links to the English /<assistant>/<network> guides
+    byNetworkTitle: 'Guías por asistente y red',
+    byNetworkLead: 'Configuración y ejemplos de peticiones para cada asistente en cada red activa (en inglés).',
     guides: [
       { title: 'Conexiones MCP', text: 'Cómo se conectan los clientes de IA compatibles a PostDelegate y qué pueden hacer.' },
       { title: 'La API REST', text: 'La interfaz para desarrolladores detrás de los borradores, los medios y los flujos de publicación.' },
@@ -380,6 +383,7 @@ const dict: Dict = {
     postBridgeCta: 'Compara el enfoque',
     pairsTitle: 'Comparativas cara a cara',
     pairsIntro: 'Otras dos herramientas lado a lado, con precios tomados de la página de precios de cada proveedor y una nota aparte sobre el lugar de PostDelegate.',
+    morePairsTitle: 'Más comparativas directas (en inglés)',
     pairs: [
       { title: 'Postiz vs Buffer', text: 'Planes fijos o precio por canal, costos calculados con 3, 10 y 30 cuentas, autoalojamiento, API y MCP.' },
       { title: 'Postiz vs Mixpost', text: 'Dos planificadores autoalojados: AGPL o MIT y licencias de pago único, stack de servidor, costo a 12 meses y redes.' },
@@ -461,6 +465,7 @@ const dict: Dict = {
     planText: (name: string) => `${name} está en el mismo calendario que todos los demás canales que conectes. En una sola publicación puedes elegir varios canales, escribir el contenido una vez y adaptarlo a cada uno, y cada canal conserva sus propios ajustes. Elige Guardar como borrador para revisar antes una publicación, Agregar al calendario para programarla o Publicar ahora para enviarla al momento. La <a href="/docs/posts">guía de programación</a> explica los borradores, las repeticiones, las vistas previas y los horarios.`,
     aiTitle: (name: string) => `Usa Claude o ChatGPT con ${name}`,
     aiText: (name: string) => `PostDelegate tiene un servidor MCP, así que un asistente que ya usas puede ver tu canal de ${name}, leer sus reglas y crear un borrador para que lo revises. La IA la pones tú, y PostDelegate nunca cobra por ella. Guías de configuración: <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> y <a href="/guides/social-media-mcp-server">qué es un servidor MCP para redes sociales</a>.`,
+    fromAgents: (name: string) => `Guías paso a paso para ${name} (en inglés):`,
     reviewTitle: 'Revisa toda la publicación',
     reviewText: 'Comprueba el destino, el texto, los medios y la hora antes de programar. Mira el resultado en tu espacio de trabajo después de la publicación; un elemento en cola no confirma que se haya publicado.',
     faqTitle: 'Preguntas frecuentes',

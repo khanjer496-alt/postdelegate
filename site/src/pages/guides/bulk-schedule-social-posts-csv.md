@@ -4,6 +4,8 @@ title: "How to bulk schedule social media posts from a CSV"
 metaTitle: "Bulk Schedule Social Media Posts from a CSV | PostDelegate"
 description: "Schedule up to 200 posts at once from a spreadsheet: the columns the importer reads, a sample CSV, dates and timezones, channel settings and fixing errors."
 date: "2026-11-01"
+shot: "calendar"
+shotCaption: "The month view after a bulk import: every scheduled post in its slot, across the channels in the sidebar."
 ---
 
 Some posts are best written one at a time. Others come in batches: a month of tips, a run of event reminders, a content plan that already lives in a spreadsheet. Copying each row into a composer by hand is slow and easy to get wrong. A CSV import takes the spreadsheet as it is and schedules every row that is ready.

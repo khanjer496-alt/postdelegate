@@ -85,6 +85,10 @@ import {
   Sections,
   SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import {
+  OrgScope,
+  PUBLIC_PREVIEW,
+} from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 
 type PostWithConditionals = Post & {
   integration?: Integration;
@@ -550,7 +554,7 @@ export class PostsService {
   async getPostsRecursively(
     id: string,
     includeIntegration = false,
-    orgId?: string,
+    orgId: OrgScope,
     isFirst?: boolean
   ): Promise<PostWithConditionals[]> {
     const post = await this._postRepository.getPost(
@@ -2691,8 +2695,13 @@ export class PostsService {
     return date.clone().add(num, 'minutes').format('YYYY-MM-DDTHH:mm:00');
   }
 
+  // the public preview's comment list: unauthenticated by design
   async getComments(previewId: string) {
-    const posts = await this.getPostsRecursively(previewId, false);
+    const posts = await this.getPostsRecursively(
+      previewId,
+      false,
+      PUBLIC_PREVIEW
+    );
     const comments = await this._postRepository.getCommentsForPosts(
       posts.map((p) => p.id)
     );
@@ -2724,7 +2733,13 @@ export class PostsService {
     // authenticated flow: the post must belong to the caller's organization
     orgId?: string
   ) {
-    const posts = await this.getPostsRecursively(previewId, false);
+    // unauthenticated commenters are allowed; the authenticated flow below
+    // still checks the post belongs to the caller's organization
+    const posts = await this.getPostsRecursively(
+      previewId,
+      false,
+      PUBLIC_PREVIEW
+    );
     if (!posts.length || (orgId && posts[0].organizationId !== orgId)) {
       throw new NotFoundException('Post not found');
     }

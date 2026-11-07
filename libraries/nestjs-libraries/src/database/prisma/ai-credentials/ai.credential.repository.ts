@@ -1,6 +1,9 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { writeSecret } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
+
+// Folded into the AAD of a workspace's own AI key.
+export const AI_CREDENTIAL_LABEL = 'ai-credential';
 
 @Injectable()
 export class AiCredentialRepository {
@@ -18,11 +21,11 @@ export class AiCredentialRepository {
       create: {
         organizationId: orgId,
         provider,
-        apiKey: AuthService.fixedEncryption(apiKey),
+        apiKey: writeSecret(apiKey, AI_CREDENTIAL_LABEL),
       },
       update: {
         provider,
-        apiKey: AuthService.fixedEncryption(apiKey),
+        apiKey: writeSecret(apiKey, AI_CREDENTIAL_LABEL),
       },
     });
   }

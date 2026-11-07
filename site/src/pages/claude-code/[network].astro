@@ -1,0 +1,7 @@
+---
+import AgentGuidePage from '../../components/pages/AgentGuidePage.astro';
+import { agentGuidePaths } from '../../data/agent-guides';
+export function getStaticPaths() { return agentGuidePaths('claude-code'); }
+const { agent, network } = Astro.props;
+---
+<AgentGuidePage agent={agent} network={network} />

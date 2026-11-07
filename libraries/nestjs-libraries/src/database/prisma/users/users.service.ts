@@ -246,6 +246,10 @@ export class UsersService {
     return this._usersRepository.updateEmailNotifications(userId, body);
   }
 
+  signOutEverywhere(userId: string) {
+    return this._usersRepository.signOutEverywhere(userId);
+  }
+
   updateTimezone(userId: string, body: TimezoneDto) {
     return this._usersRepository.updateTimezone(userId, body);
   }
