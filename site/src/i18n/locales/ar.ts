@@ -11,7 +11,7 @@ const dict: Dict = {
     ctaNote: 'لا حاجة إلى بطاقة ائتمان',
     skipToContent: 'تخطَّ إلى المحتوى',
     homeLabel: 'الصفحة الرئيسية لـ PostDelegate',
-    // alt text of /og.png, the share image on every page
+    // alt text of /og.png, the share image of the pages with no card of their own (src/data/og-cards.mjs)
     ogImageAlt: 'شعار PostDelegate وعبارة “Your social media, all in one place.” على خلفية داكنة',
   },
   header: {

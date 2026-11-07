@@ -9,6 +9,7 @@ import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import LogoStack from '../LogoStack.astro';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
+import { ogCardFor } from '../../data/og-cards.mjs';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = strings(lang);
@@ -38,7 +39,7 @@ const questions = [
   { q: p.aiQ, a: p.aiA },
 ];
 // One Offer per plan, monthly price in US dollars, from plans.ts.
-const productLd = { '@context': 'https://schema.org', '@type': 'Product', name: 'PostDelegate', description: p.description(PLANS[0].monthly, TRIAL_DAYS), brand: { '@type': 'Brand', name: 'PostDelegate' }, image: new URL('/og.png', SITE.url).href, url: `${SITE.url}${localeHref(lang, '/pricing')}`,
+const productLd = { '@context': 'https://schema.org', '@type': 'Product', name: 'PostDelegate', description: p.description(PLANS[0].monthly, TRIAL_DAYS), brand: { '@type': 'Brand', name: 'PostDelegate' }, image: new URL(ogCardFor(localeHref(lang, '/pricing')) ?? '/og.png', SITE.url).href, url: `${SITE.url}${localeHref(lang, '/pricing')}`,
   offers: PLANS.map((plan) => ({ '@type': 'Offer', name: plan.name, description: t.planTaglines[plan.slug] ?? plan.tagline, price: plan.monthly, priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: `${SITE.url}${localeHref(lang, '/pricing')}`,
     priceSpecification: { '@type': 'UnitPriceSpecification', price: plan.monthly, priceCurrency: 'USD', unitCode: 'MON', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' } } })) };
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: t.buyerFaq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a.replace(/<[^>]+>/g, '') } })) };

@@ -28,7 +28,7 @@ const en = {
     ctaNote: CTA_NOTE,
     skipToContent: 'Skip to content',
     homeLabel: 'PostDelegate home',
-    // alt text of /og.png, the share image on every page
+    // alt text of /og.png, the share image of the pages with no card of their own (src/data/og-cards.mjs)
     ogImageAlt: 'PostDelegate logo and the line “Your social media, all in one place.” on a dark background',
   },
   header: {
