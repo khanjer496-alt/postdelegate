@@ -174,14 +174,36 @@ describe('ErrorBodyScrubService', () => {
       repository as any
     ).run();
 
-    expect(Object.keys(tokenLike['Errors.message'])).toEqual(
+    expect(Object.keys(tokenLike!['Errors.message'])).toEqual(
       TOKEN_LIKE_PATTERNS
     );
-    expect(tokenLike['Errors.message']['Bearer ']).toBe(1);
-    expect(tokenLike['Post.error']['access_token=']).toBe(1);
-    expect(tokenLike['Post.error']['Bearer ']).toBe(0);
+    expect(tokenLike!['Errors.message']['Bearer ']).toBe(1);
+    expect(tokenLike!['Post.error']['access_token=']).toBe(1);
+    expect(tokenLike!['Post.error']['Bearer ']).toBe(0);
     expect(rows[0].message).toBe(message);
     expect(posts[0].error).toBe('https://x?access_token=abc');
+  });
+
+  it('keeps a completed rewrite when the token-like counts fail', async () => {
+    const error = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const { repository, rows } = repositoryFake([
+      { id: 'e-1', body: leakingBody('p-1') },
+    ]);
+    repository.countPostErrorsContaining = jest.fn(async () => {
+      throw new Error('canceling statement due to statement timeout');
+    });
+
+    const { bodies, tokenLike } = await new ErrorBodyScrubService(
+      repository as any
+    ).run();
+
+    expect(bodies.updated).toBe(1);
+    expect(rows[0].body).not.toContain('secret');
+    expect(tokenLike).toBeNull();
+    expect(error).toHaveBeenCalledWith('token-like counts unavailable');
+    error.mockRestore();
   });
 
   it('reports counts, never a value', async () => {

@@ -46,7 +46,11 @@ export class ErrorBodyScrubService {
       dryRun?: boolean;
       onProgress?: (report: ErrorBodyScrubReport) => void;
     } = {}
-  ): Promise<{ bodies: ErrorBodyScrubReport; tokenLike: TokenLikeReport }> {
+  ): Promise<{
+    bodies: ErrorBodyScrubReport;
+    // null when the counts could not be taken; the rewrite still completed
+    tokenLike: TokenLikeReport | null;
+  }> {
     const batchSize = Math.max(1, options.batchSize ?? 200);
     const report: ErrorBodyScrubReport = {
       dryRun: !!options.dryRun,
@@ -84,7 +88,18 @@ export class ErrorBodyScrubService {
       cursor = rows[rows.length - 1].id;
     }
 
-    return { bodies: report, tokenLike: await this.countTokenLike() };
+    // The counts are unindexed LIKE scans over two large columns, so they can
+    // hit a statement timeout. That must not turn a completed rewrite into a
+    // failure: report them as unavailable and keep the rewrite's result. The
+    // error itself is not logged, since a database error can echo the query.
+    let tokenLike: TokenLikeReport | null = null;
+    try {
+      tokenLike = await this.countTokenLike();
+    } catch {
+      console.error('token-like counts unavailable');
+    }
+
+    return { bodies: report, tokenLike };
   }
 
   private async countTokenLike(): Promise<TokenLikeReport> {

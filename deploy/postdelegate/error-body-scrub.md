@@ -17,7 +17,15 @@ held 2 such rows, both in the owner's own test workspace.
 
 ---
 
-## 1. Back up first
+## 1. Deploy the release first
+
+Run the scrub only once the app container is on the release that contains it.
+The backend and the orchestrator share that one image here, so this also means
+the workers write allowlisted bodies from then on. Run it earlier, from an old
+container, and the command is not there; run it while an old orchestrator is
+still writing, and new unfiltered rows can land after the scrub passed them.
+
+## 2. Back up
 
 ```bash
 sudo backup-postiz
@@ -26,7 +34,7 @@ sudo backup-postiz
 The scrub rewrites a column in place and cannot be undone except by restoring
 that backup.
 
-## 2. Dry run
+## 3. Dry run
 
 The release image wraps the command as `scrub-error-bodies`, the same way it
 wraps `backfill-secrets`:
@@ -44,8 +52,12 @@ It writes nothing and prints `done {...}` with:
   `"token":"`. Counts only, never the rows. These two columns are **not**
   rewritten (changing what a persisted column holds needs its own decision).
   `EAA` also matches ordinary text, so a count is a reason to look, not proof.
+  The counts are unindexed `LIKE '%...%'` scans over both tables, so on a large
+  database they are slow and can hit a statement timeout. If they fail the
+  command prints `token-like counts unavailable`, reports `tokenLike: null`
+  and keeps the rewrite's exit code.
 
-## 3. Real run
+## 4. Real run
 
 ```bash
 sudo postiz-compose exec -T postiz scrub-error-bodies
@@ -61,9 +73,11 @@ up), `1` it failed (rows already rewritten stay rewritten; fix the cause and
 re-run). The `tokenLike` counts do not affect the exit code, since nothing here
 rewrites those columns: read them. It never logs a value, only counts.
 
-A second run should report `updated: 0`.
+Then run it a second time. It **must** report `updated: 0`: anything else means
+something is still writing unfiltered bodies (check that every container is on
+the new release, step 1) and the scrub is not done.
 
-## 4. Copies the scrub does not reach
+## 5. Copies the scrub does not reach
 
 - **Backups.** The local backups under `/var/backups/postiz` and the encrypted
   off-site backups (14 daily + 8 weekly in R2) keep the old rows until their
@@ -71,7 +85,7 @@ A second run should report `updated: 0`.
   encrypted to a key that is never on the VPS; the local ones are not, so they
   are only as safe as root on the server.
 - **A restore brings them back.** After restoring any backup taken before the
-  scrub, run steps 2 and 3 again on the restored database.
+  scrub, run steps 3 and 4 again on the restored database.
 - **Temporal workflow history.** The workflows passed the same posts to the
   `changeState` activity, so the activity inputs in Temporal's history hold
   them too. Closed workflow history is kept for 24 hours (archival disabled),

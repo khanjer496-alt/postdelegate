@@ -47,8 +47,9 @@ async function bootstrap() {
     console.log(`done ${JSON.stringify(report)}`);
     await app.close();
     // a non-zero exit when something could not be processed, so it is noticed.
-    // The tokenLike counts are for reading, not for the exit code: nothing
-    // here rewrites those columns, so a re-run could never clear them.
+    // The tokenLike counts (null when unavailable) are for reading, not for
+    // the exit code: nothing here rewrites those columns, so a re-run could
+    // never clear them.
     process.exit(report.bodies.skippedChanged ? 2 : 0);
   } catch (error) {
     console.error((error as Error).message);
