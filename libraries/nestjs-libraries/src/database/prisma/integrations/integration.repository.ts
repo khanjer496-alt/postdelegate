@@ -229,52 +229,39 @@ export class IntegrationRepository {
     return findIt.length > 0;
   }
 
-  // a removed channel (or the tombstone a revoked one leaves) is never edited
-  updateProviderSettings(org: string, id: string, settings: string) {
-    return this._integration.model.integration.update({
-      select: {
-        id: true,
-      },
+  // Edits a channel of the workspace that is not deleted: a removed channel,
+  // or the tombstone a revoked one leaves (its flags are matched on, see
+  // CHANNEL_DISCONNECTED), is never edited and answers 404
+  private async updateLiveChannel(
+    org: string,
+    id: string,
+    data: Prisma.IntegrationUpdateManyMutationInput
+  ) {
+    const { count } = await this._integration.model.integration.updateMany({
       where: {
         id,
         organizationId: org,
         deletedAt: null,
       },
-      data: {
-        additionalSettings: settings,
-      },
+      data,
     });
+    if (!count) {
+      throw new NotFoundException('Integration not found');
+    }
+    return { id };
+  }
+
+  updateProviderSettings(org: string, id: string, settings: string) {
+    return this.updateLiveChannel(org, id, { additionalSettings: settings });
   }
 
   updateCustomName(org: string, id: string, name: string) {
-    return this._integration.model.integration.update({
-      select: {
-        id: true,
-      },
-      where: {
-        id,
-        organizationId: org,
-        deletedAt: null,
-      },
-      data: {
-        customName: name.trim() || null,
-      },
-    });
+    return this.updateLiveChannel(org, id, { customName: name.trim() || null });
   }
 
   async setTimes(org: string, id: string, times: IntegrationTimeDto) {
-    return this._integration.model.integration.update({
-      select: {
-        id: true,
-      },
-      where: {
-        id,
-        organizationId: org,
-        deletedAt: null,
-      },
-      data: {
-        postingTimes: JSON.stringify(times.time),
-      },
+    return this.updateLiveChannel(org, id, {
+      postingTimes: JSON.stringify(times.time),
     });
   }
 
@@ -1054,38 +1041,12 @@ export class IntegrationRepository {
     });
   }
 
-  // a removed channel keeps its flags: the tombstone a revoked one leaves is
-  // matched on them (CHANNEL_DISCONNECTED)
-  async disableChannel(org: string, id: string) {
-    await this._integration.model.integration.update({
-      select: {
-        id: true,
-      },
-      where: {
-        id,
-        organizationId: org,
-        deletedAt: null,
-      },
-      data: {
-        disabled: true,
-      },
-    });
+  disableChannel(org: string, id: string) {
+    return this.updateLiveChannel(org, id, { disabled: true });
   }
 
-  async enableChannel(org: string, id: string) {
-    await this._integration.model.integration.update({
-      select: {
-        id: true,
-      },
-      where: {
-        id,
-        organizationId: org,
-        deletedAt: null,
-      },
-      data: {
-        disabled: false,
-      },
-    });
+  enableChannel(org: string, id: string) {
+    return this.updateLiveChannel(org, id, { disabled: false });
   }
 
   getPostsForChannel(org: string, id: string) {

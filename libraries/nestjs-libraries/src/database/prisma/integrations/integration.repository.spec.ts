@@ -186,23 +186,36 @@ describe('IntegrationRepository.deleteChannel', () => {
 });
 
 describe('IntegrationRepository channel edits', () => {
+  const edits = (repo: IntegrationRepository) => [
+    () => repo.enableChannel('org-A', 'int-1'),
+    () => repo.disableChannel('org-A', 'int-1'),
+    () => repo.updateCustomName('org-A', 'int-1', 'n'),
+    () => repo.setTimes('org-A', 'int-1', { time: [{ time: 1 }] } as any),
+    () => repo.updateProviderSettings('org-A', 'int-1', '[]'),
+  ];
+
   it('never edits or re-enables a removed channel', async () => {
     const { repo, integration } = makeRepo();
-    await repo.enableChannel('org-A', 'int-1');
-    await repo.disableChannel('org-A', 'int-1');
-    await repo.updateCustomName('org-A', 'int-1', 'n');
-    await repo.setTimes('org-A', 'int-1', { time: [{ time: 1 }] } as any);
-    await repo.updateProviderSettings('org-A', 'int-1', '[]');
+    for (const edit of edits(repo)) {
+      expect(await edit()).toEqual({ id: 'int-1' });
+    }
 
-    for (const [args] of integration.update.mock.calls) {
+    for (const [args] of integration.updateMany.mock.calls) {
       expect(args.where).toEqual({
         id: 'int-1',
         organizationId: 'org-A',
         deletedAt: null,
       });
-      expect(args.select).toEqual({ id: true });
     }
-    expect(integration.update).toHaveBeenCalledTimes(5);
+    expect(integration.updateMany).toHaveBeenCalledTimes(5);
+  });
+
+  it('answers 404 for a deleted or unknown channel instead of a 500', async () => {
+    const { repo, integration } = makeRepo();
+    integration.updateMany.mockResolvedValue({ count: 0 });
+    for (const edit of edits(repo)) {
+      await expect(edit()).rejects.toBeInstanceOf(NotFoundException);
+    }
   });
 
   it('only links a customer that is not deleted', async () => {

@@ -556,43 +556,54 @@ export class OrganizationRepository {
     // Checking the invite is unused, joining and burning the invite id are
     // one serializable transaction: a half applied accept can't leave the
     // invite usable again, and two accepts of one invite can't both join
-    const create = await this._transaction.model.$transaction(
-      async (tx) => {
-        const checkIfInviteExists = await tx.user.findFirst({
-          where: {
-            inviteId: id,
-          },
-          select: {
-            id: true,
-          },
-        });
+    const create = await this._transaction.model
+      .$transaction(
+        async (tx) => {
+          const checkIfInviteExists = await tx.user.findFirst({
+            where: {
+              inviteId: id,
+            },
+            select: {
+              id: true,
+            },
+          });
 
-        if (checkIfInviteExists) {
+          if (checkIfInviteExists) {
+            return null;
+          }
+
+          const membership = await tx.userOrganization.create({
+            data: {
+              role,
+              userId,
+              organizationId: orgId,
+            },
+          });
+          await tx.user.update({
+            where: {
+              id: userId,
+            },
+            data: {
+              inviteId: id,
+            },
+            select: {
+              id: true,
+            },
+          });
+          return membership;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+      .catch((err) => {
+        // the loser of two concurrent accepts of one invite
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2034'
+        ) {
           return null;
         }
-
-        const membership = await tx.userOrganization.create({
-          data: {
-            role,
-            userId,
-            organizationId: orgId,
-          },
-        });
-        await tx.user.update({
-          where: {
-            id: userId,
-          },
-          data: {
-            inviteId: id,
-          },
-          select: {
-            id: true,
-          },
-        });
-        return membership;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-    );
+        throw err;
+      });
 
     if (!create) {
       return { failed: 'already_used' as InviteFailure };

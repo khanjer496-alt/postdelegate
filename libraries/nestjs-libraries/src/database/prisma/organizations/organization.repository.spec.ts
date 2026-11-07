@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 
 const makeRepo = () => {
@@ -90,6 +91,20 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
     ).resolves.toEqual({ failed: 'already_used' });
     expect($transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the loser of two concurrent accepts the invite was used', async () => {
+    const { repo, $transaction } = makeRepo();
+    $transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('serialization failure', {
+        code: 'P2034',
+        clientVersion: 'test',
+      })
+    );
+
+    await expect(
+      repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+    ).resolves.toEqual({ failed: 'already_used' });
   });
 
   it('does not add a user that is already a member', async () => {

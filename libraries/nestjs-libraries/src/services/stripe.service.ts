@@ -1295,13 +1295,20 @@ export class StripeService extends PaymentProviderAbstract {
       ? intent === 'reactivate'
       : !!sub.cancel_at_period_end;
 
-    // Un-cancelling just removes the cancel, on each subscription that has it
+    // Un-cancelling removes the cancel on each subscription that has one:
+    // at the period end, or on an explicit date (only an explicit intent
+    // clears that one, the old toggle never saw it)
     if (reactivate) {
       let cancel_at: number | null = null;
       for (const s of subscriptions) {
         const updated = s.cancel_at_period_end
           ? await stripe.subscriptions.update(s.id, {
               cancel_at_period_end: false,
+              metadata: { service: 'gitroom', id },
+            })
+          : intent && s.cancel_at
+          ? await stripe.subscriptions.update(s.id, {
+              cancel_at: '',
               metadata: { service: 'gitroom', id },
             })
           : s;
@@ -1311,6 +1318,7 @@ export class StripeService extends PaymentProviderAbstract {
 
       return {
         id,
+        action: 'reactivate' as const,
         cancel_at: cancel_at ? new Date(cancel_at * 1000) : undefined,
       };
     }
@@ -1337,6 +1345,7 @@ export class StripeService extends PaymentProviderAbstract {
 
       return {
         id,
+        action: 'cancel' as const,
         cancel_at: new Date(),
       };
     }
@@ -1356,6 +1365,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     return {
       id,
+      action: 'cancel' as const,
       cancel_at: cancel_at ? new Date(cancel_at * 1000) : undefined,
     };
   }

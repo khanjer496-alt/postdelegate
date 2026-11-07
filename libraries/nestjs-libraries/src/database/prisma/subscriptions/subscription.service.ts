@@ -17,11 +17,13 @@ import {
 type Tier = 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
 
 // What a subscription write tells the payment webhook that asked for it:
-// `retry` - it could not be applied (a database or provider error), the
+// `retry` - the plan could not be read or stored (a database error), the
 // webhook answers non-2xx so the provider sends the event again (every step
 // is safe to run twice); `codeUsed` - a lifetime code was redeemed by someone
 // else first. Skipped events (unknown customer, a lifetime plan, another
-// provider's plan) are not failures and return neither
+// provider's plan) are not failures and return neither, and neither is a
+// plan change that fails on what the event carries (an unknown plan in its
+// metadata): it is logged and acknowledged, a retry would fail the same way
 export type SubscriptionWriteResult =
   | { retry?: boolean; codeUsed?: boolean }
   | undefined;
@@ -306,6 +308,12 @@ export class SubscriptionService {
       if (!(await this.isManagedBy(customerId, provider))) {
         return {};
       }
+    } catch (e) {
+      console.error('Error reading the subscription:', e);
+      return { retry: true };
+    }
+
+    try {
       const load = await this.modifySubscription(
         customerId,
         totalChannels,
@@ -314,6 +322,12 @@ export class SubscriptionService {
       if (!load) {
         return {};
       }
+    } catch (e) {
+      console.error('Error modifying subscription:', e);
+      return {};
+    }
+
+    try {
       await this._subscriptionRepository.createOrUpdateSubscription(
         provider,
         isTrailing,
@@ -328,7 +342,7 @@ export class SubscriptionService {
       );
       return undefined;
     } catch (e) {
-      console.error('Error modifying subscription:', e);
+      console.error('Error storing subscription:', e);
       return { retry: true };
     }
   }
@@ -403,7 +417,12 @@ export class SubscriptionService {
       if (current && (current.isLifetime || current.provider !== provider)) {
         return {};
       }
+    } catch (e) {
+      console.error('Error reading the subscription:', e);
+      return { retry: true };
+    }
 
+    try {
       const load = await this.modifySubscriptionByOrg(
         organizationId,
         totalChannels,
@@ -412,7 +431,12 @@ export class SubscriptionService {
       if (!load) {
         return {};
       }
+    } catch (e) {
+      console.error('Error modifying subscription:', e);
+      return {};
+    }
 
+    try {
       await this._subscriptionRepository.createOrUpdateSubscription(
         provider,
         isTrailing,
@@ -427,10 +451,11 @@ export class SubscriptionService {
       );
       return undefined;
     } catch (e) {
-      console.error('Error modifying subscription:', e);
+      console.error('Error storing subscription:', e);
       return { retry: true };
     }
   }
+
 
 
   // Channels that count against the limit right now, the ones a lower limit
@@ -560,9 +585,30 @@ export class SubscriptionService {
   // Organization.paymentId: that holds the workspace's Stripe customer, and
   // writing the admin's user id there broke every later Stripe call
   // (cancelling on account deletion, checkout). The `admin_` identifier tells
-  // these plans apart from paid ones
-  async addSubscription(orgId: string, subscription: any, provider: string) {
-    return this.createOrUpdateSubscriptionByOrg(
+  // these plans apart from paid ones. A workspace on a lifetime plan or on
+  // another provider's plan is left as it is, and the admin is told why
+  async addSubscription(
+    orgId: string,
+    subscription: any,
+    provider: string
+  ): Promise<{ added: boolean; reason?: string }> {
+    const current = await this._subscriptionRepository.getSubscriptionByOrgId(
+      orgId
+    );
+    if (current?.isLifetime) {
+      return {
+        added: false,
+        reason: 'This workspace has a lifetime plan, it was left as it is',
+      };
+    }
+    if (current && current.provider !== provider) {
+      return {
+        added: false,
+        reason: `This workspace's plan is managed by ${current.provider}, it was left as it is`,
+      };
+    }
+
+    const result = await this.createOrUpdateSubscriptionByOrg(
       false,
       orgId,
       provider,
@@ -572,6 +618,12 @@ export class SubscriptionService {
       'MONTHLY',
       null
     );
+    if (result) {
+      return {
+        added: false,
+        reason: 'The plan could not be saved, please try again',
+      };
+    }
+    return { added: true };
   }
-
 }

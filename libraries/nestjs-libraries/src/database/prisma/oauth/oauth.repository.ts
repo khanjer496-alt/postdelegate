@@ -62,36 +62,47 @@ export class OAuthRepository {
       clientSecret: string;
     }
   ) {
-    return this._transaction.model.$transaction(
-      async (tx) => {
-        const existing = await tx.oAuthApp.findFirst({
-          where: {
-            organizationId: orgId,
-            deletedAt: null,
-          },
-          select: { id: true },
-        });
-        if (existing) {
+    return this._transaction.model
+      .$transaction(
+        async (tx) => {
+          const existing = await tx.oAuthApp.findFirst({
+            where: {
+              organizationId: orgId,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (existing) {
+            return null;
+          }
+
+          return tx.oAuthApp.create({
+            data: {
+              organizationId: orgId,
+              name: data.name,
+              description: data.description,
+              pictureId: data.pictureId,
+              redirectUrl: data.redirectUrl,
+              clientId: data.clientId,
+              clientSecret: data.clientSecret,
+            },
+            include: {
+              picture: true,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+      .catch((err) => {
+        // the loser of two concurrent creates: the other one made the app
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2034'
+        ) {
           return null;
         }
-
-        return tx.oAuthApp.create({
-          data: {
-            organizationId: orgId,
-            name: data.name,
-            description: data.description,
-            pictureId: data.pictureId,
-            redirectUrl: data.redirectUrl,
-            clientId: data.clientId,
-            clientSecret: data.clientSecret,
-          },
-          include: {
-            picture: true,
-          },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-    );
+        throw err;
+      });
   }
 
   createDynamicApp(data: {

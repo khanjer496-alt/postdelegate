@@ -68,11 +68,16 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
         .filter((p: string) => p && !p.startsWith('$RCAnonymousID:'))
     ) as string[];
 
+    // every organization is synced; one that could not be stored makes the
+    // webhook answer non-2xx (PaymentController) so RevenueCat sends it again
+    let retry = false;
     for (const organizationId of organizations) {
-      await this.syncSubscription(organizationId);
+      if ((await this.syncSubscription(organizationId)).retry) {
+        retry = true;
+      }
     }
 
-    return { ok: true };
+    return retry ? { ok: false, retry: true } : { ok: true };
   }
 
   // Store subscriptions can only be cancelled by the user in the App Store /
@@ -81,7 +86,10 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
     return;
   }
 
-  override async syncSubscription(organizationId: string) {
+  // `retry`: the plan could not be stored, the webhook asks for the event again
+  override async syncSubscription(
+    organizationId: string
+  ): Promise<{ active: boolean; retry?: boolean }> {
     const organization = await this._organizationService.getOrgById(
       organizationId
     );
@@ -101,7 +109,7 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
     const { billing, period } = this.parseProductId(active.productId);
 
     // Store trials (intro offers) keep the same trial restrictions as a Stripe trial
-    await this._subscriptionService.createOrUpdateSubscriptionByOrg(
+    const result = await this._subscriptionService.createOrUpdateSubscriptionByOrg(
       active.subscription.period_type === 'trial',
       organizationId,
       REVENUECAT_PROVIDER,
@@ -114,6 +122,10 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
         ? dayjs(active.subscription.expires_date).unix()
         : null
     );
+    // the plan could not be stored, never reported as active
+    if (result?.retry) {
+      return { active: false, retry: true };
+    }
 
     return { active: true };
   }

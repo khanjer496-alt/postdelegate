@@ -722,6 +722,14 @@ export const MainBillingComponent: FC<{
               cancelAt: cancel_at,
             }));
 
+            // only said once no cancel date is left
+            if (cancel_at) {
+              toast.show(
+                'Your subscription is still set to cancel, please try again or contact support',
+                'warning'
+              );
+              return;
+            }
             toast.show('Subscription reactivated successfully');
             return;
           }

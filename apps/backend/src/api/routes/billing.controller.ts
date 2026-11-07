@@ -265,7 +265,9 @@ export class BillingController {
       await this.provider(org)
     ).setToCancel(org.id, body.intent);
 
-    if (result.cancel_at) {
+    // only when this request actually set it to cancel (an explicit cancel,
+    // or the old toggle going that way), never on a reactivation
+    if (result.action === 'cancel' && result.cancel_at) {
       await this._notificationService.sendEmail(
         process.env.EMAIL_FROM_ADDRESS,
         'Subscription Cancelled',
@@ -392,10 +394,14 @@ export class BillingController {
       throw new Error('Unauthorized');
     }
 
-    await this._subscriptionService.addSubscription(
+    const { added, reason } = await this._subscriptionService.addSubscription(
       org.id,
       body.subscription,
       this._paymentService.getDefaultProviderName('web')
     );
+    if (!added) {
+      throw new HttpException(reason || 'The plan was not added', 400);
+    }
+    return { added };
   }
 }

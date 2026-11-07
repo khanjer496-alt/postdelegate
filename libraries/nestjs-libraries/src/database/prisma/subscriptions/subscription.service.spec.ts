@@ -171,6 +171,20 @@ describe('SubscriptionService plan writes', () => {
     ).toEqual({ retry: true });
   });
 
+  it('acknowledges a plan change that fails on what the event carries', async () => {
+    const { service, repository } = make({
+      provider: 'stripe',
+      subscriptionTier: 'PRO',
+    });
+    // an unknown plan in the metadata: a retry would fail the same way
+    expect(
+      await service.createOrUpdateSubscription(
+        'stripe', false, 'u1', 'cus_1', 30, 'UNKNOWN' as any, 'MONTHLY', null
+      )
+    ).toEqual({});
+    expect(repository.createOrUpdateSubscription).not.toHaveBeenCalled();
+  });
+
   it('does not ask for a retry for a customer it does not know', async () => {
     const { service, repository } = make(null);
     repository.getOrganizationByCustomerId.mockResolvedValue(null);
@@ -196,9 +210,24 @@ describe('SubscriptionService plan writes', () => {
     expect(integrations.disableIntegrations).toHaveBeenCalledWith('org_1', 1);
   });
 
+  it('tells the admin why a lifetime or another provider plan was left alone', async () => {
+    const lifetime = make({ provider: 'stripe', isLifetime: true });
+    expect(
+      await lifetime.service.addSubscription('org_1', 'PRO', 'stripe')
+    ).toEqual({ added: false, reason: expect.stringContaining('lifetime') });
+
+    const store = make({ provider: 'revenuecat', isLifetime: false });
+    expect(
+      await store.service.addSubscription('org_1', 'PRO', 'stripe')
+    ).toEqual({ added: false, reason: expect.stringContaining('revenuecat') });
+    expect(store.repository.createOrUpdateSubscription).not.toHaveBeenCalled();
+  });
+
   it('sets an admin plan on the workspace without touching its Stripe customer', async () => {
     const { service, repository } = make(null);
-    await service.addSubscription('org_1', 'PRO', 'stripe');
+    expect(await service.addSubscription('org_1', 'PRO', 'stripe')).toEqual({
+      added: true,
+    });
     expect(repository.setCustomerId).not.toHaveBeenCalled();
     expect(repository.createOrUpdateSubscription).toHaveBeenCalledWith(
       'stripe',

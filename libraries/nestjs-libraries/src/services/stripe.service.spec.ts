@@ -2156,6 +2156,20 @@ describe('extra channels', () => {
       expect(result.cancel_at).toBeUndefined();
     });
 
+    it('reactivates a subscription set to cancel on an explicit date', async () => {
+      live(
+        stripeSubscription({ cancel_at: 1900000000, cancel_at_period_end: false })
+      );
+      mockStripe.subscriptions.update.mockResolvedValue({ cancel_at: null });
+      const result = await service.setToCancel('org_1', 'reactivate');
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
+        'sub_1',
+        expect.objectContaining({ cancel_at: '' })
+      );
+      expect(result).toMatchObject({ action: 'reactivate' });
+      expect(result.cancel_at).toBeUndefined();
+    });
+
     it('keeps toggling on the first subscription without an intent', async () => {
       live(stripeSubscription({ cancel_at_period_end: true }));
       mockStripe.subscriptions.update.mockResolvedValue({ cancel_at: null });
