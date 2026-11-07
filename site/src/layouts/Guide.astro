@@ -1,7 +1,7 @@
 ---
 import Doc from './Doc.astro';
 import { GUIDES } from '../data/guides';
-import { SITE, CTA_LABEL } from '../data/site';
+import { SITE, CTA_LABEL, pagePath } from '../data/site';
 import { ogCardFor } from '../data/og-cards.mjs';
 import AppShot from '../components/AppShot.astro';
 // Markdown guides pass { frontmatter }; .astro guides pass the same prop by hand.
@@ -10,7 +10,7 @@ import AppShot from '../components/AppShot.astro';
 interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string; shot?: 'calendar' | 'composer'; shotCaption?: string } }
 const { frontmatter } = Astro.props;
 const { title, description, metaTitle, date = '2026-11-01', shot, shotCaption } = frontmatter;
-const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
+const path = pagePath(Astro.url);
 const url = new URL(path, SITE.url).href;
 const more = GUIDES.filter((guide) => `/guides/${guide.slug}` !== path);
 const card = ogCardFor(path);

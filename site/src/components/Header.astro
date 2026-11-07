@@ -1,7 +1,7 @@
 ---
 import Logo from './Logo.astro';
 import Flag from './Flag.astro';
-import { SITE } from '../data/site';
+import { SITE, pagePath } from '../data/site';
 import { menuNetworks } from '../data/networks';
 import { LOCALES, LANGUAGES, TRANSLATED_PATHS, localeHref, localePath, splitPath, strings, type Lang } from '../i18n';
 interface Props { lang?: Lang }
@@ -33,7 +33,7 @@ const groups: { label: string; channels?: boolean; links: { label: string; href:
     { label: h.support, href: href('/support'), description: h.supportText },
   ] },
 ];
-const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+const path = pagePath(Astro.url);
 // The language switcher opens the same page in the other language when it is translated,
 // otherwise that language's home page. English-only pages keep their own URL in English.
 const { path: englishPath } = splitPath(path);

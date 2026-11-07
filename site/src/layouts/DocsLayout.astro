@@ -3,12 +3,12 @@ import Base from './Base.astro';
 import DocsSidebar from '../components/docs/DocsSidebar.astro';
 import DocsToc from '../components/docs/DocsToc.astro';
 import { DOC_PAGES, findDocSection } from '../data/docs';
-import { SITE } from '../data/site';
+import { SITE, pagePath } from '../data/site';
 // Markdown pages pass { frontmatter, headings }; .astro pages pass the same props by hand.
 interface Props { frontmatter: { title: string; description: string; eyebrow?: string }; headings?: { depth: number; slug: string; text: string }[] }
 const { frontmatter, headings = [] } = Astro.props;
 const { title, description } = frontmatter;
-const current = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
+const current = pagePath(Astro.url);
 const isHome = current === '/docs';
 const section = findDocSection(current);
 const eyebrow = frontmatter.eyebrow ?? section?.title ?? 'Documentation';
