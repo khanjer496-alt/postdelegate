@@ -156,7 +156,7 @@ const dict: Dict = {
     talkToUs: 'Habla con nosotros',
     // the checklist under every plan card; each item is documented under /docs
     everyPlanTitle: 'En todos los planes',
-    everyPlan: ['Hilos y comentarios', 'Publicaciones recurrentes y evergreen', 'Enlaces de aprobación para clientes', 'Importación masiva desde CSV', 'Grupos de clientes', 'Analíticas', 'Sets y firmas', 'Vistas de día, semana, mes y lista'],
+    everyPlan: ['Hilos de publicaciones y comentarios', 'Publicaciones recurrentes y evergreen', 'Enlaces de aprobación para clientes', 'Importación masiva desde CSV', 'Grupos de clientes', 'Analíticas', 'Sets y firmas', 'Vistas de día, semana, mes y lista'],
     whyTitle: '¿Por qué no hay créditos de IA?',
     whyText: 'Usas tu propia clave de OpenAI, o el asistente que ya pagas, así que pagas las tarifas de OpenAI sin ningún recargo nuestro y sin límite mensual de créditos.',
     note: 'Precios en dólares estadounidenses. La IA funciona con tu propia clave de OpenAI o con el asistente que ya usas mediante <a href="/docs/mcp">MCP</a>, y PostDelegate nunca cobra por ella. Content Studio está incluido en todos los planes de pago con uso razonable. Una prueba gratuita por dirección de correo. Consulta <a href="/docs/billing">planes y facturación</a>.',
@@ -180,7 +180,7 @@ const dict: Dict = {
     },
     {
       q: '¿Hay un límite de publicaciones?',
-      a: 'No hay un límite práctico de publicaciones en ningún plan. La API pública acepta hasta 30 solicitudes de creación de publicaciones por hora y espacio de trabajo; consulta los <a href="/docs/api#rate-limits">límites de uso</a>.',
+      a: 'No. Todos los planes incluyen publicaciones ilimitadas al mes. La API pública acepta hasta 30 solicitudes de creación de publicaciones por hora y espacio de trabajo; consulta los <a href="/docs/api#rate-limits">límites de uso</a>.',
     },
     {
       q: '¿Mis clientes pueden aprobar publicaciones?',

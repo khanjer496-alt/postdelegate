@@ -156,7 +156,7 @@ const dict: Dict = {
     talkToUs: 'Fale com a gente',
     // the checklist under every plan card; each item is documented under /docs
     everyPlanTitle: 'Em todos os planos',
-    everyPlan: ['Threads e comentários', 'Posts recorrentes e evergreen', 'Links de aprovação para clientes', 'Importação em massa por CSV', 'Grupos de clientes', 'Análises', 'Sets e assinaturas', 'Visões de dia, semana, mês e lista'],
+    everyPlan: ['Sequências de posts e comentários', 'Posts recorrentes e evergreen', 'Links de aprovação para clientes', 'Importação em massa por CSV', 'Grupos de clientes', 'Análises', 'Sets e assinaturas', 'Visualizações de dia, semana, mês e lista'],
     whyTitle: 'Por que não há créditos de IA?',
     whyText: 'Você usa sua própria chave da OpenAI, ou o assistente que já assina, e paga as tarifas da própria OpenAI, sem sobretaxa nossa e sem limite mensal de créditos.',
     note: 'Preços em dólares americanos. A IA usa sua própria chave da OpenAI ou o assistente que você já usa pelo <a href="/docs/mcp">MCP</a>, e o PostDelegate nunca cobra por ela. O Content Studio está incluído em todos os planos pagos, com uso justo. Um teste gratuito por endereço de e-mail. Veja <a href="/docs/billing">planos e cobrança</a>.',
@@ -180,7 +180,7 @@ const dict: Dict = {
     },
     {
       q: 'Existe limite de posts?',
-      a: 'Não há limite prático de posts em nenhum plano. A API pública aceita até 30 solicitações de criação de post por hora por espaço de trabalho; veja os <a href="/docs/api#rate-limits">limites de requisições</a>.',
+      a: 'Não. Todo plano inclui posts ilimitados por mês. A API pública aceita até 30 solicitações de criação de post por hora por espaço de trabalho; veja os <a href="/docs/api#rate-limits">limites de requisições</a>.',
     },
     {
       q: 'Meus clientes podem aprovar posts?',

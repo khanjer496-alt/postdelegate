@@ -156,7 +156,7 @@ const dict: Dict = {
     talkToUs: 'Contattaci',
     // the checklist under every plan card; each item is documented under /docs
     everyPlanTitle: 'In ogni piano',
-    everyPlan: ['Thread e commenti', 'Post ricorrenti ed evergreen', 'Link di approvazione per i clienti', 'Importazione in blocco da CSV', 'Gruppi di clienti', 'Analisi', 'Set e firme', 'Viste giorno, settimana, mese ed elenco'],
+    everyPlan: ['Post in serie e commenti', 'Post ricorrenti ed evergreen', 'Link di approvazione per i clienti', 'Importazione in blocco da CSV', 'Gruppi di clienti', 'Analisi', 'Set e firme', 'Viste giorno, settimana, mese ed elenco'],
     whyTitle: 'Perché niente crediti IA?',
     whyText: 'Usi la tua chiave OpenAI, o l’assistente che paghi già, quindi paghi le tariffe di OpenAI senza alcun ricarico da parte nostra e senza un tetto mensile di crediti.',
     note: 'Prezzi in dollari USA. L’IA funziona con la tua chiave OpenAI o con l’assistente che usi già tramite <a href="/docs/mcp">MCP</a>, e PostDelegate non la fa mai pagare. Content Studio è incluso in ogni piano a pagamento, con uso corretto. Una sola prova gratuita per indirizzo email. Consulta <a href="/docs/billing">piani e fatturazione</a>.',
@@ -180,7 +180,7 @@ const dict: Dict = {
     },
     {
       q: 'C’è un limite ai post?',
-      a: 'Non c’è alcun limite pratico ai post, in nessun piano. L’API pubblica accetta fino a 30 richieste di creazione post all’ora per workspace; vedi i <a href="/docs/api#rate-limits">limiti di frequenza</a>.',
+      a: 'No. Ogni piano include post illimitati ogni mese. L’API pubblica accetta fino a 30 richieste di creazione post all’ora per workspace; vedi i <a href="/docs/api#rate-limits">limiti di frequenza</a>.',
     },
     {
       q: 'I miei clienti possono approvare i post?',

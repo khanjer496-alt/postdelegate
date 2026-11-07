@@ -152,7 +152,7 @@ const en = {
     talkToUs: 'Talk to us',
     // the checklist under every plan card; each item is documented under /docs
     everyPlanTitle: 'On every plan',
-    everyPlan: ['Threads and comments', 'Repeating and evergreen posts', 'Client approval links', 'Bulk import from CSV', 'Customer groups for clients', 'Analytics', 'Sets and signatures', 'Day, week, month and list views'],
+    everyPlan: ['Threaded posts and comments', 'Repeating and evergreen posts', 'Client approval links', 'Bulk import from CSV', 'Customer groups', 'Analytics', 'Sets and signatures', 'Day, week, month and list views'],
     whyTitle: 'Why no AI credits?',
     whyText: 'You bring your own OpenAI key, or the assistant you already pay for, so you pay OpenAI\'s own rates with no markup from us and no monthly credit cap.',
     note: 'Prices in US dollars. AI runs on your own OpenAI key or the assistant you already use over <a href="/docs/mcp">MCP</a>, and PostDelegate never charges for it. Content Studio is included on every paid plan with fair use. One free trial per email address. See <a href="/docs/billing">plans and billing</a>.',

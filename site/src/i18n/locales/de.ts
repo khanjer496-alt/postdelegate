@@ -156,7 +156,7 @@ const dict: Dict = {
     talkToUs: 'Kontakt aufnehmen',
     // the checklist under every plan card; each item is documented under /docs
     everyPlanTitle: 'In jedem Plan',
-    everyPlan: ['Threads und Kommentare', 'Wiederkehrende und Evergreen-Beiträge', 'Freigabelinks für Kunden', 'Massenimport per CSV', 'Kundengruppen', 'Analysen', 'Sets und Signaturen', 'Tages-, Wochen-, Monats- und Listenansicht'],
+    everyPlan: ['Beitragsserien und Kommentare', 'Wiederkehrende und Evergreen-Beiträge', 'Freigabelinks für Kunden', 'Massenimport per CSV', 'Kundengruppen', 'Analysen', 'Sets und Signaturen', 'Tages-, Wochen-, Monats- und Listenansicht'],
     whyTitle: 'Warum keine KI-Credits?',
     whyText: 'Sie nutzen Ihren eigenen OpenAI-Schlüssel oder den Assistenten, für den Sie ohnehin bezahlen. So zahlen Sie die Preise von OpenAI, ohne Aufschlag von uns und ohne monatliches Credit-Limit.',
     note: 'Preise in US-Dollar. KI läuft über Ihren eigenen OpenAI-Schlüssel oder den Assistenten, den Sie bereits über <a href="/docs/mcp">MCP</a> nutzen, und PostDelegate berechnet nie etwas dafür. Content Studio ist in jedem kostenpflichtigen Plan im Rahmen der Fair-Use-Regeln enthalten. Eine kostenlose Testphase pro E-Mail-Adresse. Siehe <a href="/docs/billing">Pläne und Abrechnung</a>.',
@@ -180,7 +180,7 @@ const dict: Dict = {
     },
     {
       q: 'Gibt es ein Limit für Beiträge?',
-      a: 'In keinem Plan gibt es ein praktisches Limit für Beiträge. Die öffentliche API akzeptiert bis zu 30 Anfragen zum Erstellen von Beiträgen pro Stunde und Arbeitsbereich; siehe <a href="/docs/api#rate-limits">Rate-Limits</a>.',
+      a: 'Nein. Jeder Plan enthält unbegrenzte Beiträge pro Monat. Die öffentliche API akzeptiert bis zu 30 Anfragen zum Erstellen von Beiträgen pro Stunde und Arbeitsbereich; siehe <a href="/docs/api#rate-limits">Rate-Limits</a>.',
     },
     {
       q: 'Können meine Kunden Beiträge genehmigen?',
