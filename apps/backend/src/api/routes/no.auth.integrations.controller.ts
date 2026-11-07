@@ -367,7 +367,9 @@ export class NoAuthIntegrationsController {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             params: AuthService.signTypedJWT('connect-webhook', {
-              apiKey: org.apiKey,
+              // the readable key: the partner presents it back to
+              // getOrgByApiKey, so the stored form would not work
+              apiKey: this._organizationService.readApiKey(org),
             }),
           }),
           // @ts-ignore — undici option, not in lib.dom fetch types

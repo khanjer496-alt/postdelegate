@@ -125,7 +125,7 @@ export class UsersController {
         organization?.users[0]?.role === 'SUPERADMIN' ||
         // @ts-ignore
         organization?.users[0]?.role === 'ADMIN'
-          ? organization?.apiKey
+          ? this._orgService.readApiKey(organization)
           : '',
     };
   }

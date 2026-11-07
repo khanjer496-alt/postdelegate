@@ -2,6 +2,7 @@ import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/d
 import { Prisma, Role, ShortLinkPreference } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { SecretCrypto } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
 import {
   evergreenShareDate,
   evergreenSharesDone,
@@ -18,6 +19,9 @@ export type InviteFailure =
   | 'already_member'
   | 'plan';
 
+// Folded into the HMAC and the AAD of an organization's API key.
+export const ORG_API_KEY_LABEL = 'org-api-key';
+
 @Injectable()
 export class OrganizationRepository {
   constructor(
@@ -27,15 +31,53 @@ export class OrganizationRepository {
     private _transaction: PrismaTransaction
   ) {}
 
-  createMaxUser(id: string, name: string, saasName: string, email: string) {
-    return this._organization.model.organization.create({
+  // An API key is handed to the customer, shown again in Settings and sent to
+  // enterprise webhooks, so it has to stay readable - but nothing should have
+  // to query the secret itself. So: the key, an encrypted copy to read back,
+  // and a hash to look up.
+  //
+  // Without TOKEN_ENCRYPTION_KEY this degrades to exactly the old behaviour -
+  // the key stored as it is, matched by equality - so a self-hosted instance
+  // with no key configured keeps working.
+  issueApiKey() {
+    const key = makeSecureId(20);
+    return {
+      key,
+      stored: SecretCrypto.encrypt(key, ORG_API_KEY_LABEL),
+      hash: SecretCrypto.isEnabled()
+        ? SecretCrypto.hash(key, ORG_API_KEY_LABEL)
+        : null,
+    };
+  }
+
+  // The key the customer holds. A value written before this change IS the key
+  // (the random id behind it was discarded at creation), so it is returned
+  // unchanged; only a value carrying the encryption prefix is decrypted.
+  readApiKey(org?: { apiKey?: string | null } | null): string {
+    const stored = org?.apiKey;
+    if (!stored) {
+      return '';
+    }
+    return SecretCrypto.isEncrypted(stored)
+      ? SecretCrypto.decrypt(stored, ORG_API_KEY_LABEL)
+      : stored;
+  }
+
+  async createMaxUser(
+    id: string,
+    name: string,
+    saasName: string,
+    email: string
+  ) {
+    const api = this.issueApiKey();
+    const created = await this._organization.model.organization.create({
       select: {
         id: true,
-        apiKey: true,
       },
       data: {
         name: name ? `${name}###${id}` : `Unnamed User###${id}`,
-        apiKey: AuthService.fixedEncryption(makeSecureId(20)),
+        apiKey: api.stored,
+        apiKeyHash: api.hash,
         isTrailing: false,
         approvalSettings: {
           create: { requireAgentApproval: true },
@@ -67,12 +109,23 @@ export class OrganizationRepository {
         },
       },
     });
+
+    return { ...created, apiKey: api.key };
   }
 
-  getOrgByApiKey(api: string) {
+  // Matches the hash of the presented key (under the current key, or a retired
+  // one mid-rotation) or, until the backfill has run, the key stored as it is.
+  async getOrgByApiKey(api: string) {
+    if (typeof api !== 'string' || !api.trim()) {
+      return null;
+    }
+    const hashes = SecretCrypto.hashCandidates(api, ORG_API_KEY_LABEL);
     return this._organization.model.organization.findFirst({
       where: {
-        apiKey: api,
+        OR: [
+          ...(hashes.length ? [{ apiKeyHash: { in: hashes } }] : []),
+          { apiKey: api },
+        ],
         deletedAt: null,
       },
       include: {
@@ -251,15 +304,18 @@ export class OrganizationRepository {
     });
   }
 
-  updateApiKey(orgId: string) {
-    return this._organization.model.organization.update({
+  async updateApiKey(orgId: string) {
+    const api = this.issueApiKey();
+    await this._organization.model.organization.update({
       where: {
         id: orgId,
       },
       data: {
-        apiKey: AuthService.fixedEncryption(makeSecureId(20)),
+        apiKey: api.stored,
+        apiKeyHash: api.hash,
       },
     });
+    return api.key;
   }
 
   async getOrgsByUserId(userId: string) {
@@ -524,10 +580,12 @@ export class OrganizationRepository {
     ip: string,
     userAgent: string
   ) {
+    const api = this.issueApiKey();
     return this._organization.model.organization.create({
       data: {
         name: body.company,
-        apiKey: AuthService.fixedEncryption(makeSecureId(20)),
+        apiKey: api.stored,
+        apiKeyHash: api.hash,
         allowTrial: true,
         isTrailing: true,
         // new workspaces hold AI agent posts for review, older ones have no
