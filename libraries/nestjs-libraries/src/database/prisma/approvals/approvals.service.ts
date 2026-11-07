@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   GoneException,
   Injectable,
@@ -13,7 +14,12 @@ import {
   ApprovalActor,
   ApprovalPolicyService,
   isAdminRole,
+  isBeingPublished,
 } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
+import {
+  ChannelState,
+  channelState,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { ActivityLogService } from '@gitroom/nestjs-libraries/database/prisma/activity-log/activity.log.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import {
@@ -37,11 +43,39 @@ type RootPost = NonNullable<
   Awaited<ReturnType<ApprovalsRepository['getRootPost']>>
 >;
 
+// an approval names the version it approves, a newer one needs a new look
+const CHANGED_SINCE_VIEWED =
+  'This post was edited after you opened it. Refresh to see the latest version, then approve it.';
+
 // statuses an approver can approve from
 const APPROVABLE: ApprovalStatus[] = ['IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'];
 
 // a link view is written to the history at most this often
 const VIEW_LOG_INTERVAL_MINUTES = 30;
+
+// The claim side of assertNotPublished: the post is still not published, and
+// not a scheduled post whose time came (it may be going out right now). The
+// write re-checks it, a read a moment earlier may be stale.
+const notPublishing = (): Prisma.PostWhereInput => ({
+  state: { not: 'PUBLISHED' },
+  NOT: [{ state: 'QUEUE', publishDate: { lt: new Date() } }],
+});
+
+// Why a channel can't take a post that would publish once approved, null when
+// it can. Same states as integration.state.ts; a removed channel never gets
+// here, getRootPost leaves its posts out. Clients read it too (approval
+// links), so it says what is wrong rather than where to click.
+const CHANNEL_NOT_READY: Partial<Record<ChannelState, string>> = {
+  off: 'it is turned off',
+  reconnect: 'it needs to be reconnected',
+  incomplete: 'it is not fully connected yet',
+};
+const channelProblem = (integration: RootPost['integration']) => {
+  const reason = CHANNEL_NOT_READY[channelState(integration)];
+  return reason
+    ? `This post can't be approved yet, ${integration.name} can't publish right now: ${reason}. Approve it once the channel is fixed.`
+    : null;
+};
 
 export const hashApprovalToken = (token: string) =>
   createHash('sha256').update(token).digest('hex');
@@ -192,7 +226,7 @@ export class ApprovalsService {
       throw new BadRequestException('This post was already published.');
     }
     // a scheduled post whose time came may be going out right now
-    if (post.state === 'QUEUE' && dayjs(post.publishDate).isBefore(dayjs())) {
+    if (isBeingPublished(post)) {
       throw new BadRequestException(
         'This post is already being published, it can no longer be reviewed.'
       );
@@ -255,8 +289,10 @@ export class ApprovalsService {
       organizationId,
       post,
       {
-        state: { not: 'PUBLISHED' },
-        NOT: [{ state: 'DRAFT', approvalStatus: 'IN_REVIEW' }],
+        AND: [
+          notPublishing(),
+          { NOT: [{ state: 'DRAFT', approvalStatus: 'IN_REVIEW' }] },
+        ],
       },
       'DRAFT',
       'IN_REVIEW'
@@ -294,7 +330,9 @@ export class ApprovalsService {
     comment: string | undefined,
     // clients approve only what waits for them, the team can also approve a
     // post it sent back or rejected
-    approvable: ApprovalStatus[]
+    approvable: ApprovalStatus[],
+    // the version the approver saw: an edit since then needs a new look
+    expectedUpdatedAt?: Date
   ) {
     const already = {
       id: post.id,
@@ -311,6 +349,19 @@ export class ApprovalsService {
     }
     if (!approvable.includes(post.approvalStatus)) {
       throw new BadRequestException("This post isn't waiting for approval.");
+    }
+    if (
+      expectedUpdatedAt &&
+      post.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+    ) {
+      throw new ConflictException(CHANGED_SINCE_VIEWED);
+    }
+
+    // approving queues it, a channel that can't publish now would fail it
+    // (or publish it the moment it is reconnected, unreviewed by then)
+    const problemWithChannel = channelProblem(post.integration);
+    if (problemWithChannel) {
+      throw new BadRequestException(problemWithChannel);
     }
 
     // the content may have changed since it was checked, e.g. saved as a draft
@@ -342,7 +393,12 @@ export class ApprovalsService {
     const moved = await this.moveTo(
       organizationId,
       post,
-      { approvalStatus: { in: approvable }, state: { not: 'PUBLISHED' } },
+      {
+        approvalStatus: { in: approvable },
+        state: { not: 'PUBLISHED' },
+        // bound to the version that was checked above, not one saved since
+        ...(expectedUpdatedAt ? { updatedAt: post.updatedAt } : {}),
+      },
       'QUEUE',
       'APPROVED',
       publishDate
@@ -355,6 +411,13 @@ export class ApprovalsService {
       );
       if (current?.state === 'QUEUE' && current.approvalStatus === 'APPROVED') {
         return { ...already, publishDate: current.publishDate };
+      }
+      if (
+        expectedUpdatedAt &&
+        current &&
+        current.updatedAt.getTime() !== post.updatedAt.getTime()
+      ) {
+        throw new ConflictException(CHANGED_SINCE_VIEWED);
       }
       throw new BadRequestException(
         'This post was just changed by someone else. Refresh and try again.'
@@ -388,11 +451,20 @@ export class ApprovalsService {
     organizationId: string,
     postId: string,
     actor: UserActor,
-    comment?: string
+    comment?: string,
+    // the updatedAt of the post the approver saw, optional for API callers
+    expectedUpdatedAt?: string
   ) {
     await this.assertApprover(organizationId, actor);
     const post = await this.getPost(organizationId, postId);
-    return this.approveAs(organizationId, post, byUser(actor), comment, APPROVABLE);
+    return this.approveAs(
+      organizationId,
+      post,
+      byUser(actor),
+      comment,
+      APPROVABLE,
+      expectedUpdatedAt ? new Date(expectedUpdatedAt) : undefined
+    );
   }
 
   private async sendBack(
@@ -408,7 +480,7 @@ export class ApprovalsService {
     const moved = await this.moveTo(
       organizationId,
       post,
-      { AND: [expected, { state: { not: 'PUBLISHED' } }] },
+      { AND: [expected, notPublishing()] },
       'DRAFT',
       status
     );

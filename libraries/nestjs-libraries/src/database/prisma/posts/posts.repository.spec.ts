@@ -256,3 +256,146 @@ describe('PostsRepository channel-state scoping', () => {
     expect(post.findMany.mock.calls[0][0].where.integration).toEqual(ready);
   });
 });
+
+describe('PostsRepository state and date of a thread', () => {
+  const makeThreadRepo = () => {
+    const post = {
+      findFirst: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockImplementation(async ({ where }: any) => ({
+        id: where.id,
+      })),
+      update: jest.fn().mockResolvedValue({
+        id: 'p-1',
+        group: 'g-1',
+        integrationId: 'int-1',
+      }),
+      updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+    };
+    const transaction = {
+      model: { $transaction: jest.fn((run: any) => run({ post })) },
+    };
+    const repo = new PostsRepository(
+      { model: { post } } as any,
+      {} as any,
+      {} as any,
+      { model: { tags: { findMany: jest.fn() } } } as any,
+      { model: { tagsPosts: { deleteMany: jest.fn() } } } as any,
+      {} as any,
+      transaction as any,
+      {} as any
+    );
+    return { repo, post, transaction };
+  };
+
+  it('a reschedule moves the comments with the main post and clears the old attempt', async () => {
+    const { repo, post, transaction } = makeThreadRepo();
+    await repo.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', false, 'schedule');
+
+    expect(transaction.model.$transaction).toHaveBeenCalledTimes(1);
+    const [{ where, data }] = post.update.mock.calls[0];
+    expect(where).toEqual({ organizationId: 'org-1', id: 'p-1' });
+    expect(data).toMatchObject({
+      state: 'QUEUE',
+      error: null,
+      releaseId: null,
+      releaseURL: null,
+    });
+    const [{ where: comments, data: commentData }] = post.updateMany.mock.calls[0];
+    expect(comments).toEqual({
+      organizationId: 'org-1',
+      group: 'g-1',
+      integrationId: 'int-1',
+      deletedAt: null,
+      id: { not: 'p-1' },
+    });
+    expect(commentData).toEqual(data);
+  });
+
+  it('moving the date only keeps the state, the release and the error', async () => {
+    const { repo, post } = makeThreadRepo();
+    await repo.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', false, 'update');
+    const [{ data }] = post.update.mock.calls[0];
+    expect(Object.keys(data)).toEqual(['publishDate']);
+    expect(post.updateMany.mock.calls[0][0].data).toEqual(data);
+  });
+
+  it('a status change moves the whole thread of the channel', async () => {
+    const { repo, post } = makeThreadRepo();
+    await repo.changeGroupState(
+      'org-1',
+      { group: 'g-1', integrationId: 'int-1' },
+      'QUEUE'
+    );
+    expect(post.updateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: 'org-1',
+        group: 'g-1',
+        integrationId: 'int-1',
+        deletedAt: null,
+        integration: { deletedAt: null },
+      },
+      data: { state: 'QUEUE', error: null, releaseId: null, releaseURL: null },
+    });
+
+    await repo.changeGroupState(
+      'org-1',
+      { group: 'g-1', integrationId: 'int-1' },
+      'DRAFT'
+    );
+    expect(post.updateMany.mock.calls[1][0].data).toEqual({
+      state: 'DRAFT',
+      error: null,
+    });
+  });
+
+  it('a status change of a post that is gone fails', async () => {
+    const { repo, post } = makeThreadRepo();
+    post.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      repo.changeGroupState('org-1', { group: 'g-1', integrationId: 'int-1' }, 'QUEUE')
+    ).rejects.toThrow('Post is no longer available.');
+  });
+
+  it('a save that queues a post again clears the old attempt, an update keeps it', async () => {
+    const { repo, post } = makeThreadRepo();
+    await repo.createOrUpdatePost(
+      'schedule',
+      'org-1',
+      '2030-01-01T10:00:00',
+      body(),
+      [],
+      'API' as any
+    );
+    expect(post.upsert.mock.calls[0][0].update).toMatchObject({
+      state: 'QUEUE',
+      error: null,
+      releaseId: null,
+      releaseURL: null,
+    });
+
+    await repo.createOrUpdatePost(
+      'draft',
+      'org-1',
+      '2030-01-01T10:00:00',
+      body(),
+      [],
+      'API' as any
+    );
+    const draft = post.upsert.mock.calls[1][0].update;
+    expect(draft).toMatchObject({ state: 'DRAFT', error: null });
+    expect(draft).not.toHaveProperty('releaseURL');
+
+    await repo.createOrUpdatePost(
+      'update',
+      'org-1',
+      '2030-01-01T10:00:00',
+      body(),
+      [],
+      'API' as any
+    );
+    const update = post.upsert.mock.calls[2][0].update;
+    expect(update).not.toHaveProperty('state');
+    expect(update).not.toHaveProperty('error');
+    expect(update).not.toHaveProperty('releaseURL');
+  });
+});

@@ -622,24 +622,70 @@ export class PostsRepository {
     isDraft: boolean,
     action: 'schedule' | 'update' = 'schedule'
   ) {
-    return this._post.model.post.update({
+    const data = {
+      publishDate: dayjs(date).toDate(),
+      // schedule: set state to QUEUE (or DRAFT if it was a draft), the
+      // error and release of an earlier attempt no longer describe it
+      // update: don't change the state
+      ...(action === 'schedule'
+        ? {
+            state: isDraft ? ('DRAFT' as const) : ('QUEUE' as const),
+            error: null,
+            releaseId: null,
+            releaseURL: null,
+          }
+        : {}),
+    };
+    return this._transaction.model.$transaction(async (tx) => {
+      const updated = await tx.post.update({
+        where: {
+          organizationId: orgId,
+          id,
+        },
+        data,
+      });
+      // the comments of a thread share the main post's date and state, like
+      // createOrUpdatePost stores them
+      await tx.post.updateMany({
+        where: {
+          organizationId: orgId,
+          group: updated.group,
+          integrationId: updated.integrationId,
+          deletedAt: null,
+          id: { not: id },
+        },
+        data,
+      });
+      return updated;
+    });
+  }
+
+  // Moves a post and its comments to a state together, the comments of a
+  // thread publish with the main post. Leaving ERROR clears its error; queued
+  // again, the release of an earlier attempt is cleared too, like changeDate.
+  async changeGroupState(
+    orgId: string,
+    post: { group: string; integrationId: string },
+    state: 'DRAFT' | 'QUEUE'
+  ) {
+    const changed = await this._post.model.post.updateMany({
       where: {
         organizationId: orgId,
-        id,
+        group: post.group,
+        integrationId: post.integrationId,
+        deletedAt: null,
+        integration: { deletedAt: null },
       },
       data: {
-        publishDate: dayjs(date).toDate(),
-        // schedule: set state to QUEUE (or DRAFT if it was a draft)
-        // update: don't change the state
-        ...(action === 'schedule'
-          ? {
-              state: isDraft ? 'DRAFT' : 'QUEUE',
-              releaseId: null,
-              releaseURL: null,
-            }
-          : {}),
+        state,
+        error: null,
+        ...(state === 'QUEUE' ? { releaseId: null, releaseURL: null } : {}),
       },
     });
+    if (!changed.count) {
+      throw new BadRequestException('Post is no longer available.');
+    }
+    return changed;
   }
 
   countPostsFromDay(orgId: string, date: Date) {
@@ -888,6 +934,13 @@ export class PostsRepository {
           : {
               state:
                 state === 'draft' ? ('DRAFT' as const) : ('QUEUE' as const),
+              // no longer failed: the error of an earlier attempt goes
+              error: null,
+              // queued again: so does the release of an earlier publish,
+              // like changeDate on a reschedule
+              ...(state === 'draft'
+                ? {}
+                : { releaseId: null, releaseURL: null }),
             }),
         image: JSON.stringify(value.image),
         settings: JSON.stringify(body.settings),
@@ -1010,11 +1063,12 @@ export class PostsRepository {
     return { previousPost, posts };
   }
 
-  // Keeps a post and its comments as a draft until an approver approves it
+  // Keeps a post and its comments as a draft until an approver approves it.
+  // A failed post held this way is no longer failed, its old error goes.
   holdForReview(orgId: string, group: string) {
     return this._post.model.post.updateMany({
       where: { organizationId: orgId, group, deletedAt: null },
-      data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' },
+      data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW', error: null },
     });
   }
 

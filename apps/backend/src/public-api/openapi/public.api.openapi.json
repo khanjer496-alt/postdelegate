@@ -1675,7 +1675,7 @@
           "Posts"
         ],
         "summary": "Change post status",
-        "description": "Moves a post between `draft` and `schedule` state.\n\n- `schedule` → sets the post state to `QUEUE` and (re)starts the publishing workflow so it will be published at its stored date.\n- `draft` → sets the post state to `DRAFT` and terminates any currently running publishing workflow for the post, so it will not be published.\n\nThe post keeps its stored date; only the state (and the workflow) changes.",
+        "description": "Moves a post between `draft` and `schedule` state.\n\n- `schedule` → sets the post state to `QUEUE` and (re)starts the publishing workflow so it will be published at its stored date.\n- `draft` → sets the post state to `DRAFT` and terminates any currently running publishing workflow for the post, so it will not be published.\n\nThe post keeps its stored date; only the state (and the workflow) changes. A thread's comments move with it.\n\nA post that was already published, or whose time came and is being published right now, is refused unless `republish: true` is passed, since changing it can publish it again. Pass the id of the main post, not of a comment.",
         "operationId": "changePostStatus",
         "parameters": [
           {
@@ -1705,6 +1705,10 @@
                       "schedule"
                     ],
                     "description": "New status for the post"
+                  },
+                  "republish": {
+                    "type": "boolean",
+                    "description": "Required to change the status of a post that was already published or is being published right now. It can publish the post again."
                   }
                 }
               },
