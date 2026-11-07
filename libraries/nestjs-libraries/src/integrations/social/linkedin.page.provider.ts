@@ -29,7 +29,11 @@ export class LinkedinPageProvider
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
   // The Community Management API set. This provider posts as the
   // organization, so it needs no member scope; r_basicprofile belongs to a
-  // restricted product the app does not hold.
+  // restricted product the app does not hold. openid/profile stay because
+  // authenticate() and refreshToken() read /v2/userinfo. Unverified until
+  // LinkedIn approves the pages app - checkScopes throws NotEnoughScopes on
+  // any scope the app was not granted, so reconcile this list against the
+  // granted one before taking LinkedIn Page out of HIDDEN_PROVIDERS.
   override scopes = [
     'openid',
     'profile',
@@ -40,13 +44,13 @@ export class LinkedinPageProvider
 
   // Pages live in their own LinkedIn app, because LinkedIn grants the
   // Community Management API only to an app that holds no other product.
-  // Falling back keeps a single-app install working unchanged.
-  protected override get clientId() {
-    return process.env.LINKEDIN_PAGE_CLIENT_ID || super.clientId;
-  }
-
-  protected override get clientSecret() {
-    return process.env.LINKEDIN_PAGE_CLIENT_SECRET || super.clientSecret;
+  // An install whose single app holds every product can leave these unset.
+  protected override credentials() {
+    const { clientId, clientSecret } = super.credentials();
+    return {
+      clientId: process.env.LINKEDIN_PAGE_CLIENT_ID || clientId,
+      clientSecret: process.env.LINKEDIN_PAGE_CLIENT_SECRET || clientSecret,
+    };
   }
 
   override editor = 'normal' as const;
@@ -67,8 +71,8 @@ export class LinkedinPageProvider
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token,
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
+          client_id: this.credentials().clientId,
+          client_secret: this.credentials().clientSecret,
         }),
       })
     ).json();
@@ -92,7 +96,7 @@ export class LinkedinPageProvider
       expiresIn: expires_in,
       name,
       picture,
-      username: await this.fetchVanityName(accessToken, id),
+      username: id,
     };
   }
 
@@ -130,7 +134,7 @@ export class LinkedinPageProvider
     const state = makeSecureId(6);
     const codeVerifier = makeSecureId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&prompt=none&client_id=${
-      this.clientId
+      this.credentials().clientId
     }&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin-page`
     )}&state=${state}&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -226,8 +230,8 @@ export class LinkedinPageProvider
       'redirect_uri',
       `${process.env.FRONTEND_URL}/integrations/social/linkedin-page`
     );
-    body.append('client_id', this.clientId);
-    body.append('client_secret', this.clientSecret);
+    body.append('client_id', this.credentials().clientId);
+    body.append('client_secret', this.credentials().clientSecret);
 
     const {
       access_token: accessToken,
@@ -258,7 +262,6 @@ export class LinkedinPageProvider
       })
     ).json();
 
-
     return {
       // namespaced placeholder so the in-between row never collides with the
       // personal LinkedIn channel row (same org + same member sub)
@@ -268,7 +271,7 @@ export class LinkedinPageProvider
       expiresIn,
       name,
       picture,
-      username: await this.fetchVanityName(accessToken, id),
+      username: id,
     };
   }
 

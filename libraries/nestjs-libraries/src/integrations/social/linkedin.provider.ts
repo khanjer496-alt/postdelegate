@@ -73,36 +73,15 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   editor = 'normal' as const;
   dto = LinkedinDto;
 
-  // LinkedIn refuses the Community Management API on an app that holds any
-  // other product, so pages and personal profiles come from two separate
-  // apps. The page provider overrides these; a single-app install keeps
-  // working because it only sets LINKEDIN_CLIENT_ID.
-  protected get clientId() {
-    return process.env.LINKEDIN_CLIENT_ID!;
+  // The LinkedIn app the channel's tokens belong to: the personal app here,
+  // the pages app for LinkedIn Page (linkedin.page.provider.ts)
+  protected credentials() {
+    return {
+      clientId: process.env.LINKEDIN_CLIENT_ID!,
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
+    };
   }
 
-  protected get clientSecret() {
-    return process.env.LINKEDIN_CLIENT_SECRET!;
-  }
-
-  // vanityName comes from /v2/me, which needs r_basicprofile - a restricted
-  // product we do not have. Fall back to the member id rather than storing an
-  // undefined username.
-  protected async fetchVanityName(accessToken: string, fallback: string) {
-    try {
-      const { vanityName } = await (
-        await fetch('https://api.linkedin.com/v2/me', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        })
-      ).json();
-
-      return vanityName || fallback;
-    } catch (err) {
-      return fallback;
-    }
-  }
   maxLength() {
     return 3000;
   }
@@ -169,8 +148,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token,
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
+          client_id: this.credentials().clientId,
+          client_secret: this.credentials().clientSecret,
         }),
       })
     ).json();
@@ -194,7 +173,9 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       expiresIn: expires_in,
       name,
       picture: picture || '',
-      username: await this.fetchVanityName(accessToken, id),
+      // /v2/me, the only source of vanityName, needs r_basicprofile, which
+      // this app does not hold - so the member id is the username
+      username: id,
     };
   }
 
@@ -202,7 +183,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     const state = makeSecureId(6);
     const codeVerifier = makeSecureId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
-      this.clientId
+      this.credentials().clientId
     }&prompt=none&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin`
     )}&state=${state}&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -227,8 +208,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         params.refresh ? `?refresh=${params.refresh}` : ''
       }`
     );
-    body.append('client_id', this.clientId);
-    body.append('client_secret', this.clientSecret);
+    body.append('client_id', this.credentials().clientId);
+    body.append('client_secret', this.credentials().clientSecret);
 
     const {
       access_token: accessToken,
@@ -266,7 +247,9 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       expiresIn,
       name,
       picture,
-      username: await this.fetchVanityName(accessToken, id),
+      // /v2/me, the only source of vanityName, needs r_basicprofile, which
+      // this app does not hold - so the member id is the username
+      username: id,
     };
   }
 
