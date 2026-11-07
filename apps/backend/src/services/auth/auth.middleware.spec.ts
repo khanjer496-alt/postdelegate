@@ -51,6 +51,58 @@ const session = (over: object = {}) =>
     ...over,
   });
 
+describe('AuthMiddleware session revocation', () => {
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+    process.env.FRONTEND_URL = 'https://app.example.com';
+  });
+
+  const withVersion = (v: number) => setup({ ...user, sessionVersion: v });
+
+  // A session issued before this change has no sv claim. It must keep working,
+  // or the deploy signs every customer out.
+  it('accepts a session issued before sessionVersion existed', async () => {
+    const { middleware } = withVersion(0);
+    const { allowed } = await run(middleware, {
+      headers: { auth: session() },
+    });
+    expect(allowed).toBe(true);
+  });
+
+  it('accepts a session whose version matches the user', async () => {
+    const { middleware } = withVersion(2);
+    const { allowed } = await run(middleware, {
+      headers: { auth: session({ sv: 2 }) },
+    });
+    expect(allowed).toBe(true);
+  });
+
+  // "sign out everywhere" increments the user's sessionVersion
+  it('rejects a session issued before the user signed out everywhere', async () => {
+    const { middleware } = withVersion(1);
+    const { allowed } = await run(middleware, {
+      headers: { auth: session({ sv: 0 }) },
+    });
+    expect(allowed).toBe(false);
+  });
+
+  it('rejects a pre-change session once the user has signed out everywhere', async () => {
+    const { middleware } = withVersion(1);
+    const { allowed } = await run(middleware, {
+      headers: { auth: session() },
+    });
+    expect(allowed).toBe(false);
+  });
+
+  it('rejects a session claiming a version ahead of the user', async () => {
+    const { middleware } = withVersion(1);
+    const { allowed } = await run(middleware, {
+      headers: { auth: session({ sv: 9 }) },
+    });
+    expect(allowed).toBe(false);
+  });
+});
+
 describe('AuthMiddleware', () => {
   beforeAll(() => {
     process.env.JWT_SECRET = 'unit-test-secret';

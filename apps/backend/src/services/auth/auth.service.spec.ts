@@ -175,8 +175,17 @@ describe('AuthService tokens', () => {
       const payload: any = Tokens.verifyTypedJWT(session, 'session');
       expect(payload.id).toBe('u1');
       expect(payload.pv).toBe(Tokens.passwordFingerprint('hash-1'));
-      // nothing but who it is travels in the session
-      expect(Object.keys(payload).sort()).toEqual(['exp', 'iat', 'id', 'pv', 'typ']);
+      // nothing but who it is travels in the session: the id, the password
+      // fingerprint, and sv, the session generation that "sign out of all
+      // devices" bumps. No user data, and no claim trusted for authorization.
+      expect(Object.keys(payload).sort()).toEqual([
+        'exp',
+        'iat',
+        'id',
+        'pv',
+        'sv',
+        'typ',
+      ]);
     });
 
     it('does not activate with a session, reset or legacy token', async () => {

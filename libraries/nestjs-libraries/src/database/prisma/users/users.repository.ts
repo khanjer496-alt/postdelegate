@@ -391,6 +391,22 @@ export class UsersRepository {
     });
   }
 
+  // Invalidates every session this user has, including the one asking, by
+  // moving the generation every issued session carries. Returns nothing: the
+  // caller's own cookie is cleared by the controller.
+  async signOutEverywhere(userId: string) {
+    await this._user.model.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        sessionVersion: {
+          increment: 1,
+        },
+      },
+    });
+  }
+
   async updateTimezone(userId: string, body: TimezoneDto) {
     await this._user.model.user.update({
       where: {

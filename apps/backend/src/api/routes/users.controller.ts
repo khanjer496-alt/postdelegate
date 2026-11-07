@@ -370,6 +370,18 @@ export class UsersController {
     return this.logout(response);
   }
 
+  // Every device, including this one. The only other way to invalidate a
+  // session is changing the password, which customers do not think to do when
+  // a laptop goes missing.
+  @Post('/logout-everywhere')
+  async logoutEverywhere(
+    @GetUserFromRequest() user: User,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    await this._userService.signOutEverywhere(user.id);
+    return this.logout(response);
+  }
+
   @Post('/logout')
   logout(@Res({ passthrough: true }) response: Response) {
     response.header('logout', 'true');
