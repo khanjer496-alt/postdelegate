@@ -32,7 +32,14 @@ interface TwoStepState {
 type ConnectState =
   | { status: 'loading' }
   // a shared connect link: the person says which workspace gets the account
-  | { status: 'confirm'; workspaceName: string; providerName: string }
+  | {
+      status: 'confirm';
+      workspaceName: string;
+      providerName: string;
+      createdBy?: string;
+      // signed in to PostDelegate, but not a member of the link's workspace
+      outsideWorkspace: boolean;
+    }
   | { status: 'picking'; step: TwoStepState; saveError?: string }
   | { status: 'saving'; step: TwoStepState }
   | { status: 'error'; message?: string }
@@ -223,6 +230,11 @@ export const ContinueIntegration: FC<{
           status: 'confirm',
           workspaceName: String(pending.workspaceName || ''),
           providerName: String(pending.providerName || providerDisplayName),
+          createdBy:
+            typeof pending.createdBy === 'string' && pending.createdBy
+              ? pending.createdBy
+              : undefined,
+          outsideWorkspace: !!pending.signedInOutsideWorkspace,
         });
         return;
       }
@@ -411,8 +423,13 @@ export const ContinueIntegration: FC<{
     });
   }, [connect]);
 
-  // nothing was exchanged, the link expires on its own
-  const cancelLink = useCallback(() => {
+  // nothing was exchanged; the link is dropped so the code the platform sent
+  // can never be completed later
+  const cancelLink = useCallback(async () => {
+    await fetch(`/integrations/social-connect/${provider}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ state: modifiedParams.state }),
+    }).catch(() => undefined);
     setState({
       status: 'error',
       message: t(
@@ -420,7 +437,7 @@ export const ContinueIntegration: FC<{
         'The connection was cancelled and nothing was added. You can close this window.'
       ),
     });
-  }, [t]);
+  }, [fetch, provider, modifiedParams, t]);
 
   // A shared link names the workspace before anything is connected
   if (state.status === 'confirm') {
@@ -450,7 +467,26 @@ export const ContinueIntegration: FC<{
                   }
                 )}
               </p>
+              {!!state.createdBy && (
+                <p className="text-[14px] text-gray-400">
+                  {t('confirm_connect_created_by', 'Link created by {{name}}', {
+                    name: state.createdBy,
+                    interpolation: { escapeValue: false },
+                  })}
+                </p>
+              )}
             </div>
+            {state.outsideWorkspace && (
+              <div
+                role="alert"
+                className="rounded-[8px] bg-red-500/10 ring-1 ring-red-500/40 text-red-400 text-[14px] px-[16px] py-[12px] text-center"
+              >
+                {t(
+                  'confirm_connect_outside_workspace',
+                  "You're signed in to PostDelegate, but this link connects your account to a workspace you're not part of."
+                )}
+              </div>
+            )}
             <div className="flex gap-[12px]">
               <Button
                 secondary

@@ -185,7 +185,7 @@
           "Integrations"
         ],
         "summary": "Get OAuth URL for a channel",
-        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord, Mastodon or Google Business Profile (gmb). Networks that take a pasted credential, such as Bluesky, are not. The URL works once and for 15 minutes; after signing in on the network, the person opening it is asked to confirm the workspace the channel is added to, and the workspace admins are notified.",
+        "description": "Generate an OAuth authorization URL for a given integration. Use this to connect a new social media channel. Only networks that sign in on the network's own page are supported, such as YouTube, Discord, Mastodon or Google Business Profile (gmb). Networks that take a pasted credential, such as Bluesky, are not. The URL works once and for 1 hour; after signing in on the network, the person opening it is asked to confirm the workspace the channel is added to, and the workspace admins are notified.",
         "operationId": "getIntegrationUrl",
         "parameters": [
           {

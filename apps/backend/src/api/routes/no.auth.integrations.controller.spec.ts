@@ -26,6 +26,7 @@ import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
 import {
   CONNECT_LINK_TTL,
   CONNECT_OTHER_BROWSER_MESSAGE,
+  connectNonceCookieOptions,
   CONNECT_SESSION_TTL,
   connectNonceCookie,
   saveConnectBinding,
@@ -69,7 +70,14 @@ const make = (
       })),
     } as any,
     permissions as any,
-    {} as any
+    {
+      getUserById: jest.fn(async (id: string) => ({
+        id,
+        name: 'Jane',
+        lastName: 'Doe',
+        email: 'jane@acme.com',
+      })),
+    } as any
   );
   return { controller, integrationService, permissions };
 };
@@ -114,12 +122,22 @@ describe('NoAuthIntegrationsController state keys', () => {
     await controller.connectSocialMedia('demo', { state: 's1', code: 'c', timezone: 0 } as any);
     expect(redis.data.get('organization:s1')).toBe('org-1');
 
-    await controller.saveProviderPage('int-1', { state: 's1', page: 'p' });
+    await controller.saveProviderPage(
+      'int-1',
+      { state: 's1', page: 'p' },
+      { method: 'POST', cookies: {}, headers: {} } as any,
+      { cookie: jest.fn() } as any
+    );
     expect(integrationService.saveProviderPage).toHaveBeenCalledTimes(1);
     expect(redis.data.has('organization:s1')).toBe(false);
 
     await expect(
-      controller.saveProviderPage('int-1', { state: 's1', page: 'p' })
+      controller.saveProviderPage(
+        'int-1',
+        { state: 's1', page: 'p' },
+        { method: 'POST', cookies: {}, headers: {} } as any,
+        { cookie: jest.fn() } as any
+      )
     ).rejects.toThrow('Organization not found');
     expect(integrationService.saveProviderPage).toHaveBeenCalledTimes(1);
   });
@@ -128,7 +146,12 @@ describe('NoAuthIntegrationsController state keys', () => {
     const { controller, integrationService } = make({ ...authenticated, isBetweenSteps: true });
     integrationService.saveProviderPage.mockRejectedValueOnce(new Error('bad page'));
     await expect(
-      controller.saveProviderPage('int-1', { state: 's1', page: 'p' })
+      controller.saveProviderPage(
+        'int-1',
+        { state: 's1', page: 'p' },
+        { method: 'POST', cookies: {}, headers: {} } as any,
+        { cookie: jest.fn() } as any
+      )
     ).rejects.toThrow('bad page');
     expect(redis.data.get('organization:s1')).toBe('org-1');
   });
@@ -179,7 +202,12 @@ describe('NoAuthIntegrationsController connect binding', () => {
     process.env.FRONTEND_URL = 'https://app.example.com';
   });
 
+  afterAll(() => {
+    delete process.env.NOT_SECURED;
+  });
+
   beforeEach(() => {
+    delete process.env.NOT_SECURED;
     redis.data.clear();
     redis.set.mockClear();
     sessionUser.mockReset();
@@ -276,14 +304,48 @@ describe('NoAuthIntegrationsController connect binding', () => {
       expect(integrationService.informAboutLinkConnect).not.toHaveBeenCalled();
       expect(redis.data.has('binding:s1')).toBe(false);
       expect(redis.data.has('organization:s1')).toBe(false);
+      // cleared with the attributes it was set with
       expect(res.cookie).toHaveBeenCalledWith(
         connectNonceCookie('s1'),
         '',
-        expect.objectContaining({ httpOnly: true })
+        connectNonceCookieOptions(-1)
       );
     });
 
-    it('connects for the same member signed in, when the cookie did not come back', async () => {
+    it('is a host-only __Host- cookie: no Domain, Secure, HttpOnly, Lax', () => {
+      expect(connectNonceCookie('s1')).toMatch(/^__Host-connect_[0-9a-f]{16}$/);
+      const options = connectNonceCookieOptions(3600);
+      expect(options).toEqual({
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: true,
+        maxAge: 3600 * 1000,
+      });
+      expect(options).not.toHaveProperty('domain');
+
+      process.env.NOT_SECURED = 'true';
+      expect(connectNonceCookie('s1')).toMatch(/^connect_[0-9a-f]{16}$/);
+      expect(connectNonceCookieOptions(3600).secure).toBe(false);
+    });
+
+    it('does not take the same member signed in for the cookie in production', async () => {
+      const { controller, integrationService } = make({ ...authenticated });
+      await startedInApp();
+      sessionUser.mockResolvedValue({ id: 'u1' });
+      await expect(
+        controller.connectSocialMedia(
+          'demo',
+          body(),
+          request({}, { auth: 'token-of-u1' }),
+          response()
+        )
+      ).rejects.toMatchObject({ status: 403 });
+      expect(integrationService.createOrUpdateIntegration).not.toHaveBeenCalled();
+    });
+
+    it('under NOT_SECURED connects for the same member signed in, when the cookie did not come back', async () => {
+      process.env.NOT_SECURED = 'true';
       const { controller, integrationService } = make({ ...authenticated });
       await startedInApp();
       sessionUser.mockResolvedValue({ id: 'u1' });
@@ -293,11 +355,12 @@ describe('NoAuthIntegrationsController connect binding', () => {
         request({}, { auth: 'token-of-u1' }),
         response()
       );
-      expect(sessionUser).toHaveBeenCalledWith({}, 'token-of-u1');
+      expect(sessionUser).toHaveBeenCalledWith(expect.anything(), 'token-of-u1');
       expect(integrationService.createOrUpdateIntegration).toHaveBeenCalledTimes(1);
     });
 
     it('does not trust the auth cookie of a request sent from another site', async () => {
+      process.env.NOT_SECURED = 'true';
       const { controller } = make({ ...authenticated });
       await startedInApp();
       sessionUser.mockResolvedValue({ id: 'u1' });
@@ -345,7 +408,7 @@ describe('NoAuthIntegrationsController connect binding', () => {
       const shared = () =>
         saveConnectBinding('s1', { type, orgId: 'org-1', userId: 'u1' });
 
-      it('lives 15 minutes and sets no cookie', async () => {
+      it('lives an hour, like every connect, and sets no cookie', async () => {
         const { nonce, ttl } = await shared();
         expect(nonce).toBeUndefined();
         expect(ttl).toBe(CONNECT_LINK_TTL);
@@ -363,6 +426,8 @@ describe('NoAuthIntegrationsController connect binding', () => {
           needsConfirmation: true,
           workspaceName: 'Acme',
           providerName: 'Demo',
+          createdBy: 'Jane Doe (ja***@acme.com)',
+          signedInOutsideWorkspace: false,
         });
         expect(authenticated.authenticate).not.toHaveBeenCalled();
         expect(integrationService.createOrUpdateIntegration).not.toHaveBeenCalled();
@@ -380,12 +445,17 @@ describe('NoAuthIntegrationsController connect binding', () => {
           response()
         );
         expect(integrationService.createOrUpdateIntegration).toHaveBeenCalledTimes(1);
-        expect(integrationService.informAboutLinkConnect).toHaveBeenCalledWith(
-          'org-1',
-          'Acme',
-          '@demo',
-          'Demo'
-        );
+        // a mobile connect is the member's own, a partner manages its own
+        if (type === 'invite' || type === 'api') {
+          expect(integrationService.informAboutLinkConnect).toHaveBeenCalledWith(
+            'org-1',
+            'Acme',
+            '@demo',
+            'Demo'
+          );
+        } else {
+          expect(integrationService.informAboutLinkConnect).not.toHaveBeenCalled();
+        }
         expect(redis.data.has('binding:s1')).toBe(false);
 
         await expect(
@@ -397,6 +467,78 @@ describe('NoAuthIntegrationsController connect binding', () => {
           )
         ).rejects.toBeDefined();
         expect(integrationService.createOrUpdateIntegration).toHaveBeenCalledTimes(1);
+      });
+
+      it('warns a signed-in person who is not a member of the workspace', async () => {
+        const { controller } = make({ ...authenticated });
+        await shared();
+        sessionUser.mockResolvedValue({ id: 'u9' });
+        const answer: any = await controller.connectSocialMedia(
+          'demo',
+          body(),
+          request({}, { auth: 'token-of-u9' }),
+          response()
+        );
+        expect(answer.signedInOutsideWorkspace).toBe(true);
+
+        sessionUser.mockResolvedValue({ id: 'u1' });
+        const member: any = await controller.connectSocialMedia(
+          'demo',
+          body(),
+          request({}, { auth: 'token-of-u1' }),
+          response()
+        );
+        expect(member.signedInOutsideWorkspace).toBe(false);
+      });
+
+      it('refuses a full plan before asking for a confirmation', async () => {
+        const { controller, integrationService } = make(
+          { ...authenticated },
+          { canAdd: false }
+        );
+        await shared();
+        await expect(
+          controller.connectSocialMedia('demo', body(), request(), response())
+        ).rejects.toMatchObject({ response: { section: 'channel' } });
+        expect(integrationService.checkProviderAvailable).toHaveBeenCalledWith(
+          'org-1',
+          'demo',
+          undefined
+        );
+        expect(authenticated.authenticate).not.toHaveBeenCalled();
+      });
+
+      it('lets a reconnect of a channel the workspace has be confirmed at the limit', async () => {
+        const { controller } = make(
+          { ...authenticated },
+          { canAdd: false, existing: { id: 'int-1' } }
+        );
+        await shared();
+        redis.data.set('refresh:s1', '1');
+        expect(
+          await controller.connectSocialMedia('demo', body(), request(), response())
+        ).toMatchObject({ needsConfirmation: true });
+      });
+
+      it('is dropped by Cancel, so its code can not be completed later', async () => {
+        const { controller, integrationService } = make({ ...authenticated });
+        await shared();
+        redis.data.set('refresh:s1', '1');
+        expect(await controller.cancelLinkConnect('s1')).toEqual({
+          cancelled: true,
+        });
+        for (const key of ['login', 'organization', 'refresh', 'binding']) {
+          expect(redis.data.has(`${key}:s1`)).toBe(false);
+        }
+        await expect(
+          controller.connectSocialMedia(
+            'demo',
+            body({ confirmed: true }),
+            request(),
+            response()
+          )
+        ).rejects.toBeDefined();
+        expect(integrationService.createOrUpdateIntegration).not.toHaveBeenCalled();
       });
 
       it('lets only a confirmed connect pick its page', async () => {
@@ -429,6 +571,14 @@ describe('NoAuthIntegrationsController connect binding', () => {
       });
     }
   );
+
+  it('never cancels a connect started in the app by its state', async () => {
+    const { controller } = make({ ...authenticated });
+    await startedInApp();
+    expect(await controller.cancelLinkConnect('s1')).toEqual({ cancelled: false });
+    expect(redis.data.get('login:s1')).toBe('verifier');
+    expect(redis.data.has('binding:s1')).toBe(true);
+  });
 
   it('gives a connect started in the app an hour and a nonce cookie', async () => {
     const { nonce, ttl } = await saveConnectBinding('s2', {

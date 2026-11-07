@@ -479,6 +479,7 @@ describe('connect binding of every connect producer', () => {
     process.env.FRONTEND_URL = 'https://app.postdelegate.com';
     delete process.env.HIDDEN_PROVIDERS;
     delete process.env.MOBILE_APP_SCHEME;
+    delete process.env.NOT_SECURED;
   });
 
   afterAll(() => {
@@ -506,10 +507,13 @@ describe('connect binding of every connect producer', () => {
       userId: 'u1',
     });
     const [name, nonce, options] = res.cookie.mock.calls[0];
-    expect(name).toMatch(/^connect_[0-9a-f]{16}$/);
+    // host-only: no Domain another subdomain could share
+    expect(name).toMatch(/^__Host-connect_[0-9a-f]{16}$/);
     expect(nonce).toHaveLength(32);
-    expect(options).toMatchObject({
+    expect(options).toEqual({
+      path: '/',
       httpOnly: true,
+      sameSite: 'lax',
       secure: true,
       maxAge: 3600 * 1000,
     });
@@ -520,7 +524,7 @@ describe('connect binding of every connect producer', () => {
     expect([organization, login, external]).toEqual([3600, 3600, 3600]);
   });
 
-  it('makes an invite link a confirmed, 15 minute link without a cookie', async () => {
+  it('makes an invite link a confirmed link without a cookie, kept an hour', async () => {
     const { urls } = setup();
     const res = { cookie: jest.fn() };
     await getUrl(urls, 'bluesky', 'org-1', '', { invite: 'true' }, res);
@@ -528,7 +532,7 @@ describe('connect binding of every connect producer', () => {
     expect(binding().nonceHash).toBeUndefined();
     expect(res.cookie).not.toHaveBeenCalled();
     const { organization, login, external } = ttls();
-    expect([organization, login, external]).toEqual([900, 900, 900]);
+    expect([organization, login, external]).toEqual([3600, 3600, 3600]);
   });
 
   it('makes a connect that returns to the mobile app a link', async () => {
@@ -544,7 +548,7 @@ describe('connect binding of every connect producer', () => {
     );
     expect(binding().type).toBe('mobile');
     expect(res.cookie).not.toHaveBeenCalled();
-    expect(ttls().redirect).toBe(900);
+    expect(ttls().redirect).toBe(3600);
   });
 
   it('keeps a connect that returns to a page of the app tied to the browser', async () => {
@@ -560,7 +564,7 @@ describe('connect binding of every connect producer', () => {
     await publicApi.getIntegrationUrl('bluesky', '', { id: 'org-1' } as any);
     expect(binding()).toEqual({ type: 'api', orgId: 'org-1' });
     const { organization, login } = ttls();
-    expect([organization, login]).toEqual([900, 900]);
+    expect([organization, login]).toEqual([3600, 3600]);
   });
 
   it('makes a partner connect URL an enterprise link', async () => {
@@ -578,7 +582,7 @@ describe('connect binding of every connect producer', () => {
     expect(binding()).toEqual({ type: 'enterprise', orgId: 'org-1' });
     const { organization, login, webhookUrl, redirect } = ttls();
     expect([organization, login, webhookUrl, redirect]).toEqual([
-      900, 900, 900, 900,
+      3600, 3600, 3600, 3600,
     ]);
   });
 

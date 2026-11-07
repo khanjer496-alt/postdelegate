@@ -439,7 +439,7 @@ export class PublicIntegrationsController {
         await integrationProvider.generateAuthUrl();
 
       // the URL is handed to whoever the API client gives it to, so the
-      // person opening it confirms the workspace, within 15 minutes, once
+      // person opening it confirms the workspace, once
       // (see connect.binding)
       const { ttl } = await saveConnectBinding(state, {
         type: 'api',

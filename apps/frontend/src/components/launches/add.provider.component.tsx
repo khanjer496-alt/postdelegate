@@ -480,7 +480,7 @@ export const AddProviderComponent: FC<{
           // back to the iOS/Android app after OAuth completes, instead
           // of the default web redirect.
           // an invite link is opened by the customer, not in this browser:
-          // the backend makes it a confirmed, 15 minute, single use link
+          // the backend makes it a confirmed, single use link
           const params = [
             `externalUrl=${encodeURIComponent(externalUrl)}`,
             onboardingParam,
@@ -515,7 +515,7 @@ export const AddProviderComponent: FC<{
             toaster.show(
               t(
                 'invite_link_copied',
-                'Invite link copied to clipboard, it works once and for 15 minutes'
+                'Invite link copied to clipboard, it works once and for 1 hour'
               ),
               'success'
             );

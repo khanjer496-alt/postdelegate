@@ -34,15 +34,19 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
 import { isCrossSiteCookieRequest } from '@gitroom/backend/services/auth/csrf';
+import { Organization } from '@prisma/client';
 import {
   ConnectBinding,
   CONNECT_OTHER_BROWSER_MESSAGE,
   confirmConnectBinding,
+  connectLinkCreator,
   connectNonceCookie,
   connectNonceCookieOptions,
   connectNonceMatches,
   deleteConnectBinding,
+  deleteConnectState,
   isConnectLink,
+  notifiesAdmins,
   readConnectBinding,
 } from '@gitroom/nestjs-libraries/integrations/connect.binding';
 
@@ -68,12 +72,19 @@ export class NoAuthIntegrationsController {
     return (await getSessionUser(this._usersService, auth))?.id;
   }
 
+  private async isActiveMember(orgId: string, userId: string) {
+    return !!(await this._organizationService.getActiveTeam(orgId))?.users.some(
+      (member) => member.user.id === userId
+    );
+  }
+
   // Whoever finishes a connect is whoever started it (see connect.binding).
-  // A connect started in the app needs that browser's nonce cookie, or the
-  // same member signed in, and that member still in the workspace. A shared
-  // link is confirmed by the person who opens it instead (the caller asks).
-  // Runs before anything of the state is spent, a refused callback changes
-  // nothing.
+  // A connect started in the app needs that browser's nonce cookie and that
+  // member still in the workspace. The same member signed in stands in for
+  // the cookie only under NOT_SECURED, where the app and the API can sit on
+  // different sites and a cookie may not travel. A shared link is confirmed
+  // by the person who opens it instead (the caller asks). Runs before
+  // anything of the state is spent, a refused callback changes nothing.
   private async checkConnectBinding(
     req: Request,
     state: string,
@@ -96,14 +107,62 @@ export class NoAuthIntegrationsController {
       !binding.userId ||
       !(
         sameBrowser ||
-        (await this.signedInUserId(req)) === binding.userId
+        (!!process.env.NOT_SECURED &&
+          (await this.signedInUserId(req)) === binding.userId)
       ) ||
-      !(await this._organizationService.getActiveTeam(orgId))?.users.some(
-        (member) => member.user.id === binding.userId
-      )
+      !(await this.isActiveMember(orgId, binding.userId))
     ) {
       throw new HttpException(CONNECT_OTHER_BROWSER_MESSAGE, 403);
     }
+  }
+
+  // This route runs without a session, so the guard never checked the plan's
+  // channel limit. A channel the workspace already has (a reconnect) never
+  // counts as a new one
+  private async checkChannelLimit(org: Organization, internalId?: string) {
+    if (
+      internalId &&
+      (await this._integrationService.getIntegrationByInternalId(
+        org.id,
+        internalId
+      ))
+    ) {
+      return;
+    }
+    if (await this._permissionsService.canAddChannel(org.id, org.createdAt)) {
+      return;
+    }
+    const message = await this._permissionsService
+      .channelLimitMessage(org.id)
+      .catch((): undefined => undefined);
+    throw new SubscriptionException({
+      section: Sections.CHANNEL,
+      action: AuthorizationActions.Create,
+      ...(message ? { message } : {}),
+    });
+  }
+
+  // What the person opening a shared link is asked to confirm: the
+  // workspace, the network and who created the link, plus a warning when they
+  // are signed in to PostDelegate but not a member of that workspace
+  private async linkConfirmation(
+    req: Request,
+    org: Organization,
+    binding: ConnectBinding,
+    providerName: string
+  ) {
+    const creator = binding.userId
+      ? await this._usersService.getUserById(binding.userId).catch(() => null)
+      : null;
+    const viewer = await this.signedInUserId(req);
+    return {
+      needsConfirmation: true,
+      workspaceName: org.name,
+      providerName,
+      createdBy: connectLinkCreator(creator),
+      signedInOutsideWorkspace:
+        !!viewer && !(await this.isActiveMember(org.id, viewer)),
+    };
   }
 
   // The state is spent: its binding goes, and the nonce cookie with it.
@@ -135,7 +194,8 @@ export class NoAuthIntegrationsController {
     @Param('integration') integration: string,
     @Body() body: ConnectIntegrationDto,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response
+    // not "res": the token exchange below names its resolve function that
+    @Res({ passthrough: true }) response: Response
   ) {
     if (
       !this._integrationManager
@@ -166,9 +226,10 @@ export class NoAuthIntegrationsController {
 
     const org = await this._organizationService.getOrgById(organization);
 
-    // No binding: a state started before this release, which keeps the old
-    // behaviour until it expires (an hour at most). Every connect started
-    // since has one
+    // No binding exists only for a state created before this release (every
+    // producer writes it first, Redis never evicts); it keeps the old
+    // behaviour until it expires, an hour at most. Remove this branch once
+    // the release is an hour old
     const binding = await readConnectBinding(body.state);
     const sharedLink = !!binding && isConnectLink(binding);
     if (binding) {
@@ -177,13 +238,24 @@ export class NoAuthIntegrationsController {
 
     // A shared link says which workspace it adds the account to before the
     // code is exchanged; nothing of the state is spent until the person
-    // confirms and the page posts again with confirmed: true
-    if (sharedLink && body.confirmed !== true) {
-      return {
-        needsConfirmation: true,
-        workspaceName: org.name,
-        providerName: integrationProvider.name,
-      };
+    // confirms and the page posts again with confirmed: true. What can be
+    // refused without the account (a network not available to the
+    // workspace, a full plan) is refused before asking
+    if (binding && sharedLink && body.confirmed !== true) {
+      const pendingRefresh =
+        (await ioRedis.get(`refresh:${body.state}`)) || undefined;
+      await this._integrationService.checkProviderAvailable(
+        org.id,
+        integration,
+        pendingRefresh
+      );
+      await this.checkChannelLimit(org, pendingRefresh);
+      return this.linkConfirmation(
+        req,
+        org,
+        binding,
+        integrationProvider.name
+      );
     }
 
     if (!integrationProvider.customFields) {
@@ -354,25 +426,7 @@ export class NoAuthIntegrationsController {
       integration
     );
 
-    // This route runs without a session, so the guard never checked the plan's
-    // channel limit. A channel the workspace already has (a reconnect) never
-    // counts as a new one
-    if (
-      !(await this._integrationService.getIntegrationByInternalId(
-        org.id,
-        refresh || String(id)
-      )) &&
-      !(await this._permissionsService.canAddChannel(org.id, org.createdAt))
-    ) {
-      const message = await this._permissionsService
-        .channelLimitMessage(org.id)
-        .catch((): undefined => undefined);
-      throw new SubscriptionException({
-        section: Sections.CHANNEL,
-        action: AuthorizationActions.Create,
-        ...(message ? { message } : {}),
-      });
-    }
+    await this.checkChannelLimit(org, refresh || String(id));
 
     if (refresh && String(id) !== String(refresh)) {
       // A reconnect that returns a different id is either the wrong account or
@@ -435,9 +489,9 @@ export class NoAuthIntegrationsController {
         console.log(err);
       });
 
-    // the admins hear about every account a shared link added, so one they
-    // did not expect is easy to spot and remove
-    if (sharedLink) {
+    // the admins hear about every account an invite or API link added, so
+    // one they did not expect is easy to spot and remove
+    if (binding && notifiesAdmins(binding)) {
       this._integrationService
         .informAboutLinkConnect(
           org.id,
@@ -477,7 +531,7 @@ export class NoAuthIntegrationsController {
     // the retry of providers that take credentials from the person
     if (!(integrationProvider.isBetweenSteps && !refresh)) {
       await ioRedis.del(`organization:${body.state}`);
-      await this.spendConnectBinding(res, body.state, binding);
+      await this.spendConnectBinding(response, body.state, binding);
     } else if (binding && sharedLink) {
       // the page picking step that follows is part of this confirmed connect
       await confirmConnectBinding(body.state, binding);
@@ -538,6 +592,22 @@ export class NoAuthIntegrationsController {
       ...(returnURL ? { returnURL } : {}),
       ...(extensionToken ? { extensionToken } : {}),
     };
+  }
+
+  // "Cancel" on the confirmation of a shared link: the state is dropped so
+  // the code the platform sent can never be completed later. Only a link not
+  // confirmed yet, a connect started in the app is never cancelled by state
+  @Post('/social-connect/:integration/cancel')
+  async cancelLinkConnect(@Body('state') state: string) {
+    if (!state || typeof state !== 'string') {
+      throw new HttpException('Invalid state', 400);
+    }
+    const binding = await readConnectBinding(state);
+    if (!binding || !isConnectLink(binding) || binding.confirmed) {
+      return { cancelled: false };
+    }
+    await deleteConnectState(state);
+    return { cancelled: true };
   }
 
   @Post('/public/provider/:id/connect')

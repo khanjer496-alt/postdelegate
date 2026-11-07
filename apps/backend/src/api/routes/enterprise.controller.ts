@@ -102,7 +102,7 @@ export class EnterpriseController {
         await integrationProvider.generateAuthUrl();
 
       // opened in the partner's customer's browser, never ours: the person
-      // confirms the workspace, within 15 minutes, once (see connect.binding)
+      // confirms the workspace, once (see connect.binding)
       const { ttl } = await saveConnectBinding(state, {
         type: 'enterprise',
         orgId: org.id,

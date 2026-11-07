@@ -1,7 +1,6 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
-import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.management';
 
 // Who may finish a connect. The OAuth callback (POST
 // /integrations/social-connect) runs without a session and finds the
@@ -15,8 +14,8 @@ import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.manag
 // - invite, api, enterprise, mobile: a link meant to be opened somewhere
 //   else (a customer, an API client, a partner app, the system browser of the
 //   mobile app). Nothing ties it to a browser, so the person opening it
-//   confirms the workspace before the code is exchanged, the link lives 15
-//   minutes and the admins hear about the channel it added.
+//   confirms the workspace before the code is exchanged and the link works
+//   once. The admins hear about the channels an invite or API link added.
 export type ConnectBindingType =
   | 'session'
   | 'invite'
@@ -43,11 +42,10 @@ export interface ConnectBinding {
   confirmed?: boolean;
 }
 
-// An OAuth code is short lived (about 10 minutes for most platforms), so a
-// link that has to be forwarded and confirmed gets a bit more than that, not
-// the hour a connect started in the app keeps
+// A forwarded invite has to survive until it is opened, so a link keeps the
+// hour every connect always had; it is single use and confirmed instead
 export const CONNECT_SESSION_TTL = 3600;
-export const CONNECT_LINK_TTL = 15 * 60;
+export const CONNECT_LINK_TTL = 3600;
 
 export const CONNECT_OTHER_BROWSER_MESSAGE =
   'This connect link was started in another browser. Start the connection again from PostDelegate.';
@@ -58,22 +56,54 @@ export const connectStateTtl = (type: ConnectBindingType) =>
 export const isConnectLink = (binding: ConnectBinding) =>
   binding.type !== 'session';
 
+// A mobile connect is the member's own and a partner manages its enterprise
+// connects, only an invite or an API link adds a channel the admins may not
+// expect
+export const notifiesAdmins = (binding: ConnectBinding) =>
+  binding.type === 'invite' || binding.type === 'api';
+
+// who created a link, for the person asked to confirm it: the member's name
+// with the email masked (ja***@example.com), or just the masked email
+export const connectLinkCreator = (user?: {
+  name?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+} | null) => {
+  if (!user) {
+    return undefined;
+  }
+  const [local = '', domain = ''] = (user.email || '').split('@');
+  const masked = local && domain ? `${local.slice(0, 2)}***@${domain}` : '';
+  const name = [user.name, user.lastName].filter(Boolean).join(' ').trim();
+  if (name && masked) {
+    return `${name} (${masked})`;
+  }
+  return name || masked || undefined;
+};
+
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex');
 
 const bindingKey = (state: string) => `binding:${state}`;
 
 // One cookie per connect, so two connects started in two tabs never
-// overwrite each other. Named after a hash, the state never sits in a header
+// overwrite each other. Named after a hash, the state never sits in a header.
+// Host-only: with a Domain any other subdomain (staging, the site) could
+// plant a nonce, so it carries the __Host- prefix whenever it is Secure, which
+// makes the browser refuse one with a Domain or set over http
 export const connectNonceCookie = (state: string) =>
-  `connect_${sha256(state).slice(0, 16)}`;
+  `${process.env.NOT_SECURED ? '' : '__Host-'}connect_${sha256(state).slice(
+    0,
+    16
+  )}`;
 
-// Same domain and SameSite as the auth cookie, so it reaches the API the same
-// way. Always HttpOnly: the app never reads it, it only travels back
+// Always HttpOnly, the app never reads it, it only travels back. Cleared with
+// the same attributes and a negative age
 export const connectNonceCookieOptions = (maxAgeSeconds: number) => ({
-  ...getAuthCookieOptions(),
-  httpOnly: true,
   path: '/',
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: !process.env.NOT_SECURED,
   maxAge: maxAgeSeconds * 1000,
 });
 
@@ -105,9 +135,11 @@ export const saveConnectBinding = async (
   return { nonce, ttl };
 };
 
-// undefined only when nothing was recorded: a state started before bindings
-// existed. Those expire within an hour of the release and keep the old
-// behaviour until then. Anything unreadable is refused, never read as legacy
+// undefined only when nothing was recorded, which only a state created before
+// this release can be (every producer writes the binding first, and Redis
+// runs without eviction). Those expire within an hour of the release and keep
+// the old behaviour until then. Anything unreadable is refused, never read as
+// legacy
 export const readConnectBinding = async (
   state: string
 ): Promise<ConnectBinding | undefined> => {
@@ -149,3 +181,20 @@ export const confirmConnectBinding = (state: string, binding: ConnectBinding) =>
 
 export const deleteConnectBinding = (state: string) =>
   ioRedis.del(bindingKey(state));
+
+// Every key a connect producer writes for a state, binding last so the state
+// is never left without one
+export const deleteConnectState = async (state: string) => {
+  for (const key of [
+    'login',
+    'organization',
+    'refresh',
+    'onboarding',
+    'redirect',
+    'external',
+    'webhookUrl',
+  ]) {
+    await ioRedis.del(`${key}:${state}`);
+  }
+  await deleteConnectBinding(state);
+};
