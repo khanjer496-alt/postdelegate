@@ -138,7 +138,7 @@ describe('NoAuthIntegrationsController state keys', () => {
         { method: 'POST', cookies: {}, headers: {} } as any,
         { cookie: jest.fn() } as any
       )
-    ).rejects.toThrow('Organization not found');
+    ).rejects.toThrow('This connection link expired or was already used');
     expect(integrationService.saveProviderPage).toHaveBeenCalledTimes(1);
   });
 

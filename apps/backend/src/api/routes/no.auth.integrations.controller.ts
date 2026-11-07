@@ -221,7 +221,11 @@ export class NoAuthIntegrationsController {
 
     const organization = await ioRedis.get(`organization:${body.state}`);
     if (!organization) {
-      throw new Error('Organization not found');
+      // spent or expired, the same answer the code verifier check gives
+      throw new HttpException(
+        'This connection link expired or was already used, please connect the channel again',
+        400
+      );
     }
 
     const org = await this._organizationService.getOrgById(organization);
@@ -623,14 +627,21 @@ export class NoAuthIntegrationsController {
 
     const organization = await ioRedis.get(`organization:${body.state}`);
     if (!organization) {
-      throw new Error('Organization not found');
+      // spent or expired, the same answer the code verifier check gives
+      throw new HttpException(
+        'This connection link expired or was already used, please connect the channel again',
+        400
+      );
     }
 
     const org = await this._organizationService.getOrgByIdWithSubscription(
       organization
     );
     if (!org) {
-      throw new Error('Organization not found');
+      throw new HttpException(
+        'This connection link expired or was already used, please connect the channel again',
+        400
+      );
     }
 
     // the page is picked by whoever finished the connect: the same browser,
