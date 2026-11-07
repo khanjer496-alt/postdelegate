@@ -37,6 +37,14 @@ R2 usage is billed under the account's existing allowances/pricing; this is not 
 - Founder credentials: `/etc/postiz/owner-credentials.json` (0600); local protected copy in this checkout's ignored `.local/owner-credentials.json`.
 - Compose wrapper: `sudo postiz-compose ps`, `sudo postiz-compose logs --tail 100 postiz`.
 - Staging copy (https://staging.postdelegate.com): `sudo postiz-staging-release release-<rev>`; see [STAGING.md](STAGING.md).
+- Publishing a release's source (the AGPL offer): copy that release's tarball into `/opt/postiz/source/`, then point the stable symlink at it and record the revision:
+
+  ```
+  sudo ln -sfn postdelegate-<rev>.tar.gz /opt/postiz/source/postdelegate-latest.tar.gz
+  echo <rev> | sudo tee /opt/postiz/source/REVISION
+  ```
+
+  `/source` redirects to `postdelegate-latest.tar.gz`, so the Caddyfile does not change and Caddy is not restarted for a release. Every release's tarball stays downloadable by its own name.
 - Daily local backups: `postiz-backup.timer`, with output under `/var/backups/postiz`.
 - Manual backup: `sudo backup-postiz`.
 - Off-site encrypted backups and health alerts: `offsite-backup-postiz`, `postiz-healthcheck`, installed with `install-ops.sh`; see [Operations: off-site backups and alerts](#operations-off-site-backups-and-alerts).
