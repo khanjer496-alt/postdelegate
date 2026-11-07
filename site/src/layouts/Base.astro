@@ -50,6 +50,9 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/postdelegate-apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <!-- Pulse: our self-hosted, cookie-free analytics. It stores nothing on the
+         device, so it needs no cookie-banner choice; public/_headers allows it. -->
+    <script defer src="https://pulse.nasidaapps.com/js/script.js" data-site="postdelegate"></script>
     <meta property="og:site_name" content="PostDelegate" />
     <meta property="og:type" content={type} />
     <meta property="og:title" content={title} />
