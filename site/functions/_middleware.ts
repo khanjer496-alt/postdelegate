@@ -11,13 +11,14 @@ interface Context {
   env: { PULSE_CRAWL_KEY?: string };
 }
 
-// Cheap prefilter only; Pulse does the real classification and ignores anything it doesn't know.
-const CRAWLER = /bot|crawl|spider|slurp|gpt|claude|anthropic|perplexity|ccbot|bytespider|duckassist|mistralai|meta-external|cohere|diffbot|timpibot|google-cloudvertex|oai-search/i;
+// Copy of CRAWLER_UA from github.com/khanjer496-alt/site-analytics src/lib.ts: only named search and
+// AI crawlers are reported, and Pulse does the final classification.
+const CRAWLER = /chatgpt-user|oai-searchbot|perplexity-user|perplexitybot|claude-user|claude-searchbot|duckassistbot|mistralai-user|meta-externalfetcher|youbot|gptbot|claudebot|anthropic-ai|ccbot|google-cloudvertexbot|bytespider|amazonbot|applebot-extended|meta-externalagent|cohere-ai|diffbot|ai2bot|petalbot|timpibot|googleother|googlebot|bingbot|applebot|duckduckbot|yandexbot|baiduspider|slurp/i;
 
 export const onRequest = async ({ request, next, waitUntil, passThroughOnException, env }: Context) => {
   passThroughOnException();
   const ua = request.headers.get('User-Agent') ?? '';
-  if (env.PULSE_CRAWL_KEY && CRAWLER.test(ua)) {
+  if (env.PULSE_CRAWL_KEY && (request.method === 'GET' || request.method === 'HEAD') && CRAWLER.test(ua)) {
     const path = new URL(request.url).pathname;
     waitUntil(
       fetch('https://pulse.nasidaapps.com/crawl', {
