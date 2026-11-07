@@ -2,6 +2,7 @@
 import Doc from './Doc.astro';
 import { GUIDES } from '../data/guides';
 import { SITE, CTA_LABEL } from '../data/site';
+import { ogCardFor } from '../data/og-cards.mjs';
 // Markdown guides pass { frontmatter }; .astro guides pass the same prop by hand.
 interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string } }
 const { frontmatter } = Astro.props;
@@ -9,12 +10,16 @@ const { title, description, metaTitle, date = '2026-11-01' } = frontmatter;
 const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const url = new URL(path, SITE.url).href;
 const more = GUIDES.filter((guide) => `/guides/${guide.slug}` !== path);
+const card = ogCardFor(path);
 const jsonLd = [
   { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
     { '@type': 'ListItem', position: 1, name: 'PostDelegate', item: SITE.url },
     { '@type': 'ListItem', position: 2, name: 'Guides', item: new URL('/guides', SITE.url).href },
     { '@type': 'ListItem', position: 3, name: title, item: url }] },
+  // Article wants an image; the guide's own share card is the one picture the
+  // page is guaranteed to have, and it carries the headline.
   { '@context': 'https://schema.org', '@type': 'Article', headline: title, description, url, mainEntityOfPage: url, inLanguage: 'en', datePublished: date, dateModified: date,
+    ...(card ? { image: { '@type': 'ImageObject', url: new URL(card, SITE.url).href, width: 1200, height: 630 } } : {}),
     author: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url }, publisher: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url } },
 ];
 ---

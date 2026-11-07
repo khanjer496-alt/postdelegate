@@ -37,6 +37,20 @@ R2 usage is billed under the account's existing allowances/pricing; this is not 
 - Founder credentials: `/etc/postiz/owner-credentials.json` (0600); local protected copy in this checkout's ignored `.local/owner-credentials.json`.
 - Compose wrapper: `sudo postiz-compose ps`, `sudo postiz-compose logs --tail 100 postiz`.
 - Staging copy (https://staging.postdelegate.com): `sudo postiz-staging-release release-<rev>`; see [STAGING.md](STAGING.md).
+- Publishing a release's source (the AGPL offer): copy that release's tarball into `/opt/postiz/source/`, repoint the stable symlink, record the revision, then **verify what the public URL actually serves**:
+
+  ```
+  REV=<rev>
+  test -f /opt/postiz/source/postdelegate-$REV.tar.gz || { echo "copy the tarball first"; exit 1; }
+  sudo ln -sfn postdelegate-$REV.tar.gz /opt/postiz/source/postdelegate-latest.tar.gz
+  echo $REV | sudo tee /opt/postiz/source/REVISION
+  [ "$(curl -s https://app.postdelegate.com/source/REVISION)" = "$REV" ] &&
+    [ "$(curl -s https://app.postdelegate.com/source/postdelegate-latest.tar.gz | sha256sum | cut -d' ' -f1)" = \
+      "$(sudo sha256sum /opt/postiz/source/postdelegate-$REV.tar.gz | cut -d' ' -f1)" ] &&
+    echo "source offer OK" || echo "STALE: the edge is serving something else, purge the Cloudflare cache for /source/*"
+  ```
+
+  `/source` redirects to `postdelegate-latest.tar.gz`, so the Caddyfile does not change and Caddy is not restarted for a release. Every release's tarball stays downloadable by its own name. The hash comparison is the point: a stable filename is only safe while the edge is not holding an older copy of it, and that check catches it directly rather than trusting a header.
 - Daily local backups: `postiz-backup.timer`, with output under `/var/backups/postiz`.
 - Manual backup: `sudo backup-postiz`.
 - Off-site encrypted backups and health alerts: `offsite-backup-postiz`, `postiz-healthcheck`, installed with `install-ops.sh`; see [Operations: off-site backups and alerts](#operations-off-site-backups-and-alerts).
@@ -115,7 +129,9 @@ A stored value that was tampered with, or that the configured key cannot decrypt
 
 ## Public source offer and stock Postiz rollback
 
-The settings Source code link is live: [the source offer](https://app.postdelegate.com/source) returns HTTP 302 to [the matching versioned application archive](https://app.postdelegate.com/source/postdelegate-38dd7f0e.tar.gz), which returned HTTP 200. Independent public download verification on 2026-10-27 confirmed 13,491,032 bytes and SHA-256 `dc4f5d22c6f4b2cacff5deb119807e020f58fea3e9625244ff9ceb0769865fb8`. The redirect now uses `Cache-Control: no-store`. Use this versioned URL for release checks: Cloudflare previously served an older cached archive at a stable alias. This is the exact tracked release tree, including application source, assets, lockfiles, license, release recipe and regression tests. Ignored credentials, runtime configuration, `.local` evidence and backups are absent; the archive passed structural and credential-pattern checks.
+The settings Source code link is live: [the source offer](https://app.postdelegate.com/source) returns HTTP 302, with `Cache-Control: no-store`, to `/source/postdelegate-latest.tar.gz` — a symlink to the running release's archive, with [`/source/REVISION`](https://app.postdelegate.com/source/REVISION) naming that revision. Every release's archive also stays downloadable under its own name. The archive is the exact tracked release tree, including application source, assets, lockfiles, license, release recipe and regression tests. Ignored credentials, runtime configuration, `.local` evidence and backups are absent; the archive passed structural and credential-pattern checks. Independent public download verification on 2026-10-27, when the offer still pointed at a versioned URL, confirmed `postdelegate-38dd7f0e.tar.gz` at 13,491,032 bytes and SHA-256 `dc4f5d22c6f4b2cacff5deb119807e020f58fea3e9625244ff9ceb0769865fb8`.
+
+Cloudflare once served an older cached archive from a stable alias here. Both `/source` and the files under it now answer `Cache-Control: no-store`, so the edge does not cache them (`cf-cache-status: BYPASS`), and the release step below compares the published archive's SHA-256 against the file on disk — which catches a stale edge copy whatever the headers say. That comparison, not the URL, is the release check.
 
 ## Authorization safeguards release — 27 October 2026
 
