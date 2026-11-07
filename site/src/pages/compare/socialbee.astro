@@ -6,8 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
+const [starter, team, pro] = PLANS;
 // SocialBee facts come from src/data/tools/socialbee.json, re-read on the vendor's own site.
 const them = tool('socialbee');
 const rows = [
@@ -38,7 +37,7 @@ const rows = [
   },
   {
     "feature": "Networks",
-    "us": "18 connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available",
+    "us": `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available`,
     "them": "Facebook, Instagram, Threads, LinkedIn, X, Pinterest, TikTok, YouTube, Google Business Profile and Bluesky, with more through mobile Universal Posting"
   },
   {
@@ -60,7 +59,7 @@ const rows = [
 const faq = [
   {
     "q": "Is PostDelegate cheaper than SocialBee?",
-    "a": `At most sizes, yes. Ten channels cost $${team.monthly} a month on PostDelegate ${team.name} against $49 on SocialBee Accelerate, and thirty cost $${pro.monthly} on PostDelegate ${pro.name} against $114 on SocialBee Pro with a profile add-on. SocialBee's own cheapest tier, Bootstrap at $29 for 5 profiles, matches PostDelegate Team.`
+    "a": `At most sizes, yes. Ten channels cost $${team.monthly} a month on PostDelegate ${team.name} against $49 on SocialBee Accelerate, and thirty cost $${pro.monthly} on PostDelegate ${pro.name} against $114 on SocialBee Pro with a profile add-on. SocialBee's own cheapest tier, Bootstrap, is $29 for 5 profiles against $${team.monthly} for 10 channels on PostDelegate ${team.name}.`
   },
   {
     "q": "Does PostDelegate do content categories like SocialBee?",

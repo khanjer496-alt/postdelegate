@@ -6,8 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
+const [starter, team, pro] = PLANS;
 // Zoho Social facts come from src/data/tools/zoho-social.json, re-read on the vendor's own site.
 const them = tool('zoho-social');
 const rows = [

@@ -6,8 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
+const [starter, team, pro] = PLANS;
 // Planable facts come from src/data/tools/planable.json, re-read on the vendor's own site.
 const them = tool('planable');
 const rows = [
@@ -38,7 +37,7 @@ const rows = [
   },
   {
     "feature": "Analytics",
-    "us": "Included: daily history and per-channel views for the networks that share statistics - today YouTube and Google Business Profile, neither of which feeds trends, top posts or insights yet",
+    "us": "Included: daily history, plus a view of its own for each network that shares statistics — today YouTube, read live rather than stored, and Google Business Profile; neither feeds trends, top posts or insights yet",
     "them": "A paid add-on at $14 per workspace per month; the inbox is another $9 and listening another $99"
   },
   {
@@ -48,7 +47,7 @@ const rows = [
   },
   {
     "feature": "Networks",
-    "us": "18 connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available",
+    "us": `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available`,
     "them": "Facebook, LinkedIn, Instagram, X, Google Business Profile, YouTube, TikTok, Pinterest and Threads"
   },
   {
@@ -110,7 +109,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
     <li>Your review process has several layers and lives inside the team: optional, required and multi-level approvals are the point of the product.</li>
     <li>You want unlimited users on the cheapest plan so every reviewer can have an account.</li>
     <li>You publish to Instagram, Facebook, LinkedIn, TikTok, Threads or X today.</li>
-    <li>You want a free allowance with no clock on it rather than a seven-day trial.</li>
+    <li>You want a free allowance with no clock on it rather than a {TRIAL_DAYS}-day trial.</li>
   </ul>
 
   <h2>Where PostDelegate fits</h2>

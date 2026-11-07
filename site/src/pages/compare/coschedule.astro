@@ -4,10 +4,8 @@ import CompareTable from '../../components/CompareTable.astro';
 import Faq from '../../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
-import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
+const [starter, team, pro] = PLANS;
 // CoSchedule facts come from src/data/tools/coschedule.json, re-read on the vendor's own site.
 const them = tool('coschedule');
 const rows = [

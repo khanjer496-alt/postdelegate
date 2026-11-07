@@ -7,7 +7,6 @@ import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
 const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // Sendible facts come from src/data/tools/sendible.json, re-read on the vendor's own site.
 const them = tool('sendible');
 const rows = [
@@ -48,7 +47,7 @@ const rows = [
   },
   {
     "feature": "Networks",
-    "us": "18 connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available",
+    "us": `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available`,
     "them": "Instagram, Facebook, TikTok, X, LinkedIn, Google Business Profile, YouTube, WordPress, Threads and Bluesky"
   },
   {

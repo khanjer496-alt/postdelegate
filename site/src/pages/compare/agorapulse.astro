@@ -7,7 +7,6 @@ import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
 const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // Agorapulse facts come from src/data/tools/agorapulse.json, re-read on the vendor's own site.
 const them = tool('agorapulse');
 const rows = [
@@ -43,8 +42,8 @@ const rows = [
   },
   {
     "feature": "Networks",
-    "us": "18 connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available",
-    "them": "Facebook, Instagram, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Bluesky and Google Business"
+    "us": `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on platform approval; X is not available`,
+    "them": "Facebook, Instagram, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Bluesky, Reddit and Google Business"
   },
   {
     "feature": "Inbox and listening",
@@ -54,7 +53,7 @@ const rows = [
   {
     "feature": "API and MCP",
     "us": "Public REST API, webhooks and an MCP server on every plan; the assistant can publish and schedule",
-    "them": "A reports API on the Custom plan only. An MCP connector on all plans that reads the inbox, listening and analytics and creates drafts, but does not publish or schedule posts"
+    "them": "A reports API on the Custom plan only. An MCP connector on all four current plans that reads the inbox, listening and analytics and creates drafts, but does not publish or schedule posts"
   }
 ];
 const faq = [
@@ -64,7 +63,7 @@ const faq = [
   },
   {
     "q": "Does Agorapulse have an MCP server?",
-    "a": "Yes, and it is on every plan, which is unusual. The difference is what it can do: Agorapulse's connector reads the inbox, listening data and analytics and can create drafts and calendar notes, but its own help centre says it does not publish or schedule posts. The PostDelegate MCP server schedules and publishes, with an optional review step before anything goes out."
+    "a": "Yes, and it is on all four current plans, which is unusual. The difference is what it can do: Agorapulse's connector reads the inbox, listening data and analytics and can create drafts and calendar notes, but its own help centre says it does not publish or schedule posts. The PostDelegate MCP server schedules and publishes, with an optional review step before anything goes out."
   },
   {
     "q": "Does PostDelegate have a social inbox?",
@@ -103,7 +102,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <p>PostDelegate has none of that. It publishes: a calendar, a composer with per-network previews and limits, approvals, media, and analytics for the networks that share statistics — today YouTube and Google Business Profile. If answering your audience is as much of the job as publishing to them, that is a real gap and Agorapulse is the better tool.</p>
   
   <h2>Agents: both have MCP, and they do different things</h2>
-  <p>Agorapulse is one of the few tools in this category to ship an MCP connector on every plan, so a comparison that says "most schedulers have no MCP" no longer holds. What matters is the verb. Its own help centre describes a connector that reads the inbox, listening, analytics and organisation data, and that can create drafts and calendar notes — and states that it does not publish or schedule posts. It also needs your own paid Claude, ChatGPT or Copilot Studio subscription.</p>
+  <p>Agorapulse is one of the few tools in this category to ship an MCP connector on all four of its current plans, so a comparison that says "most schedulers have no MCP" no longer holds. What matters is the verb. Its own help centre describes a connector that reads the inbox, listening, analytics and organisation data, and that can create drafts and calendar notes — and states that it does not publish or schedule posts. It also needs your own paid Claude, ChatGPT or Copilot Studio subscription.</p>
   <p>The PostDelegate MCP server is on every plan too, and it schedules and publishes. Drafts an assistant creates can be held in an AI review inbox until a person approves them, which is the setting most teams want when an agent has posting rights. If you want an assistant that reads your social data and writes reports, Agorapulse's connector is well suited. If you want one that actually puts the post in the calendar, that is the difference.</p>
 
   <h2>Where Agorapulse is the better pick</h2>

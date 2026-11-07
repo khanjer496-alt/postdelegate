@@ -7,7 +7,6 @@ import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
 const [starter, team, pro, ultimate] = PLANS;
-const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // Metricool facts come from src/data/tools/metricool.json, re-read on the vendor's own site.
 const them = tool('metricool');
 const rows = [
@@ -28,7 +27,7 @@ const rows = [
   },
   {
     "feature": "Analytics",
-    "us": "Daily history and per-channel views for the networks that share statistics - today YouTube and Google Business Profile, neither of which feeds trends, top posts or insights yet",
+    "us": "Daily history, plus a view of its own for each network that shares statistics — today YouTube, read live rather than stored, and Google Business Profile; neither feeds trends, top posts or insights yet",
     "them": "The core of the product: analytics across every connected network, competitor tracking, and Facebook, Google and TikTok ads reporting"
   },
   {
@@ -43,7 +42,7 @@ const rows = [
   },
   {
     "feature": "Networks",
-    "us": "18 connect today, including blogs, developer communities and chat platforms; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on approval; X is not available",
+    "us": `${AVAILABLE_NETWORKS.length} connect today, including blogs, developer communities and chat platforms; Instagram, Facebook, LinkedIn, TikTok, Threads, Pinterest and Reddit are waiting on approval; X is not available`,
     "them": "Facebook, Instagram, Threads, X as an add-on, Bluesky, Pinterest, TikTok, YouTube, Twitch, LinkedIn on paid plans, and Google Business Profile"
   },
   {
