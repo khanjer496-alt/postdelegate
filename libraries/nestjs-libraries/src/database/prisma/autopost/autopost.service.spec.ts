@@ -212,6 +212,20 @@ describe('AutopostService workspace key', () => {
     );
   });
 
+  it('autopost never posts to a channel that is turned off or still picking its page', async () => {
+    autopostsRepository.getAutopost.mockResolvedValue(
+      autopost({ generateContent: false, addPicture: false })
+    );
+    integrationService.getIntegrationsList.mockResolvedValue([
+      { id: 'int-off', organizationId: 'org-1', disabled: true },
+      { id: 'int-temp', organizationId: 'org-1', inBetweenSteps: true },
+    ]);
+
+    await service.startAutopost('autopost-1');
+
+    expect(postsService.createPost).not.toHaveBeenCalled();
+  });
+
   it('autopost builds its models from the workspace key', async () => {
     autopostsRepository.getAutopost.mockResolvedValue(
       autopost({ generateContent: true, addPicture: false })

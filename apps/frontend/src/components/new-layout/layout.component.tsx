@@ -30,7 +30,6 @@ import { ShowLinkedinCompany } from '@gitroom/frontend/components/launches/helpe
 import { MediaSettingsLayout } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { Toaster } from '@gitroom/react/toaster/toaster';
 import { ShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
-import { NewSubscription } from '@gitroom/frontend/components/layout/new.subscription';
 import { Support } from '@gitroom/frontend/components/layout/support';
 import { ReviewPrompt } from '@gitroom/frontend/components/reviews/review.prompt';
 import { ContinueProvider } from '@gitroom/frontend/components/layout/continue.provider';
@@ -188,13 +187,14 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
           <ToolTip />
           <Toaster />
           <TrialTracker />
+          {/* checks a payment the page was opened with (?check=), counts a
+              confirmed paid plan as a purchase, then takes the param off */}
           <CheckPayment check={searchParams.get('check') || ''} mutate={mutate}>
             <ShowMediaBoxModal />
             <ShowLinkedinCompany />
             <MediaSettingsLayout />
             <ShowPostSelector />
             <PreConditionComponent />
-            <NewSubscription />
             <ContinueProvider />
             <InviteError />
             <div

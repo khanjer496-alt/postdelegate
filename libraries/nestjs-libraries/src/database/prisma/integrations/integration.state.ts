@@ -62,6 +62,15 @@ export const isChannelConnected = (channel: ChannelFlags) =>
 export const isChannelReady = (channel: ChannelFlags) =>
   channelState(channel) === 'ready';
 
+// The channels a plan's channel limit counts: the connected ones. Every limit
+// check - connecting, picking a page, enabling, a downgrade turning channels
+// off - counts with this, so a channel turned off (by the customer or by a
+// downgrade) frees its slot, a channel waiting for a reconnect keeps it, and
+// the temporary row of a connect that still has a page to pick never takes
+// one (the page pick checks the limit itself)
+export const countPlanChannels = (channels: ChannelFlags[]) =>
+  channels.filter(isChannelConnected).length;
+
 // Needs something from the customer before it will publish again. A channel
 // they turned off themselves is not in here: they know, and nothing is wrong
 // with it.

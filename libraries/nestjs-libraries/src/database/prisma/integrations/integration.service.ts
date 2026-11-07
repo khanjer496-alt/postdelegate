@@ -33,7 +33,11 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { TemporalService } from 'nestjs-temporal-core';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 import { isCappedProvider } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
-import { isChannelConnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import {
+  channelState,
+  countPlanChannels,
+  isChannelConnected,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 dayjs.extend(utc);
 
@@ -69,10 +73,26 @@ export class IntegrationService {
     private _authorizationLifecycle: IntegrationAuthorizationLifecycleService
   ) {}
 
+  // A plan without AutoPost stops every running feed. Each one is also marked
+  // inactive, like AutopostService.stopAll does (that service cannot be used
+  // here, it depends on this one), so the list never shows a feed as running
+  // after its workflow was terminated; the customer turns it back on after
+  // upgrading. Reached from billing webhooks: a failure is logged, never thrown
   async changeActiveCron(orgId: string) {
-    const data = await this._autopostsRepository.getAutoposts(orgId);
+    let data: { id: string; active: boolean }[] = [];
+    try {
+      data = await this._autopostsRepository.getAutoposts(orgId);
+    } catch (err) {
+      console.error(`Could not load the autoposts of ${orgId} to stop them`);
+      return false;
+    }
 
     for (const item of data.filter((f) => f.active)) {
+      try {
+        await this._autopostsRepository.changeActive(orgId, item.id, false);
+      } catch (err) {
+        console.error(`Could not mark autopost ${item.id} inactive`);
+      }
       try {
         await this._temporalService.terminateWorkflow(`autopost-${item.id}`);
       } catch (err) {}
@@ -486,12 +506,29 @@ export class IntegrationService {
   }
 
   async enableChannel(org: string, totalChannels: number, id: string) {
-    const integrations = (
-      await this._integrationRepository.getIntegrationsList(org)
-    ).filter((f) => !f.disabled);
+    const integrations =
+      await this._integrationRepository.getIntegrationsList(org);
+    const channel = integrations.find((f) => f.id === id);
+    if (!channel) {
+      throw new HttpException('Integration not found', HttpStatus.NOT_FOUND);
+    }
+
+    switch (channelState(channel)) {
+      // already on, nothing to enable and nothing to count
+      case 'ready':
+      case 'reconnect':
+        return;
+      // the connect flow still has a page to pick, which checks the limit
+      case 'incomplete':
+        throw new HttpException(
+          'Finish connecting this channel before enabling it.',
+          HttpStatus.BAD_REQUEST
+        );
+    }
+
     if (
       !!process.env.STRIPE_PUBLISHABLE_KEY &&
-      integrations.length >= totalChannels
+      countPlanChannels(integrations) >= totalChannels
     ) {
       throw new HttpException(
         'You have reached the maximum number of channels on your plan. Turn off or remove another channel, or upgrade, to enable this one.',
@@ -522,7 +559,20 @@ export class IntegrationService {
     return this._integrationRepository.checkForDeletedOnceAndUpdate(org, page);
   }
 
-  async saveProviderPage(org: string, id: string, data: any) {
+  // The last step of a connect that picks a page. The temporary row is not a
+  // channel yet (countPlanChannels leaves it out), so the plan's channel limit
+  // is checked here, where the picked page is known: a page that is already a
+  // connected channel of the workspace replaces nothing new, every other pick
+  // (a new page, or one whose channel was turned off - picking turns it back
+  // on) is one more channel. The route skips the policy guard because this
+  // check needs the pick; it runs with and without a session
+  // (/integrations/public/provider/:id/connect).
+  async saveProviderPage(
+    org: string,
+    id: string,
+    data: any,
+    totalChannels: number
+  ) {
     const getIntegration = await this._integrationRepository.getIntegrationById(
       org,
       id
@@ -549,6 +599,24 @@ export class IntegrationService {
       getIntegration.token,
       data
     );
+
+    if (process.env.STRIPE_PUBLISHABLE_KEY) {
+      const integrations =
+        await this._integrationRepository.getIntegrationsList(org);
+      const picked = integrations.find(
+        (f) =>
+          f.id !== id && f.internalId === String(getIntegrationInformation.id)
+      );
+      if (
+        !(picked && isChannelConnected(picked)) &&
+        countPlanChannels(integrations) >= totalChannels
+      ) {
+        throw new HttpException(
+          'You have reached the maximum number of channels on your plan. Turn off or remove another channel, or upgrade, to add this one.',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+    }
 
     await this.checkForDeletedOnceAndUpdate(
       org,

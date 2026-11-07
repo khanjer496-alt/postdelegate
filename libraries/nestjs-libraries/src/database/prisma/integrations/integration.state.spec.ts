@@ -5,6 +5,7 @@ import {
   channelNeedsAttention,
   channelNeedsAttentionWhere,
   channelState,
+  countPlanChannels,
   isChannelConnected,
   isChannelDisconnected,
   isChannelReady,
@@ -161,5 +162,21 @@ describe('channelState', () => {
         }
       }
     }
+  });
+});
+
+describe('countPlanChannels', () => {
+  it('counts what a plan limit counts: connected channels, also ones waiting for a reconnect', () => {
+    expect(
+      countPlanChannels([
+        channel(),
+        channel({ refreshNeeded: true }),
+        channel({ disabled: true }),
+        channel({ inBetweenSteps: true }),
+        channel({ deletedAt: new Date() }),
+        channel({ deletedAt: new Date(), disabled: true, refreshNeeded: true }),
+      ])
+    ).toBe(2);
+    expect(countPlanChannels([])).toBe(0);
   });
 });

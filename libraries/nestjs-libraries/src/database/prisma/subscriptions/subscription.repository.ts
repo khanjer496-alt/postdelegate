@@ -4,7 +4,7 @@ import {
   PrismaTransaction,
 } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import dayjs from 'dayjs';
-import { Organization } from '@prisma/client';
+import { Organization, Prisma } from '@prisma/client';
 
 @Injectable()
 export class SubscriptionRepository {
@@ -13,7 +13,8 @@ export class SubscriptionRepository {
     private readonly _organization: PrismaRepository<'organization'>,
     private readonly _user: PrismaRepository<'user'>,
     private readonly _credits: PrismaRepository<'credits'>,
-    private _usedCodes: PrismaRepository<'usedCodes'>
+    private _usedCodes: PrismaRepository<'usedCodes'>,
+    private _transaction: PrismaTransaction
   ) {}
 
   getUserAccount(userId: string) {
@@ -88,10 +89,12 @@ export class SubscriptionRepository {
     });
   }
 
+  // a lifetime plan is never removed by a customer-keyed cancellation
   deleteSubscriptionByCustomerId(customerId: string, provider: string) {
     return this._subscription.model.subscription.deleteMany({
       where: {
         provider,
+        isLifetime: false,
         organization: {
           paymentId: customerId,
         },
@@ -228,6 +231,82 @@ export class SubscriptionRepository {
         },
       });
     }
+  }
+
+  // A lifetime code is checked, spent and its plan written in one
+  // serializable transaction: UsedCodes.code is not unique, so two concurrent
+  // redeems of one code would otherwise both see it unused and both win. The
+  // loser's transaction fails (serialization) or sees the code spent and
+  // writes nothing. false: the code was already used
+  async createOrUpdateLifetimeSubscription(
+    provider: string,
+    identifier: string,
+    totalChannels: number,
+    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    period: 'MONTHLY' | 'YEARLY',
+    code: string,
+    organizationId: string
+  ) {
+    return this._transaction.model.$transaction(
+      async (tx) => {
+        const used = await tx.usedCodes.findFirst({
+          where: { code },
+          select: { id: true },
+        });
+        if (used) {
+          return false;
+        }
+
+        await tx.subscription.upsert({
+          where: {
+            organizationId,
+          },
+          update: {
+            subscriptionTier: billing,
+            provider,
+            totalChannels,
+            period,
+            identifier,
+            isLifetime: true,
+            cancelAt: null,
+            deletedAt: null,
+          },
+          create: {
+            organizationId,
+            subscriptionTier: billing,
+            provider,
+            isLifetime: true,
+            totalChannels,
+            period,
+            cancelAt: null,
+            identifier,
+            deletedAt: null,
+          },
+        });
+
+        await tx.organization.update({
+          where: {
+            id: organizationId,
+          },
+          data: {
+            isTrailing: false,
+            allowTrial: false,
+          },
+          select: { id: true },
+        });
+
+        await tx.usedCodes.create({
+          data: {
+            code,
+            orgId: organizationId,
+          },
+          select: { id: true },
+        });
+
+        return true;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   }
 
   getSubscriptionByIdentifier(identifier: string) {

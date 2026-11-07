@@ -1,4 +1,7 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import {
+  PrismaRepository,
+  PrismaTransaction,
+} from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { SignatureDto } from '@gitroom/nestjs-libraries/dtos/signature/signature.dto';
@@ -6,7 +9,10 @@ import { SignatureType } from '@prisma/client';
 
 @Injectable()
 export class SignatureRepository {
-  constructor(private _signatures: PrismaRepository<'signatures'>) {}
+  constructor(
+    private _signatures: PrismaRepository<'signatures'>,
+    private _transaction: PrismaTransaction
+  ) {}
 
   getSignaturesByOrgId(
     orgId: string,
@@ -50,20 +56,25 @@ export class SignatureRepository {
       ...(signature.name !== undefined ? { name: signature.name } : {}),
     };
 
-    const { id: updatedId } = await this._signatures.model.signatures.upsert({
-      where: { id: id || uuidv4(), organizationId: orgId },
-      update: values,
-      create: { ...values, type },
-    });
-
-    if (values.autoAdd) {
-      await this._signatures.model.signatures.updateMany({
-        where: { organizationId: orgId, id: { not: updatedId } },
-        data: { autoAdd: false },
+    // one transaction: the workspace never ends up with two auto-added
+    // signatures, or with the old one switched off and the new one not saved
+    return this._transaction.model.$transaction(async (tx) => {
+      const { id: updatedId } = await tx.signatures.upsert({
+        where: { id: id || uuidv4(), organizationId: orgId },
+        update: values,
+        create: { ...values, type },
+        select: { id: true },
       });
-    }
 
-    return { id: updatedId };
+      if (values.autoAdd) {
+        await tx.signatures.updateMany({
+          where: { organizationId: orgId, id: { not: updatedId } },
+          data: { autoAdd: false },
+        });
+      }
+
+      return { id: updatedId };
+    });
   }
 
   deleteSignature(orgId: string, id: string) {

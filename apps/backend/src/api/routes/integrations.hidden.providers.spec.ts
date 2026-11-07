@@ -85,7 +85,10 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
-import { IntegrationsController } from './integrations.controller';
+import {
+  allowedConnectRedirect,
+  IntegrationsController,
+} from './integrations.controller';
 import { NoAuthIntegrationsController } from './no.auth.integrations.controller';
 import { EnterpriseController } from './enterprise.controller';
 import { PublicIntegrationsController } from '@gitroom/backend/public-api/routes/v1/public.integrations.controller';
@@ -442,5 +445,48 @@ describe('hidden providers on the connect paths', () => {
       expect(await listed('org-1')).not.toContain('x');
       expect(await listed('org-qa')).toContain('x');
     });
+  });
+});
+
+describe('allowedConnectRedirect', () => {
+  const env = { ...process.env };
+  beforeEach(() => {
+    process.env.FRONTEND_URL = 'https://app.postdelegate.com';
+    delete process.env.MOBILE_APP_SCHEME;
+  });
+  afterAll(() => {
+    process.env = { ...env };
+  });
+
+  it('keeps an address on the app itself and the mobile app scheme', () => {
+    expect(
+      allowedConnectRedirect('https://app.postdelegate.com/launches?x=1')
+    ).toBe('https://app.postdelegate.com/launches?x=1');
+    expect(allowedConnectRedirect('postiz://integrations')).toBe(
+      'postiz://integrations'
+    );
+    process.env.MOBILE_APP_SCHEME = 'postdelegate://auth/callback';
+    expect(allowedConnectRedirect('postdelegate://integrations')).toBe(
+      'postdelegate://integrations'
+    );
+  });
+
+  it.each([
+    'https://evil.example/login',
+    'https://app.postdelegate.com.evil.example/',
+    'https://user:pass@app.postdelegate.com/',
+    'http://app.postdelegate.com/',
+    'javascript:alert(1)',
+    '//evil.example',
+    '/relative',
+    '',
+    undefined,
+  ])('drops %s', (redirectUrl) => {
+    expect(allowedConnectRedirect(redirectUrl as any)).toBeUndefined();
+  });
+
+  it('never lets an http(s) mobile scheme open every site', () => {
+    process.env.MOBILE_APP_SCHEME = 'https://anything';
+    expect(allowedConnectRedirect('https://evil.example/')).toBeUndefined();
   });
 });

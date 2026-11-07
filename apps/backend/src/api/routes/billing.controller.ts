@@ -22,6 +22,7 @@ import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/us
 import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
 import { BillingSyncDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.sync.dto';
 import { BillingExtraChannelsDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.extra.channels.dto';
+import { BillingCancelDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.cancel.dto';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import {
   AuthorizationActions,
@@ -85,7 +86,9 @@ export class BillingController {
   @Post('/apply-discount')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async applyDiscount(@GetOrgFromRequest() org: Organization) {
-    await (await this.provider(org)).applyDiscount(org);
+    return {
+      applied: !!(await (await this.provider(org)).applyDiscount(org)),
+    };
   }
 
   @Post('/finish-trial')
@@ -100,7 +103,12 @@ export class BillingController {
       return { finish: true };
     } catch (err) {
       console.error('finishTrial failed', err);
-      return { finish: false };
+      // never the provider's error, it can carry payment details
+      return {
+        finish: false,
+        reason:
+          'We could not start your plan. Check your payment method in the billing portal and try again.',
+      };
     }
   }
 
@@ -251,17 +259,23 @@ export class BillingController {
   async cancel(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Body() body: { feedback: string }
+    @Body() body: BillingCancelDto
   ) {
-    const result = await (await this.provider(org)).setToCancel(org.id);
+    const result = await (
+      await this.provider(org)
+    ).setToCancel(org.id, body.intent);
 
-    if (result.cancel_at) {
+    // only when this request actually set it to cancel (an explicit cancel,
+    // or the old toggle going that way), never on a reactivation
+    if (result.action === 'cancel' && result.cancel_at) {
       await this._notificationService.sendEmail(
         process.env.EMAIL_FROM_ADDRESS,
         'Subscription Cancelled',
         `Organization ${escape(
           org.name
-        )} has cancelled their subscription because: ${escape(body.feedback)}`,
+        )} has cancelled their subscription because: ${escape(
+          body.feedback || ''
+        )}`,
         user.email
       );
     }
@@ -380,11 +394,14 @@ export class BillingController {
       throw new Error('Unauthorized');
     }
 
-    await this._subscriptionService.addSubscription(
+    const { added, reason } = await this._subscriptionService.addSubscription(
       org.id,
-      user.id,
       body.subscription,
       this._paymentService.getDefaultProviderName('web')
     );
+    if (!added) {
+      throw new HttpException(reason || 'The plan was not added', 400);
+    }
+    return { added };
   }
 }

@@ -131,9 +131,13 @@ describe('IntegrationService.enableChannel', () => {
     const repository = {
       getIntegrationsList: jest
         .fn()
-        .mockResolvedValue(
-          Array.from({ length: enabled }, (_, i) => ({ id: `i${i}`, disabled: false }))
-        ),
+        .mockResolvedValue([
+          ...Array.from({ length: enabled }, (_, i) => ({ id: `i${i}`, disabled: false })),
+          // the channel being enabled, and a half-connected row that is not
+          // a channel yet and never counts
+          { id: 'i9', disabled: true },
+          { id: 'temp', disabled: false, inBetweenSteps: true },
+        ]),
       enableChannel: jest.fn().mockResolvedValue({}),
     };
     const service = new IntegrationService(
@@ -164,5 +168,148 @@ describe('IntegrationService.enableChannel', () => {
     const { service, repository } = makeEnableService(2);
     await service.enableChannel('org', 3, 'i9');
     expect(repository.enableChannel).toHaveBeenCalledWith('org', 'i9');
+  });
+
+  it('refuses a channel that is not in the workspace or still picking its page', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    const { service, repository } = makeEnableService(0);
+    await expect(service.enableChannel('org', 3, 'gone')).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(service.enableChannel('org', 3, 'temp')).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(repository.enableChannel).not.toHaveBeenCalled();
+  });
+
+  it('leaves a channel that is already on alone, even at the limit', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    const { service, repository } = makeEnableService(3);
+    await service.enableChannel('org', 3, 'i0');
+    expect(repository.enableChannel).not.toHaveBeenCalled();
+  });
+});
+
+describe('IntegrationService.saveProviderPage channel limit', () => {
+  const key = process.env.STRIPE_PUBLISHABLE_KEY;
+  afterEach(() => {
+    if (key === undefined) {
+      delete process.env.STRIPE_PUBLISHABLE_KEY;
+    } else {
+      process.env.STRIPE_PUBLISHABLE_KEY = key;
+    }
+  });
+
+  const makePageService = (channels: object[]) => {
+    const repository = {
+      getIntegrationById: jest.fn().mockResolvedValue({
+        id: 'temp',
+        inBetweenSteps: true,
+        providerIdentifier: 'facebook',
+        token: 't',
+      }),
+      getIntegrationsList: jest.fn().mockResolvedValue([
+        { id: 'temp', internalId: 'user-1', inBetweenSteps: true },
+        ...channels,
+      ]),
+      checkForDeletedOnceAndUpdate: jest.fn(),
+      updateIntegration: jest.fn().mockResolvedValue({}),
+    };
+    const manager = {
+      getSocialIntegration: () => ({
+        fetchPageInformation: jest.fn().mockResolvedValue({
+          id: 'page-1',
+          name: 'Page',
+          picture: '',
+          access_token: 'pt',
+          username: 'page',
+        }),
+      }),
+    };
+    const service = new IntegrationService(
+      repository as any,
+      {} as any,
+      manager as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { service, repository };
+  };
+
+  it('refuses one more channel at the plan limit', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    const { service, repository } = makePageService([
+      { id: 'a', internalId: 'x' },
+      { id: 'b', internalId: 'page-1', disabled: true },
+    ]);
+    // the picked page is a channel that was turned off: picking it turns it on
+    await expect(
+      service.saveProviderPage('org', 'temp', { page: 'page-1' }, 1)
+    ).rejects.toMatchObject({ status: 400 });
+    expect(repository.updateIntegration).not.toHaveBeenCalled();
+  });
+
+  it('lets a page that is already a connected channel through at the limit', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    const { service, repository } = makePageService([
+      { id: 'a', internalId: 'page-1' },
+    ]);
+    await service.saveProviderPage('org', 'temp', { page: 'page-1' }, 1);
+    expect(repository.updateIntegration).toHaveBeenCalled();
+  });
+
+  it('adds a page under the limit, and never checks with billing off', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    const under = makePageService([{ id: 'a', internalId: 'x' }]);
+    await under.service.saveProviderPage('org', 'temp', { page: 'page-1' }, 2);
+    expect(under.repository.updateIntegration).toHaveBeenCalled();
+
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+    const off = makePageService([{ id: 'a', internalId: 'x' }]);
+    await off.service.saveProviderPage('org', 'temp', { page: 'page-1' }, 0);
+    expect(off.repository.updateIntegration).toHaveBeenCalled();
+  });
+});
+
+describe('IntegrationService.changeActiveCron', () => {
+  it('marks every running feed inactive as it stops it, so the list matches', async () => {
+    const autoposts = {
+      getAutoposts: jest.fn().mockResolvedValue([
+        { id: 'a1', active: true },
+        { id: 'a2', active: false },
+      ]),
+      changeActive: jest.fn().mockResolvedValue({}),
+    };
+    const temporal = { terminateWorkflow: jest.fn().mockResolvedValue({}) };
+    const service = new IntegrationService(
+      {} as any,
+      autoposts as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      temporal as any,
+      {} as any
+    );
+
+    expect(await service.changeActiveCron('org')).toBe(true);
+    expect(autoposts.changeActive).toHaveBeenCalledTimes(1);
+    expect(autoposts.changeActive).toHaveBeenCalledWith('org', 'a1', false);
+    expect(temporal.terminateWorkflow).toHaveBeenCalledWith('autopost-a1');
+  });
+
+  it('never throws from a billing webhook', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const service = new IntegrationService(
+      {} as any,
+      { getAutoposts: jest.fn().mockRejectedValue(new Error('db')) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    expect(await service.changeActiveCron('org')).toBe(false);
   });
 });

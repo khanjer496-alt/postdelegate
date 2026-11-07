@@ -47,7 +47,10 @@ const make = (
     } as any,
     integrationService as any,
     { startRefreshWorkflow: jest.fn(async () => undefined) } as any,
-    { getOrgById: jest.fn(async () => org) } as any,
+    {
+      getOrgById: jest.fn(async () => org),
+      getOrgByIdWithSubscription: jest.fn(async () => org),
+    } as any,
     permissions as any
   );
   return { controller, integrationService, permissions };
