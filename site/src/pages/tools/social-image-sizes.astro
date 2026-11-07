@@ -3,6 +3,7 @@ import Doc from '../../layouts/Doc.astro';
 import Faq from '../../components/Faq.astro';
 import { NETWORKS, networkStatus } from '../../data/networks';
 import { SITE, CTA_LABEL } from '../../data/site';
+import AppShot from '../../components/AppShot.astro';
 // Only sizes stated on each platform's own help or developer pages, checked in November 2026.
 // Anything a platform does not publish is left out rather than guessed.
 const CHECKED = 'November 2026';
@@ -130,6 +131,10 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   </ul>
   <p>Ready to plan the posts these images go with? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
   <p>Platform names belong to their owners. PostDelegate is not affiliated with or endorsed by any of the platforms listed.</p>
+  <AppShot
+    shot="composer"
+    caption="Composing a post in PostDelegate, where media is attached and previewed per network."
+  />
 </Doc>
 <style>
   .status { margin: -6px 0 6px; font-size: 14px; }

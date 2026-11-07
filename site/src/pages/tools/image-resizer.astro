@@ -4,6 +4,7 @@ import PageHero from '../../components/PageHero.astro';
 import CtaBand from '../../components/CtaBand.astro';
 import Faq from '../../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../../data/site';
+import AppShot from '../../components/AppShot.astro';
 // Sizes follow the official pages listed on /tools/social-image-sizes where a platform publishes one.
 // Dribbble sizes are the two the PostDelegate Dribbble connection posts at. X and Bluesky publish no
 // post image size, so those presets use common shapes.
@@ -118,6 +119,10 @@ const radio = 'flex items-center gap-2 rounded-xl border border-line-hover bg-su
     </div>
   </div></section>
   <CtaBand title="Put your images to work." text="Keep images in the media library and schedule them with your posts on one calendar. Try PostDelegate free for 7 days, no card needed." />
+  <AppShot
+    shot="composer"
+    caption="Composing a post in PostDelegate, where the resized picture is attached and previewed per network."
+  />
 </Base>
 <script>
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

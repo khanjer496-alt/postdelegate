@@ -5,6 +5,7 @@ import CtaBand from '../../components/CtaBand.astro';
 import Faq from '../../components/Faq.astro';
 import { NETWORKS } from '../../data/networks';
 import { SITE, CTA_LABEL } from '../../data/site';
+import AppShot from '../../components/AppShot.astro';
 // Limits and counting rules come from NETWORKS, the same data the caption checker uses.
 // Nostr has no fixed note length, so the splitter starts from a shorter length the user can change.
 const START: Record<string, number> = { nostr: 500 };
@@ -76,6 +77,10 @@ const field = 'w-full rounded-xl border border-line-hover bg-surface-1 px-4 py-3
     </div>
   </div></section>
   <CtaBand title="Give your threads a place in the plan." text="Plan, schedule and publish from one calendar. Try PostDelegate free for 7 days, no card needed." />
+  <AppShot
+    shot="composer"
+    caption="Writing the thread in PostDelegate, with the per-network count and a preview of each post beside it."
+  />
 </Base>
 <script>
   import { captionLength, type Rule } from '../../scripts/caption-count';

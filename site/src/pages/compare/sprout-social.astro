@@ -1,6 +1,7 @@
 ---
 import Doc from '../../layouts/Doc.astro';
 import CompareTable from '../../components/CompareTable.astro';
+import AppShot from '../../components/AppShot.astro';
 import Faq from '../../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
@@ -34,6 +35,10 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <a slot="actions" href="https://sproutsocial.com" class="button button-outline" target="_blank" rel="noreferrer">Visit Sprout Social</a>
   <h2>At a glance</h2>
   <CompareTable other="Sprout Social" rows={rows} />
+  <AppShot
+    shot="calendar"
+    caption="PostDelegate's calendar: the connected channels down the side, and every scheduled post for the month."
+  />
   <p>Sprout Social details are taken from sproutsocial.com in October 2026. Check its website for current plans, limits and terms.</p>
 
   <h2>Pricing and trial</h2>

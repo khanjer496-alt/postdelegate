@@ -3,6 +3,7 @@ import Doc from './Doc.astro';
 import { GUIDES } from '../data/guides';
 import { SITE, CTA_LABEL } from '../data/site';
 import { ogCardFor } from '../data/og-cards.mjs';
+import AppShot from '../components/AppShot.astro';
 // Markdown guides pass { frontmatter }; .astro guides pass the same prop by hand.
 interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string } }
 const { frontmatter } = Astro.props;
@@ -27,6 +28,10 @@ const jsonLd = [
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/guides" class="button button-outline">All guides</a>
   <div class="guide-body"><slot /></div>
+  <AppShot
+    shot="composer"
+    caption="Writing the post in PostDelegate. The counter follows the network you picked - 300 characters on Bluesky - and the preview on the right is what the post will look like when it goes out."
+  />
   <h2>More guides</h2>
   <ul>{more.map((guide) => <li><a href={`/guides/${guide.slug}`}>{guide.title}</a></li>)}</ul>
 </Doc>
