@@ -28,6 +28,16 @@
 .hero-mark .pd-arc{left:0;right:.12em;bottom:-.1em;height:.16em;color:#7357ff;z-index:-1}
 .hero-description{margin:30px 0 0;color:#cfcfcf;font-size:20px;line-height:1.55;max-width:520px;letter-spacing:-.015em;text-wrap:pretty}
 .hero-actions{margin-top:36px}
+/* Hero switch: AI agents (default) or classic scheduling. Same pill as the pricing billing toggle; CSS only. */
+.mode-toggle{display:flex;gap:4px;width:fit-content;margin:0 0 6px;padding:4px;border:1px solid #383838;border-radius:999px;background:#151515}
+.mode-toggle input{position:absolute;opacity:0;pointer-events:none}
+.mode-toggle label{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 16px;border-radius:999px;color:#b9b9b9;font-size:14px;font-weight:650;cursor:pointer;white-space:nowrap}
+.mode-toggle label span{color:#c8ff4d}
+.mode-toggle input:checked+label{background:#f3f3f3;color:#151515}
+.mode-toggle input:checked+label span{color:#7357ff}
+.mode-toggle input:focus-visible+label{outline:2px solid #7357ff;outline-offset:2px}
+/* Hide the other mode only; the shown one keeps its own display. :has(#id) outranks any class rule. */
+:root:not(:has(#home-mode-classic:checked)) .mode-classic,:root:has(#home-mode-classic:checked) .mode-ai{display:none}
 .hero-cta{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:16px;min-height:62px;padding:12px 12px 12px 30px;border-radius:999px;background:#c8ff4d;color:#0d0d0d;font-size:17px;font-weight:750;letter-spacing:-.01em;box-shadow:0 0 0 6px #c8ff4d1f,0 22px 50px -12px #c8ff4d59;transition:transform .2s,box-shadow .2s,background .2s}
 .hero-cta:hover{transform:translateY(-2px);background:#d8ff80;box-shadow:0 0 0 8px #c8ff4d26,0 26px 60px -12px #c8ff4d73}
 .cta-orb{position:relative;display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:50%;background:#0d0d0d;color:#c8ff4d}
@@ -136,8 +146,7 @@
 
 /* ---------- Pricing ---------- */
 .home-pricing{padding-top:100px;padding-bottom:30px}
-.home-pricing-includes{max-width:640px;margin:26px auto 0;color:#c4c4c4;font-size:15px;line-height:1.7;text-align:center;text-wrap:balance}
-.home-pricing-more{margin-top:14px;text-align:center;font-size:14px}
+.home-pricing-more{margin-top:26px;text-align:center;font-size:14px}
 .home-pricing-more .text-link{color:#d1bfff}
 
 /* ---------- Compare ---------- */
@@ -163,6 +172,7 @@
  .home-hero h1{margin-inline:auto;max-width:13ch}
  .hero-description{margin-inline:auto}
  .hero-trial-note{justify-content:center}
+ .mode-toggle{margin-inline:auto}
  .hero-grid{-webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 60%,#000 10%,transparent 72%);mask-image:radial-gradient(ellipse 80% 60% at 50% 60%,#000 10%,transparent 72%)}
  .hero-glow{right:auto;left:50%;top:30%;translate:-50% 0}
  .home-hero .hero-star-one{left:auto;right:4%;top:40px;width:56px}
@@ -180,10 +190,12 @@
  .home-hero h1{font-size:clamp(38px,11vw,52px);line-height:1.04;margin-top:8px}
  .hero-description{font-size:17px;line-height:1.6;margin-top:22px;max-width:370px}
  .hero-actions{margin-top:28px}
+ .mode-toggle{max-width:100%}
+ .mode-toggle label{min-height:36px;padding:0 12px;font-size:13px;white-space:normal;text-align:center;line-height:1.25}
  .hero-cta{width:100%;justify-content:space-between;font-size:16px;min-height:58px;padding:9px 9px 9px 24px;gap:10px}
  .cta-orb{width:40px;height:40px}
  .hero-trial-note{font-size:13px}
- .home-hero .hero-star-one{width:38px;right:10px;top:16px;opacity:.6}
+ .home-hero .hero-star-one{width:38px;right:10px;top:4px;opacity:.6}
  .orbit-card{padding:8px 11px 8px 8px;gap:8px;border-radius:12px}
  .orbit-card i{width:24px;height:24px;border-radius:8px;font-size:12px}
  .orbit-card b{font-size:11px}
