@@ -1,0 +1,31 @@
+---
+import CompareTool from '../../components/CompareTool.astro';
+import { TOOLS } from '../../data/tools';
+import { COMPARE_PAIRS, PAIR_FIT, pairHref } from '../../data/compare-pairs';
+export function getStaticPaths() { return COMPARE_PAIRS.map((pair) => ({ params: { pair: `${pair.a}-vs-${pair.b}` }, props: { pair } })); }
+const { pair } = Astro.props;
+const name = (slug: string) => TOOLS[slug].name;
+// Related: other head-to-heads with either tool (hand-written first), PostDelegate's own page for
+// either, then the hubs. Page names come from the files, so a removed page is never linked.
+const pages = Object.keys(import.meta.glob('./*.astro')).map((path) => path.slice(2, -6));
+const shares = (slug: string) => slug.split('-vs-').some((s) => s === pair.a || s === pair.b);
+const handWritten = pages.filter((page) => page.includes('-vs-') && shares(page)).map((page) => {
+  const [a, b] = page.split('-vs-');
+  return { href: `/compare/${page}`, label: `${name(a)} vs ${name(b)}` };
+});
+const generated = COMPARE_PAIRS.filter((other) => other !== pair && shares(`${other.a}-vs-${other.b}`))
+  .map((other) => ({ href: pairHref(other), label: `${name(other.a)} vs ${name(other.b)}` }));
+const links = [
+  ...[...handWritten, ...generated].slice(0, 8),
+  ...[pair.a, pair.b].filter((slug) => pages.includes(slug)).map((slug) => ({ href: `/compare/${slug}`, label: `PostDelegate vs ${name(slug)}` })),
+  { href: '/compare', label: 'All comparisons' },
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/pricing', label: 'PostDelegate pricing' },
+];
+---
+<CompareTool
+  a={pair.a} b={pair.b} published={pair.published}
+  title={pair.title} description={pair.description} h1={pair.h1}
+  shortAnswer={pair.shortAnswer} costIntro={pair.costIntro} fitIntro={PAIR_FIT}
+  faq={pair.faq} links={links}
+/>

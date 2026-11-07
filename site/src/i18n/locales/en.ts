@@ -356,6 +356,7 @@ const en = {
     postBridgeCta: 'Compare the approach',
     pairsTitle: 'Head-to-head comparisons',
     pairsIntro: 'Two other tools side by side, with prices read from each vendor\'s own pricing page and a separate note on where PostDelegate fits.',
+    morePairsTitle: 'More head-to-head comparisons',
     // same order as PAIRS in ComparePage.astro
     pairs: [
       { title: 'Postiz vs Buffer', text: 'Flat plans or per-channel pricing, worked costs at 3, 10 and 30 accounts, self-hosting, API and MCP.' },
