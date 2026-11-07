@@ -3,6 +3,7 @@
 // the words below may only restate facts from those files, so every claim has a linked source.
 // A pair gets a hand-written page instead when it needs a worked example or its own sections.
 import { PLANS, TRIAL_DAYS } from './plans';
+import { NETWORKS, WAITING_NETWORKS, networkStatus } from './networks';
 import { TOOLS } from './tools';
 import { ogCardFor } from './og-cards.mjs';
 
@@ -26,7 +27,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     description: 'Blotato vs Buffer compared on AI images and video, flat versus per-channel pricing, free plans, trials, API and MCP access, and the cost at 10 and 30 accounts.',
     h1: 'Blotato vs Buffer: AI content studio or per-channel scheduler?',
     shortAnswer: 'Pick Blotato if you want AI to make the posts as well as send them: unlimited AI writing, AI images and video from monthly credits, and up to 20 accounts on one $29 plan. Pick Buffer if you mostly schedule posts you have already written, want a free plan to start on, or need approvals for a team. At 10 accounts, Blotato Starter costs $29 a month and Buffer Essentials $60 (10 × $6).',
-    costIntro: 'Buffer charges for each channel, so its price rises with every account you add. Blotato sells flat plans with an account limit, so Starter costs $29 whether you connect 3 accounts or 20. Buffer Essentials is cheaper up to 4 channels (4 × $6 = $24); from 5 channels (5 × $6 = $30) Blotato Starter costs less.',
+    costIntro: 'Buffer charges for each channel, so its price rises with every account you add. Blotato sells flat plans with an account limit, so Starter costs $29 whether you connect 3 accounts or 20. Buffer Essentials is cheaper up to 4 channels (4 × $6 = $24); from 5 channels (5 × $6 = $30) up to 40 accounts, Blotato costs less.',
     faq: [
       { q: 'Is Blotato free?', a: 'No. Blotato has no free plan, only a 7-day trial that needs a card. Buffer has a free plan for 3 channels, with 10 scheduled posts per channel and one user.' },
       { q: 'Can I use the API or MCP server during the trial?', a: 'Not on Blotato: its trial covers the web app only, and creating an API key ends the trial and starts the paid plan. Buffer has API keys and an MCP server on every plan, Free included, with monthly API request limits per channel.' },
@@ -39,7 +40,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Blotato vs Metricool (2026): AI Content or Analytics',
     description: 'Blotato vs Metricool compared on AI content, per-account versus per-brand pricing, the free plan, the X add-on, API and MCP access, and cost at 30 accounts.',
     h1: 'Blotato vs Metricool: AI-made content or analytics and reports?',
-    shortAnswer: 'Pick Blotato if you want AI to produce posts, images and video and send them to up to 20 accounts for $29 a month, with the API and MCP server on every paid plan. Pick Metricool if reporting matters more: it is an analytics-led suite with an inbox, ads data and a free plan, priced per brand. One brand on five networks, none of them X, fits Metricool Starter at $25 a month, against $29 for Blotato Starter.',
+    shortAnswer: 'Pick Blotato if you want AI to produce posts, images and video and send them to up to 20 accounts for $29 a month, with the API and MCP server on every paid plan. Pick Metricool if reporting matters more: it is an analytics-led suite with an inbox, ads data and a free plan, priced per brand. One brand on five networks, none of them X or LinkedIn, fits Metricool Free (20 posts a month) or Starter at $25, against $29 for Blotato Starter.',
     costIntro: 'The two count different things. Blotato counts connected accounts: Starter covers 20 for $29 and Creator 40 for $97. Metricool counts brands, each holding one profile per network, and charges $10 a month for each X account on top. The Metricool ranges below depend on how your accounts split into brands.',
     faq: [
       { q: 'Is Metricool free?', a: 'Yes, for one brand with 20 posts a month and 30 days of analytics, but the free plan cannot connect LinkedIn or X. Blotato has no free plan, only a 7-day trial that needs a card.' },
@@ -53,7 +54,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Blotato vs Mixpost (2026): AI Content vs Self-Hosting',
     description: 'Blotato vs Mixpost compared on AI content, hosted versus self-hosted setups, one-time licences against monthly plans, free options, API, MCP and cost.',
     h1: 'Blotato vs Mixpost: AI content in the cloud or a scheduler you host?',
-    shortAnswer: 'Pick Blotato if you want AI writing, images and video alongside posting, on a hosted plan of $29 a month for up to 20 accounts. Pick Mixpost if you would rather run the scheduler yourself, from the free MIT-licensed Lite to Pro at $299 one-time, or use its monthly Cloud plans. At 30 accounts, Mixpost Cloud Business costs $79 a month and Blotato Creator $97.',
+    shortAnswer: 'Pick Blotato if you want AI writing, images and video alongside posting, on a hosted plan of $29 a month for up to 20 accounts. Pick Mixpost if you would rather run the scheduler yourself, from the free MIT-licensed Lite to Pro at $299 one-time, or use its monthly Cloud plans. At 30 accounts, Mixpost Cloud Business costs $79 a month and Blotato Creator $97, though Mixpost Cloud cannot post to X.',
     costIntro: 'The Mixpost figures below are its Cloud plans. Self-hosted Mixpost is priced differently: Pro is a one-time $299 licence per domain with a year of updates, and Enterprise $1,199, and you run it on your own server. Blotato is hosted and billed monthly by connected accounts.',
     faq: [
       { q: 'Can I self-host Blotato?', a: 'No self-host option appears on Blotato’s pricing page; it is hosted. Mixpost can be self-hosted as Lite, Pro or Enterprise on PHP 8.3+, MySQL, Redis and Nginx or Apache, installed with Docker or Composer.' },
@@ -95,7 +96,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     description: 'Blotato is an AI content app and Zernio a social media API for developers. Compare free tiers, flat and per-account pricing, MCP and cost at 30 accounts.',
     h1: 'Blotato vs Zernio: AI content app or developer API?',
     shortAnswer: 'Pick Blotato if you want an app where AI writes posts and makes images and video, with an API and MCP server for automation on every paid plan. Pick Zernio if you are a developer who wants one API for posting, analytics, comments, messaging and ads, with the first 2 accounts free and no card. At 10 accounts, Zernio costs $48 a month (8 × $6) against $29 for Blotato Starter.',
-    costIntro: 'Zernio bills each connected account after the first 2: $6 each for accounts 3 to 10, $3 for 11 to 100 and $1 beyond. Blotato sells flat plans with AI credits included: $29 for up to 20 accounts and $97 for up to 40. Zernio is cheaper up to 6 accounts (4 × $6 = $24); from 7 accounts (5 × $6 = $30) Blotato Starter costs less.',
+    costIntro: 'Zernio bills each connected account after the first 2: $6 each for accounts 3 to 10, $3 for 11 to 100 and $1 beyond. Blotato sells flat plans with AI credits included: $29 for up to 20 accounts and $97 for up to 40. Zernio is cheaper up to 6 accounts (4 × $6 = $24); from 7 to 20 accounts (5 × $6 = $30 at 7) Blotato Starter costs less. From 21 to 26 accounts Zernio is cheaper again, against Creator’s $97.',
     faq: [
       { q: 'Is Zernio free?', a: 'The first 2 connected accounts are free, with no credit card. Blotato has no free plan; its 7-day trial needs a card and does not include the API or MCP server.' },
       { q: 'Do both have an MCP server?', a: 'Yes. Blotato’s hosted MCP server has 35 tools and comes with every paid plan, not the trial. Zernio’s MCP server is documented at docs.zernio.com/mcp.' },
@@ -108,12 +109,12 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Buffer vs Metricool (2026): Price, Analytics, API',
     description: 'Buffer vs Metricool compared on free plans, per-channel versus per-brand pricing, the X add-on, analytics, API and MCP, approvals and cost at 10 accounts.',
     h1: 'Buffer vs Metricool: per-channel scheduling or analytics per brand?',
-    shortAnswer: 'Pick Buffer if you mainly schedule posts and want simple per-channel pricing, with API keys and an MCP server on every plan, Free included. Pick Metricool if analytics, an inbox and ads data matter, or you manage several brands, since it charges per brand rather than per account. One brand on five networks, none of them X, costs $25 a month on Metricool Starter and $30 on Buffer Essentials (5 × $6).',
+    shortAnswer: 'Pick Buffer if you mainly schedule posts and want simple per-channel pricing, with API keys and an MCP server on every plan, Free included. Pick Metricool if analytics, an inbox and ads data matter, or you manage several brands, since it charges per brand rather than per account. One brand on five networks, none of them X or LinkedIn, fits Metricool Free (20 posts a month) or Starter at $25, against $30 on Buffer Essentials (5 × $6).',
     costIntro: 'Buffer charges for every channel. Metricool charges for brands, each holding one profile per network, plus $10 a month for each X account. The same 10 or 30 accounts can cost very different amounts on Metricool depending on how they split into brands, which is why its figures below are ranges.',
     faq: [
       { q: 'Which free plan is better?', a: 'They limit different things. Buffer Free covers 3 channels with 10 scheduled posts per channel and one user. Metricool Free covers one brand with 20 posts a month and 30 days of analytics, but no LinkedIn or X.' },
       { q: 'Do Buffer and Metricool have an API?', a: 'Buffer gives API keys on every plan, with monthly request limits per channel. Metricool’s API is on Advanced and Custom only, from $67 a month. Both have an MCP server on every plan, Free included; Metricool says limits may apply.' },
-      { q: 'Which is cheaper for 10 accounts?', a: 'Usually Metricool: Starter costs $25 for up to 5 brands or $45 for up to 10, against $60 on Buffer Essentials (10 × $6). Metricool adds $10 a month for each X account.' },
+      { q: 'Which is cheaper for 10 accounts?', a: 'Metricool, unless several of the accounts are on X: Starter costs $25 for up to 5 brands or $45 for up to 10, against $60 on Buffer Essentials (10 × $6). Metricool adds $10 a month for each X account.' },
       { q: 'Which has post approvals?', a: 'Both, on their higher plans. Buffer Team has unlimited team members and approval workflows at $12 per channel for the first 10. Metricool has team and client management, roles and post approvals on Advanced, from $67 for 15 brands.' },
     ],
   },
@@ -122,7 +123,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Buffer vs Mixpost (2026): Hosted vs Self-Hosted, Price',
     description: 'Buffer vs Mixpost compared on hosted versus self-hosted setups, per-channel pricing against one-time licences and Cloud plans, X support, teams, API and MCP.',
     h1: 'Buffer vs Mixpost: pay per channel or run your own scheduler?',
-    shortAnswer: 'Pick Buffer if you want a hosted scheduler with a free plan for 3 channels and an API and MCP server on every plan. Pick Mixpost if you want to self-host, from the free MIT-licensed Lite to Pro at $299 one-time with unlimited users, or want flat Cloud plans that cost less than per-channel billing as you grow. At 30 accounts, Mixpost Cloud Business costs $79 a month against $135 on Buffer Essentials.',
+    shortAnswer: 'Pick Buffer if you want a hosted scheduler with a free plan for 3 channels and an API and MCP server on every plan. Pick Mixpost if you want to self-host, from the free MIT-licensed Lite to Pro at $299 one-time with unlimited users, or want flat Cloud plans that cost less than Buffer from 10 channels ($49 vs $60). At 30 accounts, Mixpost Cloud Business costs $79 a month against $135 on Buffer Essentials, though Mixpost Cloud cannot post to X.',
     costIntro: 'Buffer bills each channel monthly. The Mixpost figures below are its Cloud plans; self-hosted Pro is instead a one-time $299 licence per domain with a year of updates, and Enterprise $1,199, which you run on your own server.',
     faq: [
       { q: 'Can I self-host Buffer?', a: 'Buffer is sold as a hosted service. Mixpost can be self-hosted as Lite, Pro or Enterprise on PHP 8.3+, MySQL, Redis and Nginx or Apache, installed with Docker or Composer.' },
@@ -137,7 +138,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     description: 'Buffer vs Post Bridge compared on per-channel versus flat pricing, free plans, API and MCP access, team members and the monthly cost at 3, 10 and 30 accounts.',
     h1: 'Buffer vs Post Bridge: pay per channel or one flat plan?',
     shortAnswer: 'Pick Buffer if you have a few channels, want a free plan, or need approvals and unlimited team members on Team. Pick Post Bridge if you cross-post to many accounts on your own and want one flat price: $39 a month covers 15 accounts, with the API and MCP included. At 10 accounts, Post Bridge costs $39 and Buffer Essentials $60 (10 × $6).',
-    costIntro: 'Buffer’s price grows with each channel, while Post Bridge Marketer is $39 for anything up to 15 accounts. Buffer Essentials is cheaper up to 6 channels (6 × $6 = $36); from 7 channels (7 × $6 = $42) Post Bridge costs less.',
+    costIntro: 'Buffer’s price grows with each channel, while Post Bridge Marketer is $39 for anything up to 15 accounts. Buffer Essentials is cheaper up to 6 channels (6 × $6 = $36); from 7 to 15 channels (7 × $6 = $42 at 7) Post Bridge Marketer costs less. From 16 to 19 channels Buffer is cheaper again, against Operator’s $99, and from 20 Post Bridge is cheaper.',
     faq: [
       { q: 'Is Buffer or Post Bridge free?', a: 'Buffer has a free plan: 3 channels, 10 scheduled posts per channel and one user. Post Bridge lets free users make 5 posts, and has a 7-day trial with $0 due today.' },
       { q: 'Which is cheaper for 30 accounts?', a: 'Post Bridge: Operator costs $99 a month for up to 99 accounts. Buffer Essentials costs $135 for 30 (10 × $6 + 15 × $4 + 5 × $3), and Team $195.' },
@@ -163,7 +164,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Metricool vs Mixpost (2026): Analytics vs Self-Hosting',
     description: 'Metricool vs Mixpost compared on analytics, per-brand pricing against one-time licences and Cloud plans, self-hosting, free plans, X support, API and MCP.',
     h1: 'Metricool vs Mixpost: analytics suite or self-hosted scheduler?',
-    shortAnswer: 'Pick Metricool if analytics, reports, an inbox and ads data matter and a hosted plan priced per brand suits you, from $25 a month for up to 5 brands. Pick Mixpost if you want to own the scheduler: self-host the free Lite or a one-time $299 Pro licence, or use Mixpost Cloud from $29 a month. Metricool also has a free plan and MCP on every plan; Mixpost’s MCP starts at Pro or Cloud Momentum.',
+    shortAnswer: 'Pick Metricool if analytics, reports, an inbox and ads data matter and a hosted plan priced per brand suits you, from $25 a month for up to 5 brands. Pick Mixpost if you want to own the scheduler: self-host the free Lite or a one-time $299 Pro licence, or use Mixpost Cloud from $29 a month. Metricool also has a free hosted plan and MCP on every plan; Mixpost’s MCP starts at Pro or Cloud Momentum.',
     costIntro: 'Metricool charges per brand, each holding one profile per network, with $10 a month per X account on top, so its figures below are ranges. The Mixpost figures are Cloud plans; self-hosted Pro is a one-time $299 licence per domain and Enterprise $1,199.',
     faq: [
       { q: 'Can I self-host Metricool?', a: 'No self-host option appears on Metricool’s pricing page. Mixpost can be self-hosted as Lite (free, MIT), Pro or Enterprise on PHP 8.3+, MySQL, Redis and Nginx or Apache.' },
@@ -177,7 +178,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Metricool vs Post Bridge (2026): Analytics or Cross-Posting',
     description: 'Metricool vs Post Bridge compared on analytics, per-brand versus flat per-account pricing, free plans, the X add-on, API and MCP access, and team features.',
     h1: 'Metricool vs Post Bridge: analytics per brand or simple cross-posting?',
-    shortAnswer: 'Pick Metricool if you report on results: it is analytics-led, with an inbox, ads data and a free plan, and charges per brand. Pick Post Bridge if you are one person cross-posting to many accounts and want the API and MCP on its $39 plan for 15 accounts. One brand on five networks, none of them X, costs $25 a month on Metricool Starter against $39 on Post Bridge Marketer.',
+    shortAnswer: 'Pick Metricool if you report on results: it is analytics-led, with an inbox, ads data and a free plan, and charges per brand. Pick Post Bridge if you are one person cross-posting to many accounts and want the API and MCP on its $39 plan for 15 accounts. One brand on five networks, none of them X or LinkedIn, fits Metricool Free (20 posts a month) or Starter at $25, against $39 on Post Bridge Marketer.',
     costIntro: 'Post Bridge counts connected accounts: $39 for up to 15 and $99 for up to 99. Metricool counts brands, each holding one profile per network, and adds $10 a month for each X account, so its figures below are ranges that depend on how your accounts split into brands.',
     faq: [
       { q: 'Is Metricool or Post Bridge free?', a: 'Metricool has a free plan for one brand, with 20 posts a month and 30 days of analytics, but no LinkedIn or X. Post Bridge lets free users make 5 posts, and has a 7-day trial with $0 due today.' },
@@ -210,7 +211,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     faq: [
       { q: 'Is Metricool or Zernio free?', a: 'Both have a free tier. Metricool Free covers one brand with 20 posts a month and 30 days of analytics, without LinkedIn or X. Zernio’s first 2 connected accounts are free, with no credit card.' },
       { q: 'Does Metricool have an API?', a: 'Yes, on Advanced and Custom only, though its MCP server is on every plan, Free included, with limits that may apply. Zernio’s product is the API itself, and its MCP server is documented at docs.zernio.com/mcp.' },
-      { q: 'Which is cheaper for 10 accounts?', a: 'Often Metricool: Starter costs $25 for up to 5 brands or $45 for up to 10. Zernio costs $48 for 10 accounts (2 free + 8 × $6). Metricool adds $10 a month for each X account.' },
+      { q: 'Which is cheaper for 10 accounts?', a: 'Metricool, unless several of the accounts are on X: Starter costs $25 for up to 5 brands or $45 for up to 10. Zernio costs $48 for 10 accounts (2 free + 8 × $6). Metricool adds $10 a month for each X account.' },
       { q: 'Which one covers ads?', a: 'Both. Metricool connects Facebook, Google and TikTok Ads alongside its social networks. Zernio’s API covers ads as well as posting, analytics, comments and messaging.' },
     ],
   },
@@ -223,7 +224,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     costIntro: 'The Mixpost figures below are its Cloud plans. Self-hosted Pro is a one-time $299 licence per domain with a year of updates, and Enterprise $1,199, run on your own server. Post Bridge is hosted and billed monthly by connected accounts.',
     faq: [
       { q: 'Can I self-host Post Bridge?', a: 'No self-host option appears on Post Bridge’s pricing page. Mixpost can be self-hosted as Lite, Pro or Enterprise on PHP 8.3+, MySQL, Redis and Nginx or Apache, installed with Docker or Composer.' },
-      { q: 'Which is cheaper for 30 accounts?', a: 'Mixpost Cloud Business costs $79 a month for 48 channels. Post Bridge Operator costs $99 for 99 accounts, then $1 for each one above.' },
+      { q: 'Which is cheaper for 30 accounts?', a: 'Mixpost Cloud Business, by $20: $79 a month for 48 channels, though Mixpost Cloud cannot post to X. Post Bridge Operator costs $99 for 99 accounts, then $1 for each one above.' },
       { q: 'Does Mixpost Cloud post to X?', a: 'No. Mixpost Cloud lists 11 networks without X; self-hosted Lite, Pro and Enterprise include it. Post Bridge lists X among its 10 networks.' },
       { q: 'Which has an API and MCP on its cheapest plan?', a: 'Post Bridge includes both on Marketer, its $39 entry plan. Mixpost has them in Pro and Enterprise and in Cloud Momentum ($49) and up, so not on Cloud Spark ($29).' },
     ],
@@ -233,7 +234,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     title: 'Mixpost vs Publer (2026): Self-Hosted vs Bulk Scheduling',
     description: 'Mixpost vs Publer compared on self-hosting, one-time licences and Cloud plans against per-account pricing, free options, API and MCP access, networks and cost.',
     h1: 'Mixpost vs Publer: own your scheduler or rent a bulk-posting one?',
-    shortAnswer: 'Pick Mixpost if you want to self-host, with Pro at $299 one-time including unlimited users and the API and MCP, or flat Cloud plans. Pick Publer if you want hosted bulk scheduling, RSS automation and post recycling, priced per account, with a free plan for 3 accounts. Publer is cheaper at 10 accounts ($36 vs $49 on Mixpost Cloud) and Mixpost at 30 ($79 vs $108).',
+    shortAnswer: 'Pick Mixpost if you want to self-host, with Pro at $299 one-time including unlimited users and the API and MCP, or flat Cloud plans. Pick Publer if you want hosted bulk scheduling, RSS automation and post recycling, priced per account, with a free plan for 3 accounts. Publer is cheaper at 10 accounts ($36 vs $49 on Mixpost Cloud) and Mixpost at 30 ($79 vs $108), though Mixpost Cloud cannot post to X.',
     costIntro: 'Publer charges for each social account, with every 10th free. The Mixpost figures below are Cloud plans; self-hosted Pro is a one-time $299 licence per domain and Enterprise $1,199, run on your own server.',
     faq: [
       { q: 'Is Publer or Mixpost free?', a: 'Publer Free covers 3 social accounts, not including X, with 10 scheduled posts per account and one user. Mixpost Lite is free to self-host and posts to Facebook Pages, X and Mastodon only.' },
@@ -253,7 +254,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
       { q: 'Can I self-host Zernio?', a: 'Zernio is a hosted API. Mixpost can be self-hosted as Lite, Pro or Enterprise on PHP 8.3+, MySQL, Redis and Nginx or Apache.' },
       { q: 'Which one is free?', a: 'Zernio’s first 2 connected accounts are free, with no credit card. Mixpost Lite is free and open source under MIT, but posts only to Facebook Pages, X and Mastodon.' },
       { q: 'Do both have an MCP server?', a: 'Yes. Mixpost includes an MCP server in Pro and Enterprise, and in Cloud Momentum and up. Zernio’s MCP server is documented at docs.zernio.com/mcp.' },
-      { q: 'Which is cheaper for 30 accounts?', a: 'Mixpost Cloud Business, at $79 a month for 48 channels. Zernio costs $108 for 30 (2 free, 8 × $6 and 20 × $3).' },
+      { q: 'Which is cheaper for 30 accounts?', a: 'Mixpost Cloud Business, at $79 a month for 48 channels, though Mixpost Cloud cannot post to X. Zernio costs $108 for 30 (2 free, 8 × $6 and 20 × $3).' },
     ],
   },
   {
@@ -276,7 +277,7 @@ export const COMPARE_PAIRS: ComparePair[] = [
     description: 'Post Bridge is a cross-posting app and Zernio a social media API for developers. Compare free tiers, flat and per-account pricing, MCP and cost at 10 accounts.',
     h1: 'Post Bridge vs Zernio: cross-posting app or developer API?',
     shortAnswer: 'Pick Post Bridge if you are one person who wants an app to cross-post to your own accounts, with the API and MCP included on its $39 plan for 15 accounts. Pick Zernio if you are building software on one API for posting, analytics, comments, messaging and ads, with the first 2 accounts free. At 30 accounts, Post Bridge Operator costs $99 a month and Zernio $108.',
-    costIntro: 'Zernio bills each account after the first 2, $6 each up to 10 and $3 from 11 to 100. Post Bridge sells flat plans, $39 for up to 15 accounts and $99 for up to 99. Zernio is cheaper up to 8 accounts (6 × $6 = $36); from 9 accounts (7 × $6 = $42) Post Bridge costs less.',
+    costIntro: 'Zernio bills each account after the first 2, $6 each up to 10 and $3 from 11 to 100. Post Bridge sells flat plans, $39 for up to 15 accounts and $99 for up to 99. Zernio is cheaper up to 8 accounts (6 × $6 = $36); from 9 to 15 accounts (7 × $6 = $42 at 9) Post Bridge Marketer costs less. From 16 to 26 accounts Zernio is cheaper again, against Operator’s $99, and from 27 Post Bridge is cheaper.',
     faq: [
       { q: 'Is Zernio free?', a: 'Zernio’s first 2 connected accounts are free, with no credit card. Post Bridge lets free users make 5 posts, and has a 7-day trial with $0 due today.' },
       { q: 'Do both have an MCP server?', a: 'Yes. Post Bridge includes an MCP agent connection and its API on Marketer. Zernio’s MCP server is documented at docs.zernio.com/mcp.' },
@@ -317,7 +318,11 @@ export const pairHref = (pair: { a: string; b: string }) => `/compare/${pair.a}-
 
 // The PostDelegate box under every generated pair. Prices come from plans.ts.
 const [starter, team] = PLANS;
-export const PAIR_FIT = `PostDelegate is a lighter alternative to both: a scheduler with flat plans from $${starter.monthly}, team members from $${team.monthly} and the API and MCP server on every plan, with AI on your own assistant or key. It cannot reach Instagram, Facebook, Threads, TikTok, LinkedIn or Pinterest yet, because those are waiting on platform approval, and X is not available. Every plan starts with a ${TRIAL_DAYS}-day trial and no card.`;
+const list = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names[0] ?? '');
+// X is the one network readers expect that PostDelegate does not offer at all.
+const x = NETWORKS.find((n) => n.key === 'x');
+const unavailable = x && networkStatus(x) === 'unavailable' ? [x.name] : [];
+export const PAIR_FIT = `PostDelegate is a lighter alternative to both: a scheduler with flat plans from $${starter.monthly}, team members from $${team.monthly} and the API and MCP server on every plan, with AI on your own assistant or key. It cannot reach ${list(WAITING_NETWORKS.map((n) => n.name))} yet, because those are waiting on platform approval${unavailable.length ? `, and ${list(unavailable)} is not available` : ''}. Every plan starts with a ${TRIAL_DAYS}-day trial and no card.`;
 
 // Every generated pair needs both tools' data and a share card, and must not shadow a hand-written page.
 const handWritten = Object.keys(import.meta.glob('../pages/compare/*.astro')).map((path) => path.split('/').pop()!.replace('.astro', ''));
