@@ -98,5 +98,14 @@ RUN test -f /app/apps/backend/dist/apps/backend/src/commands/erase-account.js \
       'exec node --experimental-require-module /app/apps/backend/dist/apps/backend/src/commands/erase-account.js "$@"' \
       > /usr/local/bin/erase-account \
     && chmod 0755 /usr/local/bin/erase-account
+# Secrets-at-rest backfill, same shape as erase-account above: compiled by the
+# backend build, not part of the API or the worker. See
+# deploy/postdelegate/secrets-at-rest-rollout.md. Run it with:
+#   docker exec ... backfill-secrets --dry-run
+RUN test -f /app/apps/backend/dist/apps/backend/src/commands/backfill.secrets.js \
+    && printf '%s\n' '#!/bin/sh' \
+      'exec node --experimental-require-module /app/apps/backend/dist/apps/backend/src/commands/backfill.secrets.js "$@"' \
+      > /usr/local/bin/backfill-secrets \
+    && chmod 0755 /usr/local/bin/backfill-secrets
 RUN rm -rf /app/apps/frontend/.next /app/libraries/react-shared-libraries/src/translation/locales/he \
     && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter ./apps/frontend run build

@@ -121,6 +121,23 @@ export class AuthService {
       .slice(0, 16);
   }
 
+  // DO NOT USE FOR NEW STORAGE. AES-256-CBC with both the key and the IV
+  // derived from JWT_SECRET by MD5: reversible with nothing but that secret,
+  // deterministic (equal plaintexts give equal ciphertext), and unauthenticated
+  // (a decrypt cannot tell tampering from a wrong key).
+  //
+  // Credentials at rest belong in
+  // nestjs-libraries/database/prisma/secrets/secret.crypto.ts - hash() for a
+  // secret that is only ever matched, writeSecret()/readLegacySecret() for one
+  // that has to be read back. See
+  // deploy/postdelegate/secrets-at-rest-rollout.md.
+  //
+  // What is left here is the lifetime-deal code format: codes.service.ts mints
+  // 10,000 codes by encrypting `<token>:<index>`, and StripeService.lifetimeDeal
+  // verifies a redemption by decrypting it. Those codes are already in
+  // customers' hands, so the scheme cannot change without invalidating them -
+  // which also makes them the one thing still coupled to JWT_SECRET, and the
+  // reason rotating it is not yet a safe operation.
   static fixedEncryption(value: string) {
     return encrypt_legacy_using_IV(value);
   }

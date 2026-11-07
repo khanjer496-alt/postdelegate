@@ -16,7 +16,9 @@ import {
 // so it can be re-run or resumed. Built with the backend, run inside the
 // container (see deploy/postdelegate/secrets-at-rest-rollout.md):
 //
-//   node apps/backend/dist/apps/backend/src/commands/backfill.secrets.js [--dry-run] [--only=org|oauth|credentials|integrations] [--batch-size=200]
+//   backfill-secrets [--dry-run] [--only=org|oauth|credentials|integrations] [--batch-size=200]
+//
+// The release image wraps it under that name, as it does erase-account.
 @Module({
   providers: [
     PrismaService,

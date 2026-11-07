@@ -35,17 +35,18 @@ authenticates exactly as before.
 
 ## 3. Backfill
 
-Inside the container, dry run first and read the report:
+Dry run first and read the report. The release image wraps the command as
+`backfill-secrets`, the same way it wraps `erase-account`:
 
 ```bash
-node apps/backend/dist/apps/backend/src/commands/backfill.secrets.js --dry-run
+docker exec -i postdelegate-postiz-postiz-1 backfill-secrets --dry-run
 ```
 
 Then for real. It is idempotent and resumable, so it can be re-run, and it can
 be taken a group at a time (`org`, `oauth`, `credentials`, `integrations`):
 
 ```bash
-node apps/backend/dist/apps/backend/src/commands/backfill.secrets.js
+docker exec -i postdelegate-postiz-postiz-1 backfill-secrets
 ```
 
 It exits 2 when any row was `unreadable` (could not be read, never modified) or
