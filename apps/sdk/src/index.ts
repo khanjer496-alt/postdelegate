@@ -1,5 +1,6 @@
 import pkg from '../package.json';
 import type {
+  ChangePostStatusOptions,
   CreatePostBody,
   CreatePostResult,
   FindSlotResponse,
@@ -198,12 +199,20 @@ export class PostDelegate {
     return this.request('DELETE', `/posts/group/${encodeURIComponent(group)}`);
   }
 
-  /** Move a not yet published post between `draft` and `schedule`. */
-  changePostStatus(id: string, status: 'draft' | 'schedule') {
+  /**
+   * Move a not yet published post between `draft` and `schedule`. A published
+   * post, or scheduling one being published right now, needs
+   * `{ republish: true }`.
+   */
+  changePostStatus(
+    id: string,
+    status: 'draft' | 'schedule',
+    options: ChangePostStatusOptions = {}
+  ) {
     return this.request<unknown>(
       'PUT',
       `/posts/${encodeURIComponent(id)}/status`,
-      { json: { status } }
+      { json: { status, ...(options.republish ? { republish: true } : {}) } }
     );
   }
 

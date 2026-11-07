@@ -63,15 +63,25 @@ const notPublishing = (): Prisma.PostWhereInput => ({
 
 // Why a channel can't take a post that would publish once approved, null when
 // it can. Same states as integration.state.ts; a removed channel never gets
-// here, getRootPost leaves its posts out. Clients read it too (approval
-// links), so it says what is wrong rather than where to click.
+// here, getRootPost leaves its posts out. A channel that needs a reconnect is
+// still connected: a post for later is fine once it is reconnected (the
+// workflow checks again when it goes out), only one that publishes now isn't.
+// Clients read it too (approval links), so it says what is wrong rather than
+// where to click.
 const CHANNEL_NOT_READY: Partial<Record<ChannelState, string>> = {
   off: 'it is turned off',
   reconnect: 'it needs to be reconnected',
   incomplete: 'it is not fully connected yet',
 };
-const channelProblem = (integration: RootPost['integration']) => {
-  const reason = CHANNEL_NOT_READY[channelState(integration)];
+const channelProblem = (
+  integration: RootPost['integration'],
+  publishesNow: boolean
+) => {
+  const state = channelState(integration);
+  const reason =
+    state === 'reconnect' && !publishesNow
+      ? undefined
+      : CHANNEL_NOT_READY[state];
   return reason
     ? `This post can't be approved yet, ${integration.name} can't publish right now: ${reason}. Approve it once the channel is fixed.`
     : null;
@@ -357,9 +367,13 @@ export class ApprovalsService {
       throw new ConflictException(CHANGED_SINCE_VIEWED);
     }
 
-    // approving queues it, a channel that can't publish now would fail it
-    // (or publish it the moment it is reconnected, unreviewed by then)
-    const problemWithChannel = channelProblem(post.integration);
+    // approving queues it: a channel turned off or never fully connected
+    // would fail it, and one waiting for a reconnect fails a post that goes
+    // out right away
+    const problemWithChannel = channelProblem(
+      post.integration,
+      dayjs(post.publishDate).isBefore(dayjs())
+    );
     if (problemWithChannel) {
       throw new BadRequestException(problemWithChannel);
     }

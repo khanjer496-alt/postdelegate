@@ -299,15 +299,17 @@ describe('ApprovalsService transitions', () => {
 });
 
 describe('ApprovalsService stale reads and channels', () => {
-  it('does not approve a post on a channel that cannot publish now', async () => {
-    const cases: [Record<string, any>, string][] = [
-      [{ disabled: true }, 'is turned off'],
-      [{ refreshNeeded: true }, 'needs to be reconnected'],
-      [{ inBetweenSteps: true }, 'not fully connected'],
+  it('does not approve a post on a channel that cannot publish it', async () => {
+    const cases: [Record<string, any>, string, Date][] = [
+      [{ disabled: true }, 'is turned off', future()],
+      [{ inBetweenSteps: true }, 'not fully connected', future()],
+      // it would publish right away
+      [{ refreshNeeded: true }, 'needs to be reconnected', past()],
     ];
-    for (const [flags, message] of cases) {
+    for (const [flags, message, publishDate] of cases) {
       const { service, repository, posts, policy } = makeService({
         post: makePost({
+          publishDate,
           integration: {
             id: 'i-1',
             name: 'Brand X',
@@ -321,6 +323,21 @@ describe('ApprovalsService stale reads and channels', () => {
       expect(posts.startWorkflow).not.toHaveBeenCalled();
       expect(policy.notifyAuthor).not.toHaveBeenCalled();
     }
+  });
+
+  it('approves a post for later on a channel that only needs a reconnect', async () => {
+    const { service, repository } = makeService({
+      post: makePost({
+        integration: {
+          id: 'i-1',
+          name: 'Brand X',
+          providerIdentifier: 'linkedin-page',
+          refreshNeeded: true,
+        },
+      }),
+    });
+    await service.approve(ORG, 'p-1', admin);
+    expect(repository.transitionGroup).toHaveBeenCalled();
   });
 
   it('refuses with a 409 a post edited after the approver opened it', async () => {

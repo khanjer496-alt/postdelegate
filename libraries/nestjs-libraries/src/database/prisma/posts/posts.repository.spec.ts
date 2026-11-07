@@ -333,6 +333,8 @@ describe('PostsRepository state and date of a thread', () => {
         integrationId: 'int-1',
         deletedAt: null,
         integration: { deletedAt: null },
+        // published since it was read: left alone
+        state: { not: 'PUBLISHED' },
       },
       data: { state: 'QUEUE', error: null, releaseId: null, releaseURL: null },
     });
@@ -346,6 +348,15 @@ describe('PostsRepository state and date of a thread', () => {
       state: 'DRAFT',
       error: null,
     });
+
+    // republish: a published post is what is meant
+    await repo.changeGroupState(
+      'org-1',
+      { group: 'g-1', integrationId: 'int-1' },
+      'QUEUE',
+      true
+    );
+    expect(post.updateMany.mock.calls[2][0].where).not.toHaveProperty('state');
   });
 
   it('a status change of a post that is gone fails', async () => {

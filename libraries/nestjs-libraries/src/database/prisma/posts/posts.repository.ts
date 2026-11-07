@@ -663,10 +663,12 @@ export class PostsRepository {
   // Moves a post and its comments to a state together, the comments of a
   // thread publish with the main post. Leaving ERROR clears its error; queued
   // again, the release of an earlier attempt is cleared too, like changeDate.
+  // Without `republish` a post published since it was read is left alone.
   async changeGroupState(
     orgId: string,
     post: { group: string; integrationId: string },
-    state: 'DRAFT' | 'QUEUE'
+    state: 'DRAFT' | 'QUEUE',
+    republish = false
   ) {
     const changed = await this._post.model.post.updateMany({
       where: {
@@ -675,6 +677,7 @@ export class PostsRepository {
         integrationId: post.integrationId,
         deletedAt: null,
         integration: { deletedAt: null },
+        ...(republish ? {} : { state: { not: 'PUBLISHED' as const } }),
       },
       data: {
         state,

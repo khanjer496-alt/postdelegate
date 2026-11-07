@@ -433,7 +433,8 @@ describe('PostsService status and date changes', () => {
       expect(postRepository.changeGroupState).toHaveBeenCalledWith(
         'org-1',
         expect.objectContaining({ id: 'p-1', group: 'g-1', integrationId: 'i-1' }),
-        'QUEUE'
+        'QUEUE',
+        false
       );
       expect(postRepository.changeState).not.toHaveBeenCalled();
       expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
@@ -453,19 +454,35 @@ describe('PostsService status and date changes', () => {
       expect(service.startWorkflow).not.toHaveBeenCalled();
 
       await service.changePostStatus('org-1', 'p-1', 'schedule', undefined, true);
-      expect(postRepository.changeGroupState).toHaveBeenCalled();
+      // republish lets the write change a published post
+      expect(postRepository.changeGroupState).toHaveBeenCalledWith(
+        'org-1',
+        expect.anything(),
+        'QUEUE',
+        true
+      );
     });
 
-    it('does not touch a post that is being published', async () => {
+    it('does not schedule again a post that is being published, but can stop it', async () => {
       const { service, postRepository } = makeStateService();
       postRepository.getPostById.mockResolvedValue(
         stored({ state: 'QUEUE', publishDate: past() })
       );
       await expect(
-        service.changePostStatus('org-1', 'p-1', 'draft')
+        service.changePostStatus('org-1', 'p-1', 'schedule')
       ).rejects.toThrow('already being published');
       expect(postRepository.changeGroupState).not.toHaveBeenCalled();
       expect(service.startWorkflow).not.toHaveBeenCalled();
+
+      // a draft stops it, the safe direction
+      await service.changePostStatus('org-1', 'p-1', 'draft');
+      expect(postRepository.changeGroupState).toHaveBeenCalledWith(
+        'org-1',
+        expect.anything(),
+        'DRAFT',
+        false
+      );
+      expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'DRAFT');
     });
 
     it('refuses a deleted post or a comment, and never notifies about them', async () => {
@@ -527,14 +544,11 @@ describe('PostsService status and date changes', () => {
       expect(service.startWorkflow).not.toHaveBeenCalled();
     });
 
-    it('does not move a post that is being published unless asked to publish it again', async () => {
+    it('does not reschedule a post that is being published unless asked to publish it again', async () => {
       const { service, postRepository } = makeStateService();
       postRepository.getPostById.mockResolvedValue(
         stored({ state: 'QUEUE', publishDate: past() })
       );
-      await expect(
-        service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update')
-      ).rejects.toThrow('already being published');
       await expect(
         service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule')
       ).rejects.toThrow('already being published');
@@ -542,6 +556,33 @@ describe('PostsService status and date changes', () => {
 
       await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule', true);
       expect(service.startWorkflow).toHaveBeenCalledWith('linkedin', 'p-1', 'org-1', 'QUEUE');
+    });
+
+    it('only moves the date of a post that is being published, its workflow keeps running', async () => {
+      const { service, postRepository } = makeStateService();
+      postRepository.getPostById.mockResolvedValue(
+        stored({ state: 'QUEUE', publishDate: past() })
+      );
+      await service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'update');
+      expect(postRepository.changeDate).toHaveBeenCalledWith(
+        'org-1',
+        'p-1',
+        '2030-01-01T10:00:00',
+        false,
+        'update'
+      );
+      expect(service.startWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('tells a member that publishing a post again needs an approver', async () => {
+      const decision = { hold: true, approvalStatus: 'IN_REVIEW', previous: 'NONE' };
+      const { service, postRepository } = makeStateService(decision);
+      postRepository.getPostById.mockResolvedValue(stored({ state: 'PUBLISHED' }));
+      await expect(
+        service.changeDate('org-1', 'p-1', '2030-01-01T10:00:00', 'schedule', true, member)
+      ).rejects.toThrow('Publishing it again needs an approver');
+      expect(postRepository.changeDate).not.toHaveBeenCalled();
+      expect(postRepository.holdForReview).not.toHaveBeenCalled();
     });
 
     it('holds a failed post queued again by someone who cannot approve', async () => {

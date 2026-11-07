@@ -1454,7 +1454,7 @@ export class PostsService {
   private guardAgainstPublishing(post: { state: State; publishDate: Date }) {
     if (isBeingPublished(post)) {
       throw new BadRequestException(
-        'This post is already being published, its status and time cannot change now. To intentionally publish it again, pass republish: true.'
+        'This post is already being published, it cannot be scheduled again now. To intentionally publish it again, pass republish: true.'
       );
     }
   }
@@ -1610,11 +1610,7 @@ export class PostsService {
           posts[0].id,
           orgId,
           posts[0].state
-        ).catch((err) =>
-          this._logger.error(
-            `Could not restart the workflow of post ${posts[0].id}: ${err}`
-          )
-        );
+        ).catch((err) => {});
       }
 
       if (actor) {
@@ -2378,7 +2374,10 @@ export class PostsService {
 
     if (!republish) {
       this.guardAgainstRepublish(getPostById, 'changePostStatus');
-      this.guardAgainstPublishing(getPostById);
+      // a draft stops it, the safe direction; scheduling restarts it
+      if (status === 'schedule') {
+        this.guardAgainstPublishing(getPostById);
+      }
     }
 
     // queued again from a draft, a failure or a published post (a draft held
@@ -2414,29 +2413,32 @@ export class PostsService {
     // the comments of a thread move with it, a scheduled thread whose
     // comments stayed drafts would fail every comment
     const state = status === 'draft' ? ('DRAFT' as const) : ('QUEUE' as const);
-    await this._postRepository.changeGroupState(orgId, getPostById, state);
+    await this._postRepository.changeGroupState(
+      orgId,
+      getPostById,
+      state,
+      republish
+    );
 
-    try {
-      await this.startWorkflow(
-        getPostById.integration.providerIdentifier.split('-')[0].toLowerCase(),
-        getPostById.id,
-        orgId,
-        state
-      );
-    } catch (err) {
-      this._logger.error(
-        `Could not restart the workflow of post ${getPostById.id}: ${err}`
-      );
-    }
+    // startWorkflow logs its own failures
+    await this.startWorkflow(
+      getPostById.integration.providerIdentifier.split('-')[0].toLowerCase(),
+      getPostById.id,
+      orgId,
+      state
+    );
 
     return { id, state };
   }
 
   // A post that can't go out without an approver's review stays a draft
   private assertCanHold(post: { state: State; publishDate: Date }) {
-    // a post that went out, or is going out now, can't be held anymore
+    // a post that went out, or is going out now, can't be held anymore: a
+    // published one can't wait as a draft for its second publish
     if (post.state === 'PUBLISHED') {
-      throw new BadRequestException('This post was already published.');
+      throw new BadRequestException(
+        'This post was already published. Publishing it again needs an approver in this workspace: ask one to reschedule it.'
+      );
     }
     if (isBeingPublished(post)) {
       throw new BadRequestException('This post is already being published.');
@@ -2562,10 +2564,10 @@ export class PostsService {
   ) {
     const getPostById = await this.getStoredRootPost(orgId, id);
 
-    if (!republish) {
-      if (action === 'schedule') {
-        this.guardAgainstRepublish(getPostById, 'changeDate');
-      }
+    // schedule restarts the workflow: refused for a post that went out or is
+    // going out, unless asked. update only moves the date, see below.
+    if (action === 'schedule' && !republish) {
+      this.guardAgainstRepublish(getPostById, 'changeDate');
       this.guardAgainstPublishing(getPostById);
     }
 
@@ -2622,22 +2624,19 @@ export class PostsService {
     );
 
     // schedule (re)starts it; update moves a queued post, the workflow
-    // already waiting would still fire at the old time
-    if (action === 'schedule' || getPostById.state === 'QUEUE') {
-      try {
-        await this.startWorkflow(
-          getPostById.integration.providerIdentifier
-            .split('-')[0]
-            .toLowerCase(),
-          getPostById.id,
-          orgId,
-          getPostById.state === 'DRAFT' ? 'DRAFT' : 'QUEUE'
-        );
-      } catch (err) {
-        this._logger.error(
-          `Could not restart the workflow of post ${getPostById.id}: ${err}`
-        );
-      }
+    // already waiting would still fire at the old time. Not one that is
+    // going out now: restarting it could publish it twice, the date alone
+    // moves. startWorkflow logs its own failures.
+    if (
+      action === 'schedule' ||
+      (getPostById.state === 'QUEUE' && !isBeingPublished(getPostById))
+    ) {
+      await this.startWorkflow(
+        getPostById.integration.providerIdentifier.split('-')[0].toLowerCase(),
+        getPostById.id,
+        orgId,
+        getPostById.state === 'DRAFT' ? 'DRAFT' : 'QUEUE'
+      );
     }
 
     return newDate;
