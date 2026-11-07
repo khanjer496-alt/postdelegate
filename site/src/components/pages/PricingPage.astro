@@ -46,7 +46,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 ---
 <Base title={p.title} description={p.description(PLANS[0].monthly, TRIAL_DAYS)} jsonLd={[productLd, faqLd]} lang={lang}>
   <PageHero eyebrow={p.eyebrow} title={p.h1(PLANS[0].monthly, TRIAL_DAYS)} lead={p.lead}>
-    <a href={SITE.signup} class="button">{t.common.ctaLabel}</a>
+    <a href={SITE.signup} data-pulse-goal="trial_started" class="button">{t.common.ctaLabel}</a>
     <a href="/docs/billing" class="button button-outline">{p.billingGuide}</a>
     <p class="trial-note"><span aria-hidden="true"></span>{p.trialNote(t.common.ctaNote)}</p>
     <p class="hero-networks"><LogoStack networks={AVAILABLE_NETWORKS} max={8} size="sm" lang={lang} /><span set:html={p.heroNetworks(AVAILABLE_NETWORKS.length)} /></p>

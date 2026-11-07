@@ -6,7 +6,7 @@ const list = { '@context': 'https://schema.org', '@type': 'CollectionPage', name
 const sections = GUIDE_GROUPS.map((group) => ({ group, guides: GUIDES.filter((guide) => guide.group === group) })).filter((section) => section.guides.length);
 ---
 <Doc title="Guides: Schedule Posts with AI and MCP | PostDelegate" description="Step-by-step guides for scheduling posts with Claude and ChatGPT, safe AI agents, Slack, Twitch, Nostr, WordPress and DEV.to, CSV imports and client approvals." h1="Guides for planning, scheduling and automating your posts." eyebrow="Guides" lead="Practical walkthroughs that follow what PostDelegate does today. Each one links to the matching channel page and documentation." jsonLd={[list]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/docs" class="button button-outline">Read the docs</a>
   {sections.map((section) => (
     <>

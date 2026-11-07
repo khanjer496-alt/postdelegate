@@ -69,7 +69,7 @@ const aiLinks = [
         <p class="hero-description mode-ai">{h.lead(liveCount)}</p>
         <p class="hero-description mode-classic">{h.classicLead(liveCount)}</p>
         <div class="hero-actions">
-          <a class="hero-cta" href={SITE.signup}><span>{t.common.ctaLabel}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
+          <a class="hero-cta" href={SITE.signup} data-pulse-goal="trial_started"><span>{t.common.ctaLabel}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span>{h.trialNote(lowestPrice)}</p>
           <a class="text-link hero-mcp mode-ai" href={href('/mcp')}>{h.mcpLink} <span aria-hidden="true">↗</span></a>
         </div>

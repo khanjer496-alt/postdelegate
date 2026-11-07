@@ -28,7 +28,7 @@ const pending = WAITING_NETWORKS.map((n) => n.name).join(', ');
     shot="calendar"
     caption="PostDelegate's calendar in month view: the connected channels down the side, and what is scheduled, day by day."
   />
-  <p class="pd-fit-actions"><a href={SITE.signup} class="button">{CTA_LABEL}</a><a href="/mcp" class="button button-outline">How MCP works</a></p>
+  <p class="pd-fit-actions"><a href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a><a href="/mcp" class="button button-outline">How MCP works</a></p>
 </section>
 <style>
   .pd-fit { margin: 44px 0; padding: 28px; border: 1px solid #4a3d8f; border-radius: 22px; background: linear-gradient(180deg, #1b1630, #151515 70%); }

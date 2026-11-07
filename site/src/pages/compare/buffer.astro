@@ -37,7 +37,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Buffer alternative: PostDelegate vs Buffer compared" description="PostDelegate vs Buffer: flat plans or per-channel pricing, free trial, AI approach, approvals, API and MCP, and the networks each connects today." h1="PostDelegate vs Buffer." eyebrow="Compare" lead="Buffer charges per channel. PostDelegate charges a flat price for a set of channels. Here is how pricing, AI, approvals and networks compare, including where Buffer is the better pick today." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://buffer.com" class="button button-outline" target="_blank" rel="noreferrer">Visit Buffer</a>
   <h2>At a glance</h2>
   <CompareTable other="Buffer" rows={rows} />

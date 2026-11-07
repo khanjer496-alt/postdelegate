@@ -32,7 +32,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Hootsuite alternative: PostDelegate vs Hootsuite compared" description="PostDelegate vs Hootsuite: flat plans or per-seat pricing, free trial, channel limits, approvals, AI approach, MCP and the networks each connects today." h1="PostDelegate vs Hootsuite: a flat-price Hootsuite alternative" eyebrow="Compare" lead="Hootsuite is a full social media suite priced per person. PostDelegate is a scheduler with flat plans. Here is how pricing, approvals, AI and networks compare, including where Hootsuite is the better pick today." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://www.hootsuite.com" class="button button-outline" target="_blank" rel="noreferrer">Visit Hootsuite</a>
   <h2>At a glance</h2>
   <CompareTable other="Hootsuite" rows={rows} />

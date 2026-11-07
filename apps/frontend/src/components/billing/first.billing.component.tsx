@@ -33,7 +33,7 @@ import { DeveloperIconComponent } from '@gitroom/frontend/components/developer/d
 import { InvoicesComponent } from '@gitroom/frontend/components/layout/invoices.component';
 import { Button } from '@gitroom/react/form/button';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
-import { useUtmUrl } from '@gitroom/helpers/utils/utm.saver';
+import { usePulseVisitor, useUtmUrl } from '@gitroom/helpers/utils/utm.saver';
 import { hasConsent } from '@gitroom/helpers/consent/consent.cookie';
 
 const ModeComponent = dynamic(
@@ -61,6 +61,7 @@ export const useStartTrial = () => {
   const t = useT();
   const dub = useDubClickId();
   const utm = useUtmUrl();
+  const pulse_vid = usePulseVisitor();
   const [datafast_visitor_id] = useCookie('datafast_visitor_id', '');
   const [datafast_session_id] = useCookie('datafast_session_id', '');
   const [fbc] = useCookie('_fbc', '');
@@ -81,6 +82,7 @@ export const useStartTrial = () => {
             ...(dub ? { dub } : {}),
             ...(fbc && hasConsent('analytics') ? { fbc } : {}),
             ...(fbp && hasConsent('analytics') ? { fbp } : {}),
+            ...(pulse_vid ? { pulse_vid } : {}),
           }),
         })
       ).json();
@@ -114,7 +116,7 @@ export const useStartTrial = () => {
       );
       mutate('/user/self');
     },
-    [utm, dub, fbc, fbp, datafast_visitor_id, datafast_session_id]
+    [utm, pulse_vid, dub, fbc, fbp, datafast_visitor_id, datafast_session_id]
   );
 };
 
@@ -159,6 +161,7 @@ export const FirstBillingComponent = () => {
   const { stripeClient } = useVariables();
   const user = useUser();
   const dub = useDubClickId();
+  const pulse_vid = usePulseVisitor();
   const [stripe, setStripe] = useState<null | Promise<Stripe>>(null);
   const [stripeFailed, setStripeFailed] = useState(false);
   const [tier, setTier] = useState('STANDARD');
@@ -190,10 +193,11 @@ export const FirstBillingComponent = () => {
           ...(dub ? { dub } : {}),
           ...(fbc && hasConsent('analytics') ? { fbc } : {}),
           ...(fbp && hasConsent('analytics') ? { fbp } : {}),
+          ...(pulse_vid ? { pulse_vid } : {}),
         }),
       })
     ).json();
-  }, [tier, period]);
+  }, [tier, period, pulse_vid]);
 
   // a trial starts without a card, so no checkout is created for it
   const { data, isLoading } = useSWR(

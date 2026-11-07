@@ -27,4 +27,15 @@ export class BillingSubscribeDto {
     typeof value === 'string' && value.length <= 500 ? value : undefined
   )
   fbp: string;
+
+  // The visitor id of our site analytics (Pulse), saved on the checkout and
+  // the subscription so the revenue is credited to the visit. Anything but
+  // the 32 lowercase hex characters Pulse makes is dropped instead of failing
+  // the checkout.
+  @Transform(({ value }) =>
+    typeof value === 'string' && /^[0-9a-f]{32}$/.test(value)
+      ? value
+      : undefined
+  )
+  pulse_vid: string;
 }

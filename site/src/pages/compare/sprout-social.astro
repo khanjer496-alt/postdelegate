@@ -31,7 +31,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Sprout Social alternative: PostDelegate vs Sprout Social" description="PostDelegate vs Sprout Social: flat plans or per-seat pricing, free trial, profile limits, AI approach, API and MCP, and the networks each connects today." h1="PostDelegate vs Sprout Social." eyebrow="Compare" lead="Sprout Social is a broad social media platform priced per seat. PostDelegate is a scheduler with flat plans. Here is how pricing, AI, API access and networks compare, including where Sprout Social is the better pick today." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://sproutsocial.com" class="button button-outline" target="_blank" rel="noreferrer">Visit Sprout Social</a>
   <h2>At a glance</h2>
   <CompareTable other="Sprout Social" rows={rows} />
