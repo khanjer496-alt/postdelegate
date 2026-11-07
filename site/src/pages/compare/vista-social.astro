@@ -5,6 +5,7 @@ import Faq from '../../components/Faq.astro';
 import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { tool, formatDate } from '../../data/tools';
+import AppShot from '../../components/AppShot.astro';
 const [starter, team, pro] = PLANS;
 // Vista Social facts come from src/data/tools/vista-social.json, re-read on the vendor's own site.
 const them = tool('vista-social');
@@ -88,6 +89,10 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 
   <h2>At a glance</h2>
   <CompareTable other="Vista Social" rows={rows} />
+  <AppShot
+    shot="calendar"
+    caption="PostDelegate's calendar in month view: the connected channels down the side, and what is scheduled, day by day."
+  />
   <p>Vista Social prices checked on {formatDate(them.checked)}, monthly billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
 
   <h2>Pricing and the floor</h2>

@@ -6,6 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
+import AppShot from '../../components/AppShot.astro';
 const [starter, team, pro, ultimate] = PLANS;
 // Agorapulse facts come from src/data/tools/agorapulse.json, re-read on the vendor's own site.
 const them = tool('agorapulse');
@@ -89,6 +90,10 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 
   <h2>At a glance</h2>
   <CompareTable other="Agorapulse" rows={rows} />
+  <AppShot
+    shot="calendar"
+    caption="PostDelegate's calendar in month view: the connected channels down the side, and what is scheduled, day by day."
+  />
   <p>Agorapulse prices checked on {formatDate(them.checked)}, monthly billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
 
   <h2>Pricing and trial</h2>

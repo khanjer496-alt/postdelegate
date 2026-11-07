@@ -6,6 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
+import AppShot from '../../components/AppShot.astro';
 const [starter, team, pro] = PLANS;
 // Typefully facts come from src/data/tools/typefully.json, re-read on the vendor's own site.
 const them = tool('typefully');
@@ -89,6 +90,10 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 
   <h2>At a glance</h2>
   <CompareTable other="Typefully" rows={rows} />
+  <AppShot
+    shot="calendar"
+    caption="PostDelegate's calendar in month view: the connected channels down the side, and what is scheduled, day by day."
+  />
   <p>Typefully prices checked on {formatDate(them.checked)}, annual billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
 
   <h2>These tools are not competing for the same job</h2>
