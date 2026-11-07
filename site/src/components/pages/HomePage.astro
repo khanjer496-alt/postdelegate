@@ -1,6 +1,7 @@
 ---
 // The home page, kept lean: hero, how it works, networks, four features, bring your own AI,
-// pricing, compare, five questions and one closing call to action. The words live in
+// pricing, compare, five questions and one closing call to action. The hero switch shows the
+// page for AI agents (default) or for classic scheduling: CSS only, like the billing toggle. The words live in
 // src/i18n (home); facts come from src/data so the page never drifts from the product.
 import Base from '../../layouts/Base.astro';
 import Faq from '../Faq.astro';
@@ -57,12 +58,20 @@ const aiLinks = [
     <OrbitAccent kind="planet" class="hero-star-one" />
     <div class="home-wide hero-layout">
       <div class="hero-copy">
-        <h1 id="hero-title">{h.h1}<span class="hero-mark">{h.h1Mark}<OrbitAccent kind="arc" /></span></h1>
-        <p class="hero-description">{h.lead(liveCount)}</p>
+        <fieldset class="mode-toggle">
+          <legend class="sr-only">{h.modeLabel}</legend>
+          <input type="radio" name="home-mode" id="home-mode-ai" value="ai" checked />
+          <label for="home-mode-ai"><span aria-hidden="true">✦</span> {h.modeAi}</label>
+          <input type="radio" name="home-mode" id="home-mode-classic" value="classic" />
+          <label for="home-mode-classic">{h.modeClassic}</label>
+        </fieldset>
+        <h1 id="hero-title"><span class="mode-ai">{h.h1}<span class="hero-mark">{h.h1Mark}<OrbitAccent kind="arc" /></span></span><span class="mode-classic">{h.classicH1}<span class="hero-mark">{h.classicH1Mark}<OrbitAccent kind="arc" /></span></span></h1>
+        <p class="hero-description mode-ai">{h.lead(liveCount)}</p>
+        <p class="hero-description mode-classic">{h.classicLead(liveCount)}</p>
         <div class="hero-actions">
           <a class="hero-cta" href={SITE.signup}><span>{t.common.ctaLabel}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span>{h.trialNote(lowestPrice)}</p>
-          <a class="text-link hero-mcp" href={href('/mcp')}>{h.mcpLink} <span aria-hidden="true">↗</span></a>
+          <a class="text-link hero-mcp mode-ai" href={href('/mcp')}>{h.mcpLink} <span aria-hidden="true">↗</span></a>
         </div>
       </div>
       <div class="hero-visual">
@@ -72,7 +81,7 @@ const aiLinks = [
           <span class="orbit-ring ring-inner" style="--r:21.5cqw">{orbitInner.map((n, i) => <span class="orbit-slot" style={`--a:${i * 90 + 45}deg`}><span class="orbit-body orbit-live"><NetworkBadge n={n} size="md" /></span></span>)}</span>
           <span class="orbit-core"><img src="/mark.svg?v=orbit-slot" width="56" height="56" alt="" /><b>{h.orbitCore}</b></span>
           <span class="orbit-card orbit-card-scheduled"><i class="card-check">✓</i><span><b>{h.cardScheduled}</b><small>{h.cardScheduledSub}</small></span></span>
-          <span class="orbit-card orbit-card-draft"><i class="card-spark">✦</i><span><b>{h.cardDraft}</b><small>{h.cardDraftSub}</small></span></span>
+          <span class="orbit-card orbit-card-draft"><i class="card-spark">✦</i><span><b>{h.cardDraft}</b><small class="mode-ai">{h.cardDraftSub}</small><small class="mode-classic">{h.classicCardDraftSub}</small></span></span>
         </div>
         <p class="orbit-legend"><span><i class="legend-live" aria-hidden="true"></i>{h.legendLive}</span><span><i class="legend-soon" aria-hidden="true"></i>{h.legendSoon}</span></p>
       </div>
@@ -88,7 +97,7 @@ const aiLinks = [
         {h.steps.map((step, i) => (
           <li class="relay-step reveal">
             <span class:list={['relay-icon', ['is-ai', 'is-you', 'is-pd'][i]]} aria-hidden="true">{i === 0 ? '✦' : i === 1 ? '✓' : <img src="/mark.svg" width="28" height="28" alt="" />}</span>
-            <h3>{step}</h3>
+            <h3><span class="mode-ai">{step}</span><span class="mode-classic">{h.classicSteps[i]}</span></h3>
           </li>
         ))}
       </ol>
@@ -131,7 +140,7 @@ const aiLinks = [
 
   <Testimonials lang={lang} />
 
-  <section class="section ai-section" id="ai" aria-labelledby="ai-title">
+  <section class="section ai-section mode-ai" id="ai" aria-labelledby="ai-title">
     <div class="container ai-panel reveal">
       <span class="eyebrow">{h.aiEyebrow}</span>
       <h2 class="section-heading" id="ai-title">{h.aiTitleA}{' '}<br />{h.aiTitleB}<span class="ink-circle">{h.aiMark}<OrbitAccent kind="ring" /></span></h2>
@@ -145,8 +154,7 @@ const aiLinks = [
   <section class="section home-pricing" id="pricing" aria-labelledby="pricing-title">
     <div class="container">
       <div class="section-head reveal"><span class="eyebrow">{h.pricingEyebrow}</span><h2 class="section-heading" id="pricing-title">{h.pricingTitle}</h2></div>
-      <Pricing heading={false} compact lang={lang} />
-      <p class="home-pricing-includes">{h.pricingIncludes}</p>
+      <Pricing heading={false} lang={lang} />
       <p class="home-pricing-more"><a class="text-link" href={href('/pricing')}>{h.pricingMore} <span aria-hidden="true">↗</span></a></p>
     </div>
   </section>
