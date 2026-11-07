@@ -381,6 +381,9 @@ export class PublicIntegrationsController {
         identifier: integration.providerIdentifier,
         picture: integration.picture,
         disabled: integration.disabled,
+        // why it is off: 'USER' (turned off in the app), 'PLAN_LIMIT'
+        // (locked by the plan) or null
+        disabledReason: integration.disabledReason,
         profile: integration.profile,
         customer: integration.customer
           ? {

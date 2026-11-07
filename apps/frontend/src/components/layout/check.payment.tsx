@@ -7,6 +7,8 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
+import { isChannelLockedByPlan } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import type { ChannelFlags } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 // how long the spinner waits for the payment to be confirmed
 const CHECK_TIMEOUT_MS = 60000;
 
@@ -184,8 +186,11 @@ export const CheckPaymentInner: FC<{
 };
 
 export const ChannelsAfterPayment: FC<{
-  integrations: { disabled: boolean }[];
-}> = ({ integrations }) => {
+  integrations: ChannelFlags[];
+  // reloads the channel list and answers it, the list rendered first can be
+  // from before the payment turned channels back on
+  reload: () => Promise<ChannelFlags[] | undefined>;
+}> = ({ integrations, reload }) => {
   const searchParams = useSearchParams();
   // read once: CheckPayment takes the param off the address after this mounts
   const [check] = useState(() => searchParams.get('check'));
@@ -210,16 +215,42 @@ export const ChannelsAfterPayment: FC<{
       if (status !== 2) {
         return;
       }
-      if (integrations.some((p) => p.disabled)) {
+      let channels = integrations;
+      try {
+        channels = (await reload()) || integrations;
+      } catch (err) {
+        // keep the list already shown
+      }
+      // only the channels the plan locked are the plan's business: one the
+      // customer turned off stays off after a payment, and says so itself
+      if (channels.some(isChannelLockedByPlan)) {
         modal.open({
-          title: t('channels_still_disabled', 'Your channels are disabled'),
+          title: t('channels_still_locked', 'Some channels are still locked'),
           onlyApprove: true,
           approveLabel: t('ok', 'OK'),
           description: t(
-            'channels_still_disabled_description',
-            "Your plan doesn't cover all of your connected channels, so they stay disabled. Enable the ones you want from each channel's menu, up to your plan's limit, or upgrade your plan to enable all of them."
+            'channels_still_locked_description',
+            "Your plan doesn't have room for all of your connected channels, so some stay locked. Enable the ones you want from each channel's menu, up to your plan's limit, or upgrade your plan to unlock all of them."
           ),
         });
+        return;
+      }
+      // turned off before the reason was recorded: it may have been the plan,
+      // and it does not come back by itself, so say where to enable it
+      if (channels.some((p) => p.disabled && !p.disabledReason)) {
+        modal.open({
+          title: t('channels_turned_off', 'Some channels are turned off'),
+          onlyApprove: true,
+          approveLabel: t('ok', 'OK'),
+          description: t(
+            'channels_turned_off_description',
+            "Enable the ones you want from each channel's menu, up to your plan's limit."
+          ),
+        });
+        return;
+      }
+      // the rest are off because the customer turned them off
+      if (channels.some((p) => p.disabled)) {
         return;
       }
       modal.open({

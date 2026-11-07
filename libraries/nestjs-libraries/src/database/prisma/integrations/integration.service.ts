@@ -501,10 +501,14 @@ export class IntegrationService {
     }
   }
 
+  // turned off by the customer (DISABLED_BY_USER): an upgrade never turns it
+  // back on, only enableChannel does
   async disableChannel(org: string, id: string) {
     return this._integrationRepository.disableChannel(org, id);
   }
 
+  // any channel that is off, whatever turned it off, comes back on through
+  // here within the plan's limit, and no longer has a reason to be off
   async enableChannel(org: string, totalChannels: number, id: string) {
     const integrations =
       await this._integrationRepository.getIntegrationsList(org);
@@ -551,8 +555,8 @@ export class IntegrationService {
     return this._integrationRepository.disableIntegrations(org, totalChannels);
   }
 
-  async enableAllIntegrations(org: string) {
-    return this._integrationRepository.enableAllIntegrations(org);
+  async enablePlanLockedIntegrations(org: string, room: number) {
+    return this._integrationRepository.enablePlanLockedIntegrations(org, room);
   }
 
   async checkForDeletedOnceAndUpdate(org: string, page: string) {

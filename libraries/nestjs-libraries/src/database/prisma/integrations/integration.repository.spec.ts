@@ -100,7 +100,7 @@ describe('IntegrationRepository.disableIntegrations', () => {
   it('turns off the newest channels first on a downgrade', async () => {
     const integration = {
       findMany: jest.fn().mockResolvedValue([{ id: 'newest' }]),
-      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     };
     const repo = new IntegrationRepository(
       { model: { integration } } as any,
@@ -126,10 +126,83 @@ describe('IntegrationRepository.disableIntegrations', () => {
       orderBy: { createdAt: 'desc' },
       take: 1,
     });
-    expect(integration.update).toHaveBeenCalledWith({
-      where: { id: 'newest' },
-      data: { disabled: true },
+    // locked by the plan, so an upgrade can tell it from one the customer
+    // turned off; the write matches the read again, so a channel turned off
+    // in between keeps the customer's reason
+    expect(integration.updateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: 'org-A',
+        disabled: false,
+        deletedAt: null,
+        inBetweenSteps: false,
+        id: { in: ['newest'] },
+      },
+      data: { disabled: true, disabledReason: 'PLAN_LIMIT' },
     });
+  });
+});
+
+describe('IntegrationRepository.enablePlanLockedIntegrations', () => {
+  const make = (locked: { id: string }[]) => {
+    const integration = {
+      findMany: jest.fn().mockResolvedValue(locked),
+      updateMany: jest.fn().mockResolvedValue({ count: locked.length }),
+    };
+    const repo = new IntegrationRepository(
+      { model: { integration } } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { repo, integration };
+  };
+
+  const lockedByPlan = {
+    organizationId: 'org-A',
+    deletedAt: null,
+    disabled: true,
+    disabledReason: 'PLAN_LIMIT',
+    inBetweenSteps: false,
+  };
+
+  it('turns back on only the channels the plan locked, oldest first, up to the room', async () => {
+    const { repo, integration } = make([{ id: 'oldest' }, { id: 'older' }]);
+
+    expect(await repo.enablePlanLockedIntegrations('org-A', 2)).toEqual({
+      count: 2,
+    });
+
+    expect(integration.findMany.mock.calls[0][0]).toEqual({
+      where: lockedByPlan,
+      orderBy: { createdAt: 'asc' },
+      take: 2,
+      select: { id: true },
+    });
+    // the write matches the lock again, so a channel the customer turned on
+    // or off in between keeps what they did
+    expect(integration.updateMany).toHaveBeenCalledWith({
+      where: { ...lockedByPlan, id: { in: ['oldest', 'older'] } },
+      data: { disabled: false, disabledReason: null },
+    });
+  });
+
+  it('touches nothing without room or without a locked channel', async () => {
+    const none = make([{ id: 'a' }]);
+    expect(await none.repo.enablePlanLockedIntegrations('org-A', 0)).toEqual({
+      count: 0,
+    });
+    expect(none.integration.findMany).not.toHaveBeenCalled();
+    expect(none.integration.updateMany).not.toHaveBeenCalled();
+
+    const empty = make([]);
+    expect(await empty.repo.enablePlanLockedIntegrations('org-A', 3)).toEqual({
+      count: 0,
+    });
+    expect(empty.integration.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -188,7 +261,6 @@ describe('IntegrationRepository.deleteChannel', () => {
 describe('IntegrationRepository channel edits', () => {
   const edits = (repo: IntegrationRepository) => [
     () => repo.enableChannel('org-A', 'int-1'),
-    () => repo.disableChannel('org-A', 'int-1'),
     () => repo.updateCustomName('org-A', 'int-1', 'n'),
     () => repo.setTimes('org-A', 'int-1', { time: [{ time: 1 }] } as any),
     () => repo.updateProviderSettings('org-A', 'int-1', '[]'),
@@ -207,7 +279,48 @@ describe('IntegrationRepository channel edits', () => {
         deletedAt: null,
       });
     }
-    expect(integration.updateMany).toHaveBeenCalledTimes(5);
+    expect(integration.updateMany).toHaveBeenCalledTimes(4);
+  });
+
+  it('records that the customer turned a channel off, and clears it when they turn it on', async () => {
+    const { repo, integration } = makeRepo();
+
+    expect(await repo.disableChannel('org-A', 'int-1')).toEqual({ id: 'int-1' });
+    // one statement, only on a live channel that is on
+    expect(integration.updateMany.mock.calls[0][0]).toEqual({
+      where: {
+        id: 'int-1',
+        organizationId: 'org-A',
+        deletedAt: null,
+        disabled: false,
+      },
+      data: { disabled: true, disabledReason: 'USER' },
+    });
+
+    await repo.enableChannel('org-A', 'int-1');
+    expect(integration.updateMany.mock.calls[1][0].data).toEqual({
+      disabled: false,
+      disabledReason: null,
+    });
+  });
+
+  it('leaves a channel already off as it is, keeping why it is off', async () => {
+    const { repo, integration } = makeRepo();
+    integration.updateMany.mockResolvedValue({ count: 0 });
+    integration.findFirst.mockResolvedValue({ id: 'int-1' });
+
+    expect(await repo.disableChannel('org-A', 'int-1')).toEqual({ id: 'int-1' });
+    expect(integration.updateMany).toHaveBeenCalledTimes(1);
+    expect(integration.findFirst.mock.calls[0][0]).toEqual({
+      where: { id: 'int-1', organizationId: 'org-A', deletedAt: null },
+      select: { id: true },
+    });
+
+    // removed or unknown: 404, like every other channel edit
+    integration.findFirst.mockResolvedValue(null);
+    await expect(repo.disableChannel('org-A', 'int-1')).rejects.toBeInstanceOf(
+      NotFoundException
+    );
   });
 
   it('answers 404 for a deleted or unknown channel instead of a 500', async () => {

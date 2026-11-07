@@ -109,6 +109,8 @@ export interface Integrations {
   originalName?: string;
   id: string;
   disabled?: boolean;
+  // why it is off: 'USER', 'PLAN_LIMIT' or null (unknown)
+  disabledReason?: string | null;
   inBetweenSteps: boolean;
   refreshNeeded?: boolean;
   // what those flags mean together, decided by the backend

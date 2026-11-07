@@ -80,6 +80,7 @@
                     "identifier": "x",
                     "picture": "https://media.postdelegate.com/example/avatar.jpg",
                     "disabled": false,
+                    "disabledReason": null,
                     "profile": "nevodavid",
                     "customer": {
                       "id": "customer-id",
@@ -2509,6 +2510,18 @@
           "disabled": {
             "type": "boolean",
             "description": "Whether the integration is disabled"
+          },
+          "disabledReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "USER",
+              "PLAN_LIMIT",
+              null
+            ],
+            "description": "Why the integration is disabled: USER (turned off in the app), PLAN_LIMIT (locked because the plan has no room for it, comes back on an upgrade) or null (not disabled, or the reason was not recorded)"
           },
           "profile": {
             "type": "string",
