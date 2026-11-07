@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import EventEmitter from 'events';
 import clsx from 'clsx';
 const toaster = new EventEmitter();
+// A page's first effect runs before the layout's Toaster has subscribed, so a
+// toast shown on load is kept here and shown once the Toaster is listening.
+let pending: { text: string; type?: 'success' | 'warning' } | undefined;
 export const Toaster = () => {
   const [showToaster, setShowToaster] = useState(false);
   const [toasterText, setToasterText] = useState('');
@@ -23,6 +26,10 @@ export const Toaster = () => {
         }, 4200);
       }
     );
+    if (pending) {
+      toaster.emit('show', pending);
+      pending = undefined;
+    }
     return () => {
       toaster.removeAllListeners();
     };
@@ -114,6 +121,10 @@ export const Toaster = () => {
 export const useToaster = () => {
   return {
     show: useCallback((text: string, type?: 'success' | 'warning') => {
+      if (!toaster.listenerCount('show')) {
+        pending = { text, type };
+        return;
+      }
       toaster.emit('show', {
         text,
         type,
