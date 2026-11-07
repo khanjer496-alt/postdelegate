@@ -60,8 +60,15 @@ export const jwtLifetimes: Record<JwtType, SignOptions['expiresIn']> = {
 };
 
 export class AuthService {
+  // Cost 12. Existing hashes stay at whatever cost they were made with and are
+  // upgraded when the password next changes: bcrypt reads the cost from the
+  // hash, so comparePassword keeps working either way.
+  //
+  // Deliberately NOT rehashed on successful login. passwordFingerprint is
+  // derived from the stored hash, so rehashing would change the fingerprint
+  // and sign the user out of every other device for no reason they could see.
   static hashPassword(password: string) {
-    return hashSync(password, 10);
+    return hashSync(password, 12);
   }
   static comparePassword(password: string, hash: string) {
     return compareSync(password, hash);

@@ -14,6 +14,50 @@ const caddyfile = readFileSync(
   'utf8'
 );
 
+describe('the committed Caddyfile security headers', () => {
+  // Audit finding A9. Both site blocks get these, so a header is never only on
+  // production or only on staging.
+  const blocks = caddyfile
+    .split(/^(?=\S.*\{$)/m)
+    .filter((block) => /^(app|staging)\.postdelegate\.com \{/.test(block));
+
+  it('has both site blocks', () => {
+    expect(blocks).toHaveLength(2);
+  });
+
+  it.each(['app', 'staging'])('%s: narrows what the page may load', (name) => {
+    const block = blocks.find((b) => b.startsWith(`${name}.`)) as string;
+    const csp = block.match(/Content-Security-Policy "([^"]+)"/)?.[1] ?? '';
+    expect(csp).toContain("frame-ancestors 'self'");
+    // a stolen injection cannot retarget relative URLs or load a plugin
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("object-src 'none'");
+  });
+
+  it.each(['app', 'staging'])(
+    '%s: denies device APIs the app never uses',
+    (name) => {
+      const block = blocks.find((b) => b.startsWith(`${name}.`)) as string;
+      const policy =
+        block.match(/Permissions-Policy "([^"]+)"/)?.[1] ?? '';
+      expect(policy).toContain('camera=()');
+      expect(policy).toContain('microphone=()');
+      expect(policy).toContain('geolocation=()');
+    }
+  );
+
+  // Cross-Origin-Opener-Policy is deliberately absent: the social connect
+  // flows are popups that talk back through window.opener, and same-origin
+  // COOP severs that.
+  it('does not set Cross-Origin-Opener-Policy', () => {
+    // mentioning it in a comment is fine; setting it is not
+    const set = caddyfile
+      .split('\n')
+      .filter((line) => /^\s*Cross-Origin-Opener-Policy\s+\S/.test(line));
+    expect(set).toEqual([]);
+  });
+});
+
 describe('the committed Caddyfile', () => {
   it('carries no credential', () => {
     // the staging login lives only in the live /opt/postiz/Caddyfile

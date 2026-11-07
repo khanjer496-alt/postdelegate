@@ -26,6 +26,7 @@ import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { CreatePublicCommentDto } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
+import { PUBLIC_PREVIEW } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 
 const pump = promisify(pipeline);
 
@@ -41,7 +42,11 @@ export class PublicController {
   async getPreview(@Param('id') id: string) {
     // unauthenticated: expose only what the preview page renders, never the
     // internal group/batch/settings/error fields of the stored row
-    const posts = await this._postsService.getPostsRecursively(id, true);
+    const posts = await this._postsService.getPostsRecursively(
+      id,
+      true,
+      PUBLIC_PREVIEW
+    );
     // only the first post of the chain comes back with its channel, and a
     // chain is one post and its children, which are pinned to that same
     // channel when they are saved - the page already renders it for all of
