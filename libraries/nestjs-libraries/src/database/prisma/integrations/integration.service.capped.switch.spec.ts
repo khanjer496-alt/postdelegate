@@ -127,7 +127,10 @@ describe('IntegrationService.enableChannel', () => {
     }
   });
 
-  const makeEnableService = (enabled: number) => {
+  const makeEnableService = (
+    enabled: number,
+    disabledReason: string | null = null
+  ) => {
     const repository = {
       getIntegrationsList: jest
         .fn()
@@ -135,10 +138,11 @@ describe('IntegrationService.enableChannel', () => {
           ...Array.from({ length: enabled }, (_, i) => ({ id: `i${i}`, disabled: false })),
           // the channel being enabled, and a half-connected row that is not
           // a channel yet and never counts
-          { id: 'i9', disabled: true },
+          { id: 'i9', disabled: true, disabledReason },
           { id: 'temp', disabled: false, inBetweenSteps: true },
         ]),
       enableChannel: jest.fn().mockResolvedValue({}),
+      disableChannel: jest.fn().mockResolvedValue({ id: 'i0' }),
     };
     const service = new IntegrationService(
       repository as any,
@@ -180,6 +184,33 @@ describe('IntegrationService.enableChannel', () => {
       status: 400,
     });
     expect(repository.enableChannel).not.toHaveBeenCalled();
+  });
+
+  it('checks the limit whatever turned the channel off', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    for (const reason of ['USER', 'PLAN_LIMIT', null]) {
+      const full = makeEnableService(3, reason);
+      await expect(full.service.enableChannel('org', 3, 'i9')).rejects.toMatchObject({
+        status: 400,
+      });
+      expect(full.repository.enableChannel).not.toHaveBeenCalled();
+
+      const room = makeEnableService(2, reason);
+      await room.service.enableChannel('org', 3, 'i9');
+      expect(room.repository.enableChannel).toHaveBeenCalledWith('org', 'i9');
+    }
+  });
+
+  it('turns a channel off through the repository, which records the customer did it', async () => {
+    const { service, repository } = makeEnableService(1);
+    expect(await service.disableChannel('org', 'i0')).toEqual({ id: 'i0' });
+    expect(repository.disableChannel).toHaveBeenCalledWith('org', 'i0');
+  });
+
+  it('keeps why a channel already off is off, so a plan lock is not taken over by the customer', async () => {
+    const { service, repository } = makeEnableService(1, 'PLAN_LIMIT');
+    expect(await service.disableChannel('org', 'i9')).toEqual({ id: 'i9' });
+    expect(repository.disableChannel).not.toHaveBeenCalled();
   });
 
   it('leaves a channel that is already on alone, even at the limit', async () => {

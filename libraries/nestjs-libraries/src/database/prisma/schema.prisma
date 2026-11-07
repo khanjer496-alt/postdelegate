@@ -491,6 +491,10 @@ model Integration {
   type                  String
   token                 String
   disabled              Boolean                @default(false)
+  // why `disabled` is on: 'USER' (turned off by the customer) or
+  // 'PLAN_LIMIT' (turned off by a downgrade). Null is unknown (rows from
+  // before this column): never turned back on automatically
+  disabledReason        String?
   tokenExpiration       DateTime?
   refreshToken          String?
   profile               String?

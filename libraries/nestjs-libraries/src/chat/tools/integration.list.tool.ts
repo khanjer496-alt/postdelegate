@@ -58,6 +58,8 @@ export class IntegrationListTool implements AgentToolInterface {
               name: p.customName || p.name,
               id: p.id,
               disabled: p.disabled,
+              // why it is off: 'USER', 'PLAN_LIMIT' or null
+              disabledReason: p.disabledReason,
               picture: p.picture || '/no-picture.jpg',
               platform: p.providerIdentifier,
               display: p.profile,

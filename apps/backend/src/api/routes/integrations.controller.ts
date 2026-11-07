@@ -171,6 +171,8 @@ export class IntegrationsController {
             id: p.id,
             internalId: p.internalId,
             disabled: p.disabled,
+            // why it is off: 'USER', 'PLAN_LIMIT' or null (unknown)
+            disabledReason: p.disabledReason,
             editor: findIntegration.editor,
             stripLinks: !!findIntegration?.stripLinks?.(),
             picture: p.picture || '/no-picture.jpg',

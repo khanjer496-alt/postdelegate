@@ -9,10 +9,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { Organization } from '@prisma/client';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import {
-  channelState,
-  countPlanChannels,
-} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import { countPlanChannels } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 type Tier = 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
 
@@ -210,10 +207,11 @@ export class SubscriptionService {
   }
 
   // What moving from the `current` plan to `billing` does to the workspace:
-  // channels over the new limit are turned off (newest first), channels a
-  // lapse turned off come back when the new plan holds them all, team members
-  // follow the plan, and a plan without AutoPost stops it. Channels are
-  // counted with countPlanChannels, like every other limit check
+  // channels over the new limit are locked (turned off, newest first),
+  // channels a downgrade locked come back when the limit grew, as many as it
+  // has room for, team members follow the plan, and a plan without AutoPost
+  // stops it. Channels are counted with countPlanChannels, like every other
+  // limit check
   private async applyPlanChange(
     organizationId: string,
     current: { subscriptionTier: Tier; totalChannels: number } | null,
@@ -223,15 +221,9 @@ export class SubscriptionService {
     const from = pricing[current?.subscriptionTier || 'FREE'];
     const to = pricing[billing];
 
-    const allChannels = await this._integrationService.getIntegrationsList(
-      organizationId
+    const activeChannels = countPlanChannels(
+      await this._integrationService.getIntegrationsList(organizationId)
     );
-    const activeChannels = countPlanChannels(allChannels);
-    // every channel the workspace has, on or off, but not the temporary row
-    // of a connect that still has a page to pick
-    const keptChannels = allChannels.filter(
-      (f) => channelState(f) !== 'incomplete'
-    ).length;
 
     if (activeChannels > totalChannels) {
       await this._integrationService.disableIntegrations(
@@ -240,18 +232,21 @@ export class SubscriptionService {
       );
     }
 
-    // channels are auto-disabled when a subscription lapses; once the new plan
-    // can hold all of them and the limit grew, enable everything back (partial
-    // enabling or same-plan updates would risk enabling channels the user
-    // disabled on purpose)
+    // only the channels a downgrade locked (DISABLED_BY_PLAN) come back, and
+    // only when the limit grew: a same-plan update or a renewal never turns a
+    // channel on. As many come back as the new limit has room for next to the
+    // channels already on, so a partial unlock is fine. One the customer
+    // turned off, or one turned off before the reason was recorded, stays off
     if (
       billing !== 'FREE' &&
-      activeChannels < keptChannels &&
-      keptChannels <= totalChannels &&
-      totalChannels > (current?.totalChannels || 0)
+      totalChannels > (current?.totalChannels || 0) &&
+      totalChannels > activeChannels
     ) {
       try {
-        await this._integrationService.enableAllIntegrations(organizationId);
+        await this._integrationService.enablePlanLockedIntegrations(
+          organizationId,
+          totalChannels - activeChannels
+        );
       } catch (err) {
         console.error(
           'Error enabling channels after subscription change:',
@@ -349,8 +344,8 @@ export class SubscriptionService {
 
   // The code is checked and spent in the same transaction as the plan is
   // written, so two redeems of one code can't both win. The workspace then
-  // gets what any upgrade gives it (applyPlanChange): channels a lapse turned
-  // off come back when the plan holds them, team members are enabled
+  // gets what any upgrade gives it (applyPlanChange): channels a downgrade
+  // locked come back as far as the plan has room, team members are enabled
   private async redeemLifetimeCode(
     provider: string,
     identifier: string,

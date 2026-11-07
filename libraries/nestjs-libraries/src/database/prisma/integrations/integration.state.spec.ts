@@ -8,6 +8,7 @@ import {
   countPlanChannels,
   isChannelConnected,
   isChannelDisconnected,
+  isChannelLockedByPlan,
   isChannelReady,
 } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
@@ -178,5 +179,35 @@ describe('countPlanChannels', () => {
       ])
     ).toBe(2);
     expect(countPlanChannels([])).toBe(0);
+  });
+});
+
+describe('isChannelLockedByPlan', () => {
+  it('is a channel that is off because the plan has no room for it, and nothing else', () => {
+    expect(
+      isChannelLockedByPlan(channel({ disabled: true, disabledReason: 'PLAN_LIMIT' }))
+    ).toBe(true);
+    // turned off by the customer, or before the reason was recorded
+    expect(
+      isChannelLockedByPlan(channel({ disabled: true, disabledReason: 'USER' }))
+    ).toBe(false);
+    expect(isChannelLockedByPlan(channel({ disabled: true }))).toBe(false);
+    // on again, or removed: the reason left on the row means nothing
+    expect(
+      isChannelLockedByPlan(channel({ disabledReason: 'PLAN_LIMIT' }))
+    ).toBe(false);
+    expect(
+      isChannelLockedByPlan(
+        channel({ deletedAt: new Date(), disabled: true, disabledReason: 'PLAN_LIMIT' })
+      )
+    ).toBe(false);
+  });
+
+  it('never changes what a turned off channel is or counts as', () => {
+    for (const disabledReason of ['USER', 'PLAN_LIMIT', null]) {
+      const off = channel({ disabled: true, disabledReason });
+      expect(channelState(off)).toBe('off');
+      expect(countPlanChannels([off])).toBe(0);
+    }
   });
 });

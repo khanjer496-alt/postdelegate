@@ -126,10 +126,77 @@ describe('IntegrationRepository.disableIntegrations', () => {
       orderBy: { createdAt: 'desc' },
       take: 1,
     });
+    // locked by the plan, so an upgrade can tell it from one the customer
+    // turned off
     expect(integration.update).toHaveBeenCalledWith({
       where: { id: 'newest' },
-      data: { disabled: true },
+      data: { disabled: true, disabledReason: 'PLAN_LIMIT' },
+      select: { id: true },
     });
+  });
+});
+
+describe('IntegrationRepository.enablePlanLockedIntegrations', () => {
+  const make = (locked: { id: string }[]) => {
+    const integration = {
+      findMany: jest.fn().mockResolvedValue(locked),
+      updateMany: jest.fn().mockResolvedValue({ count: locked.length }),
+    };
+    const repo = new IntegrationRepository(
+      { model: { integration } } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { repo, integration };
+  };
+
+  const lockedByPlan = {
+    organizationId: 'org-A',
+    deletedAt: null,
+    disabled: true,
+    disabledReason: 'PLAN_LIMIT',
+    inBetweenSteps: false,
+  };
+
+  it('turns back on only the channels the plan locked, oldest first, up to the room', async () => {
+    const { repo, integration } = make([{ id: 'oldest' }, { id: 'older' }]);
+
+    expect(await repo.enablePlanLockedIntegrations('org-A', 2)).toEqual({
+      count: 2,
+    });
+
+    expect(integration.findMany.mock.calls[0][0]).toEqual({
+      where: lockedByPlan,
+      orderBy: { createdAt: 'asc' },
+      take: 2,
+      select: { id: true },
+    });
+    // the write matches the lock again, so a channel the customer turned on
+    // or off in between keeps what they did
+    expect(integration.updateMany).toHaveBeenCalledWith({
+      where: { ...lockedByPlan, id: { in: ['oldest', 'older'] } },
+      data: { disabled: false, disabledReason: null },
+    });
+  });
+
+  it('touches nothing without room or without a locked channel', async () => {
+    const none = make([{ id: 'a' }]);
+    expect(await none.repo.enablePlanLockedIntegrations('org-A', 0)).toEqual({
+      count: 0,
+    });
+    expect(none.integration.findMany).not.toHaveBeenCalled();
+    expect(none.integration.updateMany).not.toHaveBeenCalled();
+
+    const empty = make([]);
+    expect(await empty.repo.enablePlanLockedIntegrations('org-A', 3)).toEqual({
+      count: 0,
+    });
+    expect(empty.integration.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -208,6 +275,22 @@ describe('IntegrationRepository channel edits', () => {
       });
     }
     expect(integration.updateMany).toHaveBeenCalledTimes(5);
+  });
+
+  it('records that the customer turned a channel off, and clears it when they turn it on', async () => {
+    const { repo, integration } = makeRepo();
+
+    await repo.disableChannel('org-A', 'int-1');
+    expect(integration.updateMany.mock.calls[0][0].data).toEqual({
+      disabled: true,
+      disabledReason: 'USER',
+    });
+
+    await repo.enableChannel('org-A', 'int-1');
+    expect(integration.updateMany.mock.calls[1][0].data).toEqual({
+      disabled: false,
+      disabledReason: null,
+    });
   });
 
   it('answers 404 for a deleted or unknown channel instead of a 500', async () => {
