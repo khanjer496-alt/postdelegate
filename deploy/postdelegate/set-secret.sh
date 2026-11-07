@@ -19,7 +19,7 @@ if [[ ! "$NAME" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
   exit 2
 fi
 case "$FILE" in
-  /etc/postiz/runtime.env|/etc/postiz/r2.env|/etc/postiz/backup-r2.env|/etc/postiz/alerts.env) ;;
+  /etc/postiz/runtime.env|/etc/postiz/staging.env|/etc/postiz/r2.env|/etc/postiz/backup-r2.env|/etc/postiz/alerts.env) ;;
   *) echo "refusing unknown target file $FILE" >&2; exit 2 ;;
 esac
 
