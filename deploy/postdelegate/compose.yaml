@@ -2,6 +2,10 @@ name: postdelegate-postiz
 
 x-service: &service
   restart: unless-stopped
+  # No process in any of these containers needs to gain privileges it was not
+  # started with, and nothing here uses setuid binaries.
+  security_opt:
+    - no-new-privileges:true
   logging:
     driver: json-file
     options:
@@ -17,7 +21,7 @@ services:
       - /etc/postiz/r2.env
     environment:
       DATABASE_URL: postgresql://postiz:${POSTIZ_DB_PASSWORD:?required}@postgres:5432/postiz
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://default:${POSTIZ_REDIS_PASSWORD:?set POSTIZ_REDIS_PASSWORD in /etc/postiz/runtime.env}@redis:6379
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_NAMESPACE: default
       BACKEND_INTERNAL_URL: http://localhost:3000
@@ -58,7 +62,25 @@ services:
   redis:
     <<: *service
     image: redis:7.2-alpine
-    command: [redis-server, --appendonly, "yes"]
+    # Redis holds queue state and cache and is reachable from every container
+    # on this network, so it asks for a password. POSTIZ_REDIS_PASSWORD has no
+    # default on purpose: Compose refuses to start without it rather than
+    # quietly running an open Redis again.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${POSTIZ_REDIS_PASSWORD:?set POSTIZ_REDIS_PASSWORD in /etc/postiz/runtime.env}"
+    environment:
+      # redis-cli reads this, so the healthcheck authenticates without putting
+      # the password in the healthcheck command
+      REDISCLI_AUTH: ${POSTIZ_REDIS_PASSWORD:?set POSTIZ_REDIS_PASSWORD in /etc/postiz/runtime.env}
+    # redis-server needs no capabilities at all. Postgres, Temporal and Caddy
+    # are left alone: their entrypoints need chown/setuid, and Caddy needs
+    # NET_BIND_SERVICE for 80/443, so dropping everything breaks them.
+    cap_drop:
+      - ALL
     volumes:
       - redis-data:/data
     healthcheck:

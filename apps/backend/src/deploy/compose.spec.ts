@@ -1,0 +1,72 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+// deploy/postdelegate/compose.yaml is the committed copy of what runs in
+// production. Audit findings A5 and A7: Redis had no password and was reachable
+// from every container on the network, and nothing stopped a process gaining
+// privileges. These assert the hardening is still there, since a merge or an
+// edit on the server can quietly undo it.
+// (The spec lives here because jest only looks under apps/*/src and
+// libraries/*/src.)
+
+const compose = readFileSync(
+  join(__dirname, '..', '..', '..', '..', 'deploy', 'postdelegate', 'compose.yaml'),
+  'utf8'
+);
+
+describe('the committed compose file', () => {
+  it('denies privilege escalation for every service, via the shared anchor', () => {
+    expect(compose).toContain('no-new-privileges:true');
+    // on the anchor rather than one service, so a new service inherits it
+    const anchor = compose.slice(
+      compose.indexOf('x-service: &service'),
+      compose.indexOf('services:')
+    );
+    expect(anchor).toContain('no-new-privileges:true');
+  });
+
+  it('requires a Redis password, with no default to fall back to', () => {
+    expect(compose).toContain('--requirepass');
+    // ":?" makes Compose refuse to start rather than run an open Redis
+    expect(compose).toMatch(/POSTIZ_REDIS_PASSWORD:\?/);
+    expect(compose).not.toMatch(/POSTIZ_REDIS_PASSWORD:-/);
+  });
+
+  it('points the app at Redis with credentials', () => {
+    const url = compose.match(/REDIS_URL: (\S+)/)?.[1] ?? '';
+    expect(url).toContain('POSTIZ_REDIS_PASSWORD');
+    expect(url).not.toBe('redis://redis:6379');
+  });
+
+  it('keeps the password out of the healthcheck command', () => {
+    const healthchecks = compose
+      .split('\n')
+      .filter((line) => line.includes('redis-cli'));
+    expect(healthchecks.length).toBeGreaterThan(0);
+    for (const line of healthchecks) {
+      expect(line).not.toContain('POSTIZ_REDIS_PASSWORD');
+      expect(line).not.toContain('-a ');
+    }
+  });
+
+  it('drops all capabilities from redis, which needs none', () => {
+    const redis = compose.slice(
+      compose.indexOf('\n  redis:'),
+      compose.indexOf('\n  temporal-postgresql:')
+    );
+    expect(redis).toContain('cap_drop');
+    expect(redis).toContain('- ALL');
+  });
+
+  it('publishes no database or cache port to the host', () => {
+    // only Caddy may be reachable from outside the Compose network
+    const published = compose
+      .split('\n')
+      .filter((line) => /^\s+- \d+:\d+|^\s+- "\d+:\d+/.test(line));
+    for (const line of published) {
+      expect(line).toMatch(/- "?(80|443):/);
+    }
+    expect(compose).not.toMatch(/\n\s+- \d+:5432/);
+    expect(compose).not.toMatch(/\n\s+- \d+:6379/);
+  });
+});
