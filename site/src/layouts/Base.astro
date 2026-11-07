@@ -8,8 +8,8 @@ import { LOCALES, LANGUAGES, TRANSLATED_PATHS, localePath, splitPath, strings, t
 import { OG_CARDS, ogCardFor } from '../data/og-cards.mjs';
 // markdown: path of the page's Markdown version, announced to agents with rel=alternate.
 // lang: the page's language; pages that exist in every language get hreflang alternates.
-interface Props { title: string; description: string; ogImage?: string; jsonLd?: object[]; noindex?: boolean; type?: string; markdown?: string; lang?: Lang }
-const { title, description, ogImage, jsonLd = [], type = 'website', markdown, lang = 'en' } = Astro.props;
+interface Props { title: string; description: string; jsonLd?: object[]; noindex?: boolean; type?: string; markdown?: string; lang?: Lang }
+const { title, description, jsonLd = [], type = 'website', markdown, lang = 'en' } = Astro.props;
 const canonicalPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const noindex = Astro.props.noindex || NOINDEX_PATHS.includes(canonicalPath);
 const canonical = new URL(canonicalPath, SITE.url).href;
@@ -24,8 +24,8 @@ const t = strings(lang);
 // paths are not in that list and fall back on purpose: an English card over a
 // Spanish page reads worse than the brand one.
 const card = OG_CARDS[canonicalPath];
-const og = new URL(ogImage ?? ogCardFor(canonicalPath) ?? '/og.png', SITE.url).href;
-const ogAlt = !ogImage && card ? `${card.title} — PostDelegate` : t.common.ogImageAlt;
+const og = new URL(ogCardFor(canonicalPath) ?? '/og.png', SITE.url).href;
+const ogAlt = card ? `${card.title} — PostDelegate` : t.common.ogImageAlt;
 const logo = { '@type': 'ImageObject', '@id': `${SITE.url}/#logo`, url: new URL('/postdelegate-icon-512.png', SITE.url).href, contentUrl: new URL('/postdelegate-icon-512.png', SITE.url).href, width: 512, height: 512, caption: 'PostDelegate logo' };
 const org = { '@context': 'https://schema.org', '@type': 'Organization', '@id': `${SITE.url}/#organization`, name: 'PostDelegate', legalName: SITE.operator, url: SITE.url, logo, image: { '@id': `${SITE.url}/#logo` }, email: SITE.email, sameAs: SOCIAL_PROFILES.map((profile) => profile.href) };
 const website = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'PostDelegate', url: SITE.url };

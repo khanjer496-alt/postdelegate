@@ -64,6 +64,7 @@ export const OG_CARDS = {
   '/agents': { kicker: 'For agents', title: 'Let your AI assistant run your social media' },
   '/api': { kicker: 'Developers', title: 'The PostDelegate API' },
   '/alternatives': { kicker: 'Compare', title: 'Social media scheduler alternatives' },
+  '/alternatives/postiz': { kicker: 'Compare', title: 'Postiz alternatives: hosted, self-hosted and API' },
   '/guides': { kicker: 'Guides', title: 'Guides for scheduling social media' },
   '/compare': { kicker: 'Compare', title: 'PostDelegate compared to every scheduler' },
   '/tools': { kicker: 'Free tools', title: 'Free tools for social media posts' },

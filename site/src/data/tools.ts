@@ -5,6 +5,7 @@
 // so prices are re-read on the vendor's own site before they go stale.
 import { PLANS, type Plan } from './plans';
 import { SITE } from './site';
+import { ogCardFor } from './og-cards.mjs';
 
 export interface Fact { value: string; src: string | string[]; note?: string }
 // Per-unit prices that drop at volume: [up to this many units, price per unit per month], in order.
@@ -99,7 +100,9 @@ export function comparisonJsonLd(page: { path: string; title: string; descriptio
       { '@type': 'ListItem', position: 3, name: page.title, item: url }] },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: page.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: strip(f.a) } })) },
     { '@context': 'https://schema.org', '@type': 'Article', headline: page.title, description: page.description, url, mainEntityOfPage: url, inLanguage: 'en',
-      image: new URL('/og.png', SITE.url).href, datePublished: page.published, dateModified: page.modified,
+      // the page's own share card, which carries its headline; /og.png only
+      // for the pages that have no card of their own
+      image: new URL(ogCardFor(page.path) ?? '/og.png', SITE.url).href, datePublished: page.published, dateModified: page.modified,
       author: { '@type': 'Person', name: 'Naser Khanjar' },
       publisher: { '@type': 'Organization', name: SITE.operator, url: SITE.url, logo: { '@type': 'ImageObject', url: new URL('/postdelegate-icon-512.png', SITE.url).href, width: 512, height: 512 } } },
   ];

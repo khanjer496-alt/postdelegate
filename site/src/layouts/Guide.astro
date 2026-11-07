@@ -10,6 +10,7 @@ const { title, description, metaTitle, date = '2026-11-01' } = frontmatter;
 const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const url = new URL(path, SITE.url).href;
 const more = GUIDES.filter((guide) => `/guides/${guide.slug}` !== path);
+const card = ogCardFor(path);
 const jsonLd = [
   { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
     { '@type': 'ListItem', position: 1, name: 'PostDelegate', item: SITE.url },
@@ -18,7 +19,7 @@ const jsonLd = [
   // Article wants an image; the guide's own share card is the one picture the
   // page is guaranteed to have, and it carries the headline.
   { '@context': 'https://schema.org', '@type': 'Article', headline: title, description, url, mainEntityOfPage: url, inLanguage: 'en', datePublished: date, dateModified: date,
-    ...(ogCardFor(path) ? { image: { '@type': 'ImageObject', url: new URL(ogCardFor(path)!, SITE.url).href, width: 1200, height: 630 } } : {}),
+    ...(card ? { image: { '@type': 'ImageObject', url: new URL(card, SITE.url).href, width: 1200, height: 630 } } : {}),
     author: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url }, publisher: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url } },
 ];
 ---
