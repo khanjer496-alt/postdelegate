@@ -6,7 +6,10 @@ name: Build
 on:
   pull_request:
     paths-ignore:
-      - deploy/**
+      # deploy/** is NOT ignored: the Caddy config that fronts production lives
+      # there and nothing else compiles it. It was once committed in a state
+      # Caddy refuses to load, and a Caddyfile-only pull request is exactly the
+      # shape of change that would have skipped every check.
       - site/**
       - '**/*.md'
       - .github/workflows/uptime.yml
@@ -26,6 +29,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Caddy config
+        # Caddy itself is the only authority on whether this file loads: a
+        # duplicate matcher, an unknown directive or a bad placeholder all
+        # fail here instead of on the server. The staging login is supplied
+        # from the environment on the server; any bcrypt hash validates.
+        run: |
+          # generated here, never written down: basic_auth only needs the
+          # placeholder to parse as a bcrypt hash
+          HASH="$(docker run --rm caddy:2.10-alpine caddy hash-password --plaintext ci)"
+          docker run --rm \
+            -v "$PWD/deploy/postdelegate/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -e STAGING_BASIC_AUTH_USER=ci \
+            -e STAGING_BASIC_AUTH_HASH="$HASH" \
+            caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Use Node.js
         uses: actions/setup-node@v4
