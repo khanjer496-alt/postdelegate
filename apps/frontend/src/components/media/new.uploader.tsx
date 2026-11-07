@@ -311,10 +311,12 @@ export function useUppyUploader(props: {
       props.onEnd();
       fileOrderIndex = 0;
     });
-    // a closed window cancels its uploads, nothing finishes them anymore
+    // a closed window cancels its uploads, nothing finishes them anymore; a
+    // batch still saving its files releases the lock once it is done
     uppy2.on('cancel-all', () => {
-      saving = 0;
-      setLocked(false, lockOwner);
+      if (!saving) {
+        setLocked(false, lockOwner);
+      }
     });
     uppy2.on('upload-start', () => {
       props.onStart();

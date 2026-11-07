@@ -843,16 +843,52 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             // Automatically shortlink without asking
             shortLink = true;
           } else {
-            // ASK: Show the dialog
-            shortLink = await deleteDialog(
-              t(
-                'shortlink_urls_question',
-                'Do you want to shortlink the URLs? it will let you get statistics over clicks'
-              ),
-              t('yes_shortlink_it', 'Yes, shortlink it!'),
-              undefined,
-              t('no_original_urls', 'No, original URLs')
+            // ASK: Show the dialog, closing it stops the save like the
+            // other questions do
+            const answer = await new Promise<boolean | undefined>(
+              (resolve) => {
+                modal.openModal({
+                  id: 'shortlink-post',
+                  title: t('are_you_sure', 'Are you sure?'),
+                  onClose: () => resolve(undefined),
+                  children: (
+                    <div className="flex flex-col">
+                      <div className="max-w-[600px]">
+                        {t(
+                          'shortlink_urls_question',
+                          'Do you want to shortlink the URLs? it will let you get statistics over clicks'
+                        )}
+                      </div>
+                      <div className="flex gap-[12px] mt-[16px]">
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            modal.closeById('shortlink-post');
+                            resolve(true);
+                          }}
+                        >
+                          {t('yes_shortlink_it', 'Yes, shortlink it!')}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            modal.closeById('shortlink-post');
+                            resolve(false);
+                          }}
+                        >
+                          {t('no_original_urls', 'No, original URLs')}
+                        </Button>
+                      </div>
+                    </div>
+                  ),
+                });
+              }
             );
+
+            if (answer === undefined) {
+              return false;
+            }
+            shortLink = answer;
           }
         }
       }

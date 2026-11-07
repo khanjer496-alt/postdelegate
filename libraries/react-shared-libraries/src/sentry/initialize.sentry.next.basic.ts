@@ -30,6 +30,11 @@ export const initializeSentryBasic = (environment: string, dsn: string, extensio
     'code' in exception &&
     'message' in exception;
 
+  // customFetch rejects with HandledResponseError once a trial or billing dialog
+  // already answered the response, it is the user's choice, not a bug.
+  const isHandledResponse = (exception: unknown) =>
+    exception instanceof Error && exception.name === 'HandledResponseError';
+
   // Frameless rejections our code can never produce: every chrome.runtime.sendMessage
   // call we make passes a callback, so it never rejects with this message.
   const thirdPartyFramelessPatterns = [
@@ -88,6 +93,10 @@ export const initializeSentryBasic = (environment: string, dsn: string, extensio
 
       beforeSend(event, hint) {
         if (isWalletExtensionRejection(hint?.originalException)) {
+          return null; // Ignore the event
+        }
+
+        if (isHandledResponse(hint?.originalException)) {
           return null; // Ignore the event
         }
 

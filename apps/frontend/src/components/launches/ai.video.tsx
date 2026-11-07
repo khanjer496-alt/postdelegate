@@ -46,9 +46,18 @@ export const Modal: FC<{
       return;
     }
 
+    // a trial that can't use this video type already showed its dialog
     const allowed = await fetch(
       `/media/generate-video/${type.identifier}/allowed`
-    );
+    ).catch((e) => {
+      if (e instanceof HandledResponseError) {
+        return undefined;
+      }
+      throw e;
+    });
+    if (!allowed) {
+      return;
+    }
     if (!allowed.ok) {
       // a plan limit already showed its own dialog
       if (allowed.status !== 402) {

@@ -28,6 +28,9 @@ const swrConfig = {
     SWRConfig.defaultValue.onErrorRetry(...args);
   },
 };
+// endpoints whose 406 is their own error, shown by the caller, not the trial
+// wall; the trial 406 has no marker in its body to tell them apart
+const OWN_NOT_ACCEPTABLE = ['/integrations/social-connect/'];
 export function setCookie(cname: string, cvalue: string, exdays: number) {
   if (typeof document === 'undefined') {
     return;
@@ -107,7 +110,10 @@ function LayoutContextInner(params: { children: ReactNode }) {
         }
         window.location.href = '/';
       }
-      if (response.status === 406) {
+      if (
+        response.status === 406 &&
+        !OWN_NOT_ACCEPTABLE.some((path) => url.startsWith(path))
+      ) {
         if (
           await deleteDialog(
             "This feature is not available during the trial. You can end the trial now: your plan's first payment is charged today instead of at the end of the trial.",
