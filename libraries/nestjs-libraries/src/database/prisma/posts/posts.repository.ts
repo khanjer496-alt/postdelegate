@@ -20,6 +20,7 @@ import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dt
 import { decryptIntegrationOf } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
 import { evergreenOccurrences } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
 import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
+import { CHANNEL_READY } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
@@ -98,12 +99,7 @@ export class PostsRepository {
   searchForMissingThreeHoursPosts() {
     return this._post.model.post.findMany({
       where: {
-        integration: {
-          refreshNeeded: false,
-          inBetweenSteps: false,
-          disabled: false,
-          deletedAt: null,
-        },
+        integration: { ...CHANNEL_READY },
         publishDate: {
           gte: dayjs.utc().subtract(2, 'day').toDate(),
           lt: dayjs.utc().toDate(),
@@ -128,11 +124,9 @@ export class PostsRepository {
   getOldPosts(orgId: string, date: string) {
     return this._post.model.post.findMany({
       where: {
-        integration: {
-          refreshNeeded: false,
-          inBetweenSteps: false,
-          disabled: false,
-        },
+        // this one used to leave out deletedAt, so it returned the old posts
+        // of channels the customer had already removed
+        integration: { ...CHANNEL_READY },
         organizationId: orgId,
         publishDate: {
           lte: dayjs(date).toDate(),

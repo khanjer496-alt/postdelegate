@@ -302,7 +302,7 @@ const Steps: FC<{ step: number }> = ({ step }) => {
   );
 };
 
-const Alert: FC<{ tone: 'warn' | 'error'; children: React.ReactNode }> = ({
+export const Alert: FC<{ tone: 'warn' | 'error'; children: React.ReactNode }> = ({
   tone,
   children,
 }) => (

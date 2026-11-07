@@ -37,6 +37,7 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { uniqBy } from 'lodash';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
+import { channelState } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -139,6 +140,9 @@ export class IntegrationsController {
             dataDeletionNotice: findIntegration.authorizationPolicy?.deletionNotice,
             inBetweenSteps: p.inBetweenSteps,
             refreshNeeded: p.refreshNeeded,
+            // what those two flags and `disabled` mean together, decided in
+            // one place so every screen says the same thing about a channel
+            state: channelState(p),
             isCustomFields: !!findIntegration.customFields,
             ...(findIntegration.customFields
               ? { customFields: await findIntegration.customFields() }

@@ -25,6 +25,7 @@ import {
   postId as postIdSearchParam,
 } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { isChannelReady } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import {
   setHeartbeatDetails,
   withHeartbeat,
@@ -119,10 +120,7 @@ export class PostActivity {
       integration.organizationId,
       integration.id
     );
-    if (
-      !current || current.deletedAt ||
-      (requireReady && (current.disabled || current.inBetweenSteps || current.refreshNeeded))
-    ) {
+    if (!current || current.deletedAt || (requireReady && !isChannelReady(current))) {
       throw new BadBody(
         'channel-unavailable', '{}', '{}',
         'This channel or post is no longer available.'

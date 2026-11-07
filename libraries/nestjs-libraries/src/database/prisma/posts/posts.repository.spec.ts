@@ -219,3 +219,40 @@ describe('PostsRepository.getAccountPostingDates', () => {
     expect(findMany.mock.calls[1][0].where.id).toBeUndefined();
   });
 });
+
+describe('PostsRepository channel-state scoping', () => {
+  const makeFindMany = () => {
+    const post = { findMany: jest.fn().mockResolvedValue([]) };
+    const repo = new PostsRepository(
+      { model: { post } } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { repo, post };
+  };
+
+  const ready = {
+    deletedAt: null,
+    disabled: false,
+    inBetweenSteps: false,
+    refreshNeeded: false,
+  };
+
+  it('only looks at channels a post can still go out on', async () => {
+    const { repo, post } = makeFindMany();
+    await repo.searchForMissingThreeHoursPosts();
+    expect(post.findMany.mock.calls[0][0].where.integration).toEqual(ready);
+  });
+
+  // this one used to leave deletedAt out, so it returned the old posts of
+  // channels the customer had already removed
+  it('leaves out the old posts of a removed channel', async () => {
+    const { repo, post } = makeFindMany();
+    await repo.getOldPosts('org-1', '2026-01-01');
+    expect(post.findMany.mock.calls[0][0].where.integration).toEqual(ready);
+  });
+});

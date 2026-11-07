@@ -796,3 +796,59 @@ describe('PostsBulkVideosService', () => {
     ]);
   });
 });
+
+describe('PostsBulkVideosService.channels', () => {
+  const channel = (id: string, flags: Record<string, any> = {}) => ({
+    id,
+    name: id,
+    providerIdentifier: 'x',
+    picture: null,
+    deletedAt: null,
+    disabled: false,
+    inBetweenSteps: false,
+    refreshNeeded: false,
+    additionalSettings: '[]',
+    ...flags,
+  });
+
+  const make = (list: any[]) => {
+    const integrationService = {
+      getIntegrationsList: jest.fn().mockResolvedValue(list),
+    };
+    const integrationManager = {
+      getSocialIntegration: jest.fn().mockReturnValue({ editor: 'normal' }),
+    };
+    return new PostsBulkVideosService(
+      {} as any,
+      {} as any,
+      integrationService as any,
+      integrationManager as any,
+      {} as any
+    );
+  };
+
+  // the composer offers a channel that needs reconnecting and the CSV import
+  // warns about it rather than hiding it, so this list does the same
+  it('offers a channel that needs reconnecting, and says so', async () => {
+    const service = make([
+      channel('ready'),
+      channel('stale', { refreshNeeded: true }),
+    ]);
+    const channels = await service.channels('org-1');
+    expect(channels.map((c: any) => [c.id, c.state])).toEqual([
+      ['ready', 'ready'],
+      ['stale', 'reconnect'],
+    ]);
+  });
+
+  it('leaves out the ones nothing can be scheduled to', async () => {
+    const service = make([
+      channel('ready'),
+      channel('off', { disabled: true }),
+      channel('half', { inBetweenSteps: true }),
+      channel('gone', { deletedAt: new Date() }),
+    ]);
+    const channels = await service.channels('org-1');
+    expect(channels.map((c: any) => c.id)).toEqual(['ready']);
+  });
+});

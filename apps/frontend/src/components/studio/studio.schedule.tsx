@@ -11,6 +11,7 @@ import {
   StatusChip,
 } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 import {
+  Alert,
   SettingInput,
   cleanSettings,
   initialSettings,
@@ -81,8 +82,13 @@ const ScheduleRenders: FC<{
   const [problems, setProblems] = useState<string[]>([]);
   const [result, setResult] = useState<ScheduleResult>();
 
+  // the same channels the composer offers: one that needs reconnecting is
+  // still schedulable, and like the CSV import this says so rather than
+  // hiding it. The backend decides the state; this does not re-derive it.
   const usable = (channels || []).filter(
-    (channel) => channel.acceptsVideo && !channel.refreshNeeded
+    (channel) =>
+      channel.acceptsVideo &&
+      (!channel.state || channel.state === 'ready' || channel.state === 'reconnect')
   );
   const pickedIds = Object.keys(picked);
 
@@ -244,6 +250,16 @@ const ScheduleRenders: FC<{
                       </span>
                     )}
                   </label>
+                  {/* the same warning, and the same translated sentence, the
+                      bulk video upload shows for a channel in this state */}
+                  {channel.state === 'reconnect' && (
+                    <Alert tone="warn">
+                      {t(
+                        'bulk_videos_refresh_needed',
+                        'This channel needs to be reconnected before the posts go out.'
+                      )}
+                    </Alert>
+                  )}
                   {checked && (
                     <ChannelSettings
                       channel={channel}

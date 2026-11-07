@@ -22,6 +22,7 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { setHeartbeatDetails } from '@gitroom/nestjs-libraries/temporal/temporal.heartbeat';
+import { isChannelReady } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 dayjs.extend(utc);
 
@@ -171,10 +172,7 @@ export class AnalyticsSnapshotService {
     if (
       !integration ||
       integration.organizationId !== orgId ||
-      integration.deletedAt ||
-      integration.disabled ||
-      integration.refreshNeeded ||
-      integration.inBetweenSteps ||
+      !isChannelReady(integration) ||
       integration.type !== 'social' ||
       (integration.tokenExpiration &&
         dayjs(integration.tokenExpiration).isBefore(dayjs(now)))

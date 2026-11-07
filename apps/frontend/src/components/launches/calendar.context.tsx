@@ -26,6 +26,7 @@ import {
 } from '@gitroom/frontend/components/layout/set.timezone';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { expandPostsList, expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
+import type { ChannelState } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 extend(isoWeek);
 extend(weekOfYear);
 
@@ -109,6 +110,9 @@ export interface Integrations {
   id: string;
   disabled?: boolean;
   inBetweenSteps: boolean;
+  refreshNeeded?: boolean;
+  // what those flags mean together, decided by the backend
+  state?: ChannelState;
   editor: 'none' | 'normal' | 'markdown' | 'html';
   stripLinks?: boolean;
   display: string;
