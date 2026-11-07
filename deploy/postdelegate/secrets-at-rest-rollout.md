@@ -35,7 +35,25 @@ authenticates exactly as before.
 
 ## 3. Backfill
 
-(Filled in by Task 6 — dry run first, read the report, then for real.)
+Inside the container, dry run first and read the report:
+
+```bash
+node apps/backend/dist/apps/backend/src/commands/backfill.secrets.js --dry-run
+```
+
+Then for real. It is idempotent and resumable, so it can be re-run, and it can
+be taken a group at a time (`org`, `oauth`, `credentials`, `integrations`):
+
+```bash
+node apps/backend/dist/apps/backend/src/commands/backfill.secrets.js
+```
+
+It exits 2 when any row was `unreadable` (could not be read, never modified) or
+`skippedChanged` (a reconnect, refresh or rotation landed while the batch was in
+flight — re-run to pick those up). It never logs a secret value, only row ids.
+
+Authorization codes are deliberately not converted: they expire ten minutes
+after being issued, and both forms are accepted while they live.
 
 ## 4. Verify, then stop writing the legacy form
 
@@ -49,6 +67,12 @@ After this work, `fixedEncryption` keeps exactly one caller: the lifetime-deal
 code format (`codes.service.ts`, `stripe.service.ts`'s `lifetimeDeal`). Those
 codes are already in customers' hands, so the scheme cannot change without
 invalidating them.
+
+One vestigial site remains: `skool.provider.ts` pre-encrypts its cookie JSON
+into `Integration.token`, a column the repository then encrypts again with
+`token.encryption.ts`. Nothing reads that inner layer (`getCookies` reads
+`customInstanceDetails` instead), so it was left alone rather than changing a
+stored format on a deliberately hidden provider.
 
 Note also that rotating `JWT_SECRET` signs out every session by design, through
 `AuthService.passwordFingerprint`. It is not a quiet change.
