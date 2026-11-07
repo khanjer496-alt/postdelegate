@@ -121,7 +121,8 @@ The normal OAuth callback shape is `https://app.postdelegate.com/integrations/so
 | `facebook`, `instagram` | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` |
 | `instagram-standalone` | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` |
 | `threads` | `THREADS_APP_ID`, `THREADS_APP_SECRET` |
-| `linkedin`, `linkedin-page` | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`; both callbacks must be registered |
+| `linkedin` | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` (personal app) |
+| `linkedin-page` | `LINKEDIN_PAGE_CLIENT_ID`, `LINKEDIN_PAGE_CLIENT_SECRET` (separate app: LinkedIn grants the Community Management API only to an app holding no other product). Falls back to the personal app's variables when unset |
 | `youtube` | `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`; also used by working native Google login, so preserve that callback and retest login when changing this client |
 | `gmb` | `GOOGLE_GMB_CLIENT_ID`, `GOOGLE_GMB_CLIENT_SECRET`, with the documented YouTube-credential fallback |
 | `tiktok` | `TIKTOK_CLIENT_ID`, `TIKTOK_CLIENT_SECRET` |

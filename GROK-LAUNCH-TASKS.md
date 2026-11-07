@@ -123,7 +123,7 @@ Status: no app yet, and the company Page couldn't be created because the LinkedI
    - `https://app.postdelegate.com/integrations/social/linkedin-page`
 6. The code requests these scopes: `openid`, `profile`, `w_member_social`, `r_basicprofile`, `rw_organization_admin`, `w_organization_social`, `r_organization_social`
 7. **Important:** LinkedIn may refuse to put Community Management API on an app that already has other products, and may require a separate app for it. If that happens, don't work around it. Record it in section 6 and Claude will add support for a second LinkedIn client.
-8. Server settings: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
+8. Server settings: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, and for LinkedIn Pages `LINKEDIN_PAGE_CLIENT_ID`, `LINKEDIN_PAGE_CLIENT_SECRET` (separate app)
 9. Don't accept LinkedIn's API terms without the owner's OK. It's listed as an owner decision.
 
 ### 2.4 Pinterest (priority 2)
