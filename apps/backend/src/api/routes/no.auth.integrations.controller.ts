@@ -5,8 +5,11 @@ import {
   HttpException,
   Param,
   Post,
+  Req,
+  Res,
   UseFilters,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { ConnectIntegrationDto } from '@gitroom/nestjs-libraries/dtos/integrations/connect.integration.dto';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
@@ -28,6 +31,24 @@ import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/s
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { writeCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
+import { isCrossSiteCookieRequest } from '@gitroom/backend/services/auth/csrf';
+import { Organization } from '@prisma/client';
+import {
+  ConnectBinding,
+  CONNECT_OTHER_BROWSER_MESSAGE,
+  confirmConnectBinding,
+  connectLinkCreator,
+  connectNonceCookie,
+  connectNonceCookieOptions,
+  connectNonceMatches,
+  deleteConnectBinding,
+  deleteConnectState,
+  isConnectLink,
+  notifiesAdmins,
+  readConnectBinding,
+} from '@gitroom/nestjs-libraries/integrations/connect.binding';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -37,8 +58,129 @@ export class NoAuthIntegrationsController {
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _organizationService: OrganizationService,
-    private _permissionsService: PermissionsService
+    private _permissionsService: PermissionsService,
+    private _usersService: UsersService
   ) {}
+
+  // The id of the member signed in on this request, by the auth header or by
+  // the auth cookie of a request sent from the app itself
+  private async signedInUserId(req: Request) {
+    const auth = req.headers?.auth || req.cookies?.auth;
+    if (!auth || typeof auth !== 'string' || isCrossSiteCookieRequest(req)) {
+      return undefined;
+    }
+    return (await getSessionUser(this._usersService, auth))?.id;
+  }
+
+  private async isActiveMember(orgId: string, userId: string) {
+    return !!(await this._organizationService.getActiveTeam(orgId))?.users.some(
+      (member) => member.user.id === userId
+    );
+  }
+
+  // Whoever finishes a connect is whoever started it (see connect.binding).
+  // A connect started in the app needs that browser's nonce cookie and that
+  // member still in the workspace. The same member signed in stands in for
+  // the cookie only under NOT_SECURED, where the app and the API can sit on
+  // different sites and a cookie may not travel. A shared link is confirmed
+  // by the person who opens it instead (the caller asks). Runs before
+  // anything of the state is spent, a refused callback changes nothing.
+  private async checkConnectBinding(
+    req: Request,
+    state: string,
+    binding: ConnectBinding,
+    orgId: string
+  ) {
+    if (binding.orgId !== orgId) {
+      throw new HttpException(CONNECT_OTHER_BROWSER_MESSAGE, 403);
+    }
+
+    if (isConnectLink(binding)) {
+      return;
+    }
+
+    const sameBrowser = connectNonceMatches(
+      binding,
+      req.cookies?.[connectNonceCookie(state)]
+    );
+    if (
+      !binding.userId ||
+      !(
+        sameBrowser ||
+        (!!process.env.NOT_SECURED &&
+          (await this.signedInUserId(req)) === binding.userId)
+      ) ||
+      !(await this.isActiveMember(orgId, binding.userId))
+    ) {
+      throw new HttpException(CONNECT_OTHER_BROWSER_MESSAGE, 403);
+    }
+  }
+
+  // This route runs without a session, so the guard never checked the plan's
+  // channel limit. A channel the workspace already has (a reconnect) never
+  // counts as a new one
+  private async checkChannelLimit(org: Organization, internalId?: string) {
+    if (
+      internalId &&
+      (await this._integrationService.getIntegrationByInternalId(
+        org.id,
+        internalId
+      ))
+    ) {
+      return;
+    }
+    if (await this._permissionsService.canAddChannel(org.id, org.createdAt)) {
+      return;
+    }
+    const message = await this._permissionsService
+      .channelLimitMessage(org.id)
+      .catch((): undefined => undefined);
+    throw new SubscriptionException({
+      section: Sections.CHANNEL,
+      action: AuthorizationActions.Create,
+      ...(message ? { message } : {}),
+    });
+  }
+
+  // What the person opening a shared link is asked to confirm: the
+  // workspace, the network and who created the link, plus a warning when they
+  // are signed in to PostDelegate but not a member of that workspace
+  private async linkConfirmation(
+    req: Request,
+    org: Organization,
+    binding: ConnectBinding,
+    providerName: string
+  ) {
+    const creator = binding.userId
+      ? await this._usersService.getUserById(binding.userId).catch(() => null)
+      : null;
+    const viewer = await this.signedInUserId(req);
+    return {
+      needsConfirmation: true,
+      workspaceName: org.name,
+      providerName,
+      createdBy: connectLinkCreator(creator),
+      signedInOutsideWorkspace:
+        !!viewer && !(await this.isActiveMember(org.id, viewer)),
+    };
+  }
+
+  // The state is spent: its binding goes, and the nonce cookie with it.
+  // Always after organization:{state} is gone, a state without a binding is
+  // read as one started before bindings existed
+  private async spendConnectBinding(
+    res: Response,
+    state: string,
+    binding?: ConnectBinding
+  ) {
+    if (!binding) {
+      return;
+    }
+    await deleteConnectBinding(state);
+    if (!isConnectLink(binding)) {
+      res.cookie(connectNonceCookie(state), '', connectNonceCookieOptions(-1));
+    }
+  }
 
   @Get('/')
   getIntegrations() {
@@ -50,7 +192,10 @@ export class NoAuthIntegrationsController {
   @UseFilters(new NotEnoughScopesFilter())
   async connectSocialMedia(
     @Param('integration') integration: string,
-    @Body() body: ConnectIntegrationDto
+    @Body() body: ConnectIntegrationDto,
+    @Req() req: Request,
+    // not "res": the token exchange below names its resolve function that
+    @Res({ passthrough: true }) response: Response
   ) {
     if (
       !this._integrationManager
@@ -80,6 +225,38 @@ export class NoAuthIntegrationsController {
     }
 
     const org = await this._organizationService.getOrgById(organization);
+
+    // No binding exists only for a state created before this release (every
+    // producer writes it first, Redis never evicts); it keeps the old
+    // behaviour until it expires, an hour at most. Remove this branch once
+    // the release is an hour old
+    const binding = await readConnectBinding(body.state);
+    const sharedLink = !!binding && isConnectLink(binding);
+    if (binding) {
+      await this.checkConnectBinding(req, body.state, binding, org.id);
+    }
+
+    // A shared link says which workspace it adds the account to before the
+    // code is exchanged; nothing of the state is spent until the person
+    // confirms and the page posts again with confirmed: true. What can be
+    // refused without the account (a network not available to the
+    // workspace, a full plan) is refused before asking
+    if (binding && sharedLink && body.confirmed !== true) {
+      const pendingRefresh =
+        (await ioRedis.get(`refresh:${body.state}`)) || undefined;
+      await this._integrationService.checkProviderAvailable(
+        org.id,
+        integration,
+        pendingRefresh
+      );
+      await this.checkChannelLimit(org, pendingRefresh);
+      return this.linkConfirmation(
+        req,
+        org,
+        binding,
+        integrationProvider.name
+      );
+    }
 
     if (!integrationProvider.customFields) {
       await ioRedis.del(`login:${body.state}`);
@@ -249,25 +426,7 @@ export class NoAuthIntegrationsController {
       integration
     );
 
-    // This route runs without a session, so the guard never checked the plan's
-    // channel limit. A channel the workspace already has (a reconnect) never
-    // counts as a new one
-    if (
-      !(await this._integrationService.getIntegrationByInternalId(
-        org.id,
-        refresh || String(id)
-      )) &&
-      !(await this._permissionsService.canAddChannel(org.id, org.createdAt))
-    ) {
-      const message = await this._permissionsService
-        .channelLimitMessage(org.id)
-        .catch((): undefined => undefined);
-      throw new SubscriptionException({
-        section: Sections.CHANNEL,
-        action: AuthorizationActions.Create,
-        ...(message ? { message } : {}),
-      });
-    }
+    await this.checkChannelLimit(org, refresh || String(id));
 
     if (refresh && String(id) !== String(refresh)) {
       // A reconnect that returns a different id is either the wrong account or
@@ -330,6 +489,21 @@ export class NoAuthIntegrationsController {
         console.log(err);
       });
 
+    // the admins hear about every account an invite or API link added, so
+    // one they did not expect is easy to spot and remove
+    if (binding && notifiesAdmins(binding)) {
+      this._integrationService
+        .informAboutLinkConnect(
+          org.id,
+          org.name,
+          username ? `@${username}` : validName.trim(),
+          integrationProvider.name
+        )
+        .catch((err) => {
+          console.log(err);
+        });
+    }
+
     // Fetch pages if this is a two-step provider and not a refresh
     let pages: any[] = [];
     if (integrationProvider.isBetweenSteps && !refresh) {
@@ -357,6 +531,10 @@ export class NoAuthIntegrationsController {
     // the retry of providers that take credentials from the person
     if (!(integrationProvider.isBetweenSteps && !refresh)) {
       await ioRedis.del(`organization:${body.state}`);
+      await this.spendConnectBinding(response, body.state, binding);
+    } else if (binding && sharedLink) {
+      // the page picking step that follows is part of this confirmed connect
+      await confirmConnectBinding(body.state, binding);
     }
 
     await ioRedis.del(`login:${body.state}`);
@@ -416,9 +594,30 @@ export class NoAuthIntegrationsController {
     };
   }
 
+  // "Cancel" on the confirmation of a shared link: the state is dropped so
+  // the code the platform sent can never be completed later. Only a link not
+  // confirmed yet, a connect started in the app is never cancelled by state
+  @Post('/social-connect/:integration/cancel')
+  async cancelLinkConnect(@Body('state') state: string) {
+    if (!state || typeof state !== 'string') {
+      throw new HttpException('Invalid state', 400);
+    }
+    const binding = await readConnectBinding(state);
+    if (!binding || !isConnectLink(binding) || binding.confirmed) {
+      return { cancelled: false };
+    }
+    await deleteConnectState(state);
+    return { cancelled: true };
+  }
+
   @Post('/public/provider/:id/connect')
-  async saveProviderPage(@Param('id') id: string, @Body() body: any) {
-    if (!body.state) {
+  async saveProviderPage(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    if (!body.state || typeof body.state !== 'string') {
       throw new Error('Invalid state');
     }
 
@@ -434,6 +633,19 @@ export class NoAuthIntegrationsController {
       throw new Error('Organization not found');
     }
 
+    // the page is picked by whoever finished the connect: the same browser,
+    // or the person who confirmed the shared link
+    const binding = await readConnectBinding(body.state);
+    if (binding) {
+      await this.checkConnectBinding(req, body.state, binding, org.id);
+      if (isConnectLink(binding) && !binding.confirmed) {
+        throw new HttpException(
+          'This connection link expired or was already used, please connect the channel again',
+          400
+        );
+      }
+    }
+
     const saved = await this._integrationService.saveProviderPage(
       org.id,
       id,
@@ -441,6 +653,7 @@ export class NoAuthIntegrationsController {
       org.subscription?.totalChannels || pricing.FREE.channel!
     );
     await ioRedis.del(`organization:${body.state}`);
+    await this.spendConnectBinding(res, body.state, binding);
     return saved;
   }
 

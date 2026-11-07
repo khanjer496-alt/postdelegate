@@ -26,7 +26,7 @@ import {
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
-import { difference, uniq } from 'lodash';
+import { difference, escape, uniq } from 'lodash';
 import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -474,6 +474,30 @@ export class IntegrationService {
       'info',
       { integrationId: integration.id }
     );
+  }
+
+  // A channel added through a shared connect link (an invite, the public API,
+  // a partner or the mobile app) rather than in the browser that started it,
+  // so a channel nobody in the workspace expected is easy to spot and remove.
+  // Never breaks the connect it reports
+  async informAboutLinkConnect(
+    orgId: string,
+    workspace: string,
+    account: string,
+    providerName: string
+  ) {
+    const subject = 'A channel was connected through a shared link';
+    const message = `${account} (${providerName}) was connected to ${workspace} through a shared connect link. If you did not expect it, remove the channel from the calendar.`;
+    try {
+      await this._notificationService.inAppNotification(orgId, subject, message);
+      await this._notificationService.sendEmailsToOrgAdmins(
+        orgId,
+        subject,
+        `<p style="margin:0 0 20px">${escape(message)}</p>`
+      );
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   async refreshNeeded(org: string, id: string, expectedToken?: string) {

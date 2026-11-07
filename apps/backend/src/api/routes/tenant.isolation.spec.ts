@@ -35,6 +35,7 @@ const EXEMPT: Record<string, string> = {
   // resolves its own tenant from the state or token it was given
   'no.auth.integrations.controller.ts#connectSocialMedia': 'pre-auth OAuth callback, resolves its own org',
   'no.auth.integrations.controller.ts#saveProviderPage': 'pre-auth OAuth callback, resolves its own org',
+  'no.auth.integrations.controller.ts#cancelLinkConnect': 'pre-auth OAuth callback, drops an unconfirmed shared link by its state',
   // login with a social provider, before any session exists; the route
   // parameter is a provider name, not a tenant-owned resource
   'auth.controller.ts#oauthLink': 'pre-auth login, param is a provider name',

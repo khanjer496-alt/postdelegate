@@ -4,6 +4,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HttpStatusCode } from 'axios';
 import { useRouter } from 'next/navigation';
 import { Redirect } from '@gitroom/frontend/components/layout/redirect';
+import { Button } from '@gitroom/react/form/button';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { continueProviderList } from '@gitroom/frontend/components/new-launch/providers/continue-provider/list';
@@ -22,11 +23,23 @@ interface TwoStepState {
   onboarding: boolean;
   pages: any[];
   returnURL?: string;
+  // a confirmed shared link: the page is saved by its state, never by the
+  // workspace this browser happens to be signed in to
+  sharedLink: boolean;
 }
 
 // The whole screen is one value, so every path ends in something visible
 type ConnectState =
   | { status: 'loading' }
+  // a shared connect link: the person says which workspace gets the account
+  | {
+      status: 'confirm';
+      workspaceName: string;
+      providerName: string;
+      createdBy?: string;
+      // signed in to PostDelegate, but not a member of the link's workspace
+      outsideWorkspace: boolean;
+    }
   | { status: 'picking'; step: TwoStepState; saveError?: string }
   | { status: 'saving'; step: TwoStepState }
   | { status: 'error'; message?: string }
@@ -69,13 +82,16 @@ export const ContinueIntegration: FC<{
   const started = useRef(false);
 
   // Redirects to the return address, or to the calendar when logged in,
-  // otherwise shows the result on this page
+  // otherwise shows the result on this page. A shared link's channel went to
+  // the workspace of the link, not necessarily the one signed in here, so it
+  // shows the result too
   const navigateOrShow = useCallback(
     (
       params: Record<string, string>,
       returnURL: string | undefined,
       message: string,
-      kind: 'success' | 'error'
+      kind: 'success' | 'error',
+      sharedLink = false
     ) => {
       const target = safeReturnUrl(returnURL);
       if (target) {
@@ -89,7 +105,7 @@ export const ContinueIntegration: FC<{
         }
         return;
       }
-      if (logged) {
+      if (logged && !sharedLink) {
         push(`/launches?${new URLSearchParams(params).toString()}`);
         return;
       }
@@ -155,13 +171,27 @@ export const ContinueIntegration: FC<{
     );
   }, [provider]);
 
-  const connect = useCallback(async () => {
+  const providerDisplayName = useMemo(() => {
+    const names: Record<string, string> = {
+      facebook: 'Facebook',
+      instagram: 'Instagram',
+      'linkedin-page': 'LinkedIn',
+      youtube: 'YouTube',
+      gmb: 'Google Business',
+      tumblr: 'Tumblr',
+      'tiktok-business': 'TikTok Business',
+    };
+    return names[provider] || provider;
+  }, [provider]);
+
+  const connect = useCallback(async (confirmed = false) => {
     const timezone = String(newDayjs().utcOffset());
     const extensionCode = readExtensionCode(modifiedParams.state);
     const body = JSON.stringify({
       ...modifiedParams,
       ...(extensionCode ? { code: extensionCode } : {}),
       timezone,
+      ...(confirmed ? { confirmed: true } : {}),
     });
 
     // Try public endpoint first (handles both public and fallback scenarios)
@@ -185,6 +215,28 @@ export const ContinueIntegration: FC<{
           method: 'POST',
           body,
         });
+      }
+    }
+
+    // A shared link (an invite, an API or partner link, the mobile app) asks
+    // first; the code was not used yet, the confirmation posts it again
+    if (data.ok) {
+      const pending = await data
+        .clone()
+        .json()
+        .catch(() => ({}));
+      if (pending?.needsConfirmation) {
+        setState({
+          status: 'confirm',
+          workspaceName: String(pending.workspaceName || ''),
+          providerName: String(pending.providerName || providerDisplayName),
+          createdBy:
+            typeof pending.createdBy === 'string' && pending.createdBy
+              ? pending.createdBy
+              : undefined,
+          outsideWorkspace: !!pending.signedInOutsideWorkspace,
+        });
+        return;
       }
     }
 
@@ -276,6 +328,7 @@ export const ContinueIntegration: FC<{
           onboarding,
           pages: pages || [],
           returnURL,
+          sharedLink: confirmed,
         },
       });
       return;
@@ -290,9 +343,10 @@ export const ContinueIntegration: FC<{
       },
       returnURL,
       'Channel Updated',
-      'success'
+      'success',
+      confirmed
     );
-  }, [modifiedParams, provider, Provider, navigateOrShow]);
+  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName]);
 
   useEffect(() => {
     if (started.current) {
@@ -313,9 +367,10 @@ export const ContinueIntegration: FC<{
 
       try {
         // Use public or authenticated endpoint based on the flow
-        const endpoint = logged
-          ? `/integrations/provider/${step.integrationId}/connect`
-          : `/integrations/public/provider/${step.integrationId}/connect`;
+        const endpoint =
+          logged && !step.sharedLink
+            ? `/integrations/provider/${step.integrationId}/connect`
+            : `/integrations/public/provider/${step.integrationId}/connect`;
 
         // The OAuth code was already exchanged; saving the page only needs the
         // state (which finds the organization of a public flow), so a retry
@@ -347,7 +402,8 @@ export const ContinueIntegration: FC<{
           },
           step.returnURL,
           'Channel Added',
-          'success'
+          'success',
+          step.sharedLink
         );
       } catch (e) {
         setState({
@@ -360,18 +416,94 @@ export const ContinueIntegration: FC<{
     [state, fetch, logged, modifiedParams, provider, navigateOrShow, t]
   );
 
-  const providerDisplayName = useMemo(() => {
-    const names: Record<string, string> = {
-      facebook: 'Facebook',
-      instagram: 'Instagram',
-      'linkedin-page': 'LinkedIn',
-      youtube: 'YouTube',
-      gmb: 'Google Business',
-      tumblr: 'Tumblr',
-      'tiktok-business': 'TikTok Business',
-    };
-    return names[provider] || provider;
-  }, [provider]);
+  const confirmLink = useCallback(() => {
+    setState({ status: 'loading' });
+    connect(true).catch(() => {
+      setState({ status: 'error' });
+    });
+  }, [connect]);
+
+  // nothing was exchanged; the link is dropped so the code the platform sent
+  // can never be completed later
+  const cancelLink = useCallback(async () => {
+    await fetch(`/integrations/social-connect/${provider}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ state: modifiedParams.state }),
+    }).catch(() => undefined);
+    setState({
+      status: 'error',
+      message: t(
+        'connect_link_cancelled',
+        'The connection was cancelled and nothing was added. You can close this window.'
+      ),
+    });
+  }, [fetch, provider, modifiedParams, t]);
+
+  // A shared link names the workspace before anything is connected
+  if (state.status === 'confirm') {
+    return (
+      <div className="flex flex-1 items-center justify-center text-white relative overflow-hidden">
+        {/* Background gradient decoration */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-btnPrimary rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#FC69FF] rounded-full blur-[120px]" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-[480px] mx-auto px-[20px]">
+          <div className="bg-[#11141C] ring-1 ring-[#262B37] rounded-[16px] p-[32px] flex flex-col gap-[24px]">
+            <div className="flex flex-col gap-[8px] text-center">
+              <h1 className="text-[24px] font-semibold">
+                {t('confirm_connect_title', 'Confirm the connection')}
+              </h1>
+              <p className="text-[14px] text-gray-400">
+                {t(
+                  'confirm_connect_description',
+                  "Connect your {{provider}} account to the PostDelegate workspace '{{workspace}}'? Only continue if you trust whoever sent you this link.",
+                  {
+                    provider: state.providerName,
+                    workspace: state.workspaceName,
+                    // React escapes the text, i18next must not do it twice
+                    interpolation: { escapeValue: false },
+                  }
+                )}
+              </p>
+              {!!state.createdBy && (
+                <p className="text-[14px] text-gray-400">
+                  {t('confirm_connect_created_by', 'Link created by {{name}}', {
+                    name: state.createdBy,
+                    interpolation: { escapeValue: false },
+                  })}
+                </p>
+              )}
+            </div>
+            {state.outsideWorkspace && (
+              <div
+                role="alert"
+                className="rounded-[8px] bg-red-500/10 ring-1 ring-red-500/40 text-red-400 text-[14px] px-[16px] py-[12px] text-center"
+              >
+                {t(
+                  'confirm_connect_outside_workspace',
+                  "You're signed in to PostDelegate, but this link connects your account to a workspace you're not part of."
+                )}
+              </div>
+            )}
+            <div className="flex gap-[12px]">
+              <Button
+                secondary
+                className="flex-1 rounded-[8px]"
+                onClick={cancelLink}
+              >
+                {t('cancel', 'Cancel')}
+              </Button>
+              <Button className="flex-1 rounded-[8px]" onClick={confirmLink}>
+                {t('confirm_connect', 'Connect')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Success state for non-logged users without returnURL
   if (state.status === 'done') {

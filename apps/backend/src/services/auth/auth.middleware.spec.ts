@@ -3,7 +3,7 @@ jest.mock('@gitroom/nestjs-libraries/database/prisma/organizations/organization.
 jest.mock('@gitroom/nestjs-libraries/chat/mastra.service', () => ({ MastraService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/sentry/initialize.sentry', () => ({ setSentryUserContext: jest.fn() }));
 
-import { AuthMiddleware } from './auth.middleware';
+import { AuthMiddleware, getSessionUser } from './auth.middleware';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
 const user = {
@@ -214,5 +214,39 @@ describe('AuthMiddleware', () => {
         (await run(middleware, { method: 'POST', headers: { auth: session() } })).allowed
       ).toBe(true);
     });
+  });
+});
+
+// the same checks, for the connect callback that only asks who is signed in
+describe('getSessionUser', () => {
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+  });
+
+  const users = (found: any = user) =>
+    ({ getUserById: jest.fn(async () => (found ? { ...found } : null)) } as any);
+
+  it('returns the user of a live session', async () => {
+    expect((await getSessionUser(users(), session()))?.id).toBe('u1');
+  });
+
+  it('returns null, never throws, for anything else', async () => {
+    const pv = AuthService.passwordFingerprint('hash-1');
+    for (const token of [
+      'not-a-token',
+      AuthService.signTypedJWT('invite', { id: 'u1', pv }),
+      session({ sv: 3 }),
+    ]) {
+      expect(await getSessionUser(users(), token)).toBeNull();
+    }
+    expect(await getSessionUser(users(null), session())).toBeNull();
+    expect(
+      await getSessionUser(users({ ...user, activated: false }), session())
+    ).toBeNull();
+    expect(
+      await getSessionUser(users({ ...user, password: 'hash-2' }), session())
+    ).toBeNull();
+    const failing = { getUserById: jest.fn(async () => { throw new Error('db'); }) } as any;
+    expect(await getSessionUser(failing, session())).toBeNull();
   });
 });

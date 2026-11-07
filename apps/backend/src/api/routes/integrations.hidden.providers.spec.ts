@@ -70,6 +70,9 @@ jest.mock('@gitroom/nestjs-libraries/chat/validation.schemas.helper', () => ({
 jest.mock('@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher', () => ({
   getSsrfSafeDispatcher: jest.fn(),
 }));
+jest.mock('@gitroom/backend/services/auth/auth.middleware', () => ({
+  getSessionUser: jest.fn(async () => null),
+}));
 jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
   const data = new Map<string, string>();
   return {
@@ -167,7 +170,8 @@ const setup = (providerExtras: object = {}) => {
     { startRefreshWorkflow: jest.fn(async () => undefined) } as any,
     { getOrgById: jest.fn(getOrg) } as any,
     // the plan's channel limit is covered by its own specs
-    { canAddChannel: jest.fn(async () => true) } as any
+    { canAddChannel: jest.fn(async () => true) } as any,
+    {} as any
   );
   const enterprise = new EnterpriseController(
     manager,
@@ -208,11 +212,21 @@ const getUrl = (
   urls: IntegrationsController,
   integration: string,
   orgId: string,
-  refresh = ''
+  refresh = '',
+  link: { redirectUrl?: string; invite?: string } = {},
+  res: any = { cookie: jest.fn() }
 ) =>
-  urls.getIntegrationUrl(integration, refresh, '', '', '', {
-    id: orgId,
-  } as any);
+  urls.getIntegrationUrl(
+    integration,
+    refresh,
+    '',
+    link.redirectUrl || '',
+    '',
+    { id: orgId } as any,
+    link.invite || '',
+    { id: 'u1' } as any,
+    res
+  );
 
 // the state a connect link left in redis, then the callback that saves it
 const connect = (
@@ -226,11 +240,16 @@ const connect = (
   if (refresh) {
     redis.data.set('refresh:s1', refresh);
   }
-  return callback.connectSocialMedia(integration, {
-    state: 's1',
-    code: Buffer.from('{}').toString('base64'),
-    timezone: 0,
-  } as any);
+  return callback.connectSocialMedia(
+    integration,
+    {
+      state: 's1',
+      code: Buffer.from('{}').toString('base64'),
+      timezone: 0,
+    } as any,
+    { method: 'POST', cookies: {}, headers: {} } as any,
+    { cookie: jest.fn() } as any
+  );
 };
 
 describe('hidden providers on the connect paths', () => {
@@ -240,6 +259,7 @@ describe('hidden providers on the connect paths', () => {
     redis.data.clear();
     process.env.HIDDEN_PROVIDERS = 'x,pinterest,tiktok-business';
     process.env.PREVIEW_PROVIDER_ORGS = 'org-qa';
+    process.env.FRONTEND_URL = 'https://app.postdelegate.com';
   });
 
   afterEach(() => {
@@ -445,6 +465,132 @@ describe('hidden providers on the connect paths', () => {
       expect(await listed('org-1')).not.toContain('x');
       expect(await listed('org-qa')).toContain('x');
     });
+  });
+});
+
+// Every place that starts a connect records who may finish it, and how long
+// its state lives (see connect.binding)
+describe('connect binding of every connect producer', () => {
+  const env = { ...process.env };
+
+  beforeEach(() => {
+    redis.data.clear();
+    redis.set.mockClear();
+    process.env.FRONTEND_URL = 'https://app.postdelegate.com';
+    delete process.env.HIDDEN_PROVIDERS;
+    delete process.env.MOBILE_APP_SCHEME;
+    delete process.env.NOT_SECURED;
+  });
+
+  afterAll(() => {
+    process.env = { ...env };
+  });
+
+  const binding = () => JSON.parse(redis.data.get('binding:st'));
+  // the lifetime each key of the state was written with
+  const ttls = () =>
+    Object.fromEntries(
+      redis.set.mock.calls
+        .filter((call: any[]) => call[2] === 'EX')
+        .map((call: any[]) => [String(call[0]).split(':')[0], call[3]])
+    );
+
+  it('ties a connect started in the app to this browser for an hour', async () => {
+    const { urls } = setup();
+    const res = { cookie: jest.fn() };
+    expect(await getUrl(urls, 'bluesky', 'org-1', '', {}, res)).toEqual({
+      url: 'https://auth.example',
+    });
+    expect(binding()).toMatchObject({
+      type: 'session',
+      orgId: 'org-1',
+      userId: 'u1',
+    });
+    const [name, nonce, options] = res.cookie.mock.calls[0];
+    // host-only: no Domain another subdomain could share
+    expect(name).toMatch(/^__Host-connect_[0-9a-f]{16}$/);
+    expect(nonce).toHaveLength(32);
+    expect(options).toEqual({
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+      maxAge: 3600 * 1000,
+    });
+    // only the hash is stored, and the nonce never reaches the URL
+    expect(binding().nonceHash).toBeDefined();
+    expect(redis.data.get('binding:st')).not.toContain(nonce);
+    const { organization, login, external } = ttls();
+    expect([organization, login, external]).toEqual([3600, 3600, 3600]);
+  });
+
+  it('makes an invite link a confirmed link without a cookie, kept an hour', async () => {
+    const { urls } = setup();
+    const res = { cookie: jest.fn() };
+    await getUrl(urls, 'bluesky', 'org-1', '', { invite: 'true' }, res);
+    expect(binding()).toMatchObject({ type: 'invite', orgId: 'org-1' });
+    expect(binding().nonceHash).toBeUndefined();
+    expect(res.cookie).not.toHaveBeenCalled();
+    const { organization, login, external } = ttls();
+    expect([organization, login, external]).toEqual([3600, 3600, 3600]);
+  });
+
+  it('makes a connect that returns to the mobile app a link', async () => {
+    const { urls } = setup();
+    const res = { cookie: jest.fn() };
+    await getUrl(
+      urls,
+      'bluesky',
+      'org-1',
+      '',
+      { redirectUrl: 'postiz://integrations' },
+      res
+    );
+    expect(binding().type).toBe('mobile');
+    expect(res.cookie).not.toHaveBeenCalled();
+    expect(ttls().redirect).toBe(3600);
+  });
+
+  it('keeps a connect that returns to a page of the app tied to the browser', async () => {
+    const { urls } = setup();
+    await getUrl(urls, 'bluesky', 'org-1', '', {
+      redirectUrl: 'https://app.postdelegate.com/launches',
+    });
+    expect(binding().type).toBe('session');
+  });
+
+  it('makes a public API connect URL an api link', async () => {
+    const { publicApi } = setup();
+    await publicApi.getIntegrationUrl('bluesky', '', { id: 'org-1' } as any);
+    expect(binding()).toEqual({ type: 'api', orgId: 'org-1' });
+    const { organization, login } = ttls();
+    expect([organization, login]).toEqual([3600, 3600]);
+  });
+
+  it('makes a partner connect URL an enterprise link', async () => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+    const { AuthService } = await import('@gitroom/helpers/auth/auth.service');
+    const { enterprise } = setup();
+    await enterprise.redirectParams(
+      AuthService.signTypedJWT('enterprise-user', {
+        redirectUrl: 'https://partner.example',
+        apiKey: 'key',
+        provider: 'bluesky',
+        webhookUrl: 'https://partner.example/hook',
+      })
+    );
+    expect(binding()).toEqual({ type: 'enterprise', orgId: 'org-1' });
+    const { organization, login, webhookUrl, redirect } = ttls();
+    expect([organization, login, webhookUrl, redirect]).toEqual([
+      3600, 3600, 3600, 3600,
+    ]);
+  });
+
+  it('writes the binding first and keeps it a minute longer than the state', async () => {
+    const { urls } = setup();
+    await getUrl(urls, 'bluesky', 'org-1');
+    expect(String(redis.set.mock.calls[0][0])).toBe('binding:st');
+    expect(ttls().binding).toBe(3660);
   });
 });
 
