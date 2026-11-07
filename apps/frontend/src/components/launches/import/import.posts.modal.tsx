@@ -3,6 +3,7 @@
 import React, { FC, useCallback, useId, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { Button } from '@gitroom/react/form/button';
@@ -530,7 +531,10 @@ export const ImportPostsModal: FC<{
         onImported();
       }
     } catch (err) {
-      toaster.show(t('import_failed', 'The import did not go through.'), 'warning');
+      // a dialog already told the user why it stopped
+      if (!(err instanceof HandledResponseError)) {
+        toaster.show(t('import_failed', 'The import did not go through.'), 'warning');
+      }
     } finally {
       setLoading(false);
     }

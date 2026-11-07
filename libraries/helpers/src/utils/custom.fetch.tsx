@@ -29,9 +29,29 @@ export const FetchWrapperComponent: FC<Params & { children: ReactNode }> = (
 ) => {
   const { children, ...params } = props;
   const { isSecured } = useVariables();
-  // @ts-ignore
+  // the fetch is made once, it reads the latest params on every request so
+  // afterRequest never keeps a stale translation or variable
+  const latestParams = useRef(params);
+  latestParams.current = params;
   const fetchData = useRef(
-    customFetch(params, undefined, undefined, isSecured)
+    customFetch(
+      {
+        get baseUrl() {
+          return latestParams.current.baseUrl;
+        },
+        beforeRequest: (url, options) =>
+          latestParams.current.beforeRequest
+            ? latestParams.current.beforeRequest(url, options)
+            : Promise.resolve(options),
+        afterRequest: async (url, options, response) =>
+          latestParams.current.afterRequest
+            ? latestParams.current.afterRequest(url, options, response)
+            : true,
+      },
+      undefined,
+      undefined,
+      isSecured
+    )
   );
   return (
     // @ts-ignore

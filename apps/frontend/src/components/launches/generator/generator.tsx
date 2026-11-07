@@ -10,6 +10,7 @@ import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { Textarea } from '@gitroom/react/form/textarea';
 import { Checkbox } from '@gitroom/react/form/checkbox';
 import clsx from 'clsx';
@@ -202,11 +203,17 @@ const FirstStep: FC = (props) => {
           size: '80%',
         });
       } catch (e: any) {
-        toaster.show(
-          e?.message ||
-            t('generation_failed', 'Failed to generate posts, please try again.'),
-          'warning'
-        );
+        // a dialog already told the user why it stopped
+        if (!(e instanceof HandledResponseError)) {
+          toaster.show(
+            e?.message ||
+              t(
+                'generation_failed',
+                'Failed to generate posts, please try again.'
+              ),
+            'warning'
+          );
+        }
       } finally {
         setShowStep('');
         setLoading(false);

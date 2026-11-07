@@ -62,11 +62,12 @@ export const ThirdPartyPopup: FC<{
   const [thirdParty, setThirdParty] = useState<any>(null);
   const refNew = useRef(null);
 
-  const setActivateExitButton = useLaunchStore((e) => e.setActivateExitButton);
+  const blockExit = useLaunchStore((e) => e.blockExit);
+  const releaseExit = useLaunchStore((e) => e.releaseExit);
   useEffect(() => {
-    setActivateExitButton(false);
+    blockExit();
     return () => {
-      setActivateExitButton(true);
+      releaseExit();
     };
   }, []);
 

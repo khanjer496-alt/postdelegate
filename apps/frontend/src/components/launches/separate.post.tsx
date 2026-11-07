@@ -3,6 +3,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { FC, useCallback } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 export const SeparatePost: FC<{
   posts: string[];
   len: number;
@@ -22,18 +23,26 @@ export const SeparatePost: FC<{
     ) {
       props.changeLoading(true);
       const merge = props.posts.join('\n');
-      const { posts } = await (
-        await fetch('/posts/separate-posts', {
-          method: 'POST',
-          body: JSON.stringify({
-            content: merge,
-            len: props.len,
-          }),
-        })
-      ).json();
+      try {
+        const { posts } = await (
+          await fetch('/posts/separate-posts', {
+            method: 'POST',
+            body: JSON.stringify({
+              content: merge,
+              len: props.len,
+            }),
+          })
+        ).json();
 
-      props.merge(posts);
-      props.changeLoading(false);
+        props.merge(posts);
+      } catch (e) {
+        // a dialog already told the user why it stopped
+        if (!(e instanceof HandledResponseError)) {
+          throw e;
+        }
+      } finally {
+        props.changeLoading(false);
+      }
     }
   }, [len, posts]);
 
