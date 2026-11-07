@@ -69,6 +69,12 @@ export class OrganizationService {
     return this._organizationRepository.getAccountOverview(orgId);
   }
 
+  // The readable API key, for the settings page and the enterprise webhook.
+  // The stored column is not it: see OrganizationRepository.readApiKey.
+  readApiKey(org?: { apiKey?: string | null } | null) {
+    return this._organizationRepository.readApiKey(org);
+  }
+
   getOrgByApiKey(api: string) {
     return this._organizationRepository.getOrgByApiKey(api);
   }

@@ -2,6 +2,8 @@
 import Doc from '../../layouts/Doc.astro';
 import CompareCard from '../CompareCard.astro';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
+import { TOOLS } from '../../data/tools';
+import { COMPARE_PAIRS, pairHref } from '../../data/compare-pairs';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const p = strings(lang).comparePage;
@@ -52,6 +54,10 @@ const MORE = [
   <div class="compare-grid">
     {PAIRS.map((card) => <CompareCard {...card} lang={lang} />)}
   </div>
+  {!!COMPARE_PAIRS.length && <>
+    <h2>{p.morePairsTitle}</h2>
+    <ul class="pair-links">{COMPARE_PAIRS.map((pair) => <li><a href={pairHref(pair)}>{TOOLS[pair.a].name} vs {TOOLS[pair.b].name}</a></li>)}</ul>
+  </>}
   {lang === 'en' && (
     <Fragment>
       <h2>More comparisons</h2>
@@ -65,5 +71,6 @@ const MORE = [
 </Doc>
 <style>
   .compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 28px 0 36px; }
-  @media (max-width: 600px) { .compare-grid { grid-template-columns: 1fr; } }
+  .pair-links { columns: 2; column-gap: 32px; }
+  @media (max-width: 600px) { .compare-grid { grid-template-columns: 1fr; } .pair-links { columns: 1; } }
 </style>

@@ -61,10 +61,22 @@ RUN fc-cache -f \
 # so node_modules keeps the files and the store is 2.4 GB of dead weight in
 # the image.
 COPY pnpm-lock.yaml /tmp/pd-pnpm-lock.yaml
+# @sentry/* for the same reason, and it is a security upgrade rather than a
+# missing import: the pinned image carries 10.56.0, which has the middleware
+# bypass advisory (GHSA, <10.75.2). Because this repo's package.json is never
+# copied in, bumping it there alone would leave the release on 10.56.0 - so the
+# version is installed and asserted here too, or the upgrade does not ship.
 RUN grep -qE "@aws-sdk/client-sesv2@3\.1003\.0'?:" /tmp/pd-pnpm-lock.yaml \
+    && grep -qE "@sentry/nestjs@10\.78\.0'?:" /tmp/pd-pnpm-lock.yaml \
+    && grep -qE "@sentry/nextjs@10\.78\.0'?:" /tmp/pd-pnpm-lock.yaml \
+    && grep -qE "@sentry/profiling-node@10\.78\.0'?:" /tmp/pd-pnpm-lock.yaml \
+    && grep -qE "@sentry/react@10\.78\.0'?:" /tmp/pd-pnpm-lock.yaml \
     && pnpm add -w @aws-sdk/client-sesv2@3.1003.0 \
+      @sentry/nestjs@10.78.0 @sentry/nextjs@10.78.0 \
+      @sentry/profiling-node@10.78.0 @sentry/react@10.78.0 \
     && node -e "require.resolve('@aws-sdk/client-sesv2')" \
     && node -e "const v=require('/app/node_modules/@aws-sdk/client-sesv2/package.json').version; if (v !== '3.1003.0') { throw new Error('installed ' + v); }" \
+    && node -e "for (const p of ['@sentry/nestjs','@sentry/nextjs','@sentry/profiling-node','@sentry/react']) { const v = require('/app/node_modules/' + p + '/package.json').version; if (v !== '10.78.0') { throw new Error(p + ' installed ' + v); } }" \
     && rm -rf "$(pnpm store path)" /tmp/pd-pnpm-lock.yaml \
     && node -e "require.resolve('@aws-sdk/client-sesv2')"
 
@@ -98,5 +110,14 @@ RUN test -f /app/apps/backend/dist/apps/backend/src/commands/erase-account.js \
       'exec node --experimental-require-module /app/apps/backend/dist/apps/backend/src/commands/erase-account.js "$@"' \
       > /usr/local/bin/erase-account \
     && chmod 0755 /usr/local/bin/erase-account
+# Secrets-at-rest backfill, same shape as erase-account above: compiled by the
+# backend build, not part of the API or the worker. See
+# deploy/postdelegate/secrets-at-rest-rollout.md. Run it with:
+#   docker exec ... backfill-secrets --dry-run
+RUN test -f /app/apps/backend/dist/apps/backend/src/commands/backfill.secrets.js \
+    && printf '%s\n' '#!/bin/sh' \
+      'exec node --experimental-require-module /app/apps/backend/dist/apps/backend/src/commands/backfill.secrets.js "$@"' \
+      > /usr/local/bin/backfill-secrets \
+    && chmod 0755 /usr/local/bin/backfill-secrets
 RUN rm -rf /app/apps/frontend/.next /app/libraries/react-shared-libraries/src/translation/locales/he \
     && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter ./apps/frontend run build

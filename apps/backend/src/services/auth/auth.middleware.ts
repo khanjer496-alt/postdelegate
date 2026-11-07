@@ -41,10 +41,11 @@ export class AuthMiddleware implements NestMiddleware {
       // are signed with the same secret and rejected here. The claims are
       // never trusted for authorization (isSuperAdmin, activated, ...), the
       // user is always re-resolved from the database using the id.
-      const payload = AuthService.verifyTypedJWT<{ id: string; pv: string }>(
-        auth as string,
-        'session'
-      );
+      const payload = AuthService.verifyTypedJWT<{
+        id: string;
+        pv: string;
+        sv?: number;
+      }>(auth as string, 'session');
       const orgHeader = req.cookies.showorg || req.headers.showorg;
 
       if (!payload?.id || typeof payload.id !== 'string') {
@@ -59,6 +60,13 @@ export class AuthMiddleware implements NestMiddleware {
 
       // a password change signs out every session issued before it
       if (payload.pv !== AuthService.passwordFingerprint(user.password)) {
+        throw new HttpForbiddenException();
+      }
+
+      // and so does "sign out of all devices". A session issued before this
+      // claim existed carries no sv and is read as 0, which is where every
+      // user starts, so the deploy signs nobody out.
+      if ((payload.sv ?? 0) !== (user.sessionVersion ?? 0)) {
         throw new HttpForbiddenException();
       }
 

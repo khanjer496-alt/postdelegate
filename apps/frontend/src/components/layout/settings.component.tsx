@@ -20,6 +20,7 @@ import clsx from 'clsx';
 import { TeamsComponent } from '@gitroom/frontend/components/settings/teams.component';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
+import { LogoutEverywhereComponent } from '@gitroom/frontend/components/layout/logout.everywhere.component';
 import { useSearchParams } from 'next/navigation';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { PublicComponent } from '@gitroom/frontend/components/public-api/public.component';
@@ -184,8 +185,9 @@ export const SettingsPopup: FC<{
             {t('review_leave', 'Leave a review')}
           </button>
           {showLogout && (
-            <div className="mt-4 mobile:mt-[8px]">
+            <div className="mt-4 mobile:mt-[8px] flex flex-col gap-[8px]">
               <LogoutComponent />
+              <LogoutEverywhereComponent />
             </div>
           )}
           <a

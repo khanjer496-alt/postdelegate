@@ -5,9 +5,9 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/mastodon.provider';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { Integration } from '@prisma/client';
+import { readCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 
 export class MastodonCustomProvider extends MastodonProvider {
   override identifier = 'mastodon-custom';
@@ -79,7 +79,7 @@ export class MastodonCustomProvider extends MastodonProvider {
   private instanceUrl(integration?: Integration) {
     try {
       const { instanceUrl } = JSON.parse(
-        AuthService.fixedDecryption(integration?.customInstanceDetails || '')
+        readCustomInstanceDetails(integration?.customInstanceDetails) ?? ''
       );
       return instanceUrl || process.env.MASTODON_URL || 'https://mastodon.social';
     } catch (err) {

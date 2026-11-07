@@ -490,14 +490,16 @@ export class AuthService {
     return { token };
   }
 
-  // The session token: who it is and which password it was issued for
-  // (so changing the password signs every other session out). Nothing else
-  // from the user row, the claims are never trusted for authorization
+  // The session token: who it is, which password it was issued for (so
+  // changing the password signs every other session out) and which session
+  // generation (so "sign out of all devices" does too). Nothing else from the
+  // user row; the claims are never trusted for authorization
   private async jwt(user: Pick<User, 'id'>) {
     const current = await this._userService.getUserById(user.id);
     return AuthChecker.signTypedJWT('session', {
       id: user.id,
       pv: AuthChecker.passwordFingerprint(current?.password),
+      sv: current?.sessionVersion ?? 0,
     });
   }
 }

@@ -26,6 +26,7 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
+import { writeCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -309,13 +310,13 @@ export class NoAuthIntegrationsController {
         body.refresh,
         +body.timezone,
         details
-          ? AuthService.fixedEncryption(details)
+          ? writeCustomInstanceDetails(details)
           : integrationProvider.customFields
-          ? AuthService.fixedEncryption(
+          ? writeCustomInstanceDetails(
               Buffer.from(body.code, 'base64').toString()
             )
           : integrationProvider.isChromeExtension
-          ? AuthService.fixedEncryption(
+          ? writeCustomInstanceDetails(
               Buffer.from(body.code, 'base64').toString()
             )
           : undefined
@@ -367,7 +368,9 @@ export class NoAuthIntegrationsController {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             params: AuthService.signTypedJWT('connect-webhook', {
-              apiKey: org.apiKey,
+              // the readable key: the partner presents it back to
+              // getOrgByApiKey, so the stored form would not work
+              apiKey: this._organizationService.readApiKey(org),
             }),
           }),
           // @ts-ignore — undici option, not in lib.dom fetch types
@@ -511,7 +514,7 @@ export class NoAuthIntegrationsController {
       undefined,
       // stored encrypted like connectSocialMedia does, never signed: the
       // cookies JSON comes from the request
-      AuthService.fixedEncryption(
+      writeCustomInstanceDetails(
         Buffer.from(body.cookies, 'base64').toString()
       )
     );
