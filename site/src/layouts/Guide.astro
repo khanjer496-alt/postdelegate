@@ -27,7 +27,7 @@ const jsonLd = [
 ];
 ---
 <Doc title={metaTitle ?? `${title} | PostDelegate`} description={description} h1={title} eyebrow="Guide" lead={description} jsonLd={jsonLd}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/guides" class="button button-outline">All guides</a>
   <div class="guide-body"><slot /></div>
   {shot && shotCaption && <AppShot shot={shot} caption={shotCaption} />}

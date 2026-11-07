@@ -32,7 +32,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Publer alternative: PostDelegate vs Publer compared" description="PostDelegate vs Publer: flat plans or per-account pricing, free plan and trial, approvals, AI approach, API and MCP, and the networks each connects today." h1="PostDelegate vs Publer." eyebrow="Compare" lead="Publer prices by the account and the member. PostDelegate charges a flat price for a set of channels. Here is how pricing, AI, API access and networks compare, including where Publer is the better pick today." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://publer.com" class="button button-outline" target="_blank" rel="noreferrer">Visit Publer</a>
   <h2>At a glance</h2>
   <CompareTable other="Publer" rows={rows} />

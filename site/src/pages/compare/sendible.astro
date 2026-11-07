@@ -85,7 +85,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Sendible alternative: PostDelegate vs Sendible compared" description="PostDelegate vs Sendible: flat channel plans against workspace bundles with unlimited users, approvals, white label, MCP, and the networks each connects today." h1="PostDelegate vs Sendible." eyebrow="Compare" lead="Sendible sells workspaces with six profiles each and puts no limit on users. PostDelegate sells a band of channels at a flat price. Which is cheaper depends almost entirely on how many people you have." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Sendible</a>
 
   <h2>At a glance</h2>

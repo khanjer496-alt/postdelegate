@@ -85,7 +85,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Loomly alternative: PostDelegate vs Loomly compared" description="PostDelegate vs Loomly: flat channel plans against a $65-to-$332 jump, approvals, the networks each publishes to, AI on your own key, and API and MCP access." h1="PostDelegate vs Loomly." eyebrow="Compare" lead="Loomly is a calendar with approval workflows built in. PostDelegate is a calendar with an API and an MCP server built in. The sharpest differences are the price step between Loomly's two plans and which networks each can publish to." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Loomly</a>
 
   <h2>At a glance</h2>

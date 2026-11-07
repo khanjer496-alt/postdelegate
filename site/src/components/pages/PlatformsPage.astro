@@ -20,7 +20,7 @@ const href = (network: Network) => localeHref(lang, network.scheduler ? `/${netw
 ---
 <Base title={p.title(AVAILABLE_NETWORKS.length)} description={p.description(AVAILABLE_NETWORKS.length)} lang={lang}>
   <PageHero eyebrow={p.eyebrow} title={p.h1(AVAILABLE_NETWORKS.length)} lead={p.lead}>
-    <a href={SITE.signup} data-pulse-goal="trial_started" class="button">{t.common.ctaLabel}</a>
+    <a href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{t.common.ctaLabel}</a>
     <a href={localeHref(lang, '/support')} class="button button-outline">{p.ask}</a>
   </PageHero>
   <section class="section"><div class="container">
