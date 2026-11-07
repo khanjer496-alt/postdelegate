@@ -1,0 +1,24 @@
+{
+  "name": "Loomly",
+  "slug": "loomly",
+  "site": "https://www.loomly.com",
+  "pricingUrl": "https://www.loomly.com/pricing",
+  "checked": "2026-11-07",
+  "kind": { "value": "Social media calendar and content platform with an AI assistant, scheduling, approval workflows, interaction management, listening and analytics", "src": "https://www.loomly.com/pricing" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://www.loomly.com/pricing" },
+  "pricingModel": { "value": "Flat tiers by number of social accounts, each with a user cap and unlimited calendars; no per-account add-on is published. Nonprofits get a 50% lifetime discount", "src": "https://www.loomly.com/pricing" },
+  "freeOption": { "value": "No free plan; the free entry point is the trial", "src": ["https://www.loomly.com/pricing", "https://www.loomly.com/15-day-free-trial"] },
+  "trial": { "value": "7 days, no credit card needed", "note": "The pricing page says only \"No credit card required\"; the 7 days comes from the trial landing page, whose URL still reads 15-day-free-trial.", "src": "https://www.loomly.com/15-day-free-trial" },
+  "entryPaid": { "value": "Starter, $65/month on monthly billing, 12 social accounts and 3 users", "src": "https://www.loomly.com/pricing" },
+  "plans": { "value": "Starter $65/month (12 social accounts, 3 users) and Beyond $332/month (60 accounts, unlimited users) on monthly billing; Enterprise is custom-priced above 61 accounts. All plans include unlimited calendars", "note": "The toggle opens on yearly, which shows $49 and $249 per month billed annually. Yearly plans are charged upfront and cannot be ended early.", "src": "https://www.loomly.com/pricing" },
+  "cost": {
+    "3": { "value": "$65", "note": "Starter covers up to 12 social accounts on monthly billing, so 3 fits with no extras.", "src": "https://www.loomly.com/pricing" },
+    "10": { "value": "$65", "note": "Still inside Starter's 12-account limit.", "src": "https://www.loomly.com/pricing" },
+    "30": { "value": "$332", "note": "Starter caps at 12 accounts and no per-account add-on is published, so 30 means Beyond, which covers 60 accounts for $332 a month.", "src": "https://www.loomly.com/pricing" }
+  },
+  "networks": { "value": "Instagram, LinkedIn, Facebook, TikTok, YouTube, Threads, Google Business Profile, Pinterest and Snapchat", "note": "Neither the integrations page nor the pricing page lists X or Bluesky.", "src": ["https://www.loomly.com/integrations", "https://www.loomly.com/pricing"] },
+  "api": { "value": "No public API is mentioned on the pricing or integrations pages; the listed workflow integrations are Zapier, Slack and Microsoft Teams", "src": ["https://www.loomly.com/pricing", "https://www.loomly.com/integrations"] },
+  "mcp": { "value": "No MCP server is mentioned on the pricing or integrations pages", "src": ["https://www.loomly.com/pricing", "https://www.loomly.com/integrations"] },
+  "ai": { "value": "AI assistant chat, post generation, captions, replies and AI analytics on both plans, with monthly AI usage described as limited on Starter and extended on Beyond. Social listening is metered: 2 a month on Starter, 5 on Beyond", "src": "https://www.loomly.com/pricing" },
+  "teams": { "value": "3 users on Starter; unlimited on Beyond and Enterprise. Unlimited calendars on all plans, approval workflows and roles included from Starter, with calendar two-factor enforcement and custom branding on Beyond", "src": "https://www.loomly.com/pricing" }
+}
