@@ -139,6 +139,12 @@ services:
   caddy:
     <<: *service
     image: caddy:2.10-alpine
+    # The staging basic-auth login is a {$PLACEHOLDER} in the committed
+    # Caddyfile so no credential is committed; Caddy resolves it from here at
+    # start. Without this the placeholders expand to empty strings, Caddy still
+    # reports a valid config, and staging's gate silently stops working.
+    env_file:
+      - /etc/postiz/caddy.env
     profiles: [edge]
     ports:
       - 80:80

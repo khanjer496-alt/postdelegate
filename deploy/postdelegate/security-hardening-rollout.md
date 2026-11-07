@@ -77,3 +77,44 @@ needs the **container restarted**, not reloaded — a reload is a no-op here.
   prune` is safe only while the caddy container is running, since that is what
   keeps the volume from being dangling. Recoverable (Caddy re-issues) but with
   rate limits and no TLS in the meantime.
+
+---
+
+## Released to production, 7 Nov 2026
+
+Done in this order, each step verified before the next:
+
+1. Backup taken first: `/var/backups/postiz/20261107T105159Z`.
+2. `prisma migrate diff` read before anything ran. It wanted exactly three
+   statements and nothing else, so no drift had accumulated.
+3. Those applied by hand, the index **concurrently**, so writes to
+   `Organization` were never blocked — the container runs `prisma db push` on
+   every start and would otherwise have taken a SHARE lock:
+   `ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "apiKeyHash" TEXT;`
+   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "sessionVersion" INTEGER NOT NULL DEFAULT 0;`
+   `CREATE INDEX CONCURRENTLY IF NOT EXISTS "Organization_apiKeyHash_idx" ON "Organization"("apiKeyHash");`
+4. `POSTIZ_REDIS_PASSWORD` was already in `/etc/postiz/runtime.env`.
+5. New `Caddyfile` and `compose.yaml` installed, old ones kept in
+   `caddyfile-history/` and `compose.yaml.before-hardening-*`.
+6. **`/etc/postiz/caddy.env` created** (0600 root) with
+   `STAGING_BASIC_AUTH_USER` and `STAGING_BASIC_AUTH_HASH`, recovered from the
+   previous live Caddyfile, and the caddy service given that `env_file`. The
+   committed Caddyfile keeps those as `{$PLACEHOLDER}`s; without the env file
+   Caddy expands them to empty strings, **still reports a valid config**, and
+   staging's gate silently stops working. This was caught before restarting.
+7. `postiz-compose up -d`, then `--force-recreate caddy`: Compose does not
+   recreate caddy for a bind-mounted file change, and a Caddy *reload* is a
+   no-op here, so the new headers need the container recreated.
+8. Backfill: dry run read first (4 organization rows to convert, nothing
+   unreadable), then the real run — 4 updated, 0 unreadable, 0 skipped.
+
+Verified after: app healthy on `release-8b798dcf`; Redis answers `WRONGPASS`
+unauthenticated and `PONG` with credentials, runs as uid 999 with all
+capabilities dropped, 0 restarts, 0 app errors; the new CSP and
+`Permissions-Policy` live on `app.postdelegate.com`; staging still 401s
+unauthenticated; `/api/docs` still 404; **an API key issued before the
+migration still authenticates (200) and a bogus one is refused (401)**; and the
+§4 verification query returns 0 for every column.
+
+Note the rollback window (§6) is now closed: every organization row holds
+`enc:v1:…`. The pre-release backup above is the way back.
