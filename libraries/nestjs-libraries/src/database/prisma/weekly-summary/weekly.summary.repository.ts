@@ -1,6 +1,7 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { State } from '@prisma/client';
+import { channelNeedsAttentionWhere } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 const postSelect = {
   id: true,
@@ -148,9 +149,7 @@ export class WeeklySummaryRepository {
     return this._integration.model.integration.findMany({
       where: {
         organizationId: orgId,
-        deletedAt: null,
-        disabled: false,
-        OR: [{ refreshNeeded: true }, { inBetweenSteps: true }],
+        ...channelNeedsAttentionWhere(),
       },
       select: {
         id: true,

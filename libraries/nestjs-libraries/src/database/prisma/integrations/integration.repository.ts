@@ -14,6 +14,10 @@ import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { ProviderAuthorizationCheck } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import {
+  CHANNEL_DISCONNECTED,
+  isChannelDisconnected,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import {
   decryptCredentials,
   encryptCredentials,
   TokenEncryption,
@@ -146,7 +150,7 @@ export class IntegrationRepository {
 
   private async assertNoPendingAuthorizationDeletion(model: Prisma.TransactionClient['integration'], provider: string, subject: string) {
     const pending = await model.findFirst({
-      where: { providerIdentifier: provider, rootInternalId: subject, deletedAt: { not: null }, disabled: true, refreshNeeded: true, OR: [{ token: { not: '' } }, { refreshToken: { not: '' } }] },
+      where: { providerIdentifier: provider, rootInternalId: subject, ...CHANNEL_DISCONNECTED, OR: [{ token: { not: '' } }, { refreshToken: { not: '' } }] },
       select: { id: true },
     });
     if (pending) throw new ConflictException('The previous disconnect is still processing remote revocation. Please reconnect after data removal completes.');
@@ -1135,7 +1139,7 @@ export class IntegrationRepository {
   // never acts on it as if the provider had revoked the grant.
   async getAuthorizationIntegrationsPage(cursor?: string) {
     const rows = await this._integration.model.integration.findMany({
-      where: { OR: [{ deletedAt: null }, { deletedAt: { not: null }, disabled: true, refreshNeeded: true }] },
+      where: { OR: [{ deletedAt: null }, { ...CHANNEL_DISCONNECTED }] },
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { id: 'asc' }, take: 100, select: authorizationSelect,
     });
@@ -1171,13 +1175,13 @@ export class IntegrationRepository {
       if (!where) return { matched: false };
       let row = await tx.integration.findFirst({ where, select: authorizationSelect });
       if (!row) return { matched: false };
-      if (row.deletedAt && row.disabled && row.refreshNeeded) return { matched: true };
+      if (isChannelDisconnected(row)) return { matched: true };
       await this.lockAuthorizationGrant(tx, row.providerIdentifier, row.rootInternalId);
       where = await this.pinStoredToken(tx.integration, { organizationId: org, id }, expectedToken);
       if (!where) return { matched: false };
       row = await tx.integration.findFirst({ where, select: authorizationSelect });
       if (!row) return { matched: false };
-      if (row.deletedAt && row.disabled && row.refreshNeeded) return { matched: true };
+      if (isChannelDisconnected(row)) return { matched: true };
       const changed = await tx.integration.updateMany({ where, data: { deletedAt: row.deletedAt || new Date(), disabled: true, refreshNeeded: true } });
       return { matched: changed.count > 0 };
     });
@@ -1250,14 +1254,14 @@ export class IntegrationRepository {
 
   async scrubAuthorizationData(org: string, id: string) {
     return this._transaction.model.$transaction(async (tx) => {
-      const row = await tx.integration.findFirst({ where: { id, organizationId: org, deletedAt: { not: null }, disabled: true, refreshNeeded: true }, select: { id: true } });
+      const row = await tx.integration.findFirst({ where: { id, organizationId: org, ...CHANNEL_DISCONNECTED }, select: { id: true } });
       if (!row) return { count: 0 };
       await tx.errors.deleteMany({ where: { organizationId: org, post: { integrationId: id } } });
       await tx.post.updateMany({ where: { organizationId: org, integrationId: id }, data: { releaseId: null, releaseURL: null, error: null } });
       await tx.exisingPlugData.deleteMany({ where: { integrationId: id } });
       await tx.plugs.updateMany({ where: { integrationId: id, organizationId: org }, data: { activated: false, data: '{}' } });
       return tx.integration.updateMany({
-        where: { id, organizationId: org, deletedAt: { not: null }, disabled: true, refreshNeeded: true },
+        where: { id, organizationId: org, ...CHANNEL_DISCONNECTED },
         data: { token: '', refreshToken: null, tokenExpiration: null, name: 'Disconnected channel', internalId: `erased_${id}`, rootInternalId: null, profile: null, picture: null, additionalSettings: '[]', customInstanceDetails: null },
       });
     });

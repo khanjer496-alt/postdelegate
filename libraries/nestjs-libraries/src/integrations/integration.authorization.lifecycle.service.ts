@@ -5,6 +5,7 @@ import { ProviderAuthorizationCredentials, SocialProvider } from '@gitroom/nestj
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { TemporalService } from 'nestjs-temporal-core';
+import { isChannelDisconnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 type CleanupRow = NonNullable<Awaited<ReturnType<IntegrationRepository['getIntegrationForCleanup']>>>;
 
@@ -249,7 +250,8 @@ export class IntegrationAuthorizationLifecycleService {
     if (!this.enabled()) return { status: 'pending' };
     const row = await this._repository.getIntegrationForCleanup(organizationId, integrationId);
     if (!row || !row.deletedAt) return { status: 'complete' };
-    if (!row.disabled || !row.refreshNeeded) return { status: 'pending' };
+    // deleted, but the disconnect that sets the other two flags has not landed
+    if (!isChannelDisconnected(row)) return { status: 'pending' };
     try {
       const posts = await this._repository.getAuthorizationPostIds(organizationId, integrationId);
       const stopped = await this.closeRelatedWorkflows(organizationId, integrationId, posts);
@@ -302,7 +304,7 @@ export class IntegrationAuthorizationLifecycleService {
       // provider grant: never check, update or delete from them.
       if (row.credentialsUnreadable) { pending++; continue; }
       if (row.deletedAt) {
-        if (row.disabled && row.refreshNeeded && (row.token || row.refreshToken)) {
+        if (isChannelDisconnected(row) && (row.token || row.refreshToken)) {
           await this.requestDeletion(row.organizationId, row.id).catch(() => { pending++; });
         }
         continue;

@@ -1,6 +1,7 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
+import { CHANNEL_CONNECTED } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 @Injectable()
 export class TrialOnboardingRepository {
@@ -92,9 +93,7 @@ export class TrialOnboardingRepository {
     return this._integration.model.integration.count({
       where: {
         organizationId: orgId,
-        deletedAt: null,
-        disabled: false,
-        inBetweenSteps: false,
+        ...CHANNEL_CONNECTED,
       },
     });
   }

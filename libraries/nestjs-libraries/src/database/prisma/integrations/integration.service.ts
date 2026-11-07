@@ -33,6 +33,7 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { TemporalService } from 'nestjs-temporal-core';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 import { isCappedProvider } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { isChannelConnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 dayjs.extend(utc);
 
@@ -273,7 +274,7 @@ export class IntegrationService {
 
   async getActiveIntegrationById(org: string, id: string) {
     const integration = await this.getIntegrationById(org, id);
-    return integration && !integration.deletedAt && !integration.disabled && !integration.inBetweenSteps ? integration : null;
+    return integration && isChannelConnected(integration) ? integration : null;
   }
 
   // Dashboard functions also run while a channel is half connected, but only for providers that
@@ -587,7 +588,7 @@ export class IntegrationService {
 
     // a disabled, removed or half-connected channel has no analytics: `[]`,
     // as the API documents, instead of an error the analytics page can't read
-    if (getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
+    if (!isChannelConnected(getIntegration)) {
       return [];
     }
 
@@ -685,7 +686,7 @@ export class IntegrationService {
   ): Promise<RecentPostsResponse> {
     const getIntegration = await this.getIntegrationById(org.id, integration);
 
-    if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
+    if (!getIntegration || !isChannelConnected(getIntegration)) {
       throw new Error('Invalid integration');
     }
 
@@ -787,7 +788,7 @@ export class IntegrationService {
   ): Promise<TopViewedPostsResponse> {
     const getIntegration = await this.getIntegrationById(org.id, integration);
 
-    if (!getIntegration || getIntegration.deletedAt || getIntegration.disabled || getIntegration.inBetweenSteps) {
+    if (!getIntegration || !isChannelConnected(getIntegration)) {
       throw new Error('Invalid integration');
     }
 

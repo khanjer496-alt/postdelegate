@@ -9,6 +9,7 @@ import { useExistingData } from '@gitroom/frontend/components/launches/helpers/u
 import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
 import { Check } from '@gitroom/frontend/components/launches/tags.component';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import { isChannelConnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 const PlatformBadge: FC<{ integration: Integrations }> = ({ integration }) => {
   return integration.identifier === 'youtube' ? (
@@ -85,7 +86,7 @@ export const PicksSocialsComponent: FC<{
         !!exising.siblings?.some((sibling) => sibling.integration === f.id)
       );
     }
-    return !f.inBetweenSteps && !f.disabled;
+    return isChannelConnected(f);
   });
 
   const toggleIntegration = (integration: Integrations) => () => {

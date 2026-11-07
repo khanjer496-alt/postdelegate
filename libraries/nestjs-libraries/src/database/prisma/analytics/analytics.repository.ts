@@ -2,6 +2,7 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 import { Injectable } from '@nestjs/common';
 import { AnalyticsReportFrequency, Prisma } from '@prisma/client';
 import { AccountStats, PostStats } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { CHANNEL_READY } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 // the most rows one history read returns, newest first: a 90-day comparison
 // window of 100 channels is under 20,000 snapshot rows
@@ -134,10 +135,7 @@ export class AnalyticsRepository {
     return this._integration.model.integration.findMany({
       where: {
         type: 'social',
-        deletedAt: null,
-        disabled: false,
-        refreshNeeded: false,
-        inBetweenSteps: false,
+        ...CHANNEL_READY,
         providerIdentifier: { in: providers },
         organization: {
           deletedAt: null,

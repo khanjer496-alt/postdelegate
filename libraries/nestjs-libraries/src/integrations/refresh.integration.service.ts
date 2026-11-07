@@ -7,6 +7,7 @@ import {
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { providerCause } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { isChannelReady } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { TemporalService } from 'nestjs-temporal-core';
 import { timer } from '@gitroom/helpers/utils/timer';
 
@@ -117,15 +118,9 @@ export class RefreshIntegrationService {
           integration.organizationId,
           integration.id
         );
-        if (
-          !stored ||
-          stored.refreshNeeded ||
-          stored.inBetweenSteps ||
-          stored.deletedAt ||
-          // getIntegrationById does not filter this one, and every other read
-          // in this file goes through getActiveIntegrationById, which does
-          stored.disabled
-        ) {
+        // getIntegrationById filters none of these; every other read in this
+        // file goes through getActiveIntegrationById, which does
+        if (!stored || !isChannelReady(stored)) {
           break;
         }
         if (

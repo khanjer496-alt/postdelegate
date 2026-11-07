@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { channelNeedsAttentionWhere } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 // Every query is scoped to one organization. The checklist facts only ask
 // "is there at least one", so they read a single id instead of counting.
@@ -118,16 +119,12 @@ export class ActivationRepository {
     return this._integration.model.integration.findMany({
       where: {
         organizationId,
-        deletedAt: null,
-        disabled: false,
-        OR: [
-          { refreshNeeded: true },
-          { inBetweenSteps: true },
+        ...channelNeedsAttentionWhere([
           {
             tokenExpiration: { lte: expiresBefore },
             OR: [{ refreshToken: null }, { refreshToken: '' }],
           },
-        ],
+        ]),
       },
       orderBy: { createdAt: 'asc' },
       select: {

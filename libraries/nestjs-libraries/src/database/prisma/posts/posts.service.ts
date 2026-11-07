@@ -77,6 +77,10 @@ import {
 import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
 import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 import {
+  isChannelConnected,
+  isChannelReady,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import {
   AuthorizationActions,
   Sections,
   SubscriptionException,
@@ -206,7 +210,7 @@ export class PostsService {
 
   async updateReleaseId(orgId: string, postId: string, releaseId: string) {
     const post = await this._postRepository.getPostById(postId, orgId);
-    if (!post || post.deletedAt || !post.integration || post.integration.deletedAt || post.integration.disabled || post.integration.inBetweenSteps) {
+    if (!post || post.deletedAt || !post.integration || !isChannelConnected(post.integration)) {
       throw new BadRequestException('Post is no longer available.');
     }
 
@@ -292,9 +296,7 @@ export class PostsService {
     const current = await this._postRepository.getPostById(postId, orgId);
     return !!current && !current.deletedAt &&
       current.integrationId === expectedIntegration.id &&
-      !!current.integration && !current.integration.deletedAt &&
-      !current.integration.disabled && !current.integration.inBetweenSteps &&
-      !current.integration.refreshNeeded &&
+      !!current.integration && isChannelReady(current.integration) &&
       current.integration.token === expectedIntegration.token;
   }
 
@@ -312,7 +314,7 @@ export class PostsService {
     if (!post || !post.releaseURL) {
       return { releaseURL: '' };
     }
-    if (post.deletedAt || !post.integration || post.integration.deletedAt || post.integration.disabled || post.integration.inBetweenSteps) {
+    if (post.deletedAt || !post.integration || !isChannelConnected(post.integration)) {
       return { releaseURL: '', unavailable: true };
     }
 
@@ -385,7 +387,7 @@ export class PostsService {
     if (!post || !post.releaseId) {
       return [];
     }
-    if (post.deletedAt || !post.integration || post.integration.deletedAt || post.integration.disabled || post.integration.inBetweenSteps) {
+    if (post.deletedAt || !post.integration || !isChannelConnected(post.integration)) {
       return [];
     }
 
@@ -647,12 +649,7 @@ export class PostsService {
     // the same channel states that keep getReleaseURL from handing back
     // provider data, plus refreshNeeded: a channel that lost its grant is
     // never spoken for on a public page
-    if (
-      post.integration.deletedAt ||
-      post.integration.disabled ||
-      post.integration.inBetweenSteps ||
-      post.integration.refreshNeeded
-    ) {
+    if (!isChannelReady(post.integration)) {
       return undefined;
     }
 

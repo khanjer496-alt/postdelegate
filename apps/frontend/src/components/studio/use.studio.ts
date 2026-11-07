@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import type { StudioWord } from '@gitroom/helpers/utils/studio.captions';
 import type { StudioTextStyle } from '@gitroom/nestjs-libraries/dtos/studio/studio.clip.dto';
+import type { ChannelState } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 export type StudioPosition = 'top' | 'center' | 'bottom';
 
@@ -191,6 +192,8 @@ export type StudioScheduleChannel = {
   identifier: string;
   picture?: string | null;
   refreshNeeded?: boolean;
+  // what the channel's flags mean together, decided by the backend
+  state?: ChannelState;
   acceptsVideo: boolean;
   draftsOnly: boolean;
   settings: {

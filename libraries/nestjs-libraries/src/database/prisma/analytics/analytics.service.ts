@@ -14,6 +14,10 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import {
+  isChannelConnected,
+  isChannelReady,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 // provider analytics are slow third-party calls: a few at a time, and a channel
 // that takes too long is reported as unavailable instead of holding the page
@@ -547,11 +551,8 @@ export class AnalyticsService {
     const channels = (
       await this._analyticsRepository.getOverviewChannels(org.id)
     ).filter(
-      (channel) =>
-        channel.type === 'social' &&
-        !channel.disabled &&
-        !channel.refreshNeeded &&
-        !channel.inBetweenSteps
+      // getOverviewChannels already excludes removed ones
+      (channel) => channel.type === 'social' && isChannelReady(channel)
     );
 
     const supported = channels.filter(
@@ -1054,8 +1055,7 @@ export class AnalyticsService {
   // the live social channels of the organization
   private async viewGainChannels(orgId: string) {
     return (await this._analyticsRepository.getOverviewChannels(orgId)).filter(
-      (channel) =>
-        channel.type === 'social' && !channel.disabled && !channel.inBetweenSteps
+      (channel) => channel.type === 'social' && isChannelConnected(channel)
     );
   }
 

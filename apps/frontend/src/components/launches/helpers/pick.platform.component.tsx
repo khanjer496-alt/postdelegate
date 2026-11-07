@@ -222,6 +222,11 @@ export const PickPlatforms: FC<{
           <div className="innerComponent">
             <div className="flex gap-[10px] flex-wrap">
               {integrations
+                // Autopost, webhooks and internal channels keep offering a
+                // channel the customer turned off, unlike the composer: the
+                // rule they are picking it for outlives the channel being
+                // off, and switching it back on should not leave a rule
+                // silently pointing at nothing.
                 .filter((f) => !f.inBetweenSteps)
                 .map((integration) =>
                   !props.singleSelect ? (

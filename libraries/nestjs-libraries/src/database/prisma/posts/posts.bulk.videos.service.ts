@@ -25,6 +25,10 @@ import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.
 import { ApprovalActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service';
 import { plainTextToHtml } from '@gitroom/helpers/utils/plain.text.to.html';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import {
+  channelState,
+  isChannelConnected,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -281,7 +285,7 @@ export class PostsBulkVideosService {
   async channels(orgId: string) {
     const integrations = (
       await this._integrationService.getIntegrationsList(orgId)
-    ).filter((integration) => !integration.disabled && !integration.inBetweenSteps);
+    ).filter(isChannelConnected);
     const schemas = getValidationSchemas() as Record<string, any>;
 
     return Promise.all(
@@ -319,6 +323,7 @@ export class PostsBulkVideosService {
           identifier: integration.providerIdentifier,
           picture: integration.picture,
           refreshNeeded: integration.refreshNeeded,
+          state: channelState(integration),
           acceptsVideo,
           settings: form.fields,
           // a network that needs a setting picked in the composer
@@ -527,7 +532,7 @@ export class PostsBulkVideosService {
             'One of the channels was not found. Pick the channels again.'
           );
         }
-        if (integration.disabled || integration.inBetweenSteps) {
+        if (!isChannelConnected(integration)) {
           throw new BadRequestException(
             `${integration.name} is turned off or not fully connected. Pick another channel.`
           );
