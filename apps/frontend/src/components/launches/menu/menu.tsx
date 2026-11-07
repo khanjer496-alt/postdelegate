@@ -13,6 +13,7 @@ import { useClickOutside } from '@mantine/hooks';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { TimeTable } from '@gitroom/frontend/components/launches/time.table';
 import {
@@ -43,12 +44,24 @@ const RenameChannelModal: FC<{
   const t = useT();
   const { close, name, id, onSave } = props;
   const fetch = useFetch();
+  const toast = useToaster();
   const [channelName, setChannelName] = useState<string>(name);
   const save = useCallback(async () => {
-    await fetch(`/integrations/${id}/custom-name`, {
+    const response = await fetch(`/integrations/${id}/custom-name`, {
       method: 'PUT',
       body: JSON.stringify({ name: channelName }),
     });
+    // the modal stays open with the name, so it can be saved again
+    if (!response.ok) {
+      toast.show(
+        await errorMessage(
+          response,
+          t('error_occurred', 'An error occurred. Please try again.')
+        ),
+        'warning'
+      );
+      return;
+    }
     onSave();
     close();
   }, [channelName, id]);
@@ -161,12 +174,22 @@ export const Menu: FC<{
     ) {
       return;
     }
-    await fetch('/integrations/disable', {
+    const response = await fetch('/integrations/disable', {
       method: 'POST',
       body: JSON.stringify({
         id,
       }),
     });
+    if (!response.ok) {
+      toast.show(
+        await errorMessage(
+          response,
+          t('error_occurred', 'An error occurred. Please try again.')
+        ),
+        'warning'
+      );
+      return;
+    }
     toast.show(t('channel_disabled', 'Channel Disabled'), 'success');
     setShow(false);
     onChange(false);
@@ -189,13 +212,6 @@ export const Menu: FC<{
         id,
       }),
     });
-    if (deleteIntegration.status === 406) {
-      toast.show(
-        t('delete_posts_before_channel', 'You have to delete all the posts associated with this channel before deleting it'),
-        'warning'
-      );
-      return;
-    }
     if (!deleteIntegration.ok) {
       const response = await deleteIntegration.json().catch(() => ({}));
       toast.show(
@@ -410,10 +426,20 @@ export const Menu: FC<{
     setShow(false);
   }, [integrations, t]);
   const resetChannelName = useCallback(async () => {
-    await fetch(`/integrations/${id}/custom-name`, {
+    const response = await fetch(`/integrations/${id}/custom-name`, {
       method: 'PUT',
       body: JSON.stringify({ name: '' }),
     });
+    if (!response.ok) {
+      toast.show(
+        await errorMessage(
+          response,
+          t('error_occurred', 'An error occurred. Please try again.')
+        ),
+        'warning'
+      );
+      return;
+    }
     mutate();
     toast.show(t('channel_name_reset', 'Channel name reset'), 'success');
     setShow(false);

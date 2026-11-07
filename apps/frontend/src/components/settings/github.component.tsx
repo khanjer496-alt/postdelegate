@@ -15,6 +15,7 @@ const ConnectedComponent: FC<{
 }> = (props) => {
   const { id, login, deleteRepository } = props;
   const fetch = useFetch();
+  const toast = useToaster();
   const disconnect = useCallback(async () => {
     if (
       !(await deleteDialog(
@@ -23,10 +24,14 @@ const ConnectedComponent: FC<{
     ) {
       return;
     }
-    deleteRepository();
-    await fetch(`/settings/repository/${id}`, {
+    const response = await fetch(`/settings/repository/${id}`, {
       method: 'DELETE',
     });
+    if (!response.ok) {
+      toast.show('Could not disconnect the repository', 'warning');
+      return;
+    }
+    deleteRepository();
   }, []);
 
   const t = useT();
@@ -60,11 +65,13 @@ const ConnectComponent: FC<{
   const fetch = useFetch();
   const toast = useToaster();
   const cancelConnection = useCallback(async () => {
-    await (
-      await fetch(`/settings/repository/${id}`, {
-        method: 'DELETE',
-      })
-    ).json();
+    const response = await fetch(`/settings/repository/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      toast.show('Could not cancel the connection', 'warning');
+      return;
+    }
     deleteRepository();
   }, []);
   const completeConnection = useCallback(async () => {
@@ -79,6 +86,10 @@ const ConnectComponent: FC<{
     });
     if (response.status === 404) {
       toast.show('Repository not found', 'warning');
+      return;
+    }
+    if (!response.ok) {
+      toast.show('Could not connect the repository', 'warning');
       return;
     }
     setConnected(`${select}/${repo}`);
@@ -135,17 +146,28 @@ export const GithubComponent: FC<{
     login: string;
   }>;
 }> = (props) => {
-  if (typeof window !== 'undefined' && window.opener) {
-    window.close();
-  }
+  // the GitHub connect popup lands here, once it is done it closes itself
+  useEffect(() => {
+    if (window.opener) {
+      window.close();
+    }
+  }, []);
   const { github, organizations } = props;
   const [githubState, setGithubState] = useState(github);
   useEffect(() => {
     setGithubState(github);
   }, [github]);
   const fetch = useFetch();
+  const toast = useToaster();
   const connect = useCallback(async () => {
-    const { url } = await (await fetch('/settings/github/url')).json();
+    const response = await fetch('/settings/github/url');
+    const { url } = response.ok
+      ? await response.json().catch(() => ({} as any))
+      : ({} as any);
+    if (!url) {
+      toast.show('Could not connect to GitHub', 'warning');
+      return;
+    }
     window.open(url, 'Github Connect', 'width=700,height=700');
   }, []);
   const setConnected = useCallback(

@@ -2097,6 +2097,7 @@
   "resend_activation_email": "有効化メールを再送信",
   "failed_to_resend": "有効化メールを再送信できませんでした",
   "error_occurred": "エラーが発生しました。もう一度お試しください。",
+  "too_many_attempts": "試行回数が多すぎます。数分待ってから、もう一度お試しください。",
   "didnt_receive_email": "メールが届きませんか？",
   "activation_email_sent": "有効化メールを送信しました！受信トレイをご確認ください。",
   "resend_available_in": "再送信まであと",

@@ -2097,6 +2097,7 @@
   "resend_activation_email": "Reenviar correo de activación",
   "failed_to_resend": "No se pudo reenviar el correo de activación",
   "error_occurred": "Se produjo un error. Inténtalo de nuevo.",
+  "too_many_attempts": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
   "didnt_receive_email": "¿No recibiste el correo?",
   "activation_email_sent": "¡Se envió el correo de activación! Revisa tu bandeja de entrada.",
   "resend_available_in": "Puedes reenviarlo en",

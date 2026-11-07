@@ -12,6 +12,7 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const clientId = searchParams.get('client_id');
   const responseType = searchParams.get('response_type');
@@ -72,28 +73,43 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
   const handleAction = useCallback(
     async (action: 'approve' | 'deny') => {
       setSubmitting(true);
+      setActionError('');
       try {
-        const result = await (
-          await fetch('/oauth/authorize', {
-            method: 'POST',
-            body: JSON.stringify({
-              client_id: clientId,
-              state,
-              action,
-              ...(redirectUri ? { redirect_uri: redirectUri } : {}),
-              ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
-              ...(codeChallengeMethod
-                ? { code_challenge_method: codeChallengeMethod }
-                : {}),
-            }),
-          })
-        ).json();
+        const response = await fetch('/oauth/authorize', {
+          method: 'POST',
+          body: JSON.stringify({
+            client_id: clientId,
+            state,
+            action,
+            ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+            ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
+            ...(codeChallengeMethod
+              ? { code_challenge_method: codeChallengeMethod }
+              : {}),
+          }),
+        });
+        const result = await response.json().catch(() => ({} as any));
 
-        if (result.redirect) {
+        // the page stays on "submitting" only while it leaves for the app
+        if (
+          response.ok &&
+          typeof result.redirect === 'string' &&
+          result.redirect
+        ) {
           window.location.href = result.redirect;
+          return;
         }
+        const message = Array.isArray(result?.message)
+          ? result.message[0]
+          : result?.message;
+        setActionError(
+          typeof message === 'string' && message
+            ? message
+            : 'Failed to process authorization, please try again'
+        );
+        setSubmitting(false);
       } catch {
-        setError('Failed to process authorization');
+        setActionError('Failed to process authorization, please try again');
         setSubmitting(false);
       }
     },
@@ -226,6 +242,15 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
                   <li>Read your post analytics</li>
                 </ul>
               </div>
+
+              {!!actionError && (
+                <div
+                  role="alert"
+                  className="rounded-[8px] bg-red-500/10 ring-1 ring-red-500/40 text-red-400 text-[14px] px-[16px] py-[12px]"
+                >
+                  {actionError}
+                </div>
+              )}
 
               {logged ? (
                 <div className="flex gap-[12px]">
