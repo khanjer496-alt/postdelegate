@@ -1457,6 +1457,9 @@ export class PostsRepository {
   // missing-posts sweep, another run - can never overwrite what that one
   // recorded. A post that is gone or no longer in those states is not a
   // failure, there is just nothing to write: it returns null.
+  // A retried activity whose earlier attempt committed but never reported
+  // finds the row already in the target state with the same error: that is
+  // this write, so it reports it as written (without writing again).
   async changeStateIf(
     id: string,
     expectedStates: State[],
@@ -1475,10 +1478,22 @@ export class PostsRepository {
         release
       );
     } catch (e) {
-      if (e instanceof BadRequestException) {
-        return null;
+      if (!(e instanceof BadRequestException)) {
+        throw e;
       }
-      throw e;
+
+      return this._post.model.post.findFirst({
+        where: {
+          id,
+          state,
+          ...(err
+            ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
+            : {}),
+          deletedAt: null,
+          integration: { deletedAt: null },
+        },
+        select: { id: true },
+      });
     }
   }
 

@@ -279,8 +279,9 @@ describe('PostsRepository state writes', () => {
     const transaction = {
       model: { $transaction: jest.fn((cb: any) => cb(tx)) },
     };
+    const post = { findFirst: jest.fn().mockResolvedValue(null) };
     const repo = new PostsRepository(
-      {} as any,
+      { model: { post } } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -289,7 +290,7 @@ describe('PostsRepository state writes', () => {
       transaction as any,
       {} as any
     );
-    return { repo, tx };
+    return { repo, tx, post };
   };
 
   it('changeStateIf writes only while the post is in an expected state', async () => {
@@ -314,6 +315,23 @@ describe('PostsRepository state writes', () => {
     await expect(
       repo.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom', [{ id: 'p-1' }])
     ).resolves.toBeNull();
+    expect(tx.errors.create).not.toHaveBeenCalled();
+  });
+
+  it('changeStateIf reports a retried write that already landed, without writing again', async () => {
+    const { repo, tx, post } = makeStateRepo(0);
+    post.findFirst.mockResolvedValue({ id: 'p-1' });
+
+    await expect(
+      repo.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom')
+    ).resolves.toEqual({ id: 'p-1' });
+    expect(post.findFirst.mock.calls[0][0].where).toEqual({
+      id: 'p-1',
+      state: 'ERROR',
+      error: 'boom',
+      deletedAt: null,
+      integration: { deletedAt: null },
+    });
     expect(tx.errors.create).not.toHaveBeenCalled();
   });
 

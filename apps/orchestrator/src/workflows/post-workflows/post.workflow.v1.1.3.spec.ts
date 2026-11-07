@@ -264,7 +264,7 @@ describe('postWorkflowV113 failures', () => {
     expect(mockState.activities.inAppNotification).toHaveBeenCalledWith(
       'org-1',
       'Error posting comments on x for X account',
-      'An error occurred while posting comments on x: Reply refused',
+      'Your post is live on x, but a comment in its thread could not be published: Reply refused',
       true,
       false,
       'fail'
@@ -292,6 +292,38 @@ describe('postWorkflowV113 failures', () => {
 
     expect(mockState.activities.postComment).toHaveBeenCalledTimes(1);
     expect(writes().map(([id]) => id)).toEqual(['c-1', 'c-2']);
+    // the calendar only shows the main post, so the failed comment is told
+    expect(mockState.activities.inAppNotification).toHaveBeenCalledWith(
+      'org-1',
+      'Error posting comments on x for X account',
+      'Your post is live on x, but a comment in its thread could not be published',
+      true,
+      false,
+      'fail'
+    );
+  });
+
+  it('a refused token refresh on the main post notifies too', async () => {
+    mockState.activities.postSocialPending.mockRejectedValue(
+      activityFailure(
+        ApplicationFailure.create({
+          type: 'refresh_token',
+          message: 'Token expired',
+        })
+      )
+    );
+
+    await expect(run()).resolves.toBe(false);
+
+    expect(writes()).toHaveLength(1);
+    expect(mockState.activities.inAppNotification).toHaveBeenCalledWith(
+      'org-1',
+      'Error posting on x for X account',
+      'An error occurred while posting on x: Token expired',
+      true,
+      false,
+      'fail'
+    );
   });
 
   it('keeps the platform id and URL when the publish went out but could not be marked', async () => {
@@ -331,6 +363,40 @@ describe('postWorkflowV113 failures', () => {
 
     await expect(run()).rejects.toBeInstanceOf(ActivityFailure);
     expect(mockState.activities.postSocialPending).toHaveBeenCalledTimes(1);
+  });
+
+  it('a repeating post with a failed comment gets its webhooks but no next repeat', async () => {
+    const { startChild } = jest.requireMock('@temporalio/workflow');
+    startChild.mockClear();
+    mockState.activities.getPostsList.mockResolvedValue([
+      root({ intervalInDays: 1 }),
+      comment('c-1'),
+    ]);
+    mockState.activities.postComment.mockRejectedValueOnce(
+      badBody('Reply refused')
+    );
+
+    await run();
+
+    expect(mockState.activities.sendWebhooks).toHaveBeenCalledTimes(1);
+    expect(startChild).not.toHaveBeenCalled();
+  });
+
+  it('a repeating post whose thread went out schedules the next repeat', async () => {
+    const { startChild } = jest.requireMock('@temporalio/workflow');
+    startChild.mockClear();
+    mockState.activities.getPostsList.mockResolvedValue([
+      root({ intervalInDays: 1 }),
+      comment('c-1'),
+    ]);
+
+    await run();
+
+    expect(startChild).toHaveBeenCalledTimes(1);
+    expect(startChild.mock.calls[0][1].args[0]).toMatchObject({
+      postId: 'p-1',
+      postNow: true,
+    });
   });
 
   it('a repeat run writes over its PUBLISHED root', async () => {

@@ -139,9 +139,8 @@ const maxPendingChecks = 90;
 // How a post or a comment failed:
 // 'unconfirmed' - the platform may have accepted it, the user must check the
 //                 account before posting again
-// 'bad-body' - the platform refused it, the user is told why
-// 'error' - a refused token refresh or any other error, recorded without a
-//           notification like before
+// 'bad-body' - the platform refused it
+// 'error' - a refused token refresh or any other error
 type Failure = {
   type: 'unconfirmed' | 'bad-body' | 'error';
   err: any;
@@ -314,6 +313,11 @@ export async function postWorkflowV113({
   // list of all the saved results
   const postsResults: PostResponse[] = [];
 
+  // a comment of the thread failed in this run: the main post is live, but
+  // the next repeat would publish it without the failed comment, so the chain
+  // ends here
+  let threadFailed = false;
+
   // Every catch block below used to repeat the same failure classification, so
   // it is centralized here: detect the failure type, refresh the token when
   // needed, and tell the caller what to do.
@@ -423,7 +427,9 @@ export async function postWorkflowV113({
     }
 
     // the failure is recorded, a notification that can't be sent must not end
-    // the run: the root may be live, with plugs and repeats still to run
+    // the run: the root may be live, with webhooks and plugs still to run.
+    // Every failure is told: the calendar only shows the main post, so a
+    // failed comment under a live post is invisible otherwise.
     try {
       if (failure.type === 'unconfirmed') {
         // The platform may have accepted it but we can't confirm it was
@@ -434,26 +440,36 @@ export async function postWorkflowV113({
           `We couldn't confirm your ${i === 0 ? 'post' : 'comment'} on ${capitalize(
             post.integration?.providerIdentifier
           )}`,
-          `Your ${i === 0 ? 'post' : 'comment'} was sent to ${capitalize(
-            post.integration?.providerIdentifier
-          )}, but we couldn't confirm it was published. Please check your ${
-            post?.integration?.name
-          } account before posting again to avoid duplicates.`,
+          i === 0
+            ? `Your post was sent to ${capitalize(
+                post.integration?.providerIdentifier
+              )}, but we couldn't confirm it was published. Please check your ${
+                post?.integration?.name
+              } account before posting again to avoid duplicates.`
+            : `Your post is live on ${capitalize(
+                post.integration?.providerIdentifier
+              )}, but we couldn't confirm a comment in its thread was published. Please check your ${
+                post?.integration?.name
+              } account before posting it again to avoid duplicates.`,
           true,
           false,
           'fail'
         );
-      }
-
-      if (failure.type === 'bad-body') {
+      } else {
         await inAppNotification(
           post.organizationId,
           `Error posting${i === 0 ? ' ' : ' comments '}on ${
             post.integration?.providerIdentifier
           } for ${post?.integration?.name}`,
-          `An error occurred while posting${i === 0 ? ' ' : ' comments '}on ${
-            post.integration?.providerIdentifier
-          }${failure.message ? `: ${failure.message}` : ``}`,
+          i === 0
+            ? `An error occurred while posting on ${
+                post.integration?.providerIdentifier
+              }${failure.message ? `: ${failure.message}` : ``}`
+            : `Your post is live on ${
+                post.integration?.providerIdentifier
+              }, but a comment in its thread could not be published${
+                failure.message ? `: ${failure.message}` : ``
+              }`,
           true,
           false,
           'fail'
@@ -662,7 +678,7 @@ export async function postWorkflowV113({
             ? { type: 'unconfirmed', err }
             : handle.type === 'bad-body'
             ? { type: 'bad-body', err, message: handle.message }
-            : { type: 'error', err };
+            : { type: 'error', err, message: handle.message };
         break;
       }
     }
@@ -687,8 +703,9 @@ export async function postWorkflowV113({
       }
 
       // a comment failed under a live main post: the rest of the thread is
-      // failed with it, the main post still gets its webhooks, plugs and
-      // next repeat
+      // failed with it, the main post still gets its webhooks and plugs, but
+      // no next repeat
+      threadFailed = true;
       break;
     }
   }
@@ -722,16 +739,17 @@ export async function postWorkflowV113({
   );
 
   // Check if the post is repeatable
-  const repeatPost = !post.intervalInDays
-    ? []
-    : [
-        {
-          type: 'repeat-post',
-          delay:
-            post.intervalInDays * 24 * 60 * 60 * 1000 -
-            (new Date().getTime() - startTime.getTime()),
-        },
-      ];
+  const repeatPost =
+    !post.intervalInDays || threadFailed
+      ? []
+      : [
+          {
+            type: 'repeat-post',
+            delay:
+              post.intervalInDays * 24 * 60 * 60 * 1000 -
+              (new Date().getTime() - startTime.getTime()),
+          },
+        ];
 
   // Sort all the actions by delay, so we can process them in order
   const list = sortBy(
