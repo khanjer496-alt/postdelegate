@@ -552,6 +552,8 @@ export class StripeService extends PaymentProviderAbstract {
     switch (event.type) {
       case 'invoice.payment_succeeded':
         return this.paymentSucceeded(event);
+      case 'invoice.payment_failed':
+        return this.paymentFailed(event);
       case 'customer.subscription.created':
         return this.createSubscription(event);
       case 'customer.subscription.updated':
@@ -829,6 +831,57 @@ export class StripeService extends PaymentProviderAbstract {
   // Stripe sends it 3 days before the trial ends. A trial without a card is
   // canceled when it ends, so ask the workspace to add one. It never fails the
   // webhook, a retry would send the reminder twice.
+  // A renewal that could not be charged. Stripe retries on its own schedule
+  // and eventually cancels the subscription, which arrives here as
+  // customer.subscription.deleted - but the customer heard nothing in between,
+  // so an expired card looked like the plan disappearing by itself. One notice
+  // per failed attempt, which is Stripe's cadence (about four over two weeks).
+  async paymentFailed(event: Stripe.InvoicePaymentFailedEvent) {
+    try {
+      // A retried event can be days old, so act on the invoice as it is now:
+      // the card may have worked since, and alarming them then is worse than
+      // saying nothing.
+      const invoice = await stripe.invoices.retrieve(
+        event.data.object.id as string
+      );
+      if (invoice.status !== 'open' && invoice.status !== 'uncollectible') {
+        return { ok: true };
+      }
+
+      const org = await this._organizationService.getOrgByCustomerId(
+        invoice.customer as string
+      );
+      if (!org) {
+        return { ok: true };
+      }
+
+      const retriesAt = invoice.next_payment_attempt;
+      await this.notifyBilling(
+        org.id,
+        'Your payment did not go through',
+        retriesAt
+          ? `We could not charge the card on file for your PostDelegate plan. We will try again on ${dayjs
+              .unix(retriesAt)
+              .format(
+                'MMMM D, YYYY'
+              )}. To avoid any interruption, update your card in Settings > Billing (${
+              process.env.FRONTEND_URL
+            }/billing).`
+          : `We could not charge the card on file for your PostDelegate plan, and that was the last attempt, so the plan will be cancelled and your workspace paused. Add a working card in Settings > Billing (${
+              process.env.FRONTEND_URL
+            }/billing) to keep it.`,
+        'Update card'
+      );
+    } catch (err) {
+      console.error('stripe_payment_failed_notice_failed', {
+        stripe_event_id: event.id,
+        stripe_invoice_id: event.data.object.id,
+        err,
+      });
+    }
+    return { ok: true };
+  }
+
   async trialWillEnd(event: Stripe.CustomerSubscriptionTrialWillEndEvent) {
     try {
       // A retried event can be days old, so act on the subscription as it is now
