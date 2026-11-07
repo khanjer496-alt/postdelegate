@@ -2,11 +2,13 @@
 import { SITE } from '../data/site';
 // The cookie banner, shared with the app through the pd_consent cookie
 // ("v1|ref:1|analytics:0", 6 months, on .postdelegate.com; the "yes" / "no" of
-// the first version still counts as the referral answer). This site has no
-// analytics, so the only optional category is referral and campaign
-// attribution: the first-touch pd_ref cookie ("<code>.<ms>", 60 days) that
-// the app reads at sign-up. Without it, ?ref= and utm_* ride along in the
-// links of this visit and the sign-up form sends them to the app.
+// the first version still counts as the referral answer). Two optional
+// categories: referral and campaign attribution, the first-touch pd_ref cookie
+// ("<code>.<ms>", 60 days) that the app reads at sign-up (without it, ?ref= and
+// utm_* ride along in the links of this visit and the sign-up form sends them
+// to the app); and analytics, which lets Pulse (our own analytics, loaded in
+// Base.astro) set its one pulse_vid cookie. Without analytics consent Pulse
+// still counts visits, cookie-free.
 // The footer's Cookie settings button reopens it.
 import { strings, type Lang } from '../i18n';
 interface Props { lang?: Lang }
@@ -31,6 +33,10 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     <div class="cc-row">
       <div><span id="cc-ref">{c.attribution}</span><small id="cc-ref-text">{c.attributionText}</small></div>
       <button type="button" role="switch" class="cc-switch" aria-checked="false" aria-labelledby="cc-ref" aria-describedby="cc-ref-text" data-cc-switch="ref"><span></span></button>
+    </div>
+    <div class="cc-row">
+      <div><span id="cc-analytics">{c.analytics}</span><small id="cc-analytics-text">{c.analyticsText}</small></div>
+      <button type="button" role="switch" class="cc-switch" aria-checked="false" aria-labelledby="cc-analytics" aria-describedby="cc-analytics-text" data-cc-switch="analytics"><span></span></button>
     </div>
   </div>
   <div class="cc-actions" data-cc-view="banner">
@@ -72,8 +78,19 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     const flags = Object.fromEntries(parts.map((part) => part.split(':')));
     return { ref: flags.ref === '1', analytics: flags.analytics === '1' };
   };
+  // Pulse's command queue: calls made before its deferred script loads wait in pulse.q
+  type Pulse = ((...args: unknown[]) => void) & { q?: unknown[][] };
+  const pulse = (...args: unknown[]) => {
+    const w = window as unknown as { pulse?: Pulse };
+    if (typeof w.pulse === 'function') return w.pulse(...args);
+    const stub: Pulse = (...queued: unknown[]) => { (stub.q ??= []).push(queued); };
+    stub(...args);
+    w.pulse = stub;
+  };
   // first touch: a referral already remembered is never replaced
   const applyChoices = (choices: Choices | undefined) => {
+    // no answer yet: Pulse stays cookie-free; "no" also deletes its cookie
+    if (choices) pulse('consent', choices.analytics);
     if (choices?.ref && ref && !cookie('pd_ref')) write('pd_ref', `${ref}.${Date.now()}`, 60);
     if (choices && !choices.ref) {
       document.cookie = `pd_ref=; max-age=0; path=/${domain}`;
@@ -102,6 +119,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   if (banner) {
     const title = banner.querySelector<HTMLElement>('[data-cc-title]')!;
     const refSwitch = banner.querySelector<HTMLButtonElement>('[data-cc-switch="ref"]')!;
+    const analyticsSwitch = banner.querySelector<HTMLButtonElement>('[data-cc-switch="analytics"]')!;
     let opener: HTMLElement | null = null;
 
     const setView = (view: 'banner' | 'customize') => {
@@ -178,7 +196,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
       const from = event.relatedTarget as HTMLElement | null;
       if (!opener && from && !banner.contains(from)) opener = from;
     });
-    // the app's analytics choice is kept, this site has no analytics to ask about
+    // the same analytics flag the app reads, so one answer covers both
     const save = (choices: Choices) => {
       write('pd_consent', `v1|ref:${choices.ref ? 1 : 0}|analytics:${choices.analytics ? 1 : 0}`, 180);
       applyChoices(choices);
@@ -186,18 +204,18 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     };
     const customize = () => {
       refSwitch.setAttribute('aria-checked', String(!!readChoices()?.ref));
+      analyticsSwitch.setAttribute('aria-checked', String(!!readChoices()?.analytics));
       show('customize');
       title.focus();
     };
 
-    refSwitch.addEventListener('click', () => refSwitch.setAttribute('aria-checked', String(refSwitch.getAttribute('aria-checked') !== 'true')));
+    [refSwitch, analyticsSwitch].forEach((toggle) => toggle.addEventListener('click', () => toggle.setAttribute('aria-checked', String(toggle.getAttribute('aria-checked') !== 'true'))));
     banner.querySelector('[data-cc-close]')!.addEventListener('click', hide);
     banner.querySelectorAll<HTMLButtonElement>('[data-cc-answer]').forEach((button) => button.addEventListener('click', () => {
       const answer = button.dataset.ccAnswer;
-      const analytics = !!readChoices()?.analytics;
       if (answer === 'reject') save({ ref: false, analytics: false });
-      else if (answer === 'accept') save({ ref: true, analytics });
-      else if (answer === 'save') save({ ref: refSwitch.getAttribute('aria-checked') === 'true', analytics });
+      else if (answer === 'accept') save({ ref: true, analytics: true });
+      else if (answer === 'save') save({ ref: refSwitch.getAttribute('aria-checked') === 'true', analytics: analyticsSwitch.getAttribute('aria-checked') === 'true' });
       else customize();
     }));
     document.querySelectorAll<HTMLElement>('[data-cookie-settings]').forEach((button) => button.addEventListener('click', () => {
@@ -222,7 +240,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   .cc .cc-title{margin:0;font-size:14px;font-weight:700;line-height:1.3}.cc .cc-title:focus{outline:none}.cc .cc-title:focus-visible{outline:2px solid #c8ff4d;outline-offset:3px}
   .cc-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin-block:-4px;margin-inline-end:-6px;border:0;border-radius:8px;background:none;color:#b9b9b9}.cc-close:hover{color:#fff;background:#222}
   .cc a{color:#d1bfff;text-decoration:underline;text-underline-offset:3px}.cc a:hover{color:#fff}
-  .cc-categories{display:flex;flex-direction:column;gap:12px;padding:4px 0}
+  .cc-categories{display:flex;flex-direction:column;gap:8px;padding:2px 0}
   .cc-categories:not([hidden]){display:flex}.cc [hidden]{display:none!important}
   .cc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.cc-row>div{display:flex;flex-direction:column;gap:2px}.cc-row span{font-weight:650}.cc-row small{color:#b9b9b9;font-size:12px;line-height:1.45}
   .cc-switch{flex-shrink:0;width:44px;height:26px;padding:3px;border:1px solid #555;border-radius:99px;background:#0d0d0d}.cc-switch span{display:block;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
@@ -230,7 +248,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   .cc-actions{display:flex;gap:8px}
   /* the three answers look the same: saying no is as easy as saying yes */
   .cc-button{flex:1;min-height:36px;padding:5px 8px;border:1px solid #777;border-radius:100px;background:transparent;color:#fff;font-size:12.5px;font-weight:650;line-height:1.2;transition:background .18s,border-color .18s}.cc-button:hover{background:#222;border-color:#fff}
-  @media(min-width:640px){.cc{inset-inline:16px auto;bottom:16px;width:380px;gap:10px;padding:18px;border:1px solid #303030;border-radius:18px;box-shadow:0 20px 60px #000a;font-size:14px;line-height:1.45}.cc .cc-title{font-size:15px}.cc-button{min-height:38px;font-size:13px}.cc.cc-end{inset-inline:auto 16px}}
+  @media(min-width:640px){.cc{inset-inline:16px auto;bottom:16px;width:340px;gap:8px;padding:14px 16px;border:1px solid #303030;border-radius:18px;box-shadow:0 20px 60px #000a;font-size:14px;line-height:1.45}.cc .cc-title{font-size:15px}.cc-button{min-height:38px;font-size:13px}.cc.cc-end{inset-inline:auto 16px}}
   @media(prefers-reduced-motion:reduce){.cc-switch span,.cc-button{transition:none}}
 </style>
 <style is:global>
