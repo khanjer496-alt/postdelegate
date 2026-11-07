@@ -1,5 +1,19 @@
 {
   "version": 1,
-  "include": ["/docs", "/docs/*"],
-  "exclude": ["/docs/*.md"]
+  "include": ["/*"],
+  "exclude": [
+    "/_astro/*",
+    "/fonts/*",
+    "/images/*",
+    "/og/*",
+    "/platforms/*",
+    "/docs/*.md",
+    "/*.png",
+    "/*.svg",
+    "/*.ico",
+    "/*.json",
+    "/*.webmanifest",
+    "/*.tar.gz",
+    "/*.xml"
+  ]
 }
