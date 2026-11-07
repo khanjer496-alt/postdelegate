@@ -76,9 +76,17 @@ services:
       # redis-cli reads this, so the healthcheck authenticates without putting
       # the password in the healthcheck command
       REDISCLI_AUTH: ${POSTIZ_REDIS_PASSWORD:?set POSTIZ_REDIS_PASSWORD in /etc/postiz/runtime.env}
-    # redis-server needs no capabilities at all. Postgres, Temporal and Caddy
-    # are left alone: their entrypoints need chown/setuid, and Caddy needs
-    # NET_BIND_SERVICE for 80/443, so dropping everything breaks them.
+    # Runs as the redis user rather than root. This is required for cap_drop,
+    # not just nicer: the image's entrypoint starts as root and switches with
+    # gosu, which needs SETUID/SETGID, so cap_drop ALL on its own makes Redis
+    # exit with "setpriv: setresuid failed" - and depends_on would then stop
+    # the app starting at all. Starting as redis skips the switch entirely.
+    # uid 999 / gid 1000, which is what already owns the redis-data volume.
+    #
+    # Postgres, Temporal and Caddy keep their capabilities deliberately: their
+    # entrypoints need chown/setuid too, and Caddy needs NET_BIND_SERVICE for
+    # 80/443.
+    user: redis
     cap_drop:
       - ALL
     volumes:

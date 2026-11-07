@@ -58,6 +58,21 @@ describe('the committed compose file', () => {
     expect(redis).toContain('- ALL');
   });
 
+  // The trap this test exists for: the redis image's entrypoint starts as root
+  // and switches user with gosu, which needs SETUID/SETGID. cap_drop ALL on its
+  // own makes Redis exit with "setpriv: setresuid failed", and because the app
+  // depends_on redis being healthy, the whole stack fails to start. Running as
+  // the redis user skips the switch, so the two settings only work together.
+  it('runs redis as the redis user wherever it drops capabilities', () => {
+    const redis = compose.slice(
+      compose.indexOf('\n  redis:'),
+      compose.indexOf('\n  temporal-postgresql:')
+    );
+    if (redis.includes('cap_drop')) {
+      expect(redis).toMatch(/\n\s+user: (redis|"?999)/);
+    }
+  });
+
   it('publishes no database or cache port to the host', () => {
     // only Caddy may be reachable from outside the Compose network
     const published = compose
