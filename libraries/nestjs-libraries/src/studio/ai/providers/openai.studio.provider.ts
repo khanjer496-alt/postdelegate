@@ -22,12 +22,32 @@ import type { StudioWord } from '@gitroom/helpers/utils/studio.captions';
 // The models, checked against developers.openai.com/api/docs on 1 Nov 2026:
 // - gpt-6-luna replaces gpt-4.1 (shut down 14 Jan 2027) and supports Chat
 //   Completions with Structured Outputs; a script needs little reasoning
-// - gpt-4o-mini-tts is the only model left on /v1/audio/speech that takes
-//   "instructions"; it shuts down 6 Jan 2027 and its successor
-//   (gpt-realtime-2.1-mini) is Realtime only, so this needs a follow-up
-// - whisper-1 is the only model with word timestamps; it shuts down 26 Feb
-//   2027, until then a failed timing falls back to the script spread over
-//   the voice
+// - gpt-4o-mini-tts shuts down 6 Jan 2027, and so do tts-1 and tts-1-hd:
+//   after that date /v1/audio/speech has no model at all, so tts() below has
+//   to move. Checked again on 7 Nov 2026, there are two ways out and the
+//   named replacement is the worse one:
+//     * gpt-realtime-2.1-mini, which the deprecations page names, is the
+//       Realtime API: a WebSocket session (wss://api.openai.com/v1/realtime),
+//       with no documented HTTP endpoint that returns generated audio. That
+//       is the wrong shape for a render job that wants one request and a file.
+//     * gpt-audio-1.5 on POST /v1/chat/completions does it in one ordinary
+//       request - `modalities: ['text','audio']`, `audio: { voice, format }`,
+//       and the audio comes back base64 in message.audio.data. Its model page
+//       says /v1/audio/speech is NOT supported, so this is a rewrite of the
+//       call, not a model swap.
+//   Two things are unresolved and need a real key to settle, which no
+//   workspace here has: whether delivery direction can be carried at all
+//   (the chat path documents no equivalent of `instructions`, which this
+//   provider relies on), and that audio output costs $64/1M tokens against
+//   $12/1M today - the customer's key pays, but it is a five-fold jump.
+//   Until then the shutdown degrades honestly: a 404 from a retired model
+//   lands in fail() as "your OpenAI key cannot use a model Studio needs".
+// - whisper-1 is the only model that takes timestamp_granularities, and it
+//   shuts down 26 Feb 2027. Its named replacements (gpt-transcribe,
+//   gpt-live-transcribe) are not documented as returning word timestamps at
+//   all, so there may be no successor for captions timed to the word: that is
+//   a product question, not just a model swap. Until then a failed timing
+//   already falls back to the script spread over the voice.
 // - gpt-image-2.5-flare replaces gpt-image-1 (shut down 23 Oct 2026), the
 //   fastest image model
 // - Sora 2 and the Videos API shut down on 24 Sep 2026 with no replacement,
