@@ -13,6 +13,9 @@ model Organization {
   name                String
   description         String?
   apiKey              String?
+  // HMAC of the API key, the only thing an API-key lookup queries. apiKey
+  // itself keeps a copy the settings page and enterprise webhooks can read.
+  apiKeyHash          String?
   paymentId           String?
   streakSince         DateTime?
   createdAt           DateTime             @default(now())
@@ -65,6 +68,7 @@ model Organization {
   referralFirstPaidAt   DateTime?
 
   @@index([apiKey])
+  @@index([apiKeyHash])
   @@index([streakSince])
   @@index([paymentId])
   @@index([deletedAt])

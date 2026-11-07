@@ -5,6 +5,11 @@ import { UpdateOAuthAppDto } from '@gitroom/nestjs-libraries/dtos/oauth/update-o
 import { RegisterClientDto } from '@gitroom/nestjs-libraries/dtos/oauth/register-client.dto';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import {
+  readLegacySecret,
+  SecretCrypto,
+  writeSecret,
+} from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
 import { extractBearerToken } from '@gitroom/nestjs-libraries/chat/oauth-types';
 import { createHash } from 'crypto';
 import { OAuthApp } from '@prisma/client';
@@ -105,9 +110,56 @@ const isAllowedPrivateScheme = (protocol: string) => {
   );
 };
 
+// Field names folded into the HMAC of every OAuth secret, so a hash cannot be
+// lifted from one column into another. The refresh token has no label of its
+// own: a connection's refresh token *is* its access token (see refreshFields),
+// stored in the same column.
+// The API key of a self-hosted instance a cloud connection relays to: it is
+// replayed to that instance, so it has to be readable.
+export const MCP_RELAY_KEY_LABEL = 'mcp-relay-key';
+
+export const OAUTH_SECRET_LABELS = {
+  accessToken: 'oauth-access-token',
+  code: 'oauth-code',
+  clientSecret: 'oauth-client-secret',
+} as const;
+
 @Injectable()
 export class OAuthService {
   constructor(private _oauthRepository: OAuthRepository) {}
+
+  // How a secret is stored: an HMAC, which is never reversible. Without
+  // TOKEN_ENCRYPTION_KEY it keeps writing the legacy form, so a self-hosted
+  // instance with no key configured still works.
+  private storedSecret(value: string, label: string) {
+    return SecretCrypto.isEnabled()
+      ? SecretCrypto.hash(value, label)
+      : AuthService.fixedEncryption(value);
+  }
+
+  // Every stored form a presented secret could match: the hash under the
+  // current key, one per retired key, and the legacy ciphertext for rows the
+  // backfill has not converted yet. Empty for an empty secret, so a blank
+  // credential never reaches the database.
+  private lookupSecrets(value: string | undefined | null, label: string) {
+    if (!value || !value.trim()) {
+      return [];
+    }
+    return [
+      ...SecretCrypto.hashCandidates(value, label),
+      AuthService.fixedEncryption(value),
+    ];
+  }
+
+  private secretMatches(
+    presented: string | undefined | null,
+    stored: string | undefined | null,
+    label: string
+  ) {
+    return this.lookupSecrets(presented, label).some((candidate) =>
+      SecretCrypto.hashEquals(candidate, stored)
+    );
+  }
 
   async getApp(orgId: string) {
     const app = await this._oauthRepository.getAppByOrgId(orgId);
@@ -127,7 +179,10 @@ export class OAuthService {
 
     const clientId = 'pca_' + makeSecureId(32);
     const clientSecret = 'pcs_' + makeSecureId(48);
-    const encryptedSecret = AuthService.fixedEncryption(clientSecret);
+    const encryptedSecret = this.storedSecret(
+      clientSecret,
+      OAUTH_SECRET_LABELS.clientSecret
+    );
 
     const app = await this._oauthRepository.createApp(orgId, {
       name: dto.name,
@@ -167,7 +222,10 @@ export class OAuthService {
     }
 
     const newSecret = 'pcs_' + makeSecureId(48);
-    const encrypted = AuthService.fixedEncryption(newSecret);
+    const encrypted = this.storedSecret(
+      newSecret,
+      OAUTH_SECRET_LABELS.clientSecret
+    );
     await this._oauthRepository.updateClientSecret(orgId, encrypted);
     return { clientSecret: newSecret };
   }
@@ -276,7 +334,9 @@ export class OAuthService {
       redirectUrl: redirectUris[0],
       redirectUris: JSON.stringify(redirectUris),
       clientId,
-      clientSecret: clientSecret && AuthService.fixedEncryption(clientSecret),
+      clientSecret:
+        clientSecret &&
+        this.storedSecret(clientSecret, OAUTH_SECRET_LABELS.clientSecret),
       tokenEndpointAuthMethod,
     });
 
@@ -481,7 +541,7 @@ export class OAuthService {
     }
   ) {
     const code = makeSecureId(32);
-    const encryptedCode = AuthService.fixedEncryption(code);
+    const encryptedCode = this.storedSecret(code, OAUTH_SECRET_LABELS.code);
     const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await this._oauthRepository.createAuthorization({
@@ -520,9 +580,9 @@ export class OAuthService {
     await this._oauthRepository.createSelfHostedAuthorization({
       oauthAppId,
       mcpUrl: instance.mcpUrl,
-      apiKey: AuthService.fixedEncryption(instance.apiKey),
+      apiKey: writeSecret(instance.apiKey, MCP_RELAY_KEY_LABEL),
       email: instance.email,
-      authorizationCode: AuthService.fixedEncryption(code),
+      authorizationCode: this.storedSecret(code, OAUTH_SECRET_LABELS.code),
       codeExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
       codeChallenge: pkce?.codeChallenge,
       codeChallengeMethod: pkce?.codeChallengeMethod,
@@ -551,7 +611,11 @@ export class OAuthService {
       if (
         !clientSecret ||
         !app.clientSecret ||
-        app.clientSecret !== AuthService.fixedEncryption(clientSecret)
+        !this.secretMatches(
+          clientSecret,
+          app.clientSecret,
+          OAUTH_SECRET_LABELS.clientSecret
+        )
       ) {
         throw new HttpException(
           { error: 'invalid_client' },
@@ -569,8 +633,9 @@ export class OAuthService {
       );
     }
 
-    const encryptedCode = AuthService.fixedEncryption(code);
-    const auth = await this._oauthRepository.findByCode(encryptedCode);
+    const auth = await this._oauthRepository.findByCode(
+      this.lookupSecrets(code, OAUTH_SECRET_LABELS.code)
+    );
     if (!auth || auth.oauthAppId !== app.id) {
       throw new HttpException(
         { error: 'invalid_grant' },
@@ -581,7 +646,10 @@ export class OAuthService {
     this.verifyCodeGrant(auth, codeVerifier, redirectUri);
 
     const token = 'pos_' + makeSecureId(40);
-    const encryptedToken = AuthService.fixedEncryption(token);
+    const encryptedToken = this.storedSecret(
+      token,
+      OAUTH_SECRET_LABELS.accessToken
+    );
     const {
       organizationId,
       organization: { paymentId },
@@ -651,7 +719,7 @@ export class OAuthService {
     redirectUri?: string
   ) {
     const auth = await this._oauthRepository.findSelfHostedByCode(
-      AuthService.fixedEncryption(code)
+      this.lookupSecrets(code, OAUTH_SECRET_LABELS.code)
     );
     if (!auth || auth.oauthAppId !== app.id) {
       throw new HttpException(
@@ -665,7 +733,7 @@ export class OAuthService {
     const token = 'psh_' + makeSecureId(40);
     await this._oauthRepository.exchangeSelfHostedCodeForToken(
       auth.id,
-      AuthService.fixedEncryption(token)
+      this.storedSecret(token, OAUTH_SECRET_LABELS.accessToken)
     );
 
     return {
@@ -717,12 +785,15 @@ export class OAuthService {
     }
 
     // a self-hosted connection only works while the relay is on
-    const encryptedToken = AuthService.fixedEncryption(refreshToken);
+    const tokenLookup = this.lookupSecrets(
+      refreshToken,
+      OAUTH_SECRET_LABELS.accessToken
+    );
     const authorization = refreshToken.startsWith('psh_')
       ? selfHostedRelayEnabled()
-        ? await this._oauthRepository.findSelfHostedByAccessToken(encryptedToken)
+        ? await this._oauthRepository.findSelfHostedByAccessToken(tokenLookup)
         : null
-      : await this._oauthRepository.findByAccessToken(encryptedToken);
+      : await this._oauthRepository.findByAccessToken(tokenLookup);
     if (!authorization || authorization.oauthAppId !== app.id) {
       throw new HttpException(
         { error: 'invalid_grant' },
@@ -791,7 +862,7 @@ export class OAuthService {
 
     const authorization =
       await this._oauthRepository.findSelfHostedByAccessToken(
-        AuthService.fixedEncryption(token)
+        this.lookupSecrets(token, OAUTH_SECRET_LABELS.accessToken)
       );
     if (!authorization) {
       return null;
@@ -800,7 +871,11 @@ export class OAuthService {
     return {
       id: authorization.id,
       mcpUrl: authorization.mcpUrl,
-      apiKey: AuthService.fixedDecryption(authorization.apiKey),
+      // the column is non-nullable and always written, so this cannot be
+      // empty in practice; the fallback keeps the declared SelfHostedInstance
+      // contract (apiKey: string) honest rather than leaning on
+      // strictNullChecks being off
+      apiKey: readLegacySecret(authorization.apiKey, MCP_RELAY_KEY_LABEL) ?? '',
     };
   }
 
@@ -809,8 +884,11 @@ export class OAuthService {
   }
 
   async getOrgByOAuthToken(token: string) {
-    const encrypted = AuthService.fixedEncryption(token);
-    return this._oauthRepository.findByAccessToken(encrypted);
+    const lookup = this.lookupSecrets(token, OAUTH_SECRET_LABELS.accessToken);
+    if (!lookup.length) {
+      return null;
+    }
+    return this._oauthRepository.findByAccessToken(lookup);
   }
 
   async getUserInfo(authorization?: string) {
@@ -868,7 +946,7 @@ export class OAuthService {
   private async getSelfHostedUserInfo(token: string) {
     const selfHosted = selfHostedRelayEnabled()
       ? await this._oauthRepository.findSelfHostedUserInfo(
-          AuthService.fixedEncryption(token)
+          this.lookupSecrets(token, OAUTH_SECRET_LABELS.accessToken)
         )
       : null;
     if (!selfHosted) {

@@ -24,7 +24,6 @@ import {
 } from '@atproto/api';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import {
   getSsrfSafeAxios,
@@ -36,6 +35,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { readCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 
 async function reduceImageBySize(url: string, maxSizeKB = 976) {
   try {
@@ -382,7 +382,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
 
   private async getAgent(integration: Integration) {
     const body = JSON.parse(
-      AuthService.fixedDecryption(integration.customInstanceDetails!)
+      readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
     );
     const agent = new BskyAgent({
       service: body.service,
@@ -886,7 +886,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     fields: { likesAmount: string }
   ) {
     const body = JSON.parse(
-      AuthService.fixedDecryption(integration.customInstanceDetails!)
+      readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
     );
     const agent = new BskyAgent({
       service: body.service,
@@ -947,7 +947,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     fields: { likesAmount: string; post: string }
   ) {
     const body = JSON.parse(
-      AuthService.fixedDecryption(integration.customInstanceDetails!)
+      readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
     );
     const agent = new BskyAgent({
       service: body.service,
@@ -1002,7 +1002,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     integration: Integration
   ) {
     const body = JSON.parse(
-      AuthService.fixedDecryption(integration.customInstanceDetails!)
+      readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
     );
 
     const agent = new BskyAgent({

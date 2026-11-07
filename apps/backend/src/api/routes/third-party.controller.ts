@@ -11,7 +11,6 @@ import { ApiTags } from '@nestjs/swagger';
 import { ThirdPartyManager } from '@gitroom/nestjs-libraries/3rdparties/thirdparty.manager';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { ImportMediaDto } from '@gitroom/nestjs-libraries/dtos/third-party/import-media.dto';
@@ -84,7 +83,7 @@ export class ThirdPartyController {
     }
 
     const loadedData = await thirdPartyInstance?.instance?.sendData(
-      AuthService.fixedDecryption(thirdParty.apiKey),
+      this._thirdPartyManager.readApiKey(thirdParty),
       data
     );
 
@@ -117,7 +116,7 @@ export class ThirdPartyController {
     }
 
     return thirdPartyInstance?.instance?.[functionName](
-      AuthService.fixedDecryption(thirdParty.apiKey),
+      this._thirdPartyManager.readApiKey(thirdParty),
       data
     );
   }
@@ -146,7 +145,7 @@ export class ThirdPartyController {
     }
 
     const downloadUrls = await thirdPartyInstance?.instance?.['importMedia']?.(
-      AuthService.fixedDecryption(thirdParty.apiKey),
+      this._thirdPartyManager.readApiKey(thirdParty),
       body.items
     );
 

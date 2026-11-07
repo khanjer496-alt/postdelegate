@@ -383,6 +383,7 @@ const dict: Dict = {
     postBridgeCta: 'Confronta l’approccio',
     pairsTitle: 'Confronti diretti',
     pairsIntro: 'Due altri strumenti fianco a fianco, con i prezzi presi dalla pagina prezzi di ciascun fornitore e una nota a parte su dove si colloca PostDelegate.',
+    morePairsTitle: 'Altri confronti diretti (in inglese)',
     pairs: [
       { title: 'Postiz vs Buffer', text: 'Piani a prezzo fisso o prezzo per canale, costi calcolati con 3, 10 e 30 account, self-hosting, API e MCP.' },
       { title: 'Postiz vs Mixpost', text: 'Due pianificatori self-hosted: AGPL o MIT e licenze una tantum, stack server, costo su 12 mesi e social.' },

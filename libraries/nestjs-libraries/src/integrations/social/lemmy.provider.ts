@@ -13,10 +13,10 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { LemmySettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/lemmy.dto';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { readCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 
 export class LemmyProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Lemmy instances typically have moderate limits
@@ -207,7 +207,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
 
   private async getJwtAndService(integration: Integration): Promise<{ jwt: string; service: string }> {
     const body = JSON.parse(
-      AuthService.fixedDecryption(integration.customInstanceDetails!)
+      readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
     );
 
     const options = {
