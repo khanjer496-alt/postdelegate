@@ -182,7 +182,7 @@ const en = {
     classicH1Mark: 'busy teams.',
     classicLead: (count: number) => `Plan every post on one calendar, get it approved by your team or client, and it goes out on time to ${count} networks.`,
     classicCardDraftSub: 'Waiting on your approval',
-    classicSteps: ['You plan it.', 'Your team approves it.', 'PostDelegate posts it.'],
+    classicSteps: ['You plan it.', 'You or your client approve it.', 'PostDelegate posts it.'],
     channelsEyebrow: 'Live networks',
     channelsTitle: (count: number) => `Schedule YouTube, Bluesky, Discord and ${count - 3} more.`,
     featuresEyebrow: 'Inside PostDelegate',

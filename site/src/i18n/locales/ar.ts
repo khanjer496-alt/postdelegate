@@ -193,7 +193,7 @@ const dict: Dict = {
     classicH1Mark: 'للفرق المشغولة.',
     classicLead: (count: number) => `خطّط لكل منشور على تقويم واحد، واحصل على موافقة فريقك أو عميلك، ثم يُنشر في موعده على ${count} شبكة.`,
     classicCardDraftSub: 'بانتظار موافقتك',
-    classicSteps: ['أنت تخطّط له.', 'فريقك يوافق عليه.', 'وPostDelegate ينشره.'],
+    classicSteps: ['أنت تخطّط له.', 'أنت أو عميلك توافقان عليه.', 'وPostDelegate ينشره.'],
     channelsEyebrow: 'الشبكات المتاحة',
     channelsTitle: (count: number) => `جدوِل على YouTube وBluesky وDiscord و${count - 3} شبكة أخرى.`,
     featuresEyebrow: 'داخل PostDelegate',

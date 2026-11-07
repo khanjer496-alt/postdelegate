@@ -213,7 +213,7 @@ const dict: Dict = {
     classicH1Mark: 'equipes ocupadas.',
     classicLead: (count: number) => `Planeje cada post em um só calendário, peça a aprovação da equipe ou do cliente e ele sai na hora certa em ${count} redes.`,
     classicCardDraftSub: 'Aguardando sua aprovação',
-    classicSteps: ['Você planeja.', 'Sua equipe aprova.', 'O PostDelegate publica.'],
+    classicSteps: ['Você planeja.', 'Você ou seu cliente aprovam.', 'O PostDelegate publica.'],
     channelsEyebrow: 'Redes disponíveis',
     channelsTitle: (count: number) => `Agende no YouTube, Bluesky, Discord e em mais ${count - 3} redes.`,
     featuresEyebrow: 'Por dentro do PostDelegate',
