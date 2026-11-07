@@ -2,11 +2,13 @@
 import { SITE } from '../data/site';
 // The cookie banner, shared with the app through the pd_consent cookie
 // ("v1|ref:1|analytics:0", 6 months, on .postdelegate.com; the "yes" / "no" of
-// the first version still counts as the referral answer). This site has no
-// analytics, so the only optional category is referral and campaign
-// attribution: the first-touch pd_ref cookie ("<code>.<ms>", 60 days) that
-// the app reads at sign-up. Without it, ?ref= and utm_* ride along in the
-// links of this visit and the sign-up form sends them to the app.
+// the first version still counts as the referral answer). Two optional
+// categories: referral and campaign attribution, the first-touch pd_ref cookie
+// ("<code>.<ms>", 60 days) that the app reads at sign-up (without it, ?ref= and
+// utm_* ride along in the links of this visit and the sign-up form sends them
+// to the app); and analytics, which lets Pulse (our own analytics, loaded in
+// Base.astro) set its one pulse_vid cookie. Without analytics consent Pulse
+// still counts visits, cookie-free.
 // The footer's Cookie settings button reopens it.
 import { strings, type Lang } from '../i18n';
 interface Props { lang?: Lang }
@@ -31,6 +33,10 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     <div class="cc-row">
       <div><span id="cc-ref">{c.attribution}</span><small id="cc-ref-text">{c.attributionText}</small></div>
       <button type="button" role="switch" class="cc-switch" aria-checked="false" aria-labelledby="cc-ref" aria-describedby="cc-ref-text" data-cc-switch="ref"><span></span></button>
+    </div>
+    <div class="cc-row">
+      <div><span id="cc-analytics">{c.analytics}</span><small id="cc-analytics-text">{c.analyticsText}</small></div>
+      <button type="button" role="switch" class="cc-switch" aria-checked="false" aria-labelledby="cc-analytics" aria-describedby="cc-analytics-text" data-cc-switch="analytics"><span></span></button>
     </div>
   </div>
   <div class="cc-actions" data-cc-view="banner">
@@ -72,8 +78,19 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     const flags = Object.fromEntries(parts.map((part) => part.split(':')));
     return { ref: flags.ref === '1', analytics: flags.analytics === '1' };
   };
+  // Pulse's command queue: calls made before its deferred script loads wait in pulse.q
+  type Pulse = ((...args: unknown[]) => void) & { q?: unknown[][] };
+  const pulse = (...args: unknown[]) => {
+    const w = window as unknown as { pulse?: Pulse };
+    if (typeof w.pulse === 'function') return w.pulse(...args);
+    const stub: Pulse = (...queued: unknown[]) => { (stub.q ??= []).push(queued); };
+    stub(...args);
+    w.pulse = stub;
+  };
   // first touch: a referral already remembered is never replaced
   const applyChoices = (choices: Choices | undefined) => {
+    // no answer yet: Pulse stays cookie-free; "no" also deletes its cookie
+    if (choices) pulse('consent', choices.analytics);
     if (choices?.ref && ref && !cookie('pd_ref')) write('pd_ref', `${ref}.${Date.now()}`, 60);
     if (choices && !choices.ref) {
       document.cookie = `pd_ref=; max-age=0; path=/${domain}`;
@@ -102,6 +119,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   if (banner) {
     const title = banner.querySelector<HTMLElement>('[data-cc-title]')!;
     const refSwitch = banner.querySelector<HTMLButtonElement>('[data-cc-switch="ref"]')!;
+    const analyticsSwitch = banner.querySelector<HTMLButtonElement>('[data-cc-switch="analytics"]')!;
     let opener: HTMLElement | null = null;
 
     const setView = (view: 'banner' | 'customize') => {
@@ -178,7 +196,7 @@ const privacy = `${SITE.legal.privacy}#cookies`;
       const from = event.relatedTarget as HTMLElement | null;
       if (!opener && from && !banner.contains(from)) opener = from;
     });
-    // the app's analytics choice is kept, this site has no analytics to ask about
+    // the same analytics flag the app reads, so one answer covers both
     const save = (choices: Choices) => {
       write('pd_consent', `v1|ref:${choices.ref ? 1 : 0}|analytics:${choices.analytics ? 1 : 0}`, 180);
       applyChoices(choices);
@@ -186,18 +204,18 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     };
     const customize = () => {
       refSwitch.setAttribute('aria-checked', String(!!readChoices()?.ref));
+      analyticsSwitch.setAttribute('aria-checked', String(!!readChoices()?.analytics));
       show('customize');
       title.focus();
     };
 
-    refSwitch.addEventListener('click', () => refSwitch.setAttribute('aria-checked', String(refSwitch.getAttribute('aria-checked') !== 'true')));
+    [refSwitch, analyticsSwitch].forEach((toggle) => toggle.addEventListener('click', () => toggle.setAttribute('aria-checked', String(toggle.getAttribute('aria-checked') !== 'true'))));
     banner.querySelector('[data-cc-close]')!.addEventListener('click', hide);
     banner.querySelectorAll<HTMLButtonElement>('[data-cc-answer]').forEach((button) => button.addEventListener('click', () => {
       const answer = button.dataset.ccAnswer;
-      const analytics = !!readChoices()?.analytics;
       if (answer === 'reject') save({ ref: false, analytics: false });
-      else if (answer === 'accept') save({ ref: true, analytics });
-      else if (answer === 'save') save({ ref: refSwitch.getAttribute('aria-checked') === 'true', analytics });
+      else if (answer === 'accept') save({ ref: true, analytics: true });
+      else if (answer === 'save') save({ ref: refSwitch.getAttribute('aria-checked') === 'true', analytics: analyticsSwitch.getAttribute('aria-checked') === 'true' });
       else customize();
     }));
     document.querySelectorAll<HTMLElement>('[data-cookie-settings]').forEach((button) => button.addEventListener('click', () => {
