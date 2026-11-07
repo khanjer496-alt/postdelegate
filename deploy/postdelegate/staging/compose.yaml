@@ -31,6 +31,14 @@ services:
     image: ${POSTIZ_IMAGE:?set POSTIZ_IMAGE in /etc/postiz/staging.env}
     env_file:
       - /etc/postiz/staging.env
+    environment:
+      # Authoritative, and it overrides the env_file: Redis now needs
+      # credentials and an env file cannot interpolate them. The plain
+      # REDIS_URL left in /etc/postiz/staging.env is deliberately NOT removed -
+      # the compose file currently on the server still reads it from there, so
+      # deleting it would break staging on its next restart, before this file
+      # is deployed. Remove it once this compose is live.
+      REDIS_URL: redis://default:${POSTIZ_REDIS_PASSWORD:?set POSTIZ_REDIS_PASSWORD in /etc/postiz/staging.env}@app-redis:6379
     # The release image inlines https://app.postdelegate.com/api into the
     # frontend's server bundle at build time. frontend-url.sh repoints it at
     # NEXT_PUBLIC_BACKEND_URL inside this container, then starts the app the
