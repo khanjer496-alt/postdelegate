@@ -6,12 +6,17 @@ import {
   StatsParams,
 } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.repository';
 import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
+import {
+  WebsiteStatsParams,
+  WebsiteStatsService,
+} from '@gitroom/nestjs-libraries/services/website.stats.service';
 
 @Injectable()
 export class AdminStatsService {
   constructor(
     private _adminStatsRepository: AdminStatsRepository,
-    private _paymentService: PaymentService
+    private _paymentService: PaymentService,
+    private _websiteStatsService: WebsiteStatsService
   ) {}
 
   getStats(params: StatsParams) {
@@ -40,6 +45,23 @@ export class AdminStatsService {
       signUps,
       comped,
       billing,
+    };
+  }
+
+  // Visitors of the marketing site from Cloudflare, search from Google
+  // Search Console. Each source answers on its own, one that is not set up
+  // or can't be reached never hides the other
+  async getWebsite(params: WebsiteStatsParams) {
+    const [visitors, search] = await Promise.all([
+      this._websiteStatsService.getVisitors(params),
+      this._websiteStatsService.getSearch(params),
+    ]);
+
+    return {
+      from: params.from.toISOString(),
+      to: params.to.toISOString(),
+      visitors,
+      search,
     };
   }
 }

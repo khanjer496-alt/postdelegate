@@ -96,6 +96,33 @@ export class AdminController {
     });
   }
 
+  // Visitors and Google search of the marketing site, same range as /stats
+  @Get('/stats/website')
+  async getWebsiteStats(
+    @GetUserFromRequest() user: User,
+    @Query('from') from?: string,
+    @Query('to') to?: string
+  ) {
+    this.assertSuperAdmin(user);
+
+    const fromDate = from ? dayjs(from) : dayjs().subtract(30, 'day');
+    const toDate = to ? dayjs(to) : dayjs();
+    // Search Console keeps 16 months; anything wider is a mistyped date
+    if (
+      !fromDate.isValid() ||
+      !toDate.isValid() ||
+      fromDate.isAfter(toDate) ||
+      toDate.diff(fromDate, 'day') > 500
+    ) {
+      throw new HttpException('Invalid date range', 400);
+    }
+
+    return this._adminStatsService.getWebsite({
+      from: fromDate.startOf('day').toDate(),
+      to: toDate.endOf('day').toDate(),
+    });
+  }
+
   @Get('/affiliates/payouts')
   async listAffiliatePayouts(@GetUserFromRequest() user: User) {
     this.assertSuperAdmin(user);
