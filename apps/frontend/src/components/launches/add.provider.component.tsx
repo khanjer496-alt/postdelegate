@@ -479,9 +479,12 @@ export const AddProviderComponent: FC<{
           // carry the `postiz://` deep link so the backend redirects
           // back to the iOS/Android app after OAuth completes, instead
           // of the default web redirect.
+          // an invite link is opened by the customer, not in this browser:
+          // the backend makes it a confirmed, 15 minute, single use link
           const params = [
             `externalUrl=${encodeURIComponent(externalUrl)}`,
             onboardingParam,
+            invite ? 'invite=true' : '',
             isMobile
               ? `redirectUrl=${encodeURIComponent('postiz://integrations')}`
               : '',
@@ -510,7 +513,10 @@ export const AddProviderComponent: FC<{
 
           if (invite) {
             toaster.show(
-              'Invite link copied to clipboard, link will be available for 1 hour',
+              t(
+                'invite_link_copied',
+                'Invite link copied to clipboard, it works once and for 15 minutes'
+              ),
               'success'
             );
             modal.closeAll();

@@ -1,4 +1,9 @@
-import { IsDefined, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsDefined,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class ConnectIntegrationDto {
   @IsString()
@@ -16,4 +21,10 @@ export class ConnectIntegrationDto {
   @IsString()
   @IsOptional()
   refresh?: string;
+
+  // the person opening a shared connect link confirmed the workspace it adds
+  // their account to (see connect.binding)
+  @IsBoolean()
+  @IsOptional()
+  confirmed?: boolean;
 }

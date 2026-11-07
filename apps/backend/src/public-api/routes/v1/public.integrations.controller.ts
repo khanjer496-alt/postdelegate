@@ -64,6 +64,7 @@ import { GetOrgActivityDto } from '@gitroom/nestjs-libraries/dtos/analytics/get.
 import { ResetCreditsDto } from '@gitroom/nestjs-libraries/dtos/billing/reset.credits.dto';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import dayjs from 'dayjs';
+import { saveConnectBinding } from '@gitroom/nestjs-libraries/integrations/connect.binding';
 
 @ApiTags('Public API')
 @Controller('/public/v1')
@@ -437,12 +438,20 @@ export class PublicIntegrationsController {
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl();
 
+      // the URL is handed to whoever the API client gives it to, so the
+      // person opening it confirms the workspace, within 15 minutes, once
+      // (see connect.binding)
+      const { ttl } = await saveConnectBinding(state, {
+        type: 'api',
+        orgId: org.id,
+      });
+
       if (refresh) {
-        await ioRedis.set(`refresh:${state}`, refresh, 'EX', 3600);
+        await ioRedis.set(`refresh:${state}`, refresh, 'EX', ttl);
       }
 
-      await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);
-      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', 3600);
+      await ioRedis.set(`organization:${state}`, org.id, 'EX', ttl);
+      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', ttl);
 
       return { url };
     } catch (err) {

@@ -3,11 +3,14 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -38,6 +41,14 @@ import {
 import { uniqBy } from 'lodash';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { channelState } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+import {
+  ConnectBindingType,
+  connectNonceCookie,
+  connectNonceCookieOptions,
+  deleteConnectBinding,
+  readConnectBinding,
+  saveConnectBinding,
+} from '@gitroom/nestjs-libraries/integrations/connect.binding';
 
 // Where a connect may send the person after the platform's consent screen:
 // only back to us - an address on the app's own origin, or the mobile app's
@@ -86,15 +97,41 @@ export class IntegrationsController {
   async saveProviderPage(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: any
+    @Body() body: any,
+    @Res({ passthrough: true }) res: Response
   ) {
-    return this._integrationService.saveProviderPage(
+    // the state of the connect this page ends, which the app sends along
+    const state =
+      typeof body?.state === 'string' && body.state ? body.state : undefined;
+    const binding = state ? await readConnectBinding(state) : undefined;
+
+    // a connect started for another workspace never ends in this one
+    if (binding && binding.orgId !== org.id) {
+      throw new HttpException(
+        'This connection was started in another workspace. Switch to that workspace and connect the channel again.',
+        403
+      );
+    }
+
+    const saved = await this._integrationService.saveProviderPage(
       org.id,
       id,
       body,
       // @ts-ignore
       org?.subscription?.totalChannels || pricing.FREE.channel
     );
+
+    // the connect is over: its state is spent, the binding after the
+    // organization (see NoAuthIntegrationsController.spendConnectBinding)
+    if (state && binding) {
+      await ioRedis.del(`organization:${state}`);
+      await deleteConnectBinding(state);
+      if (binding.type === 'session') {
+        res.cookie(connectNonceCookie(state), '', connectNonceCookieOptions(-1));
+      }
+    }
+
+    return saved;
   }
 
   @Get('/:identifier/internal-plugs')
@@ -274,7 +311,11 @@ export class IntegrationsController {
     @Query('externalUrl') externalUrl: string,
     @Query('redirectUrl') redirectUrl: string,
     @Query('onboarding') onboarding: string,
-    @GetOrgFromRequest() org: Organization
+    @GetOrgFromRequest() org: Organization,
+    // "Send Invite Link to a customer": the link is opened by someone else
+    @Query('invite') invite: string,
+    @GetUserFromRequest() user: User,
+    @Res({ passthrough: true }) res: Response
   ) {
     if (
       !this._integrationManager
@@ -316,27 +357,52 @@ export class IntegrationsController {
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl(getExternalUrl);
 
+      const returnTo = allowedConnectRedirect(redirectUrl);
+
+      // Who may finish this connect (see connect.binding): an invite link is
+      // for someone else, a mobile connect finishes in the system browser,
+      // everything else in this browser, tied to it by a nonce cookie
+      const type: ConnectBindingType =
+        invite === 'true'
+          ? 'invite'
+          : returnTo &&
+            !['http:', 'https:'].includes(new URL(returnTo).protocol)
+          ? 'mobile'
+          : 'session';
+      const { nonce, ttl } = await saveConnectBinding(state, {
+        type,
+        orgId: org.id,
+        userId: user.id,
+      });
+
       if (refresh) {
-        await ioRedis.set(`refresh:${state}`, refresh, 'EX', 3600);
+        await ioRedis.set(`refresh:${state}`, refresh, 'EX', ttl);
       }
 
       if (onboarding === 'true') {
-        await ioRedis.set(`onboarding:${state}`, 'true', 'EX', 3600);
+        await ioRedis.set(`onboarding:${state}`, 'true', 'EX', ttl);
       }
 
-      const returnTo = allowedConnectRedirect(redirectUrl);
       if (returnTo) {
-        await ioRedis.set(`redirect:${state}`, returnTo, 'EX', 3600);
+        await ioRedis.set(`redirect:${state}`, returnTo, 'EX', ttl);
       }
 
-      await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);
-      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', 3600);
+      await ioRedis.set(`organization:${state}`, org.id, 'EX', ttl);
+      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', ttl);
       await ioRedis.set(
         `external:${state}`,
         JSON.stringify(getExternalUrl),
         'EX',
-        3600
+        ttl
       );
+
+      if (nonce) {
+        res.cookie(
+          connectNonceCookie(state),
+          nonce,
+          connectNonceCookieOptions(ttl)
+        );
+      }
 
       return { url };
     } catch (err) {
