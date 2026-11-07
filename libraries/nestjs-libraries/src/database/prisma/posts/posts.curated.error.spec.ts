@@ -54,6 +54,15 @@ describe('curatedPostError', () => {
     ).toBe(null);
   });
 
+  it('keeps the one workflow state a customer can act on', () => {
+    // nothing else tells them: a disabled channel is not in the reconnect list
+    expect(curatedPostError('Channel disabled')).toBe('Channel disabled');
+    // our own debug strings, and the ones the reconnect list already covers
+    expect(curatedPostError('Refresh channel needed')).toBe(null);
+    expect(curatedPostError('No Post')).toBe(null);
+    expect(curatedPostError('Already posted')).toBe(null);
+  });
+
   it('drops anything that is not a serialized failure', () => {
     expect(curatedPostError(null)).toBe(null);
     expect(curatedPostError('')).toBe(null);

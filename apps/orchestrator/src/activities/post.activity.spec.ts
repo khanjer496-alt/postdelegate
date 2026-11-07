@@ -18,7 +18,11 @@ jest.mock('@gitroom/nestjs-libraries/temporal/temporal.heartbeat', () => ({
 }));
 
 import { PostActivity } from './post.activity';
-import { BadBody } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import {
+  BadBody,
+  RefreshToken,
+} from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { TokenEncryptionError } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
 
 describe('PostActivity posting limits backstop', () => {
   const integration = {
@@ -227,52 +231,65 @@ describe('PostActivity refresh failure cause', () => {
     return { activity, refreshIntegrationService };
   };
 
-  // the cause ends up in the "connect it again" notification the customer
-  // reads, so a failure of ours must not travel with it
-  it('passes on a message the platform sent', async () => {
+  const causeOf = (r: { setBetweenSteps: jest.Mock }) =>
+    r.setBetweenSteps.mock.calls[0]?.[1];
+
+  // whatever lands here is read out in the "connect it again" notification and
+  // its email, so only a message the provider gave us may travel with it
+
+  it('passes on the message a provider failure carried', async () => {
+    // what reConnect throws after a successful refresh - the one provider
+    // message that reaches this catch, since refreshToken's own throw is
+    // swallowed inside refreshProcess
     const { activity, refreshIntegrationService } = make(
-      new Error('Refresh token has expired')
+      new RefreshToken('bluesky', '{}', {} as any, 'Refresh token has expired')
     );
     await expect(activity.refreshToken(integration)).resolves.toBe(false);
-    expect(refreshIntegrationService.setBetweenSteps).toHaveBeenCalledWith(
-      integration,
-      'Refresh token has expired'
-    );
+    expect(causeOf(refreshIntegrationService)).toBe('Refresh token has expired');
   });
 
-  it('drops a failure of our own, and keeps the provider cause when there is one', async () => {
-    const decrypt = Object.assign(
-      new Error('error:1C800064:Provider routines::bad decrypt'),
-      { code: 'ERR_OSSL_BAD_DECRYPT' }
+  it('drops a failure of our own, whatever its message says', async () => {
+    // the real shape of a decrypt failure: TokenEncryption catches openssl's
+    // own error and rethrows this, and the message names an internal env var
+    const encryption = make(
+      new TokenEncryptionError(
+        'A stored token could not be decrypted: it was tampered with or TOKEN_ENCRYPTION_KEY is not the key it was encrypted with'
+      )
     );
-    const { activity, refreshIntegrationService } = make(decrypt);
-    await expect(activity.refreshToken(integration)).resolves.toBe(false);
-    expect(refreshIntegrationService.setBetweenSteps).toHaveBeenCalledWith(
-      integration,
-      ''
+    await expect(encryption.activity.refreshToken(integration)).resolves.toBe(
+      false
     );
+    expect(causeOf(encryption.refreshIntegrationService)).toBe('');
 
     const typed = make(new TypeError('Cannot read properties of null'));
-    await expect(
-      typed.activity.refreshTokenWithCause(integration, '')
-    ).resolves.toBe(false);
-    expect(typed.refreshIntegrationService.setBetweenSteps).toHaveBeenCalledWith(
-      integration,
-      ''
-    );
+    await expect(typed.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(typed.refreshIntegrationService)).toBe('');
 
-    const withCause = make(new TypeError('Cannot read properties of null'));
+    const socket = make(
+      Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' })
+    );
+    await expect(socket.activity.refreshToken(integration)).resolves.toBe(false);
+    expect(causeOf(socket.refreshIntegrationService)).toBe('');
+  });
+
+  it('keeps the workflow cause, except the unmapped placeholder', async () => {
+    const kept = make(new TypeError('Cannot read properties of null'));
     await expect(
-      withCause.activity.refreshTokenWithCause(
+      kept.activity.refreshTokenWithCause(
         integration,
         'Please re-authenticate your YouTube account'
       )
     ).resolves.toBe(false);
-    expect(
-      withCause.refreshIntegrationService.setBetweenSteps
-    ).toHaveBeenCalledWith(
-      integration,
+    expect(causeOf(kept.refreshIntegrationService)).toBe(
       'Please re-authenticate your YouTube account'
     );
+
+    // lemmy rebuilds its RefreshToken with handleErrors' placeholder when it
+    // could not map the response at all
+    const unmapped = make(new TypeError('Cannot read properties of null'));
+    await expect(
+      unmapped.activity.refreshTokenWithCause(integration, 'Unknown Error')
+    ).resolves.toBe(false);
+    expect(causeOf(unmapped.refreshIntegrationService)).toBe('');
   });
 });

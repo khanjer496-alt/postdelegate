@@ -33,7 +33,7 @@ import {
   BadBody,
   Disconnect,
   PublishedWithError,
-  platformReason,
+  providerReason,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 
 // Drops fields the workflow and downstream activities never read — biggest wins are `error` (grows per retry) and `childrenPost` (Prisma side-loads it on every recursive row).
@@ -725,8 +725,8 @@ export class PostActivity {
       await this._refreshIntegrationService.setBetweenSteps(
         integration,
         // the cause is read out in the reconnect notification, so only a
-        // message the platform itself sent is passed on
-        platformReason(err) || ''
+        // message the provider itself gave us is passed on
+        providerReason(err) || ''
       );
       return false;
     }
@@ -767,9 +767,10 @@ export class PostActivity {
     } catch (err) {
       await this._refreshIntegrationService.setBetweenSteps(
         integration,
-        // cause is the provider's own RefreshToken message; anything we caught
-        // ourselves is curated before the customer reads it
-        cause || platformReason(err) || ''
+        // cause is the message a provider's RefreshToken carried back through
+        // the workflow; both it and anything we caught ourselves are curated
+        // before the customer reads them
+        providerReason(cause) || providerReason(err) || ''
       );
       return false;
     }

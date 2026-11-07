@@ -11,6 +11,7 @@ import {
   engagementFromAnalytics,
   isEmptySummary,
   isWeeklySummaryDue,
+  summaryPostError,
   weeklySummaryEmail,
   weeklySummaryWindow,
 } from '@gitroom/nestjs-libraries/database/prisma/weekly-summary/weekly.summary.service';
@@ -41,6 +42,31 @@ const data = (extra: Partial<WeeklySummaryData> = {}): WeeklySummaryData => ({
   ],
   reconnect: [{ name: 'Instagram' }],
   ...extra,
+});
+
+describe('the failure the summary email shows', () => {
+  const failure = (type: string, message: string) =>
+    JSON.stringify({ cause: { type, failure: { message } } });
+
+  it('shows a provider message, shortened', () => {
+    expect(
+      summaryPostError(failure('bad_body', 'Your video is longer than 60 seconds'))
+    ).toBe('Your video is longer than 60 seconds');
+    expect(
+      summaryPostError(failure('bad_body', 'a'.repeat(300)))?.length
+    ).toBe(200);
+  });
+
+  it('shows nothing for a failure of ours', () => {
+    // what the email printed in full before: the serialized failure, here the
+    // openssl string a key mismatch produces
+    expect(
+      summaryPostError(
+        failure('unknown', 'error:1C800064:Provider routines::bad decrypt')
+      )
+    ).toBe(undefined);
+    expect(summaryPostError(null)).toBe(undefined);
+  });
 });
 
 describe('weekly summary schedule', () => {

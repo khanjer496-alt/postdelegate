@@ -89,9 +89,11 @@ export const platformReason = (err: unknown): string | undefined => {
     return undefined;
   }
 
-  // thrown by our own code or by the runtime, never by a platform
+  // thrown by our own code or by the runtime, never by a platform.
+  // TokenEncryptionError is ours and reads like a sentence - it names
+  // TOKEN_ENCRYPTION_KEY - so a class check is the only thing that stops it
   if (
-    /^(TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|AssertionError)$/.test(
+    /^(TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|AssertionError|TokenEncryptionError)$/.test(
       String(error?.name || '')
     )
   ) {
@@ -107,6 +109,38 @@ export const platformReason = (err: unknown): string | undefined => {
   // openssl reports a failed decryption as error:1C800064:... with no code on
   // some node builds, and that message can be followed by what we decrypted
   if (/^error:[0-9a-f]{8}:/i.test(text)) {
+    return undefined;
+  }
+
+  return text;
+};
+
+// The reason a refresh failed, as a customer may read it in the "connect it
+// again" notification. A provider's own words arrive as one of our curated
+// application failures (a RefreshToken or BadBody thrown by handleErrors or by
+// a hand-written provider throw), or as the string a workflow carried back
+// from one. Everything else caught around a refresh is ours - a token that
+// could not be encrypted, a dropped socket, a bug - and a class name is not
+// enough to tell those apart (TokenEncryptionError reads like a sentence and
+// carries no code), so this accepts nothing it cannot account for.
+//
+// 'Unknown Error' is the placeholder handleErrors leaves when it could not map
+// the response at all, so it is not a message for a customer either.
+const UNMAPPED_FAILURE = 'Unknown Error';
+const CURATED_FAILURE_TYPES = ['bad_body', 'refresh_token'];
+
+export const providerReason = (value: unknown): string | undefined => {
+  const raw =
+    value instanceof ApplicationFailure
+      ? CURATED_FAILURE_TYPES.includes(String(value.type))
+        ? value.message
+        : undefined
+      : typeof value === 'string'
+      ? value
+      : undefined;
+
+  const text = (raw || '').trim();
+  if (!text || text === UNMAPPED_FAILURE) {
     return undefined;
   }
 

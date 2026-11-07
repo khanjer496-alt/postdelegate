@@ -54,9 +54,7 @@ export interface NeedsAttention {
 
 const shorten = (value: string, length: number) => {
   const flat = value.replace(/\s+/g, ' ').trim();
-  return flat.length > length
-    ? flat.slice(0, length - 1).trimEnd() + '…'
-    : flat;
+  return flat.length > length ? flat.slice(0, length - 1).trimEnd() + '…' : flat;
 };
 
 export const channelAttentionReason = (
@@ -87,20 +85,14 @@ export class ActivationService {
     userId: string,
     organizationId: string
   ): Promise<ChecklistState> {
-    const dismissedAt =
-      await this._activationRepository.getChecklistDismissedAt(
-        userId,
-        organizationId
-      );
+    const dismissedAt = await this._activationRepository.getChecklistDismissedAt(
+      userId,
+      organizationId
+    );
     if (dismissedAt) {
       return {
         dismissed: true,
-        steps: {
-          channel: false,
-          post: false,
-          scheduled: false,
-          teammate: false,
-        },
+        steps: { channel: false, post: false, scheduled: false, teammate: false },
       };
     }
 

@@ -125,6 +125,14 @@ const snippet = (html: string, length = 140) => {
   return text.length > length ? `${text.slice(0, length - 1)}…` : text;
 };
 
+// The same curation the calendar and the public API use: the raw column holds
+// the serialized workflow failure, which can carry anything the runtime put in
+// the message.
+export const summaryPostError = (error?: string | null) => {
+  const curated = curatedPostError(error);
+  return curated ? snippet(curated, 200) : undefined;
+};
+
 const formatDate = (date: Date, tz: string, withTime = true) =>
   new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
@@ -390,16 +398,12 @@ export class WeeklySummaryService {
       post.integration.providerIdentifier,
       post.integration.name
     );
-    const curated = curatedPostError(post.error);
     return {
       channel: channel.name,
       icon: channel.icon,
       text: snippet(post.content),
       date: post.publishDate,
-      // the same curation the calendar and the public API use: the raw column
-      // holds the serialized workflow failure, which can carry anything the
-      // runtime put in the message
-      error: curated ? snippet(curated, 200) : undefined,
+      error: summaryPostError(post.error),
     };
   }
 
