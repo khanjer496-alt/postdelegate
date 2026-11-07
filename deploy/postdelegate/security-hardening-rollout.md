@@ -118,3 +118,31 @@ migration still authenticates (200) and a bogus one is refused (401)**; and the
 
 Note the rollback window (§6) is now closed: every organization row holds
 `enc:v1:…`. The pre-release backup above is the way back.
+
+## 7 Nov: the caddy env file, continued
+
+Two further faults in the same area, both found while releasing `00497382` and
+both fixed on the server before this was committed.
+
+**The bcrypt hash needs its `$` doubled.** Compose interpolates `env_file`
+values, so `$2b$12$…` arrived in the container as 28 characters instead of 60.
+`basic_auth` then matched nothing and `staging.postdelegate.com` answered 401 to
+the correct password. That reads exactly like a wrong credential, which is how
+it cost an hour: the password was checked against the hash on disk, found to
+match, and the fault was still in front of it. `/etc/postiz/caddy.env` now
+writes the hash with every `$` as `$$`. To check:
+
+```
+sudo docker exec postdelegate-postiz-caddy-1 sh -c 'echo ${#STAGING_BASIC_AUTH_HASH}'   # 60
+```
+
+**Caddy was on the staging network only by hand.** It reverse-proxies
+`staging.postdelegate.com` to a container in the separate staging project, and
+that attachment had been made with `docker network connect`, not in Compose. The
+`--force-recreate caddy` needed to pick up the env file dropped it, and every
+staging page became a 502 that nothing but the Caddy log explained. `compose.yaml`
+now declares the staging network as `external` and puts caddy on it, and
+`compose.spec.ts` fails if either goes away.
+
+Both of these fail in a way that points at the wrong thing — a credential, or the
+staging app — rather than at Caddy. Check the length and the networks first.

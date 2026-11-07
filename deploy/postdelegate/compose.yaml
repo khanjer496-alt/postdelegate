@@ -143,8 +143,24 @@ services:
     # Caddyfile so no credential is committed; Caddy resolves it from here at
     # start. Without this the placeholders expand to empty strings, Caddy still
     # reports a valid config, and staging's gate silently stops working.
+    #
+    # A bcrypt hash is full of $ and Compose interpolates env_file values, so
+    # the hash in that file has every $ written as $$. Unescaped, the container
+    # receives a truncated hash, basic_auth matches nothing and staging answers
+    # 401 to the right password - which reads like a wrong credential, not a
+    # config fault. Check with:
+    #   docker exec postdelegate-postiz-caddy-1 sh -c 'echo ${#STAGING_BASIC_AUTH_HASH}'
+    # It must print 60.
     env_file:
       - /etc/postiz/caddy.env
+    # Caddy proxies staging.postdelegate.com to a container in the separate
+    # staging project, so it has to be on that project's network as well as its
+    # own. It used to be attached by hand, which a `compose up --force-recreate
+    # caddy` silently undoes: the gate then answers but every staging page is a
+    # 502 that only the Caddy log explains.
+    networks:
+      - default
+      - staging
     profiles: [edge]
     ports:
       - 80:80
@@ -159,6 +175,14 @@ services:
     depends_on:
       postiz:
         condition: service_healthy
+
+networks:
+  default:
+  # created by the staging project; `external` so this project never tries to
+  # create or remove it
+  staging:
+    external: true
+    name: postdelegate-staging
 
 volumes:
   postiz-config:
