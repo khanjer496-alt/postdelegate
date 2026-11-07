@@ -20,5 +20,5 @@
   "api": { "value": "A public API on Pro and Enterprise; the comparison table marks it as not included on Basic", "src": "https://planable.io/pricing/" },
   "mcp": { "value": "An MCP connector on all paid plans. It browses workspaces and pages, reads the calendar, creates and edits drafts, handles approvals and pulls analytics where the analytics add-on is bought, but it cannot publish directly", "src": ["https://planable.io/pricing/", "https://planable.io/guides/planable-mcp/"] },
   "ai": { "value": "AI post generation, rewriting and AI replies on every plan, with no credit limits published. AI replies live in the inbox, which is a paid add-on", "src": "https://planable.io/pricing/" },
-  "teams": { "value": "Unlimited users on every plan. Approval types grow by tier: none and optional on Basic, required on Pro, multi-level on Enterprise. Bulk approval is Pro and above, SSO is Enterprise only", "src": "https://planable.io/pricing/" }
+  "teams": { "value": "Unlimited users on Basic and Pro; the Enterprise block does not state a user count. Approval types grow by tier: none and optional on Basic, required on Pro, multi-level on Enterprise. Bulk approval is Pro and above, SSO is Enterprise only", "src": "https://planable.io/pricing/" }
 }

@@ -6,7 +6,7 @@
   "checked": "2026-11-02",
   "kind": { "value": "Analytics-led social media suite with planning, inbox, reports and ads", "src": "https://metricool.com/pricing/" },
   "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://metricool.com/pricing/" },
-  "pricingModel": { "value": "Per brand: plans cover up to 5, 10, 15, 25 or 50 brands, and each brand holds one profile per network. X is a paid add-on per account", "src": ["https://metricool.com/pricing/", "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u"] },
+  "pricingModel": { "value": "Per brand: plans cover up to 5, 10, 15, 25 or 50 brands, and each brand holds one profile per network. X is a paid add-on per account", "src": ["https://metricool.com/pricing/", "https://help.metricool.com/plans-add-ons-and-api-access-explained-xux1u", "https://help.metricool.com/whats-a-brand-in-metricool-and-how-does-it-work-5l78b"] },
   "freeOption": { "value": "Free plan: 1 brand, 20 posts a month, 30 days of analytics; no LinkedIn or X", "src": "https://metricool.com/pricing/" },
   "entryPaid": { "value": "Starter, $25/month for up to 5 brands on monthly billing", "src": "https://metricool.com/pricing/" },
   "plans": { "value": "Starter $25 (5 brands) or $45 (10); Advanced $67 (15), $107 (25) or $210 (50); Custom by quote. Monthly billing, before VAT", "src": "https://metricool.com/pricing/" },

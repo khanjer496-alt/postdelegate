@@ -10,7 +10,7 @@
   "freeOption": { "value": "No free plan. Employee advocacy is free to try and listening is free for your own profiles", "src": "https://vistasocial.com/pricing/" },
   "trial": { "value": "14-day free trial, no credit card required; Enterprise starts with a demo instead", "src": "https://vistasocial.com/pricing/" },
   "entryPaid": { "value": "Professional, $99/month on monthly billing, 15 social profiles and 2 users", "src": "https://vistasocial.com/pricing/" },
-  "plans": { "value": "Professional $99 (15 profiles, 2 users), Advanced $199 (30, 3), Scale $449 (70, 4), Enterprise custom (unlimited, 8+), on monthly billing. Add-ons: X $29/month, listening $75/month, employee advocacy $199/month for 25 employees", "note": "The toggle opens on yearly, where the three plans show $80, $160 and $360 a month.", "src": "https://vistasocial.com/pricing/" },
+  "plans": { "value": "Professional $99 (15 profiles, 2 users), Advanced $199 (30, 3), Scale $449 (70, 4), Enterprise custom (unlimited, 8+), on monthly billing. Add-ons: X $29/month, listening $75/month, employee advocacy $199/month for 25 employees", "note": "The toggle opens on yearly, where the page prints the yearly totals $950, $1,910 and $4,310 - $79, $159 and $359 a month.", "src": "https://vistasocial.com/pricing/" },
   "cost": {
     "3": { "value": "$99", "note": "Professional is the cheapest plan and already includes 15 profiles, so 3 cost the same as 15. Add $29 a month if one of them is X.", "src": "https://vistasocial.com/pricing/" },
     "10": { "value": "$99", "note": "Still inside Professional's 15 profiles, for 2 users. Add $29 a month for X.", "src": "https://vistasocial.com/pricing/" },

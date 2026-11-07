@@ -6,7 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro] = PLANS;
+const [starter, team, pro, ultimate] = PLANS;
 const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // Planable facts come from src/data/tools/planable.json, re-read on the vendor's own site.
 const them = tool('planable');
@@ -18,33 +18,33 @@ const rows = [
   },
   {
     "feature": "Monthly plans",
-    "us": "Starter $19, Team $29, Pro $39, Ultimate $79",
+    "us": PLANS.map((p) => `${p.name} $${p.monthly}`).join(', '),
     "them": "Basic $39 a workspace (4 pages, 60 posts), Pro $59 (10 pages, 150 posts), Enterprise quoted (50 pages)"
   },
   {
     "feature": "Free plan or trial",
-    "us": "A 7-day free trial on every plan, no credit card",
+    "us": `A ${TRIAL_DAYS}-day free trial on every plan, no credit card`,
     "them": "No time-limited trial: the first 50 posts are free, with no card, and the allowance does not reset"
   },
   {
     "feature": "10 channels",
-    "us": "Team, $29 a month",
+    "us": `${team.name}, $${team.monthly} a month`,
     "them": "Pro, $59 a month — Basic's four pages would need three workspaces at $117"
   },
   {
     "feature": "30 channels",
-    "us": "Pro, $39 a month",
+    "us": `${pro.name}, $${pro.monthly} a month`,
     "them": "$177 a month: three Pro workspaces at $59 each"
   },
   {
     "feature": "Analytics",
-    "us": "Included: daily history, trends and best times, for networks that share statistics — today YouTube and Google Business Profile",
+    "us": "Included: daily history and per-channel views for the networks that share statistics - today YouTube and Google Business Profile, neither of which feeds trends, top posts or insights yet",
     "them": "A paid add-on at $14 per workspace per month; the inbox is another $9 and listening another $99"
   },
   {
     "feature": "Team and approvals",
     "us": "Post statuses, an approvals inbox, client approval links that need no account, and an AI review inbox",
-    "them": "Unlimited users on every plan. Approval types rise by tier: none and optional on Basic, required on Pro, multi-level on Enterprise"
+    "them": "Unlimited users on Basic and Pro; the Enterprise block states no user count. Approval types rise by tier: none and optional on Basic, required on Pro, multi-level on Enterprise"
   },
   {
     "feature": "Networks",
@@ -60,11 +60,11 @@ const rows = [
 const faq = [
   {
     "q": "Is Planable's free plan really free?",
-    "a": "It is an allowance rather than a plan. The first 50 posts cost nothing and need no card, but the count does not reset each month — once it is used you upgrade to keep publishing. PostDelegate's free entry point is a 7-day trial on any plan, also with no card, after which it is paid."
+    "a": `It is an allowance rather than a plan. The first 50 posts cost nothing and need no card, but the count does not reset each month — once it is used you upgrade to keep publishing. PostDelegate's free entry point is a ${TRIAL_DAYS}-day trial on any plan, also with no card, after which it is paid.`
   },
   {
     "q": "Is PostDelegate cheaper than Planable?",
-    "a": "Yes at the sizes both publish. Ten channels are $29 a month here against $59 on Planable Pro, and thirty are $39 against $177, which is three Pro workspaces. The gap widens if you want analytics or an inbox, because those are add-ons there at $14 and $9 per workspace per month and included here."
+    "a": `Yes at the sizes both publish. Ten channels are $${team.monthly} a month here against $59 on Planable Pro, and thirty are $${pro.monthly} against $177, which is three Pro workspaces. The gap widens if you want analytics or an inbox, because those are add-ons there at $14 and $9 per workspace per month and included here.`
   },
   {
     "q": "Does Planable have better approvals?",
@@ -84,7 +84,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   { '@type': 'ListItem', position: 2, name: 'PostDelegate vs Planable', item: `${SITE.url}/compare/planable` }] };
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
-<Doc title="Planable alternative: PostDelegate vs Planable compared" description="PostDelegate vs Planable: flat channel plans against per-workspace pricing, approval layers, 50 free posts, MCP that publishes or only drafts, and add-on costs." h1="PostDelegate vs Planable." eyebrow="Compare" lead="Planable is built around approvals: multiple layers of them, with unlimited users on every plan. PostDelegate is built around a calendar and an API. The question is whether you are paying for the review process or the publishing." jsonLd={[crumbs, faqLd]}>
+<Doc title="Planable alternative: PostDelegate vs Planable compared" description="PostDelegate vs Planable: flat channel plans against per-workspace pricing, approval layers, 50 free posts, MCP that publishes or only drafts, and add-on costs." h1="PostDelegate vs Planable." eyebrow="Compare" lead="Planable is built around approvals: multiple layers of them, with unlimited users on Basic and Pro. PostDelegate is built around a calendar and an API. The question is whether you are paying for the review process or the publishing." jsonLd={[crumbs, faqLd]}>
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Planable</a>
 
@@ -94,11 +94,11 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 
   <h2>Pricing, and what the add-ons do to it</h2>
   <p>Planable charges per workspace per month with unlimited users: Basic $39 for four social pages and sixty posts, Pro $59 for ten pages and a hundred and fifty posts, Enterprise quoted at fifty pages. More pages means more workspaces, and the price multiplies.</p>
-  <p>So ten channels is one Pro workspace at $59, because Basic's four pages would need three workspaces at $117. Thirty channels is three Pro workspaces at $177. The same counts on PostDelegate are $29 and $39, with team members included from Team upward.</p>
+  <p>So ten channels is one Pro workspace at $59, because Basic's four pages would need three workspaces at $117. Thirty channels is three Pro workspaces at $177. The same counts on PostDelegate are ${team.monthly} and ${pro.monthly}, with team members included from Team upward.</p>
   <p>The add-ons matter more than the headline here. Analytics is $14 per workspace per month, the social inbox $9, and social listening $99 — each per workspace, so they multiply the same way the base plan does. An agency on three workspaces wanting analytics is paying $177 plus $42. And their pricing toggle opens on yearly, where Basic and Pro read $33 and $49; the figures above are monthly billing.</p>
   
   <h2>Approvals, which is Planable's real argument</h2>
-  <p>Planable is a collaboration tool first and a scheduler second, and it is good at the thing it leads with. Posts are reviewed in a feed, calendar, grid or list view that mirrors how the post will look; comments attach to specific posts; and approval comes in layers — optional on Basic, required on Pro, multi-level on Enterprise, with bulk approval above Basic. Unlimited users on every plan means you are never deciding whether a reviewer is worth a seat.</p>
+  <p>Planable is a collaboration tool first and a scheduler second, and it is good at the thing it leads with. Posts are reviewed in a feed, calendar, grid or list view that mirrors how the post will look; comments attach to specific posts; and approval comes in layers — optional on Basic, required on Pro, multi-level on Enterprise, with bulk approval above Basic. Unlimited users on Basic and Pro means you are never deciding whether a reviewer is worth a seat on the plans most teams buy.</p>
   <p>PostDelegate approaches the same problem from the client's side rather than the team's. Posts have statuses and an approvals inbox, and a client approval link opens the post for review without the client creating an account, which removes the most common piece of friction in agency review. There is also a review inbox specifically for drafts an AI assistant wrote, so an agent can fill a week and a person still signs it off. What PostDelegate does not have is Planable's multi-level chain — if your process is writer to editor to legal to client, Planable models that directly.</p>
   
   <h2>Agents, and the word "publish"</h2>
@@ -128,4 +128,5 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <Faq items={faq} />
 
   <p>More comparisons: <a href="/compare">every scheduler we compare</a>, <a href="/alternatives">scheduler alternatives</a>, <a href="/pricing">PostDelegate pricing</a> and <a href="/mcp">the MCP server</a>.</p>
+  <p>PostDelegate is operated independently by {SITE.operator} and is not affiliated with or endorsed by Planable. The Planable name belongs to its owner.</p>
 </Doc>

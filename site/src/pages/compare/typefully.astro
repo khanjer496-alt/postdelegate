@@ -6,7 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro] = PLANS;
+const [starter, team, pro, ultimate] = PLANS;
 const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // Typefully facts come from src/data/tools/typefully.json, re-read on the vendor's own site.
 const them = tool('typefully');
@@ -23,7 +23,7 @@ const rows = [
   },
   {
     "feature": "Plans",
-    "us": "Starter $19, Team $29, Pro $39, Ultimate $79, all on monthly billing",
+    "us": `${PLANS.map((p) => `${p.name} $${p.monthly}`).join(', ')}, all on monthly billing`,
     "them": "Free $0 (10 posts a month); Creator $99 a year, annual billing only; Business $18 a social set a month, billed yearly"
   },
   {
@@ -33,7 +33,7 @@ const rows = [
   },
   {
     "feature": "Free plan or trial",
-    "us": "A 7-day free trial on every plan, no credit card",
+    "us": `A ${TRIAL_DAYS}-day free trial on every plan, no credit card`,
     "them": "A free plan with one social set, one user and 10 posts a month, including API and MCP access"
   },
   {
@@ -84,17 +84,17 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   { '@type': 'ListItem', position: 2, name: 'PostDelegate vs Typefully', item: `${SITE.url}/compare/typefully` }] };
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
-<Doc title="Typefully alternative: PostDelegate vs Typefully compared" description="PostDelegate vs Typefully: a writing tool for X and LinkedIn against a multi-network scheduler, social sets versus channels, MCP on both, and annual-only billing." h1="PostDelegate vs Typefully." eyebrow="Compare" lead="Typefully is a writing tool that publishes. PostDelegate is a scheduler that happens to have a good editor. If your work is threads on X and posts on LinkedIn, these are not really the same product." jsonLd={[crumbs, faqLd]}>
+<Doc title="Typefully alternative: PostDelegate vs Typefully compared" description="PostDelegate vs Typefully: a writing tool for X and LinkedIn against a multi-network scheduler, social sets versus channels, and annual-only billing." h1="PostDelegate vs Typefully." eyebrow="Compare" lead="Typefully is a writing tool that publishes. PostDelegate is a scheduler that happens to have a good editor. If your work is threads on X and posts on LinkedIn, these are not really the same product." jsonLd={[crumbs, faqLd]}>
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Typefully</a>
 
   <h2>At a glance</h2>
   <CompareTable other="Typefully" rows={rows} />
-  <p>Typefully prices checked on {formatDate(them.checked)}, monthly billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
+  <p>Typefully prices checked on {formatDate(them.checked)}, annual billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
 
   <h2>These tools are not competing for the same job</h2>
   <p>Most comparisons on this site are between two schedulers with overlapping network lists, where the question is price and workflow. This one is different, and it is more useful to say so than to force a table into shape.</p>
-  <p>Typefully is a writing environment. Its six networks — X, Bluesky, LinkedIn, Threads, Mastodon and Substack — are the ones writers use, and the product is organised around drafting, threading and scheduling text, with X analytics to see how it landed. PostDelegate is a scheduler across eighteen networks today, including video, blogs, developer communities and chat platforms, with approvals and a media library.</p>
+  <p>Typefully is a writing environment. Its six networks — X, Bluesky, LinkedIn, Threads, Mastodon and Substack — are the ones writers use, and the product is organised around drafting, threading and scheduling text, with X analytics to see how it landed. PostDelegate is a scheduler across {AVAILABLE_NETWORKS.length} networks today, including video, blogs, developer communities and chat platforms, with approvals and a media library.</p>
   <p>The overlap is Bluesky, Mastodon and, eventually, LinkedIn and Threads once those approvals come through. If your publishing is threads on X, Typefully does that and PostDelegate cannot do it at all. If your publishing is a YouTube video, a DEV.to post, a Discord announcement and a newsletter, Typefully does not reach those.</p>
   
   <h2>Pricing, and the thing to watch</h2>
@@ -104,7 +104,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   
   <h2>Where the two genuinely agree</h2>
   <p>On agents, these are the two most open tools in this comparison set. Typefully puts its API and MCP server on every plan including Free, with setup guides for Claude, ChatGPT, Notion, Claude Code and Cursor. PostDelegate puts its REST API, webhooks and MCP server on every plan, and adds a review inbox so drafts an assistant wrote wait for a person before publishing.</p>
-  <p>The difference is scope rather than access: an assistant driving Typefully is writing and scheduling text for six networks; one driving PostDelegate is scheduling to eighteen, including video and long-form, with an approval step in front of it. Both are reasonable places for an AI assistant to work, and neither is holding the capability back for a higher tier.</p>
+  <p>The difference is scope rather than access: an assistant driving Typefully is writing and scheduling text for six networks; one driving PostDelegate is scheduling to {AVAILABLE_NETWORKS.length}, including video and long-form, with an approval step in front of it. Both are reasonable places for an AI assistant to work, and neither is holding the capability back for a higher tier.</p>
 
   <h2>Where Typefully is the better pick</h2>
   <ul>
@@ -129,4 +129,5 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <Faq items={faq} />
 
   <p>More comparisons: <a href="/compare">every scheduler we compare</a>, <a href="/alternatives">scheduler alternatives</a>, <a href="/pricing">PostDelegate pricing</a> and <a href="/mcp">the MCP server</a>.</p>
+  <p>PostDelegate is operated independently by {SITE.operator} and is not affiliated with or endorsed by Typefully. The Typefully name belongs to its owner.</p>
 </Doc>

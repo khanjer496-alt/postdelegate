@@ -6,7 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro] = PLANS;
+const [starter, team, pro, ultimate] = PLANS;
 const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // SocialBee facts come from src/data/tools/socialbee.json, re-read on the vendor's own site.
 const them = tool('socialbee');
@@ -18,17 +18,17 @@ const rows = [
   },
   {
     "feature": "Monthly plans",
-    "us": "Starter $19, Team $29, Pro $39, Ultimate $79",
+    "us": PLANS.map((p) => `${p.name} $${p.monthly}`).join(', '),
     "them": "Bootstrap $29 (5 profiles), Accelerate $49 (10), Pro $99 (25), then agency tiers to $449"
   },
   {
     "feature": "Free plan or trial",
-    "us": "A 7-day free trial on every plan, no credit card",
+    "us": `A ${TRIAL_DAYS}-day free trial on every plan, no credit card`,
     "them": "No free plan; a 14-day trial with full Pro access and no card, plus a 30-day money-back guarantee"
   },
   {
     "feature": "10 channels",
-    "us": "Team, $29 a month",
+    "us": `${team.name}, $${team.monthly} a month`,
     "them": "Accelerate, $49 a month, or Bootstrap plus one add-on pack at $44 with lower limits"
   },
   {
@@ -60,7 +60,7 @@ const rows = [
 const faq = [
   {
     "q": "Is PostDelegate cheaper than SocialBee?",
-    "a": "At most sizes, yes. Ten channels cost $29 a month on PostDelegate Team against $49 on SocialBee Accelerate, and thirty cost $39 on PostDelegate Pro against $114 on SocialBee Pro with a profile add-on. SocialBee's own cheapest tier, Bootstrap at $29 for 5 profiles, sits between PostDelegate Starter and Team."
+    "a": `At most sizes, yes. Ten channels cost $${team.monthly} a month on PostDelegate ${team.name} against $49 on SocialBee Accelerate, and thirty cost $${pro.monthly} on PostDelegate ${pro.name} against $114 on SocialBee Pro with a profile add-on. SocialBee's own cheapest tier, Bootstrap at $29 for 5 profiles, matches PostDelegate Team.`
   },
   {
     "q": "Does PostDelegate do content categories like SocialBee?",
@@ -72,7 +72,7 @@ const faq = [
   },
   {
     "q": "Which has more networks?",
-    "a": "SocialBee today, for the big consumer networks. It publishes to Facebook, Instagram, LinkedIn, X, Pinterest and TikTok, which PostDelegate cannot yet: those are waiting on platform approval and X is not available at all. PostDelegate publishes to 18 networks today, including YouTube, Bluesky, Mastodon, blogs and community chats."
+    "a": `SocialBee today, for the big consumer networks. It publishes to Facebook, Instagram, LinkedIn, X, Pinterest and TikTok, which PostDelegate cannot yet: those are waiting on platform approval and X is not available at all. PostDelegate publishes to ${AVAILABLE_NETWORKS.length} networks today, including YouTube, Bluesky, Mastodon, blogs and community chats.`
   },
   {
     "q": "Do I pay extra for AI on PostDelegate?",
@@ -93,7 +93,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <p>SocialBee prices checked on {formatDate(them.checked)}, monthly billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
 
   <h2>Pricing and trial</h2>
-  <p>Both services charge a flat price for a band of accounts rather than a price per account, so the comparison is tier against tier rather than arithmetic. SocialBee starts at $29 a month on monthly billing for 5 profiles, and rises to $49 for 10 and $99 for 25. PostDelegate starts at $19 for 5 channels, $29 for 10 and $39 for 30. The gap widens as you add accounts: at thirty, SocialBee needs its $99 Pro plan plus a $15 add-on pack to reach exactly thirty profiles, while PostDelegate Pro covers thirty for $39.</p>
+  <p>Both services charge a flat price for a band of accounts rather than a price per account, so the comparison is tier against tier rather than arithmetic. SocialBee starts at $29 a month on monthly billing for 5 profiles, and rises to $49 for 10 and $99 for 25. PostDelegate starts at ${starter.monthly} for 5 channels, ${team.monthly} for 10 and ${pro.monthly} for 30. The gap widens as you add accounts: at thirty, SocialBee needs its $99 Pro plan plus a $15 add-on pack to reach exactly thirty profiles, while PostDelegate {pro.name} covers thirty for ${pro.monthly}.</p>
   <p>Two details are easy to miss on SocialBee's pricing page. The plan cards open on the yearly toggle, which shows $24.20, $40.80 and $82.50 — switch to monthly and the figures above are what the comparison table states. And the cheapest plans are single-user: Bootstrap and Accelerate allow one user and one workspace, with extra users at $10 a month each, so a two-person team on Accelerate is really $59.</p>
   <p>The trials differ in kind. SocialBee gives 14 days with full Pro access and no card, backed by a 30-day money-back guarantee, and posting stops when the trial ends. PostDelegate gives 7 days on any plan, also with no card, and you add a card before it ends to keep going.</p>
   
@@ -128,4 +128,5 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <Faq items={faq} />
 
   <p>More comparisons: <a href="/compare">every scheduler we compare</a>, <a href="/alternatives">scheduler alternatives</a>, <a href="/pricing">PostDelegate pricing</a> and <a href="/mcp">the MCP server</a>.</p>
+  <p>PostDelegate is operated independently by {SITE.operator} and is not affiliated with or endorsed by SocialBee. The SocialBee name belongs to its owner.</p>
 </Doc>

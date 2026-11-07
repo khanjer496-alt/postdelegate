@@ -6,7 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { tool, formatDate } from '../../data/tools';
-const [starter, team, pro] = PLANS;
+const [starter, team, pro, ultimate] = PLANS;
 const available = AVAILABLE_NETWORKS.map((n) => n.name).join(', ');
 // Zoho Social facts come from src/data/tools/zoho-social.json, re-read on the vendor's own site.
 const them = tool('zoho-social');
@@ -18,22 +18,22 @@ const rows = [
   },
   {
     "feature": "Monthly plans",
-    "us": "Starter $19, Team $29, Pro $39, Ultimate $79",
+    "us": PLANS.map((p) => `${p.name} $${p.monthly}`).join(', '),
     "them": "Free $0 (6 channels), Standard $15 (14), Professional $40 (14), Premium $65 (16); agency plans $320 and $460"
   },
   {
     "feature": "Free plan or trial",
-    "us": "A 7-day free trial on every plan, no credit card",
+    "us": `A ${TRIAL_DAYS}-day free trial on every plan, no credit card`,
     "them": "A forever free plan with 1 brand, 6 channels and 1 team member, plus a 15-day all-access trial with no card"
   },
   {
     "feature": "10 channels",
-    "us": "Team, $29 a month",
+    "us": `${team.name}, $${team.monthly} a month`,
     "them": "Standard, $15 a month — a single brand holds 14 channels"
   },
   {
     "feature": "30 channels",
-    "us": "Pro, $39 a month",
+    "us": `${pro.name}, $${pro.monthly} a month`,
     "them": "$74 to $88: thirty exceeds one brand, so Professional with three brands is $74 and Premium with two is $88"
   },
   {
@@ -60,7 +60,7 @@ const rows = [
 const faq = [
   {
     "q": "Is Zoho Social cheaper than PostDelegate?",
-    "a": "At the entry, yes: Standard is $15 a month against $19 for PostDelegate Starter, and it holds fourteen channels in one brand against five. It also has a genuinely free plan for six channels. The order reverses as you grow — thirty channels cost $74 to $88 there, because they no longer fit one brand, against $39 here."
+    "a": `At the entry, yes: Standard is $15 a month against $${starter.monthly} for PostDelegate ${starter.name}, and it holds fourteen channels in one brand against five. It also has a genuinely free plan for six channels. The order reverses as you grow — thirty channels cost $74 to $88 there, because they no longer fit one brand, against $${pro.monthly} here.`
   },
   {
     "q": "What is a brand, and why does it matter?",
@@ -72,11 +72,11 @@ const faq = [
   },
   {
     "q": "When do I get approvals on Zoho Social?",
-    "a": "On Premium, at $65 a month — content approvals, workflow and custom roles are listed from that tier up. The plans below it are also single-user, with extra team members at $12 each. PostDelegate includes approvals on every plan and team members from Team at $29."
+    "a": `On Premium, at $65 a month — content approvals, workflow and custom roles are listed from that tier up. The plans below it are also single-user, with extra team members at $12 each. PostDelegate includes approvals on every plan and team members from ${team.name} at $${team.monthly}.`
   },
   {
     "q": "Which has more networks?",
-    "a": "Zoho Social, on paper: fifteen including WhatsApp, Telegram, Snapchat and Arattai, though it notes that access depends on regional restrictions. PostDelegate has eighteen live, with a different mix — blogs, developer communities and chat platforms rather than consumer messaging — and Instagram, Facebook, LinkedIn, TikTok, Threads and Pinterest are still waiting on approval here."
+    "a": `Zoho Social, on paper: fifteen including WhatsApp, Telegram, Snapchat and Arattai, though it notes that access depends on regional restrictions. PostDelegate has ${AVAILABLE_NETWORKS.length} live, with a different mix — blogs, developer communities and chat platforms rather than consumer messaging — and Instagram, Facebook, LinkedIn, TikTok, Threads and Pinterest are still waiting on approval here.`
   }
 ];
 const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
@@ -84,7 +84,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   { '@type': 'ListItem', position: 2, name: 'PostDelegate vs Zoho Social', item: `${SITE.url}/compare/zoho-social` }] };
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
-<Doc title="Zoho Social alternative: PostDelegate vs Zoho Social compared" description="PostDelegate vs Zoho Social: a $15 entry plan with per-brand channel caps against flat channel bands, AI credits, approvals, API access by request and no MCP server." h1="PostDelegate vs Zoho Social." eyebrow="Compare" lead="Zoho Social is the cheapest serious scheduler on this list to start with, at $15 a month. The catch is the brand model: channels are capped per brand, and extra brands are only sold on the dearer plans." jsonLd={[crumbs, faqLd]}>
+<Doc title="Zoho Social alternative: PostDelegate vs Zoho Social compared" description="PostDelegate vs Zoho Social: a $15 entry plan with per-brand channel caps against flat channel bands, AI credits, approvals, and no MCP server." h1="PostDelegate vs Zoho Social." eyebrow="Compare" lead="Zoho Social is the cheapest serious scheduler on this list to start with, at $15 a month. The catch is the brand model: channels are capped per brand, and extra brands are only sold on the dearer plans." jsonLd={[crumbs, faqLd]}>
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Zoho Social</a>
 
@@ -93,12 +93,12 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <p>Zoho Social prices checked on {formatDate(them.checked)}, monthly billing, USD, from <a href={them.pricingUrl} target="_blank" rel="noopener">its pricing page</a>. PostDelegate prices come from <a href="/pricing">our own pricing page</a>.</p>
 
   <h2>The brand model, which is the whole story</h2>
-  <p>Zoho Social's entry price is the lowest here: $15 a month on monthly billing for Standard, which holds one brand with fourteen channels and one team member. There is also a forever free plan with one brand, six channels and one member. For a single business with a handful of accounts and one person running them, that is very hard to beat, and PostDelegate Starter at $19 for five channels does not try to.</p>
-  <p>The model bends at scale rather than at price. Channels are capped per brand, and a second brand is an add-on sold only on Professional at $17 a brand and Premium at $23. Standard has no brand add-on at all, so it is a ceiling: fourteen channels and no way up except changing plan. Thirty channels means Professional with three brands at $74, or Premium with two at $88. The same thirty are $39 on PostDelegate Pro.</p>
-  <p>Two further notes for anyone pricing this themselves. Their page opens on yearly billing, where the business plans read $10, $30 and $40 rather than $15, $40 and $65. And it prices in the local currency by default — the figures here are the US dollar list prices selected with the page's own currency switch.</p>
+  <p>Zoho Social's entry price is the lowest here: $15 a month on monthly billing for Standard, which holds one brand with fourteen channels and one team member. There is also a forever free plan with one brand, six channels and one member. For a single business with a handful of accounts and one person running them, that is very hard to beat, and PostDelegate {starter.name} at ${starter.monthly} for five channels does not try to.</p>
+  <p>The model bends at scale rather than at price. Channels are capped per brand, and a second brand is an add-on sold only on Professional at $17 a brand and Premium at $23. Standard has no brand add-on at all, so it is a ceiling: fourteen channels and no way up except changing plan. Thirty channels means Professional with three brands at $74, or Premium with two at $88. The same thirty are ${pro.monthly} on PostDelegate {pro.name}.</p>
+  <p>Two further notes for anyone pricing this themselves. Their page opens on yearly billing, which it advertises as saving up to 33%, so the monthly figures here are the ones behind its monthly tab. And it prices in the local currency by default — the figures here are the US dollar list prices selected with the page's own currency switch.</p>
   
   <h2>Team and approvals</h2>
-  <p>This is where the cheap plans show their shape. Free, Standard and Professional are all single-user; Premium at $65 is the first with three members, and extra members are $12 each a month. Content approvals, workflow and custom roles also begin at Premium. So a two-person team that wants an approval step is comparing $65 plus $12 against PostDelegate Team at $29, which includes team members and approvals.</p>
+  <p>This is where the cheap plans show their shape. Free, Standard and Professional are all single-user; Premium at $65 is the first with three members, and extra members are $12 each a month. Content approvals, workflow and custom roles also begin at Premium. So a two-person team that wants an approval step is comparing $65 against PostDelegate {team.name} at ${team.monthly}, which includes team members and approvals.</p>
   <p>PostDelegate also puts approvals where agencies need them: a client approval link opens the post without the client making an account, and drafts written by an AI assistant land in a separate review inbox before a person releases them.</p>
   
   <h2>AI and automation</h2>
@@ -128,4 +128,5 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <Faq items={faq} />
 
   <p>More comparisons: <a href="/compare">every scheduler we compare</a>, <a href="/alternatives">scheduler alternatives</a>, <a href="/pricing">PostDelegate pricing</a> and <a href="/mcp">the MCP server</a>.</p>
+  <p>PostDelegate is operated independently by {SITE.operator} and is not affiliated with or endorsed by Zoho Social. The Zoho Social name belongs to its owner.</p>
 </Doc>
