@@ -135,6 +135,11 @@ describe('PermissionsService extraChannelsOffer', () => {
     });
   });
 
+  it('offers it on an active plan, and on one stored before the status was kept', async () => {
+    expect(await offerFor({ ...ultimate, status: 'active' })).not.toBeNull();
+    expect(await offerFor({ ...ultimate, status: null })).not.toBeNull();
+  });
+
   it('offers $9.60 a year on a yearly Ultimate plan', async () => {
     expect(await offerFor({ ...ultimate, period: 'YEARLY' })).toEqual(
       expect.objectContaining({ price: 9.6, period: 'YEARLY' })
@@ -143,8 +148,12 @@ describe('PermissionsService extraChannelsOffer', () => {
 
   it.each([
     ['a trial', ultimate, { isTrailing: true, paymentId: 'cus_1' }],
-    // the webhooks store isTrailing for every status but active
-    ['a past_due subscription', ultimate, { isTrailing: true, paymentId: 'cus_1' }],
+    // a past_due renewal is no trial, its stored status says it is not paid
+    [
+      'a past_due subscription',
+      { ...ultimate, status: 'past_due' },
+      { isTrailing: false, paymentId: 'cus_1' },
+    ],
     ['an admin-granted plan', ultimate, { paymentId: 'user_1' }],
     ['a store subscription', { ...ultimate, provider: 'revenuecat' }, undefined],
     ['a lifetime deal', { ...ultimate, isLifetime: true }, undefined],

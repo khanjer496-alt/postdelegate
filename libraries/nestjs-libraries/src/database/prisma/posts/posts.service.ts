@@ -2149,9 +2149,9 @@ export class PostsService {
 
   // The cap `total` posts are held to: the plan's, or the lower trial cap when
   // only that one would refuse them and the payment provider says the
-  // subscription is trialing right now. isTrailing alone is not enough, it is
-  // also set for a paid renewal being retried, and a provider that can't be
-  // reached keeps the plan's cap
+  // subscription is trialing right now. isTrailing alone is not enough, the
+  // stored flag can lag behind a webhook still on its way, and a provider
+  // that can't be reached keeps the plan's cap
   private async capFor(
     plan: {
       limits: Record<string, number>;

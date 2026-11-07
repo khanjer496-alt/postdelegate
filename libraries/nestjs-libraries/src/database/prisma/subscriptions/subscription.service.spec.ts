@@ -311,8 +311,73 @@ describe('SubscriptionService plan writes', () => {
       'MONTHLY',
       null,
       undefined,
-      { id: 'org_1' }
+      { id: 'org_1' },
+      // an admin plan has no provider status
+      undefined
     );
+  });
+
+  it('stores the provider status with the plan, and the trial flag it was given', async () => {
+    const { service, repository } = make({
+      provider: 'stripe',
+      subscriptionTier: 'PRO',
+    });
+    const state = {
+      status: 'past_due',
+      trialEndsAt: null,
+      currentPeriodEnd: new Date('2026-12-01T00:00:00Z'),
+    };
+    expect(
+      await service.createOrUpdateSubscription(
+        'stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null,
+        undefined, undefined, state
+      )
+    ).toBeUndefined();
+    expect(repository.createOrUpdateSubscription).toHaveBeenCalledWith(
+      'stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null,
+      undefined, undefined, state
+    );
+  });
+
+  it('stores the provider status of a store subscription keyed by the workspace', async () => {
+    const { service, repository } = make({
+      provider: 'revenuecat',
+      subscriptionTier: 'PRO',
+    });
+    const state = {
+      status: 'trialing',
+      trialEndsAt: new Date('2026-11-15T00:00:00Z'),
+      currentPeriodEnd: new Date('2026-11-15T00:00:00Z'),
+    };
+    await service.createOrUpdateSubscriptionByOrg(
+      true, 'org_1', 'revenuecat', 'com.app.pro.monthly', 30, 'PRO', 'MONTHLY', null,
+      state
+    );
+    expect(repository.createOrUpdateSubscription).toHaveBeenCalledWith(
+      'revenuecat', true, 'com.app.pro.monthly', '', 30, 'PRO', 'MONTHLY', null,
+      undefined, { id: 'org_1' }, state
+    );
+  });
+
+  it('removes the plan, and asks for a retry instead of throwing', async () => {
+    const { service, repository } = make({
+      provider: 'stripe',
+      subscriptionTier: 'PRO',
+      totalChannels: 30,
+    });
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({
+      count: 1,
+    });
+    expect(repository.deleteSubscriptionByCustomerId).toHaveBeenCalledWith(
+      'cus_1',
+      'stripe'
+    );
+
+    repository.getSubscriptionByCustomerId.mockRejectedValue(new Error('db'));
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({
+      count: 0,
+      retry: true,
+    });
   });
 
   describe('lifetime codes', () => {
