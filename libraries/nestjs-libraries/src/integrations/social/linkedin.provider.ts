@@ -63,19 +63,46 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   oneTimeToken = true;
 
   isBetweenSteps = false;
-  scopes = [
-    'openid',
-    'profile',
-    'w_member_social',
-    'r_basicprofile',
-    'rw_organization_admin',
-    'w_organization_social',
-    'r_organization_social',
-  ];
+  // Only what the "Sign In with LinkedIn using OpenID Connect" and "Share on
+  // LinkedIn" products grant. checkScopes throws NotEnoughScopes when a
+  // declared scope is missing from the token response, so anything listed here
+  // that the app was not granted breaks the whole connect flow.
+  scopes = ['openid', 'profile', 'w_member_social'];
   override maxConcurrentJob = 8; // LinkedIn limits are daily budgets
   refreshWait = true;
   editor = 'normal' as const;
   dto = LinkedinDto;
+
+  // LinkedIn refuses the Community Management API on an app that holds any
+  // other product, so pages and personal profiles come from two separate
+  // apps. The page provider overrides these; a single-app install keeps
+  // working because it only sets LINKEDIN_CLIENT_ID.
+  protected get clientId() {
+    return process.env.LINKEDIN_CLIENT_ID!;
+  }
+
+  protected get clientSecret() {
+    return process.env.LINKEDIN_CLIENT_SECRET!;
+  }
+
+  // vanityName comes from /v2/me, which needs r_basicprofile - a restricted
+  // product we do not have. Fall back to the member id rather than storing an
+  // undefined username.
+  protected async fetchVanityName(accessToken: string, fallback: string) {
+    try {
+      const { vanityName } = await (
+        await fetch('https://api.linkedin.com/v2/me', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+      ).json();
+
+      return vanityName || fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
   maxLength() {
     return 3000;
   }
@@ -142,17 +169,9 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token,
-          client_id: process.env.LINKEDIN_CLIENT_ID!,
-          client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
         }),
-      })
-    ).json();
-
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
       })
     ).json();
 
@@ -175,7 +194,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       expiresIn: expires_in,
       name,
       picture: picture || '',
-      username: vanityName,
+      username: await this.fetchVanityName(accessToken, id),
     };
   }
 
@@ -183,7 +202,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     const state = makeSecureId(6);
     const codeVerifier = makeSecureId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
-      process.env.LINKEDIN_CLIENT_ID
+      this.clientId
     }&prompt=none&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin`
     )}&state=${state}&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -208,8 +227,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         params.refresh ? `?refresh=${params.refresh}` : ''
       }`
     );
-    body.append('client_id', process.env.LINKEDIN_CLIENT_ID!);
-    body.append('client_secret', process.env.LINKEDIN_CLIENT_SECRET!);
+    body.append('client_id', this.clientId);
+    body.append('client_secret', this.clientSecret);
 
     const {
       access_token: accessToken,
@@ -240,14 +259,6 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       })
     ).json();
 
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
     return {
       id,
       accessToken,
@@ -255,7 +266,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       expiresIn,
       name,
       picture,
-      username: vanityName,
+      username: await this.fetchVanityName(accessToken, id),
     };
   }
 
