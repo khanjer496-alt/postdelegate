@@ -74,6 +74,16 @@ describe('the committed compose file', () => {
     }
   });
 
+  // The committed Caddyfile keeps the staging basic-auth login as a
+  // {$PLACEHOLDER}. Caddy expands an unset placeholder to an empty string and
+  // still reports a valid config, so a missing env_file does not fail loudly -
+  // it silently removes staging's gate.
+  it('gives caddy the env file its Caddyfile placeholders need', () => {
+    const caddy = compose.slice(compose.indexOf('\n  caddy:'));
+    expect(caddy).toContain('env_file');
+    expect(caddy).toContain('/etc/postiz/caddy.env');
+  });
+
   it('publishes no database or cache port to the host', () => {
     // only Caddy may be reachable from outside the Compose network
     const published = compose
