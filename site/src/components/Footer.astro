@@ -31,7 +31,7 @@ const columns: { title: string; links: readonly (readonly [string, string])[]; c
       <div class="footer-social"><p class="footer-label">{f.follow}</p><ul>{SOCIAL_PROFILES.map((profile) => <li><a href={profile.href} rel="me noopener" target="_blank">{profile.name}</a></li>)}</ul></div>
       {FEATURED_ON.length > 0 && <div class="footer-featured"><p class="footer-label">{f.featuredOn}</p><ul>{FEATURED_ON.map((badge) => <li class="featured-badge" set:html={badge.html} />)}</ul></div>}
     </div>
-    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. {f.rights}</p><p>{SITE.operator} · {SITE.address}</p><p><a href={SITE.source}>{f.source}</a></p><p>{f.trademarks}</p></div>
+    <div class="footer-bottom"><p>© {new Date().getFullYear()} {SITE.operator}. {f.rights}</p><p>{SITE.operator} · {SITE.address}</p><p><a href={SITE.legal.licenses}>{f.source}</a></p><p>{f.trademarks}</p></div>
   </div>
 </footer>
 <style>

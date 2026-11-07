@@ -53,7 +53,7 @@ const dict: Dict = {
     subprocessors: 'Unterauftragsverarbeiter', licenses: 'Lizenzen', cookieSettings: 'Cookie-Einstellungen',
     follow: 'PostDelegate folgen', featuredOn: 'Bekannt aus',
     rights: 'Alle Rechte vorbehalten.',
-    source: 'Quellcode (AGPL-3.0)',
+    source: 'Quellcode',
     trademarks: 'Namen und Logos der Netzwerke gehören ihren jeweiligen Inhabern.',
   },
   cookies: {
@@ -190,7 +190,7 @@ const dict: Dict = {
     },
     {
       q: 'Sind meine Daten sicher?',
-      a: 'Verbindungstokens und die von Ihnen eingegebenen Zugangsdaten werden verschlüsselt gespeichert, App und Medienhost nutzen HTTPS, und externe Backups werden verschlüsselt, bevor sie den Server verlassen. Hochgeladene Medien werden über öffentliche Links ausgeliefert, laden Sie also nur hoch, was Sie veröffentlichen möchten. Lesen Sie die <a href="https://app.postdelegate.com/legal/privacy/">Datenschutzerklärung</a>, den <a href="https://app.postdelegate.com/legal/dpa/">Auftragsverarbeitungsvertrag</a>, die Liste der <a href="https://app.postdelegate.com/legal/subprocessors/">Unterauftragsverarbeiter</a> und den <a href="https://app.postdelegate.com/source">Quellcode (AGPL-3.0)</a>.',
+      a: 'Verbindungstokens und die von Ihnen eingegebenen Zugangsdaten werden verschlüsselt gespeichert, App und Medienhost nutzen HTTPS, und externe Backups werden verschlüsselt, bevor sie den Server verlassen. Hochgeladene Medien werden über öffentliche Links ausgeliefert, laden Sie also nur hoch, was Sie veröffentlichen möchten. Lesen Sie die <a href="https://app.postdelegate.com/legal/privacy/">Datenschutzerklärung</a>, den <a href="https://app.postdelegate.com/legal/dpa/">Auftragsverarbeitungsvertrag</a>, die Liste der <a href="https://app.postdelegate.com/legal/subprocessors/">Unterauftragsverarbeiter</a> und den <a href="/licenses">Quellcode (AGPL-3.0)</a>.',
     },
   ],
   home: {
