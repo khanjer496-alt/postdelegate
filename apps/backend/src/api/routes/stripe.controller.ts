@@ -1,5 +1,7 @@
 import {
   Controller,
+  HttpException,
+  HttpStatus,
   Post,
   RawBodyRequest,
   Req,
@@ -14,11 +16,24 @@ export class StripeController {
 
   @Post('/')
   async stripe(@Req() req: RawBodyRequest<Request>) {
-    return await this._paymentService.webhook(
+    const result = await this._paymentService.webhook(
       'stripe',
       req.rawBody,
       // @ts-ignore
       req.headers
     );
+
+    // The event could not be applied (a database or Stripe error, see
+    // SubscriptionWriteResult): a non-2xx answer makes Stripe send it again,
+    // instead of losing it. Skipped events (unknown customer, lifetime plan)
+    // still answer 2xx
+    if (result?.retry) {
+      throw new HttpException(
+        'The event could not be processed, please retry',
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+
+    return result;
   }
 }

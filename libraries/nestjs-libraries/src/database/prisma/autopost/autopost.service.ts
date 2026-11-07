@@ -15,6 +15,7 @@ import Parser from 'rss-parser';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import { isChannelConnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { TemporalService } from 'nestjs-temporal-core';
 import { TypedSearchAttributes } from '@temporalio/common';
 import {
@@ -360,9 +361,11 @@ export class AutopostService {
       return;
     }
 
-    const integrations = await this._integrationService.getIntegrationsList(
-      getPost.organizationId
-    );
+    // only channels that can be scheduled to: a channel turned off, removed
+    // or still picking its page never gets a feed post
+    const integrations = (
+      await this._integrationService.getIntegrationsList(getPost.organizationId)
+    ).filter(isChannelConnected);
 
     const parseIntegrations = JSON.parse(getPost.integrations || '[]') || [];
     const neededIntegrations = integrations.filter((i) =>

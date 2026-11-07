@@ -169,14 +169,6 @@ export class OAuthService {
   }
 
   async createApp(orgId: string, dto: CreateOAuthAppDto) {
-    const existing = await this._oauthRepository.getAppByOrgId(orgId);
-    if (existing) {
-      throw new HttpException(
-        'You can only have one OAuth application per organization',
-        HttpStatus.BAD_REQUEST
-      );
-    }
-
     const clientId = 'pca_' + makeSecureId(32);
     const clientSecret = 'pcs_' + makeSecureId(48);
     const encryptedSecret = this.storedSecret(
@@ -192,6 +184,14 @@ export class OAuthService {
       clientId,
       clientSecret: encryptedSecret,
     });
+    // the check and the create are one transaction, so two concurrent
+    // requests can't both create an app
+    if (!app) {
+      throw new HttpException(
+        'You can only have one OAuth application per organization',
+        HttpStatus.BAD_REQUEST
+      );
+    }
 
     return { ...app, clientSecret };
   }
@@ -205,13 +205,12 @@ export class OAuthService {
     });
   }
 
+  // revokes every authorization and deletes the app in one transaction
   async deleteApp(orgId: string) {
-    const app = await this._oauthRepository.getAppByOrgId(orgId);
-    if (!app) {
+    const deleted = await this._oauthRepository.deleteApp(orgId);
+    if (!deleted) {
       throw new HttpException('No OAuth app found', HttpStatus.NOT_FOUND);
     }
-    await this._oauthRepository.revokeAllForApp(app.id);
-    await this._oauthRepository.deleteApp(orgId);
     return { success: true };
   }
 
@@ -650,13 +649,23 @@ export class OAuthService {
       token,
       OAUTH_SECRET_LABELS.accessToken
     );
+    // spent only if it is still this code: a concurrent exchange of the same
+    // code, or a newer consent, makes this one fail
+    const exchanged = await this._oauthRepository.exchangeCodeForToken(
+      auth.id,
+      auth.authorizationCode!,
+      encryptedToken
+    );
+    if (!exchanged) {
+      throw new HttpException(
+        { error: 'invalid_grant' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
     const {
       organizationId,
       organization: { paymentId },
-    } = await this._oauthRepository.exchangeCodeForToken(
-      auth.id,
-      encryptedToken
-    );
+    } = exchanged;
 
     return {
       id: organizationId,
@@ -731,10 +740,18 @@ export class OAuthService {
     this.verifyCodeGrant(auth, codeVerifier, redirectUri);
 
     const token = 'psh_' + makeSecureId(40);
-    await this._oauthRepository.exchangeSelfHostedCodeForToken(
-      auth.id,
-      this.storedSecret(token, OAUTH_SECRET_LABELS.accessToken)
-    );
+    if (
+      !(await this._oauthRepository.exchangeSelfHostedCodeForToken(
+        auth.id,
+        auth.authorizationCode!,
+        this.storedSecret(token, OAUTH_SECRET_LABELS.accessToken)
+      ))
+    ) {
+      throw new HttpException(
+        { error: 'invalid_grant' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
 
     return {
       access_token: token,

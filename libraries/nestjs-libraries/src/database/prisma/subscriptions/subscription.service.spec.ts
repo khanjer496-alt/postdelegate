@@ -107,3 +107,141 @@ describe('getProviderPostsLimits', () => {
     expect(await service.getProviderPostsLimits('org_1')).toBeNull();
   });
 });
+
+describe('SubscriptionService plan writes', () => {
+  const make = (current: object | null, channels: object[] = []) => {
+    const repository = {
+      getSubscriptionByCustomerId: jest.fn().mockResolvedValue(current),
+      getSubscriptionByOrgId: jest.fn().mockResolvedValue(current),
+      getOrganizationByCustomerId: jest.fn().mockResolvedValue({ id: 'org_1' }),
+      deleteSubscriptionByCustomerId: jest.fn().mockResolvedValue({ count: 1 }),
+      createOrUpdateSubscription: jest.fn(),
+      createOrUpdateLifetimeSubscription: jest.fn().mockResolvedValue(true),
+      setCustomerId: jest.fn(),
+    };
+    const integrations = {
+      getIntegrationsList: jest.fn().mockResolvedValue(channels),
+      disableIntegrations: jest.fn(),
+      enableAllIntegrations: jest.fn(),
+      changeActiveCron: jest.fn(),
+    };
+    const organizations = { disableOrEnableNonSuperAdminUsers: jest.fn() };
+    const service = new SubscriptionService(
+      repository as any,
+      integrations as any,
+      organizations as any
+    );
+    return { service, repository, integrations };
+  };
+
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('never removes a lifetime plan on a customer-keyed cancellation', async () => {
+    const { service, repository, integrations } = make({
+      provider: 'stripe',
+      isLifetime: true,
+      subscriptionTier: 'PRO',
+    });
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({
+      count: 0,
+    });
+    expect(repository.deleteSubscriptionByCustomerId).not.toHaveBeenCalled();
+    expect(integrations.disableIntegrations).not.toHaveBeenCalled();
+  });
+
+  it('asks for a retry instead of throwing when a write fails', async () => {
+    const failing = make({ provider: 'stripe', subscriptionTier: 'PRO' });
+    failing.repository.deleteSubscriptionByCustomerId.mockRejectedValue(
+      new Error('db down')
+    );
+    expect(await failing.service.deleteSubscription('cus_1', 'stripe')).toEqual(
+      { count: 0, retry: true }
+    );
+
+    const update = make({ provider: 'stripe', subscriptionTier: 'PRO' });
+    update.repository.createOrUpdateSubscription.mockRejectedValue(
+      new Error('db down')
+    );
+    expect(
+      await update.service.createOrUpdateSubscription(
+        'stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null
+      )
+    ).toEqual({ retry: true });
+  });
+
+  it('does not ask for a retry for a customer it does not know', async () => {
+    const { service, repository } = make(null);
+    repository.getOrganizationByCustomerId.mockResolvedValue(null);
+    expect(
+      await service.createOrUpdateSubscription(
+        'stripe', false, 'u1', 'cus_x', 30, 'PRO', 'MONTHLY', null
+      )
+    ).toEqual({});
+  });
+
+  it('counts only connected channels when a plan shrinks', async () => {
+    const { service, integrations } = make(
+      { provider: 'stripe', subscriptionTier: 'PRO', totalChannels: 30 },
+      [
+        { id: 'a' },
+        { id: 'b', refreshNeeded: true },
+        { id: 'c' },
+        { id: 'off', disabled: true },
+        { id: 'temp', inBetweenSteps: true },
+      ]
+    );
+    await service.modifySubscription('cus_1', 2, 'STANDARD');
+    expect(integrations.disableIntegrations).toHaveBeenCalledWith('org_1', 1);
+  });
+
+  it('sets an admin plan on the workspace without touching its Stripe customer', async () => {
+    const { service, repository } = make(null);
+    await service.addSubscription('org_1', 'PRO', 'stripe');
+    expect(repository.setCustomerId).not.toHaveBeenCalled();
+    expect(repository.createOrUpdateSubscription).toHaveBeenCalledWith(
+      'stripe',
+      false,
+      expect.stringMatching(/^admin_/),
+      '',
+      expect.any(Number),
+      'PRO',
+      'MONTHLY',
+      null,
+      undefined,
+      { id: 'org_1' }
+    );
+  });
+
+  describe('lifetime codes', () => {
+    it('turns back on the channels a lapse turned off, like an upgrade', async () => {
+      const { service, repository, integrations } = make(null, [
+        { id: 'a' },
+        { id: 'off', disabled: true },
+      ]);
+      expect(
+        await service.createOrUpdateSubscription(
+          'stripe', false, 'id', 'org_1', 5, 'STANDARD', 'MONTHLY', null,
+          'code', 'org_1'
+        )
+      ).toBeUndefined();
+      expect(
+        repository.createOrUpdateLifetimeSubscription
+      ).toHaveBeenCalledWith('stripe', 'id', 5, 'STANDARD', 'MONTHLY', 'code', 'org_1');
+      expect(integrations.enableAllIntegrations).toHaveBeenCalledWith('org_1');
+    });
+
+    it('says when the code was spent by another redeem first', async () => {
+      const { service, repository, integrations } = make(null);
+      repository.createOrUpdateLifetimeSubscription.mockResolvedValue(false);
+      expect(
+        await service.createOrUpdateSubscription(
+          'stripe', false, 'id', 'org_1', 5, 'STANDARD', 'MONTHLY', null,
+          'code', 'org_1'
+        )
+      ).toEqual({ codeUsed: true });
+      expect(integrations.enableAllIntegrations).not.toHaveBeenCalled();
+    });
+  });
+});

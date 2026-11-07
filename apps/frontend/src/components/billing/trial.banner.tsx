@@ -7,6 +7,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 
 export const useRenewal = () => {
   const fetch = useFetch();
@@ -32,10 +33,27 @@ export const useRenewal = () => {
 
 export const useAddPaymentMethod = () => {
   const fetch = useFetch();
+  const toaster = useToaster();
+  const t = useT();
   return useCallback(async () => {
-    const { portal } = await (
-      await fetch('/billing/add-payment-method')
-    ).json();
+    let portal: string | undefined;
+    try {
+      const response = await fetch('/billing/add-payment-method');
+      portal = response.ok ? (await response.json())?.portal : undefined;
+    } catch (err) {
+      portal = undefined;
+    }
+    // never a navigation to /undefined
+    if (!portal) {
+      toaster.show(
+        t(
+          'billing_portal_unavailable',
+          'We could not open the billing portal, please try again'
+        ),
+        'warning'
+      );
+      return;
+    }
     window.location.href = portal;
   }, []);
 };

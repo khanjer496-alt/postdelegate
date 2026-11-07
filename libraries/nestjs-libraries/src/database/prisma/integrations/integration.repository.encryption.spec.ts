@@ -90,7 +90,7 @@ const makeStore = (initial: any[]) => {
     { model: { $transaction: async (fn: any) => fn(tx) } } as any,
     {} as any
   );
-  return { repo, rows, integration };
+  return { repo, rows, integration, post };
 };
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -491,5 +491,63 @@ describe('IntegrationRepository token encryption', () => {
       const ids = (await repo.getStoredCredentialsPage(10)).map((r) => r.id);
       expect(ids).toEqual(['live', 'refresh-only']);
     });
+  });
+});
+
+describe('IntegrationRepository channel lifecycle on (re)connect', () => {
+  const env = { ...process.env };
+  beforeEach(() => {
+    process.env.TOKEN_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+    delete process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS;
+    TokenEncryption.reset();
+  });
+  afterAll(() => {
+    process.env = env;
+    TokenEncryption.reset();
+  });
+
+  it('updating a row with the internalId it already holds never deletes its posts', async () => {
+    const { repo, rows, post } = makeStore([
+      row({ id: 'page', internalId: 'p', token: 'x' }),
+    ]);
+    await repo.updateIntegration('page', {
+      token: 'page-token',
+      organizationId: 'org-1',
+      internalId: 'p',
+    });
+    expect(post.updateMany).not.toHaveBeenCalled();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ internalId: 'p', deletedAt: null });
+  });
+
+  it('a reconnected deleted channel comes back on, also from a revoked tombstone', async () => {
+    const { repo, rows } = makeStore([
+      row({ deletedAt: new Date(), disabled: true, refreshNeeded: true }),
+    ]);
+    await repo.createOrUpdateIntegration(
+      undefined, false, 'org-1', 'N', undefined, 'social', 'ext-1', 'x', 'tok'
+    );
+    expect(rows[0]).toMatchObject({
+      deletedAt: null,
+      disabled: false,
+      refreshNeeded: false,
+    });
+  });
+
+  it('a reconnected live channel that was turned off stays off', async () => {
+    const { repo, rows } = makeStore([row({ disabled: true })]);
+    await repo.createOrUpdateIntegration(
+      undefined, false, 'org-1', 'N', undefined, 'social', 'ext-1', 'x', 'tok'
+    );
+    expect(rows[0].disabled).toBe(true);
+  });
+
+  it('a verified reconnect finishes a channel a failed refresh left between steps', async () => {
+    const { repo, rows } = makeStore([row({ inBetweenSteps: true })]);
+    await repo.createOrUpdateIntegration(
+      undefined, false, 'org-1', 'N', undefined, 'social', 'ext-1', 'x', 'tok',
+      '', undefined, undefined, false, 'ext-1'
+    );
+    expect(rows[0].inBetweenSteps).toBe(false);
   });
 });

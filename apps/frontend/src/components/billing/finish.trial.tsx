@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useState } from 'react';
+import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -8,58 +8,114 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { usePaymentAction } from '@gitroom/frontend/components/billing/use.payment.action';
 
-export const FinishTrial: FC<{ close: () => void }> = (props) => {
+// how long the plan may take to show up after the charge (2s apart)
+const MAX_CHECKS = 30;
+
+// Ending the trial charges the plan's first payment, so nothing is sent
+// before the person clicks to confirm it here: a link or a reload of
+// /billing?finishTrial=true only opens this window. `confirmed`: the person
+// already confirmed in the app, the charge starts right away
+export const FinishTrial: FC<{ close: () => void; confirmed?: boolean }> = (
+  props
+) => {
+  const [started, setStarted] = useState(!!props.confirmed);
   const [finished, setFinished] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [stillProcessing, setStillProcessing] = useState(false);
   const fetch = useFetch();
   const toaster = useToaster();
   const t = useT();
   const paymentAction = usePaymentAction();
+  // the plan is polled until it shows up, never after the window closed
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
+
+  const close = useCallback(() => {
+    open.current = false;
+    props.close();
+  }, [props.close]);
+
+  const checkFinished = useCallback(async () => {
+    for (let attempt = 0; attempt < MAX_CHECKS; attempt++) {
+      if (!open.current) {
+        return;
+      }
+      try {
+        const response = await fetch('/billing/is-trial-finished');
+        if (response.ok && (await response.json()).finished) {
+          if (open.current) {
+            setFailed(false);
+            setFinished(true);
+          }
+          return;
+        }
+      } catch (err) {
+        // a failed check is retried like an unfinished one
+      }
+      await timer(2000);
+    }
+
+    if (open.current) {
+      setStillProcessing(true);
+      setFailed(true);
+    }
+  }, []);
 
   const finishSubscription = useCallback(async () => {
+    setStarted(true);
     setFailed(false);
-    const { finish, requiresAction, clientSecret } = await (
-      await fetch('/billing/finish-trial', {
+    setStillProcessing(false);
+    let result: {
+      finish?: boolean;
+      requiresAction?: boolean;
+      clientSecret?: string;
+      reason?: string;
+    } = {};
+    try {
+      const response = await fetch('/billing/finish-trial', {
         method: 'POST',
-      })
-    ).json();
-    if (requiresAction) {
-      const { error } = await paymentAction(clientSecret);
+      });
+      result = response.ok ? await response.json() : {};
+    } catch (err) {
+      result = {};
+    }
+    if (!open.current) {
+      return;
+    }
+    if (result.requiresAction) {
+      const { error } = await paymentAction(result.clientSecret!);
       if (error) {
         toaster.show(error, 'warning');
         setFailed(true);
         return;
       }
-    } else if (!finish) {
+    } else if (!result.finish) {
       toaster.show(
-        t('finish_trial_failed', 'We could not finish your trial'),
+        result.reason ||
+          t('finish_trial_failed', 'We could not finish your trial'),
         'warning'
       );
       setFailed(true);
       return;
     }
     checkFinished();
-  }, []);
-
-  const checkFinished = useCallback(async () => {
-    const {finished} = await (await fetch('/billing/is-trial-finished')).json();
-    if (!finished) {
-      await timer(2000);
-      return checkFinished();
-    }
-
-    setFailed(false);
-    setFinished(true);
-  }, []);
+  }, [checkFinished]);
 
   useEffect(() => {
-    finishSubscription();
+    if (props.confirmed) {
+      finishSubscription();
+    }
   }, []);
 
   const closeButton = (
     <Button
       className="flex-1"
-      onClick={() => (window.opener ? window.close() : props.close())}
+      onClick={() => (window.opener ? window.close() : close())}
     >
       {t('close', 'Close')}
     </Button>
@@ -74,7 +130,7 @@ export const FinishTrial: FC<{ close: () => void }> = (props) => {
               <TopTitle title={'Finishing Trial'} />
             </div>
             <button
-              onClick={props.close}
+              onClick={close}
               className="outline-none absolute end-[10px] top-[10px] mantine-UnstyledButton-root mantine-ActionIcon-root bg-primary hover:bg-tableBorder cursor-pointer mantine-Modal-close mantine-1dcetaa"
               type="button"
             >
@@ -97,10 +153,39 @@ export const FinishTrial: FC<{ close: () => void }> = (props) => {
           <div className="relative h-[400px]">
             <div className="absolute left-0 top-0 w-full h-full overflow-hidden overflow-y-auto">
               <div className="mt-[10px] flex w-full justify-center items-center gap-[10px]">
-                {!finished && !failed && (
+                {!started && (
+                  <div className="flex flex-col">
+                    <div>
+                      {t(
+                        'finish_trial_confirmation',
+                        "Ending the trial charges your plan's first payment today instead of at the end of the trial. Nothing extra is added. Continue?"
+                      )}
+                    </div>
+                    <div className="flex gap-[10px] mt-[20px]">
+                      <Button className="flex-1" onClick={finishSubscription}>
+                        {t('finish_trial_charge_me_now', 'End trial and pay now')}
+                      </Button>
+                      {closeButton}
+                    </div>
+                  </div>
+                )}
+                {started && !finished && !failed && (
                   <LoadingComponent height={150} width={150} />
                 )}
-                {!finished && failed && (
+                {started && !finished && failed && stillProcessing && (
+                  <div className="flex flex-col">
+                    <div>
+                      {t(
+                        'finish_trial_still_processing',
+                        'Your payment is still being processed. Your plan will update on its own in a few minutes, there is no need to pay again.'
+                      )}
+                    </div>
+                    <div className="flex gap-[10px] mt-[20px]">
+                      {closeButton}
+                    </div>
+                  </div>
+                )}
+                {started && !finished && failed && !stillProcessing && (
                   <div className="flex flex-col">
                     <div>
                       {t(

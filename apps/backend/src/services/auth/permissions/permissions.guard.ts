@@ -14,7 +14,12 @@ import { Sections, SubscriptionException } from './permission.exception.class';
 
 // Routes that run before there is an organization on the request. Matched on
 // whole path segments from the start, a path that merely contains one of
-// these (/oauth/authorize, /whatever/auth/x) is still checked
+// these (/oauth/authorize, /whatever/auth/x) is still checked.
+// /integrations/provider (the page pick that ends a connect) has an
+// organization, but whether it adds a channel depends on the page picked - a
+// page that already is a connected channel adds none - so the plan's channel
+// limit is checked by IntegrationService.saveProviderPage, which also covers
+// the session-less /integrations/public/provider route
 const skippedPrefixes = [
   '/auth',
   '/integrations/social-connect',

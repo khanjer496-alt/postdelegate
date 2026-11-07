@@ -14,6 +14,7 @@ import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { ProviderAuthorizationCheck } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import {
+  CHANNEL_CONNECTED,
   CHANNEL_DISCONNECTED,
   isChannelDisconnected,
 } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
@@ -228,11 +229,16 @@ export class IntegrationRepository {
     return findIt.length > 0;
   }
 
+  // a removed channel (or the tombstone a revoked one leaves) is never edited
   updateProviderSettings(org: string, id: string, settings: string) {
     return this._integration.model.integration.update({
+      select: {
+        id: true,
+      },
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
       },
       data: {
         additionalSettings: settings,
@@ -248,6 +254,7 @@ export class IntegrationRepository {
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
       },
       data: {
         customName: name.trim() || null,
@@ -263,6 +270,7 @@ export class IntegrationRepository {
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
       },
       data: {
         postingTimes: JSON.stringify(times.time),
@@ -348,6 +356,13 @@ export class IntegrationRepository {
         data: { internalId: `retired_${existing.id}_${makeId(10)}` },
         select: { id: true },
       });
+      existing = null;
+    }
+
+    // the row already holds this internalId: it is the one being updated, not
+    // another channel to merge into (that would delete its own posts), like
+    // the transaction path above
+    if (existing?.id === id) {
       existing = null;
     }
 
@@ -585,11 +600,10 @@ export class IntegrationRepository {
           : {}),
         ...(customInstanceDetails ? { customInstanceDetails } : {}),
         type: type as any,
-        ...(!refresh
-          ? {
-              inBetweenSteps: isBetweenSteps,
-            }
-          : {}),
+        // a verified reconnect (refresh) finishes the channel: reConnect
+        // already found its page, so a channel left between steps by a
+        // failed refresh is complete again
+        inBetweenSteps: refresh ? false : isBetweenSteps,
         ...(picture ? { picture } : {}),
         profile: username,
         providerIdentifier: provider,
@@ -605,6 +619,13 @@ export class IntegrationRepository {
         refreshNeeded: false,
       },
     };
+    // A reconnect of a live channel keeps its `disabled`: turning a channel
+    // back on goes through enableChannel and the plan's limit, a reconnect
+    // never does. A deleted row that comes back is a new channel to the plan
+    // - the connect checked the limit for it, the channel was not in the
+    // workspace - so it comes back on, like a page pick (writeIntegration)
+    // and the transaction path (a fresh row) do. Before, a revoked channel,
+    // whose tombstone is also disabled, stayed off after it was reconnected.
     const upsert = newDeletedGeneration
       ? await this._transaction.model.$transaction(async (tx) => {
           await this.lockAuthorizationGrant(tx, provider, internalId);
@@ -617,7 +638,20 @@ export class IntegrationRepository {
             ? tx.integration.update({ where: { id: existing.id, deletedAt: null }, data: write.update })
             : tx.integration.create({ data: write.create });
         })
-      : await this._integration.model.integration.upsert(write);
+      : await this._integration.model.integration.upsert({
+          ...write,
+          update: {
+            ...write.update,
+            ...((
+              await this._integration.model.integration.findUnique({
+                where: write.where,
+                select: { deletedAt: true },
+              })
+            )?.deletedAt
+              ? { disabled: false }
+              : {}),
+          },
+        });
 
     if (oneTimeToken) {
       const rootId =
@@ -756,6 +790,7 @@ export class IntegrationRepository {
           where: {
             orgId: org,
             name,
+            deletedAt: null,
           },
         })) ||
         (await this._customers.model.customer.create({
@@ -1019,11 +1054,17 @@ export class IntegrationRepository {
     });
   }
 
+  // a removed channel keeps its flags: the tombstone a revoked one leaves is
+  // matched on them (CHANNEL_DISCONNECTED)
   async disableChannel(org: string, id: string) {
     await this._integration.model.integration.update({
+      select: {
+        id: true,
+      },
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
       },
       data: {
         disabled: true,
@@ -1033,9 +1074,13 @@ export class IntegrationRepository {
 
   async enableChannel(org: string, id: string) {
     await this._integration.model.integration.update({
+      select: {
+        id: true,
+      },
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
       },
       data: {
         disabled: false,
@@ -1056,22 +1101,36 @@ export class IntegrationRepository {
 
   // clearCredentials: the provider revoked the grant, its stored tokens go
   // with the channel instead of waiting for a deletion request
-  deleteChannel(org: string, id: string, clearCredentials = false) {
-    return this._integration.model.integration.update({
-      select: {
-        id: true,
-      },
+  // Idempotent: a channel already deleted keeps the time it was deleted at
+  // (the lifecycle and retention read it), a repeated delete only clears the
+  // credentials when asked to
+  async deleteChannel(org: string, id: string, clearCredentials = false) {
+    const credentials = clearCredentials
+      ? { token: '', refreshToken: null, tokenExpiration: null }
+      : {};
+    const { count } = await this._integration.model.integration.updateMany({
       where: {
         id,
         organizationId: org,
+        deletedAt: null,
       },
       data: {
         deletedAt: new Date(),
-        ...(clearCredentials
-          ? { token: '', refreshToken: null, tokenExpiration: null }
-          : {}),
+        ...credentials,
       },
     });
+
+    if (!count && clearCredentials) {
+      await this._integration.model.integration.updateMany({
+        where: {
+          id,
+          organizationId: org,
+        },
+        data: credentials,
+      });
+    }
+
+    return { id };
   }
 
   async deleteIntegrationsForAccount(org: string, lifecycleOwnedIds: string[] = []) {
@@ -1285,9 +1344,10 @@ export class IntegrationRepository {
   async disableIntegrations(org: string, totalChannels: number) {
     const getChannels = await this._integration.model.integration.findMany({
       where: {
+        // the channels countPlanChannels counts, a half-connected row is
+        // not one of them
+        ...CHANNEL_CONNECTED,
         organizationId: org,
-        disabled: false,
-        deletedAt: null,
       },
       // a downgrade keeps the channels the workspace had first
       orderBy: { createdAt: 'desc' },

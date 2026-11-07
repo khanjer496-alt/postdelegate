@@ -9,6 +9,7 @@ const makeRepo = () => {
   const integration = {
     findFirst: jest.fn(),
     update: jest.fn().mockResolvedValue({ id: 'int-1' }),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     count: jest.fn().mockResolvedValue(0),
   };
   const customer = { findFirst: jest.fn() };
@@ -115,7 +116,13 @@ describe('IntegrationRepository.disableIntegrations', () => {
     await repo.disableIntegrations('org-A', 1);
 
     expect(integration.findMany.mock.calls[0][0]).toMatchObject({
-      where: { organizationId: 'org-A', disabled: false, deletedAt: null },
+      // a half-connected row is not a channel the plan counts
+      where: {
+        organizationId: 'org-A',
+        disabled: false,
+        deletedAt: null,
+        inBetweenSteps: false,
+      },
       orderBy: { createdAt: 'desc' },
       take: 1,
     });
@@ -129,27 +136,85 @@ describe('IntegrationRepository.disableIntegrations', () => {
 describe('IntegrationRepository.deleteChannel', () => {
   it('keeps the stored tokens of a plain delete', async () => {
     const { repo, integration } = makeRepo();
-    await repo.deleteChannel('org-A', 'int-1');
+    expect(await repo.deleteChannel('org-A', 'int-1')).toEqual({ id: 'int-1' });
 
-    const args = integration.update.mock.calls[0][0];
-    expect(args.where).toEqual({ id: 'int-1', organizationId: 'org-A' });
-    expect(args.select).toEqual({ id: true });
+    const args = integration.updateMany.mock.calls[0][0];
+    expect(args.where).toEqual({
+      id: 'int-1',
+      organizationId: 'org-A',
+      deletedAt: null,
+    });
     expect(Object.keys(args.data)).toEqual(['deletedAt']);
+    expect(integration.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it('deletes the stored tokens when the provider revoked the grant', async () => {
     const { repo, integration } = makeRepo();
     await repo.deleteChannel('org-A', 'int-1', true);
 
-    const args = integration.update.mock.calls[0][0];
-    expect(args.where).toEqual({ id: 'int-1', organizationId: 'org-A' });
-    expect(args.select).toEqual({ id: true });
+    const args = integration.updateMany.mock.calls[0][0];
+    expect(args.where).toEqual({
+      id: 'int-1',
+      organizationId: 'org-A',
+      deletedAt: null,
+    });
     expect(args.data).toMatchObject({
       token: '',
       refreshToken: null,
       tokenExpiration: null,
     });
     expect(args.data.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps the first deletion time of a channel deleted twice', async () => {
+    const { repo, integration } = makeRepo();
+    integration.updateMany.mockResolvedValue({ count: 0 });
+    await repo.deleteChannel('org-A', 'int-1');
+    expect(integration.updateMany).toHaveBeenCalledTimes(1);
+
+    // a revocation of an already deleted channel still drops its tokens,
+    // without moving deletedAt
+    await repo.deleteChannel('org-A', 'int-1', true);
+    const last = integration.updateMany.mock.calls[2][0];
+    expect(last.where).toEqual({ id: 'int-1', organizationId: 'org-A' });
+    expect(last.data).toEqual({
+      token: '',
+      refreshToken: null,
+      tokenExpiration: null,
+    });
+  });
+});
+
+describe('IntegrationRepository channel edits', () => {
+  it('never edits or re-enables a removed channel', async () => {
+    const { repo, integration } = makeRepo();
+    await repo.enableChannel('org-A', 'int-1');
+    await repo.disableChannel('org-A', 'int-1');
+    await repo.updateCustomName('org-A', 'int-1', 'n');
+    await repo.setTimes('org-A', 'int-1', { time: [{ time: 1 }] } as any);
+    await repo.updateProviderSettings('org-A', 'int-1', '[]');
+
+    for (const [args] of integration.update.mock.calls) {
+      expect(args.where).toEqual({
+        id: 'int-1',
+        organizationId: 'org-A',
+        deletedAt: null,
+      });
+      expect(args.select).toEqual({ id: true });
+    }
+    expect(integration.update).toHaveBeenCalledTimes(5);
+  });
+
+  it('only links a customer that is not deleted', async () => {
+    const { repo, customer, integration } = makeRepo();
+    customer.findFirst.mockResolvedValue({ id: 'c1' });
+    await repo.updateOnCustomerName('org-A', 'int-1', 'Acme');
+    expect(customer.findFirst.mock.calls[0][0].where).toEqual({
+      orgId: 'org-A',
+      name: 'Acme',
+      deletedAt: null,
+    });
+    expect(integration.update).toHaveBeenCalled();
   });
 });
 

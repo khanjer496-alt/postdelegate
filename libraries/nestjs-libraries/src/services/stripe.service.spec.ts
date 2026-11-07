@@ -10,7 +10,8 @@ const mockStripe = {
   },
   promotionCodes: { list: jest.fn() },
   customers: { retrieve: jest.fn(), update: jest.fn() },
-  paymentMethods: { list: jest.fn() },
+  paymentMethods: { list: jest.fn(), detach: jest.fn() },
+  paymentIntents: { create: jest.fn(), cancel: jest.fn() },
   billingPortal: { sessions: { create: jest.fn() } },
   invoicePayments: { list: jest.fn() },
   invoices: {
@@ -716,6 +717,34 @@ describe('StripeService cardless trial', () => {
     expect(trackService.track).toHaveBeenCalledTimes(sent ? 1 : 0);
   });
 
+  it('detaches the card it just failed to authorize, not the first one listed', async () => {
+    mockStripe.paymentMethods.list.mockResolvedValue({
+      data: [
+        { id: 'pm_old', created: 1 },
+        { id: 'pm_new', created: 5 },
+      ],
+    });
+    mockStripe.paymentIntents.create.mockResolvedValue({
+      id: 'pi_1',
+      status: 'requires_payment_method',
+    });
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await service.processWebhook(
+      subscriptionEvent('customer.subscription.created', {
+        status: 'trialing',
+      })
+    );
+
+    expect(mockStripe.paymentIntents.create).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: 'pm_new' })
+    );
+    expect(mockStripe.paymentMethods.detach).toHaveBeenCalledWith('pm_new');
+    expect(
+      subscriptionService.createOrUpdateSubscription
+    ).not.toHaveBeenCalled();
+  });
+
   it('still rejects a card trial that has no card', async () => {
     await service.processWebhook(
       subscriptionEvent('customer.subscription.created', {
@@ -1196,6 +1225,20 @@ describe('isTrialing', () => {
     }
   );
 
+  it('never sends a user id (a plan an admin set) to Stripe', async () => {
+    organizationService.getOrgById.mockResolvedValue({
+      id: 'org_1',
+      paymentId: 'user_1',
+    });
+    await service.cancelAllSubscriptions('org_1');
+    await expect(service.portalLink('org_1')).rejects.toBeDefined();
+    expect(await service.getInvoices('org_1')).toEqual([]);
+    expect(await service.getCharges('org_1')).toEqual([]);
+    expect(mockStripe.subscriptions.list).not.toHaveBeenCalled();
+    expect(mockStripe.billingPortal.sessions.create).not.toHaveBeenCalled();
+    expect(mockStripe.charges.list).not.toHaveBeenCalled();
+  });
+
   it('is not a trial without a Stripe customer', async () => {
     organizationService.getOrgById.mockResolvedValue({
       id: 'org_1',
@@ -1466,9 +1509,27 @@ describe('extra channels', () => {
       );
     });
 
-    it('drops the plan when the re-read subscription has ended since the event', async () => {
+    it.each(['canceled', 'incomplete_expired'])(
+      'does nothing when the re-read subscription is %s since the event, its deleted event handled it',
+      async (status) => {
+        mockStripe.subscriptions.retrieve.mockResolvedValue(
+          stripeSubscription({ status })
+        );
+        mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+        expect(
+          await service.processWebhook(updated(stripeSubscription()))
+        ).toEqual({ ok: true });
+
+        expect(
+          subscriptionService.createOrUpdateSubscription
+        ).not.toHaveBeenCalled();
+        expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
+      }
+    );
+
+    it('drops the plan when the re-read subscription became unpaid since the event', async () => {
       mockStripe.subscriptions.retrieve.mockResolvedValue(
-        stripeSubscription({ status: 'canceled' })
+        stripeSubscription({ status: 'unpaid' })
       );
       mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
       await service.processWebhook(updated(stripeSubscription()));
@@ -1480,6 +1541,52 @@ describe('extra channels', () => {
         'cus_1',
         'stripe'
       );
+    });
+
+    it('re-reads every tier, so a stale update after a cancellation never brings the plan back', async () => {
+      const standard = (status: string) =>
+        stripeSubscription({
+          status,
+          metadata: {
+            service: 'gitroom',
+            billing: 'STANDARD',
+            period: 'MONTHLY',
+            uniqueId: 'u1',
+          },
+        });
+      mockStripe.subscriptions.retrieve.mockResolvedValue(standard('canceled'));
+      mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+      await service.processWebhook(updated(standard('active')));
+      await service.processWebhook({
+        type: 'customer.subscription.created',
+        data: { object: standard('active') },
+      } as any);
+
+      expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_1');
+      expect(
+        subscriptionService.createOrUpdateSubscription
+      ).not.toHaveBeenCalled();
+    });
+
+    it('passes a failed write on, so Stripe sends the event again', async () => {
+      subscriptionService.createOrUpdateSubscription.mockResolvedValue({
+        retry: true,
+      });
+      expect(
+        await service.processWebhook(updated(stripeSubscription()))
+      ).toEqual({ retry: true });
+
+      subscriptionService.deleteSubscription.mockResolvedValue({
+        count: 0,
+        retry: true,
+      });
+      mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
+      expect(
+        await service.processWebhook({
+          type: 'customer.subscription.deleted',
+          data: { object: stripeSubscription({ status: 'canceled' }) },
+        } as any)
+      ).toEqual({ count: 0, retry: true });
     });
 
     it('keeps the event count when the subscription cannot be read, never failing the webhook', async () => {
@@ -1519,7 +1626,8 @@ describe('extra channels', () => {
         )
       );
 
-      expect(mockStripe.subscriptions.retrieve).not.toHaveBeenCalled();
+      // re-read like every tier, the extra channels item still never counts
+      expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_1');
       expect(
         subscriptionService.createOrUpdateSubscription.mock.calls[0][4]
       ).toBe(30);
@@ -2019,6 +2127,54 @@ describe('extra channels', () => {
         expect.objectContaining({ cancel_at_period_end: true })
       );
       expect(result.cancel_at).toEqual(new Date(1900000000 * 1000));
+    });
+
+    it('follows an explicit intent on every subscription, whatever the first one says', async () => {
+      mockStripe.subscriptions.list.mockResolvedValue({
+        data: [
+          stripeSubscription({ id: 'sub_1', cancel_at_period_end: true }),
+          stripeSubscription({ id: 'sub_2', cancel_at_period_end: false }),
+        ],
+      });
+
+      // a second click on "cancel" never reactivates
+      await service.setToCancel('org_1', 'cancel');
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledTimes(2);
+      for (const [, params] of mockStripe.subscriptions.update.mock.calls) {
+        expect(params.cancel_at_period_end).toBe(true);
+      }
+
+      mockStripe.subscriptions.update.mockClear();
+      mockStripe.subscriptions.update.mockResolvedValue({ cancel_at: null });
+      const result = await service.setToCancel('org_1', 'reactivate');
+      // only the one that was set to cancel changes
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledTimes(1);
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
+        'sub_1',
+        expect.objectContaining({ cancel_at_period_end: false })
+      );
+      expect(result.cancel_at).toBeUndefined();
+    });
+
+    it('keeps toggling on the first subscription without an intent', async () => {
+      live(stripeSubscription({ cancel_at_period_end: true }));
+      mockStripe.subscriptions.update.mockResolvedValue({ cancel_at: null });
+      await service.setToCancel('org_1');
+      expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
+        'sub_1',
+        expect.objectContaining({ cancel_at_period_end: false })
+      );
+    });
+
+    it('never creates a customer or calls Stripe for a workspace without one', async () => {
+      organizationService.getOrgById.mockResolvedValue({
+        id: 'org_1',
+        paymentId: 'user_1',
+      });
+      await expect(service.setToCancel('org_1', 'cancel')).rejects.toThrow(
+        'No active subscription found'
+      );
+      expect(mockStripe.subscriptions.list).not.toHaveBeenCalled();
     });
 
     it('still cancels right away after a failed renewal', async () => {

@@ -172,8 +172,11 @@ export abstract class PaymentProviderAbstract {
     return this.notSupported();
   }
 
-  // Toggle cancel-at-period-end
-  async setToCancel(organizationId: string): Promise<any> {
+  // Cancel at period end, or reactivate. Without an intent it toggles
+  async setToCancel(
+    organizationId: string,
+    intent?: 'cancel' | 'reactivate'
+  ): Promise<any> {
     return this.notSupported();
   }
 

@@ -1,12 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import {
+  PrismaRepository,
+  PrismaTransaction,
+} from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+
+// What a revocation also takes away: a consent still waiting for its code to
+// be exchanged, so a code issued before the revocation can't bring it back
+const pendingConsent = {
+  authorizationCode: null,
+  codeExpiresAt: null,
+  codeChallenge: null,
+  codeChallengeMethod: null,
+  redirectUri: null,
+};
 
 @Injectable()
 export class OAuthRepository {
   constructor(
     private _oauthApp: PrismaRepository<'oAuthApp'>,
     private _oauthAuth: PrismaRepository<'oAuthAuthorization'>,
-    private _oauthSelfHosted: PrismaRepository<'oAuthSelfHostedAuthorization'>
+    private _oauthSelfHosted: PrismaRepository<'oAuthSelfHostedAuthorization'>,
+    private _transaction: PrismaTransaction
   ) {}
 
   getAppByOrgId(orgId: string) {
@@ -33,6 +48,9 @@ export class OAuthRepository {
     });
   }
 
+  // One app per organization: checked and created in one serializable
+  // transaction (the unique index on organizationId + deletedAt does not stop
+  // two live rows, deletedAt is null on both). null: the org already has one
   createApp(
     orgId: string,
     data: {
@@ -44,20 +62,36 @@ export class OAuthRepository {
       clientSecret: string;
     }
   ) {
-    return this._oauthApp.model.oAuthApp.create({
-      data: {
-        organizationId: orgId,
-        name: data.name,
-        description: data.description,
-        pictureId: data.pictureId,
-        redirectUrl: data.redirectUrl,
-        clientId: data.clientId,
-        clientSecret: data.clientSecret,
+    return this._transaction.model.$transaction(
+      async (tx) => {
+        const existing = await tx.oAuthApp.findFirst({
+          where: {
+            organizationId: orgId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (existing) {
+          return null;
+        }
+
+        return tx.oAuthApp.create({
+          data: {
+            organizationId: orgId,
+            name: data.name,
+            description: data.description,
+            pictureId: data.pictureId,
+            redirectUrl: data.redirectUrl,
+            clientId: data.clientId,
+            clientSecret: data.clientSecret,
+          },
+          include: {
+            picture: true,
+          },
+        });
       },
-      include: {
-        picture: true,
-      },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   }
 
   createDynamicApp(data: {
@@ -121,21 +155,38 @@ export class OAuthRepository {
     });
   }
 
+  // Every authorization of the app is revoked and the app deleted together:
+  // a failure half way never leaves a deleted app with live tokens, or
+  // revoked tokens on an app that still works
   async deleteApp(orgId: string) {
-    const app = await this._oauthApp.model.oAuthApp.findFirst({
-      where: {
-        organizationId: orgId,
-        deletedAt: null,
-      },
-    });
-    if (!app) {
-      return null;
-    }
-    return this._oauthApp.model.oAuthApp.update({
-      where: { id: app.id },
-      data: {
-        deletedAt: new Date(),
-      },
+    return this._transaction.model.$transaction(async (tx) => {
+      const app = await tx.oAuthApp.findFirst({
+        where: {
+          organizationId: orgId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!app) {
+        return null;
+      }
+
+      await tx.oAuthSelfHostedAuthorization.updateMany({
+        where: { oauthAppId: app.id, revokedAt: null },
+        data: { revokedAt: new Date(), ...pendingConsent },
+      });
+      await tx.oAuthAuthorization.updateMany({
+        where: { oauthAppId: app.id, revokedAt: null },
+        data: { revokedAt: new Date(), ...pendingConsent },
+      });
+
+      return tx.oAuthApp.update({
+        where: { id: app.id },
+        data: {
+          deletedAt: new Date(),
+        },
+        select: { id: true },
+      });
     });
   }
 
@@ -191,8 +242,9 @@ export class OAuthRepository {
         codeChallenge: data.codeChallenge || null,
         codeChallengeMethod: data.codeChallengeMethod || null,
         redirectUri: data.redirectUri || null,
-        accessToken: null,
-        revokedAt: null,
+        // A new consent only adds a code: the working token keeps working and
+        // a revoked one stays revoked until this code is exchanged
+        // (exchangeCodeForToken)
       },
     });
   }
@@ -200,33 +252,51 @@ export class OAuthRepository {
   // Takes every stored form the presented secret could have (hashes under the
   // current and retired keys, plus the legacy ciphertext until the backfill has
   // run) and matches any of them. An empty list matches nothing.
+  // Also on a revoked authorization: a revocation clears the pending code
+  // (pendingConsent), so a code here was issued by a consent given since
   findByCode(storedCodes: string[]) {
     return this._oauthAuth.model.oAuthAuthorization.findFirst({
       where: {
         authorizationCode: { in: storedCodes },
-        revokedAt: null,
       },
     });
   }
 
-  exchangeCodeForToken(id: string, encryptedToken: string) {
-    return this._oauthAuth.model.oAuthAuthorization.update({
+  // Spends the code it was looked up with, only while it is still that code
+  // and not expired: of two concurrent exchanges only one updates the row.
+  // The new token replaces the old one and lifts an earlier revocation (the
+  // person consented again). null: the code was already spent or replaced
+  async exchangeCodeForToken(
+    id: string,
+    storedCode: string,
+    encryptedToken: string
+  ) {
+    const { count } =
+      await this._oauthAuth.model.oAuthAuthorization.updateMany({
+        where: {
+          id,
+          authorizationCode: storedCode,
+          codeExpiresAt: { gt: new Date() },
+        },
+        data: {
+          accessToken: encryptedToken,
+          revokedAt: null,
+          ...pendingConsent,
+        },
+      });
+    if (!count) {
+      return null;
+    }
+
+    return this._oauthAuth.model.oAuthAuthorization.findUnique({
       where: { id },
       select: {
         organizationId: true,
         organization: {
           select: {
             paymentId: true,
-          }
-        }
-      },
-      data: {
-        accessToken: encryptedToken,
-        authorizationCode: null,
-        codeExpiresAt: null,
-        codeChallenge: null,
-        codeChallengeMethod: null,
-        redirectUri: null,
+          },
+        },
       },
     });
   }
@@ -240,6 +310,9 @@ export class OAuthRepository {
         where: {
           accessToken: { in: storedTokens },
           revokedAt: null,
+          oauthApp: {
+            deletedAt: null,
+          },
           user: {
             deletedAt: null,
             activated: true,
@@ -327,7 +400,9 @@ export class OAuthRepository {
       },
       data: {
         revokedAt: new Date(),
+        ...pendingConsent,
       },
+      select: { id: true },
     });
   }
 
@@ -339,6 +414,7 @@ export class OAuthRepository {
       },
       data: {
         revokedAt: new Date(),
+        ...pendingConsent,
       },
     });
 
@@ -349,6 +425,7 @@ export class OAuthRepository {
       },
       data: {
         revokedAt: new Date(),
+        ...pendingConsent,
       },
     });
   }
@@ -404,6 +481,7 @@ export class OAuthRepository {
       select: {
         id: true,
         oauthAppId: true,
+        authorizationCode: true,
         codeExpiresAt: true,
         codeChallenge: true,
         redirectUri: true,
@@ -411,21 +489,29 @@ export class OAuthRepository {
     });
   }
 
-  exchangeSelfHostedCodeForToken(id: string, encryptedToken: string) {
-    return this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.update({
-      where: { id },
-      select: {
-        id: true,
-      },
-      data: {
-        accessToken: encryptedToken,
-        authorizationCode: null,
-        codeExpiresAt: null,
-        codeChallenge: null,
-        codeChallengeMethod: null,
-        redirectUri: null,
-      },
-    });
+  // Like exchangeCodeForToken: only one exchange of a code wins. false:
+  // the code was already spent
+  async exchangeSelfHostedCodeForToken(
+    id: string,
+    storedCode: string,
+    encryptedToken: string
+  ) {
+    const { count } =
+      await this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.updateMany(
+        {
+          where: {
+            id,
+            authorizationCode: storedCode,
+            codeExpiresAt: { gt: new Date() },
+            revokedAt: null,
+          },
+          data: {
+            accessToken: encryptedToken,
+            ...pendingConsent,
+          },
+        }
+      );
+    return count > 0;
   }
 
   findSelfHostedByAccessToken(storedTokens: string[]) {

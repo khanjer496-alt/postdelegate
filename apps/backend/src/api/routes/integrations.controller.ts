@@ -39,6 +39,37 @@ import { uniqBy } from 'lodash';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { channelState } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
+// Where a connect may send the person after the platform's consent screen:
+// only back to us - an address on the app's own origin, or the mobile app's
+// scheme (MOBILE_APP_SCHEME, `postiz:` by default). Anything else would turn
+// a real consent screen into a step towards a phishing page, so it is
+// dropped and the connect ends on the usual page instead
+export const allowedConnectRedirect = (redirectUrl?: string) => {
+  if (!redirectUrl) {
+    return undefined;
+  }
+  try {
+    const url = new URL(redirectUrl);
+    if (url.username || url.password) {
+      return undefined;
+    }
+    if (
+      process.env.FRONTEND_URL &&
+      url.origin === new URL(process.env.FRONTEND_URL).origin
+    ) {
+      return redirectUrl;
+    }
+    const appSchemes = [
+      'postiz:',
+      new URL(process.env.MOBILE_APP_SCHEME || 'postiz://auth/callback')
+        .protocol,
+    ].filter((scheme) => !['http:', 'https:'].includes(scheme));
+    return appSchemes.includes(url.protocol) ? redirectUrl : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 @ApiTags('Integrations')
 @Controller('/integrations')
 export class IntegrationsController {
@@ -49,14 +80,21 @@ export class IntegrationsController {
     private _refreshIntegrationService: RefreshIntegrationService
   ) {}
 
+  // The policy guard skips /integrations/provider (the limit depends on the
+  // picked page), saveProviderPage checks the plan's channel limit itself
   @Post('/provider/:id/connect')
-  @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
   async saveProviderPage(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
     @Body() body: any
   ) {
-    return this._integrationService.saveProviderPage(org.id, id, body);
+    return this._integrationService.saveProviderPage(
+      org.id,
+      id,
+      body,
+      // @ts-ignore
+      org?.subscription?.totalChannels || pricing.FREE.channel
+    );
   }
 
   @Get('/:identifier/internal-plugs')
@@ -286,8 +324,9 @@ export class IntegrationsController {
         await ioRedis.set(`onboarding:${state}`, 'true', 'EX', 3600);
       }
 
-      if (redirectUrl) {
-        await ioRedis.set(`redirect:${state}`, redirectUrl, 'EX', 3600);
+      const returnTo = allowedConnectRedirect(redirectUrl);
+      if (returnTo) {
+        await ioRedis.set(`redirect:${state}`, returnTo, 'EX', 3600);
       }
 
       await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);

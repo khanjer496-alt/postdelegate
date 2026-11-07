@@ -27,6 +27,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { writeCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -307,7 +308,8 @@ export class NoAuthIntegrationsController {
         expiresIn,
         username,
         refresh ? false : integrationProvider.isBetweenSteps,
-        body.refresh,
+        // the verified channel from the state, never the client's body
+        refresh || undefined,
         +body.timezone,
         details
           ? writeCustomInstanceDetails(details)
@@ -425,12 +427,18 @@ export class NoAuthIntegrationsController {
       throw new Error('Organization not found');
     }
 
-    const org = await this._organizationService.getOrgById(organization);
+    const org = await this._organizationService.getOrgByIdWithSubscription(
+      organization
+    );
+    if (!org) {
+      throw new Error('Organization not found');
+    }
 
     const saved = await this._integrationService.saveProviderPage(
       org.id,
       id,
-      body
+      body,
+      org.subscription?.totalChannels || pricing.FREE.channel!
     );
     await ioRedis.del(`organization:${body.state}`);
     return saved;

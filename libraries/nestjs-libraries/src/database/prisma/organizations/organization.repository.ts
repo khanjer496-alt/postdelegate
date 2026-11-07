@@ -533,16 +533,6 @@ export class OrganizationRepository {
       }
     }
 
-    const checkIfInviteExists = await this._user.model.user.findFirst({
-      where: {
-        inviteId: id,
-      },
-    });
-
-    if (checkIfInviteExists) {
-      return { failed: 'already_used' as InviteFailure };
-    }
-
     const checkForSubscription =
       await this._organization.model.organization.findFirst({
         where: {
@@ -563,25 +553,50 @@ export class OrganizationRepository {
       return { failed: 'plan' as InviteFailure };
     }
 
-    // joining and burning the invite id happen together, so a half applied
-    // accept can't leave the invite usable again
-    const [create] = await this._transaction.model.$transaction([
-      this._userOrg.model.userOrganization.create({
-        data: {
-          role,
-          userId,
-          organizationId: orgId,
-        },
-      }),
-      this._user.model.user.update({
-        where: {
-          id: userId,
-        },
-        data: {
-          inviteId: id,
-        },
-      }),
-    ]);
+    // Checking the invite is unused, joining and burning the invite id are
+    // one serializable transaction: a half applied accept can't leave the
+    // invite usable again, and two accepts of one invite can't both join
+    const create = await this._transaction.model.$transaction(
+      async (tx) => {
+        const checkIfInviteExists = await tx.user.findFirst({
+          where: {
+            inviteId: id,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (checkIfInviteExists) {
+          return null;
+        }
+
+        const membership = await tx.userOrganization.create({
+          data: {
+            role,
+            userId,
+            organizationId: orgId,
+          },
+        });
+        await tx.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            inviteId: id,
+          },
+          select: {
+            id: true,
+          },
+        });
+        return membership;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+
+    if (!create) {
+      return { failed: 'already_used' as InviteFailure };
+    }
 
     return create;
   }
