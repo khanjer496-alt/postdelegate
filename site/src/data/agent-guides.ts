@@ -2,6 +2,8 @@
 // /<assistant>/<network>. English only, like the guides. The setup steps and snippets are the
 // ones in /docs/mcp/claude, /docs/mcp/chatgpt and /docs/mcp/clients; the network facts come from
 // schedulers.ts and networks.ts. Only the example asks below are written for these pages.
+// Each assistant has its own route folder (src/pages/<slug>/[network].astro) rather than one
+// [agent]/[network] route, which would compete with [lang]/[scheduler] on route priority.
 import { AVAILABLE_NETWORKS, type Network } from './networks';
 
 export interface Agent {
@@ -11,6 +13,8 @@ export interface Agent {
   /** One sentence on where you use it, for the intro. */
   where: string;
   setup: { steps: string[]; code: string; codeLabel: string; after?: string };
+  /** The agent file that teaches it the posting rules, from /docs/mcp/agent-files. */
+  teach: { text: string; href: string };
   docs: string;
 }
 
@@ -24,6 +28,7 @@ export const AGENTS: Agent[] = [
       code: OAUTH_URL, codeLabel: 'Server URL',
       after: 'Custom connectors depend on your Claude plan and, on team plans, on what your organisation allows.',
     },
+    teach: { text: 'Add the PostDelegate skill to Claude so it knows the posting rules before it writes: download the skill zip and upload it under Customize, then Skills, with code execution turned on.', href: '/docs/mcp/agent-files#claude-ai' },
     docs: '/docs/mcp/claude',
   },
   {
@@ -33,6 +38,7 @@ export const AGENTS: Agent[] = [
       code: OAUTH_URL, codeLabel: 'Server URL',
       after: 'Custom connectors depend on your ChatGPT plan and workspace settings, which OpenAI controls.',
     },
+    teach: { text: 'Paste the PostDelegate instructions into a custom GPT or a Project, with the connector enabled there, so ChatGPT follows the posting rules in every chat.', href: '/docs/mcp/agent-files#chatgpt' },
     docs: '/docs/mcp/chatgpt',
   },
   {
@@ -41,6 +47,7 @@ export const AGENTS: Agent[] = [
       steps: ['Add the PostDelegate MCP server with the command below.', 'Run /mcp inside Claude Code and authenticate the postdelegate server. Your browser opens to sign in.'],
       code: `claude mcp add postdelegate --transport http "${OAUTH_URL}"`, codeLabel: 'Terminal',
     },
+    teach: { text: 'Save the PostDelegate skill to ~/.claude/skills/postdelegate/SKILL.md. Call it with /postdelegate, or just ask for a post and Claude Code loads it.', href: '/docs/mcp/agent-files#claude-code' },
     docs: '/docs/mcp/clients#claude-code',
   },
   {
@@ -49,22 +56,25 @@ export const AGENTS: Agent[] = [
       steps: ['Add the server to ~/.codex/config.toml as below.', 'Run codex mcp login postdelegate and sign in in your browser.'],
       code: `[mcp_servers.postdelegate]\nurl = "${OAUTH_URL}"`, codeLabel: '~/.codex/config.toml',
     },
+    teach: { text: 'Add PostDelegate’s AGENTS.md to your repository, so Codex knows the MCP tools, the REST API and the safety rules when it works there.', href: '/docs/mcp/agent-files#agents-md' },
     docs: '/docs/mcp/clients#codex',
   },
   {
     slug: 'cursor', name: 'Cursor', kind: 'code', where: 'from Cursor’s agent, inside your editor',
     setup: {
-      steps: ['Add the server to .cursor/mcp.json in your project, as below.', 'Cursor asks you to sign in with PostDelegate the first time the agent uses it.'],
+      steps: ['Add the server to .cursor/mcp.json in your project, as below.', 'Sign in with PostDelegate when Cursor prompts you.'],
       code: `{\n  "mcpServers": {\n    "postdelegate": {\n      "url": "${OAUTH_URL}"\n    }\n  }\n}`, codeLabel: '.cursor/mcp.json',
     },
+    teach: { text: 'Save the PostDelegate rule to .cursor/rules/postdelegate.mdc. Cursor applies it whenever a request is about PostDelegate.', href: '/docs/mcp/agent-files#cursor' },
     docs: '/docs/mcp/clients#cursor',
   },
   {
     slug: 'gemini-cli', name: 'Gemini CLI', kind: 'code', where: 'from Google’s Gemini CLI in your terminal',
     setup: {
-      steps: ['Add the server to ~/.gemini/settings.json as below.', 'Gemini CLI opens your browser to sign in with PostDelegate the first time it connects.'],
+      steps: ['Add the server to ~/.gemini/settings.json as below.', 'Sign in with PostDelegate when Gemini CLI prompts you.'],
       code: `{\n  "mcpServers": {\n    "postdelegate": {\n      "url": "${OAUTH_URL}"\n    }\n  }\n}`, codeLabel: '~/.gemini/settings.json',
     },
+    teach: { text: 'Save PostDelegate’s AGENTS.md in your repository and point to it from your GEMINI.md, so Gemini CLI follows the posting rules there.', href: '/docs/mcp/agent-files#agents-md' },
     docs: '/docs/mcp/clients#gemini-cli',
   },
 ];
@@ -88,9 +98,9 @@ export const NETWORK_ASKS: Record<string, [string, string, string]> = {
     'Summarise the README’s “Why” section as a Mastodon thread and save it as a draft.',
   ],
   google_business: [
-    'Draft a Google Business Profile offer for our weekend sale: 20% off, Saturday to Sunday, with a Shop button.',
+    'Draft a Google Business Profile offer for our weekend sale: 20% off, Saturday to Sunday, with a Shop button linking to example.com/sale.',
     'Create an event post for our open day on the 14th from 10:00 to 16:00 and schedule it for Monday morning.',
-    'Write a standard update from the opening hours in content/hours.md with a Learn More button, as a draft.',
+    'Write a standard update from the opening hours in content/hours.md with a Learn More button linking to our website, as a draft.',
   ],
   telegram: [
     'Draft a Telegram announcement for our channel about tonight’s maintenance window, then show me the preview link.',
