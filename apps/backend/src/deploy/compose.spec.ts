@@ -9,10 +9,11 @@ import { join } from 'path';
 // (The spec lives here because jest only looks under apps/*/src and
 // libraries/*/src.)
 
-const compose = readFileSync(
-  join(__dirname, '..', '..', '..', '..', 'deploy', 'postdelegate', 'compose.yaml'),
-  'utf8'
-);
+const deploy = join(__dirname, '..', '..', '..', '..', 'deploy', 'postdelegate');
+const compose = readFileSync(join(deploy, 'compose.yaml'), 'utf8');
+// staging is a separate Compose project with its own Redis, so the same
+// hardening has to be asserted there or staging quietly keeps an open one
+const staging = readFileSync(join(deploy, 'staging', 'compose.yaml'), 'utf8');
 
 describe('the committed compose file', () => {
   it('denies privilege escalation for every service, via the shared anchor', () => {
@@ -83,5 +84,35 @@ describe('the committed compose file', () => {
     }
     expect(compose).not.toMatch(/\n\s+- \d+:5432/);
     expect(compose).not.toMatch(/\n\s+- \d+:6379/);
+  });
+}
+  describe('staging mirrors the production hardening', () => {
+    it('denies privilege escalation on its shared anchor', () => {
+      const anchor = staging.slice(
+        staging.indexOf('x-service: &service'),
+        staging.indexOf('services:')
+      );
+      expect(anchor).toContain('no-new-privileges:true');
+    });
+
+    it('requires a Redis password, with no default', () => {
+      expect(staging).toContain('--requirepass');
+      expect(staging).toMatch(/POSTIZ_REDIS_PASSWORD:\?/);
+      expect(staging).not.toMatch(/POSTIZ_REDIS_PASSWORD:-/);
+    });
+
+    it('runs its redis as the redis user wherever it drops capabilities', () => {
+      const redis = staging.slice(
+        staging.indexOf('\n  app-redis:'),
+        staging.indexOf('\n  temporal-db:')
+      );
+      if (redis.includes('cap_drop')) {
+        expect(redis).toMatch(/\n\s+user: (redis|"?999)/);
+      }
+    });
+
+    it('publishes no host ports at all', () => {
+      expect(staging).not.toMatch(/\n\s+ports:/);
+    });
   });
 });
