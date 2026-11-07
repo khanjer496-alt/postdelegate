@@ -32,7 +32,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Later alternative: PostDelegate vs Later, pricing and AI" description="PostDelegate vs Later: plan prices, free trial, profile and post limits, users, AI credits or your own key, API and MCP, and the networks each connects today." h1="PostDelegate vs Later." eyebrow="Compare" lead="Later is built around visual planning for Instagram, TikTok and other image-led networks. PostDelegate is a calendar for many kinds of channels, with flat plans. Here is how they compare, including where Later is the better pick today." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="https://later.com" class="button button-outline" target="_blank" rel="noreferrer">Visit Later</a>
   <h2>At a glance</h2>
   <CompareTable other="Later" rows={rows} />

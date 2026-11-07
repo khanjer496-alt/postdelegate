@@ -52,7 +52,7 @@ const howToLd = available && s.steps?.length ? { '@context': 'https://schema.org
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((item) => ({ '@type': 'Question', name: item.q, acceptedAnswer: { '@type': 'Answer', text: plain(item.a) } })) };
 ---
 <Doc title={title} description={description} h1={s.h1} eyebrow={available ? c.eyebrow(s.name) : soon.eyebrow(s.name)} lead={s.intro} jsonLd={[crumbs, ...(howToLd ? [howToLd] : []), faqLd]} lang={lang}>
-  <a slot="actions" href={SITE.signup} class="button">{t.common.ctaLabel}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{t.common.ctaLabel}</a>
   <a slot="actions" href="/tools/caption-checker" class="button button-outline">{c.tryCaption}</a>
   {network && <div class:list={['sch-head', { 'is-soon': !available }]}>
     <NetworkBadge n={network} size="lg" />

@@ -84,7 +84,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Vista Social alternative: PostDelegate vs Vista Social compared" description="PostDelegate vs Vista Social: flat channel plans against bundled tiers, AI credits or your own key, two MCP servers compared, and the X surcharge." h1="PostDelegate vs Vista Social." eyebrow="Compare" lead="Vista Social bundles a lot into each tier and ships one of the more capable MCP servers in this category. PostDelegate is cheaper and runs AI on your own key. Here is where each one wins." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Vista Social</a>
 
   <h2>At a glance</h2>

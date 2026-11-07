@@ -10,12 +10,26 @@ import { useConsent } from '@gitroom/helpers/consent/use.consent';
 export const getUtmFromQuery = (query: Pick<URLSearchParams, 'get'>) =>
   query.get('utm_source') || query.get('utm') || '';
 
-// The campaign source is saved in the browser only while the referral and
-// campaign category of the cookie banner is on, and removed when it is off
+// The visitor id of our site analytics (Pulse) that postdelegate.com adds to
+// its sign-up links, so a checkout is credited to the visit it came from
+export const getPulseVisitorFromQuery = (
+  query: Pick<URLSearchParams, 'get'>
+) => {
+  const value = query.get('pulse_vid') || '';
+  return /^[0-9a-f]{32}$/.test(value) ? value : '';
+};
+
+// The campaign source and the site visit are saved in the browser only while
+// the referral and campaign category of the cookie banner is on, and removed
+// when it is off
 const UtmSaver: FC = () => {
   const query = useSearchParams();
   const [value, setValue, removeValue] = useLocalStorage({
     key: 'utm',
+    defaultValue: '',
+  });
+  const [pulseVisitor, setPulseVisitor, removePulseVisitor] = useLocalStorage({
+    key: 'pulse_vid',
     defaultValue: '',
   });
   const fireEvents = useFireEvents();
@@ -52,6 +66,18 @@ const UtmSaver: FC = () => {
     }
   }, [query, value, consent]);
 
+  useEffect(() => {
+    if (consent && !consent.ref) {
+      removePulseVisitor();
+      return;
+    }
+
+    const visitor = getPulseVisitorFromQuery(query);
+    if (visitor && !pulseVisitor && consent?.ref) {
+      setPulseVisitor(visitor);
+    }
+  }, [query, pulseVisitor, consent]);
+
   return <></>;
 };
 
@@ -60,5 +86,17 @@ export const useUtmUrl = () => {
   const [value] = useLocalStorage({ key: 'utm', defaultValue: '' });
   const query = useSearchParams();
   return value || getUtmFromQuery(query);
+};
+
+// Without a saved visit, the one in the current address, for this visit only.
+// Read on the first render: the checkout is created as the billing page opens
+export const usePulseVisitor = () => {
+  const [value] = useLocalStorage({
+    key: 'pulse_vid',
+    defaultValue: '',
+    getInitialValueInEffect: false,
+  });
+  const query = useSearchParams();
+  return value || getPulseVisitorFromQuery(query);
 };
 export default UtmSaver;

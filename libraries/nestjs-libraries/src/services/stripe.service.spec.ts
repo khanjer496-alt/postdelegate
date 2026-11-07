@@ -12,6 +12,7 @@ const mockStripe = {
   customers: { retrieve: jest.fn(), update: jest.fn() },
   paymentMethods: { list: jest.fn() },
   billingPortal: { sessions: { create: jest.fn() } },
+  checkout: { sessions: { create: jest.fn() } },
   invoicePayments: { list: jest.fn() },
   invoices: {
     retrieve: jest.fn(),
@@ -647,6 +648,89 @@ describe('StripeService cardless trial', () => {
         }),
       })
     );
+  });
+
+  it('saves the site visit on the trial subscription', async () => {
+    organizationService.getOrgById.mockResolvedValue({
+      id: 'org_1',
+      paymentId: 'cus_1',
+    });
+    mockStripe.prices.list.mockResolvedValueOnce({
+      data: [{ id: 'price_team_month', unit_amount: 2900 }],
+    });
+
+    await service.startTrial('cookie', 'org_1', 'user_1', {
+      billing: 'TEAM',
+      period: 'MONTHLY',
+      pulse_vid: '0123456789abcdef0123456789abcdef',
+    } as any);
+
+    expect(mockStripe.subscriptions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          pulse_vid: '0123456789abcdef0123456789abcdef',
+        }),
+      })
+    );
+  });
+
+  describe('checkout of a workspace that cannot start a trial', () => {
+    const checkout = async (body: Record<string, string>) => {
+      organizationService.getOrgById.mockResolvedValue({
+        id: 'org_1',
+        paymentId: 'cus_1',
+      });
+      mockStripe.prices.list.mockResolvedValueOnce({
+        data: [{ id: 'price_team_month', unit_amount: 2900 }],
+      });
+      mockStripe.checkout.sessions.create.mockResolvedValue({
+        client_secret: 'secret',
+      });
+      await service.embedded(
+        'cookie',
+        'org_1',
+        'user_1',
+        { billing: 'TEAM', period: 'MONTHLY', ...body } as any,
+        false
+      );
+      return mockStripe.checkout.sessions.create.mock.calls[0][0];
+    };
+
+    it('saves the site visit on the session and the subscription', async () => {
+      const session = await checkout({
+        pulse_vid: '0123456789abcdef0123456789abcdef',
+      });
+
+      expect(session.metadata).toEqual({
+        pulse_vid: '0123456789abcdef0123456789abcdef',
+      });
+      expect(session.subscription_data.metadata.pulse_vid).toBe(
+        '0123456789abcdef0123456789abcdef'
+      );
+    });
+
+    it('keeps the DataFast visit beside it', async () => {
+      const session = await checkout({
+        datafast_visitor_id: 'v1',
+        datafast_session_id: 's1',
+        pulse_vid: '0123456789abcdef0123456789abcdef',
+      });
+
+      expect(session.metadata).toEqual({
+        datafast_visitor_id: 'v1',
+        datafast_session_id: 's1',
+        pulse_vid: '0123456789abcdef0123456789abcdef',
+      });
+    });
+
+    it('adds no session metadata without a visit', async () => {
+      const session = await checkout({});
+
+      expect(session).not.toHaveProperty('metadata');
+      expect(session.subscription_data.metadata).not.toHaveProperty(
+        'pulse_vid'
+      );
+    });
   });
 
   it('does not start a second subscription', async () => {
