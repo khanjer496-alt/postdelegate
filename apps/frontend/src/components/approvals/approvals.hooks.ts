@@ -40,6 +40,8 @@ export interface ReviewItem {
   agentSource: string | null;
   creationMethod: string;
   createdAt: string;
+  // the version shown, an approval is bound to it
+  updatedAt: string;
   integration: {
     id: string;
     name: string;
@@ -177,6 +179,8 @@ export interface ChannelPost {
   state?: string;
   approvalStatus?: ApprovalStatus | string | null;
   publishDate?: string | Date | null;
+  // the version the editor loaded, when it has it
+  updatedAt?: string | Date | null;
   integration?: { name?: string | null } | null;
 }
 

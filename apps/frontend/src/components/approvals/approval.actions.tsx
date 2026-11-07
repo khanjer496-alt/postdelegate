@@ -113,6 +113,8 @@ export const CommentModal: FC<{
 type PostRef = {
   id: string;
   publishDate?: string | Date | null;
+  // the version shown: approving refuses (409) a post edited since
+  updatedAt?: string | Date | null;
   // the channel, named when the action also covers it
   name?: string;
 };
@@ -129,6 +131,12 @@ const alsoOn = (others: PostRef[], t: ReturnType<typeof useT>) => {
         )
     : '';
 };
+
+// what an approval sends: it approves the version that was shown
+const approveBody = (post: PostRef) =>
+  post.updatedAt
+    ? { expectedUpdatedAt: new Date(post.updatedAt).toISOString() }
+    : {};
 
 // approve, request changes, reject and submit, with the dialogs they need.
 // Each resolves to true when the post changed.
@@ -194,18 +202,20 @@ export const useApprovalActions = () => {
       }
       const result = await call(
         `/approvals/posts/${post.id}/approve`,
-        {},
+        approveBody(post),
         t('approval_approve_failed', 'Could not approve the post')
       );
       if (!result) {
         return false;
       }
-      await callOthers(
-        others,
-        'approve',
-        {},
-        t('approval_approve_failed', 'Could not approve the post')
-      );
+      // each channel's post is its own version
+      for (const other of others) {
+        await call(
+          `/approvals/posts/${other.id}/approve`,
+          approveBody(other),
+          t('approval_approve_failed', 'Could not approve the post')
+        );
+      }
       if (!silent) {
         toaster.show(
           result.publishedNow
@@ -216,7 +226,7 @@ export const useApprovalActions = () => {
       }
       return true;
     },
-    [call, callOthers, t, toaster]
+    [call, t, toaster]
   );
 
   const askComment = useCallback(

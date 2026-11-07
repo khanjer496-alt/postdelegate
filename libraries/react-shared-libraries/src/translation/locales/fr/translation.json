@@ -2097,6 +2097,7 @@
   "resend_activation_email": "Renvoyer l'e-mail d'activation",
   "failed_to_resend": "Impossible de renvoyer l'e-mail d'activation",
   "error_occurred": "Une erreur est survenue. Veuillez réessayer.",
+  "too_many_attempts": "Trop de tentatives. Veuillez patienter quelques minutes et réessayer.",
   "didnt_receive_email": "Vous n'avez pas reçu l'e-mail ?",
   "activation_email_sent": "L'e-mail d'activation a été envoyé ! Veuillez consulter votre boîte de réception.",
   "resend_available_in": "Vous pourrez renvoyer dans",

@@ -9,6 +9,10 @@ import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/s
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import dayjs from 'dayjs';
+import {
+  channelState,
+  countPlanChannels,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 import {
@@ -121,20 +125,19 @@ export class PermissionsService {
     return this.allows(orgId, created_at, Sections.CHANNEL);
   }
 
-  // When channels that need a reconnect or are turned off fill the plan's
-  // slots, fixing or removing one of those comes before upgrading
+  // When channels that need a reconnect fill the plan's slots, fixing or
+  // removing one of those comes before upgrading. A channel turned off frees
+  // its slot (countPlanChannels), so it is not one of them
   async channelLimitMessage(orgId: string) {
     const stuck = (
       await this._integrationService.getIntegrationsList(orgId)
-    ).filter((channel) => channel.refreshNeeded || channel.disabled).length;
+    ).filter((channel) => channelState(channel) === 'reconnect').length;
     if (!stuck) {
       return undefined;
     }
     return `All the channels of your plan are in use, and ${stuck} of them ${
       stuck === 1 ? 'needs' : 'need'
-    } a reconnect or ${
-      stuck === 1 ? 'is' : 'are'
-    } turned off. Reconnect or remove a channel first, or upgrade your plan to add more channels.`;
+    } a reconnect. Reconnect, turn off or remove a channel first, or upgrade your plan to add more channels.`;
   }
 
   async check(
@@ -199,11 +202,12 @@ export class PermissionsService {
           }
         }
 
-        // every channel the workspace keeps counts, also one that waits to
-        // be reconnected or is turned off
-        const totalChannels = (
+        // the same count as every other limit check (enabling, picking a
+        // page, a downgrade): a channel waiting for a reconnect counts, one
+        // turned off or still picking its page does not
+        const totalChannels = countPlanChannels(
           await this._integrationService.getIntegrationsList(orgId)
-        ).length;
+        );
 
         if (
           (options.channel && options.channel > totalChannels) ||

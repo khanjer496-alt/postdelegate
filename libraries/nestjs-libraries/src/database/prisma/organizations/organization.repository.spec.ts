@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 
 const makeRepo = () => {
@@ -13,7 +14,17 @@ const makeRepo = () => {
   const organization = {
     findFirst: jest.fn().mockResolvedValue({ subscription: null }),
   };
-  const $transaction = jest.fn().mockResolvedValue([{ id: 'membership' }, {}]);
+  const userOrganizationTx = {
+    create: jest.fn().mockResolvedValue({ id: 'membership' }),
+  };
+  const userTx = {
+    findFirst: user.findFirst,
+    update: jest.fn().mockResolvedValue({ id: 'user-1' }),
+  };
+  // an interactive transaction: the invite is checked inside it
+  const $transaction = jest.fn(async (fn: any) =>
+    fn({ user: userTx, userOrganization: userOrganizationTx })
+  );
   const repo = new OrganizationRepository(
     { model: { organization } } as any,
     { model: { userOrganization } } as any,
@@ -36,10 +47,7 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
     );
 
     expect(result).toEqual({ id: 'membership' });
-    expect($transaction).toHaveBeenCalledWith([
-      'membership-create',
-      'user-update',
-    ]);
+    expect($transaction).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an account whose email differs from the invited one', async () => {
@@ -63,13 +71,40 @@ describe('OrganizationRepository.addUserToOrg invites', () => {
   });
 
   it('does not let an invite id that was already used join again', async () => {
-    const { repo, user, $transaction } = makeRepo();
+    const { repo, user } = makeRepo();
     user.findFirst.mockResolvedValue({ id: 'someone' });
 
     await expect(
       repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
     ).resolves.toEqual({ failed: 'already_used' });
-    expect($transaction).not.toHaveBeenCalled();
+  });
+
+  it('checks the invite inside the transaction that burns it', async () => {
+    const { repo, user, $transaction } = makeRepo();
+    // unused when the request starts, spent by a concurrent accept by the
+    // time the transaction reads it
+    user.findFirst.mockImplementation(async () =>
+      $transaction.mock.calls.length ? { id: 'someone' } : null
+    );
+
+    await expect(
+      repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+    ).resolves.toEqual({ failed: 'already_used' });
+    expect($transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the loser of two concurrent accepts the invite was used', async () => {
+    const { repo, $transaction } = makeRepo();
+    $transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('serialization failure', {
+        code: 'P2034',
+        clientVersion: 'test',
+      })
+    );
+
+    await expect(
+      repo.addUserToOrg('user-1', 'inv-1', 'org-A', 'USER', 'invited@example.com')
+    ).resolves.toEqual({ failed: 'already_used' });
   });
 
   it('does not add a user that is already a member', async () => {

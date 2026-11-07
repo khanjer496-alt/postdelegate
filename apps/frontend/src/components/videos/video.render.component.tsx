@@ -30,11 +30,12 @@ export const useVideoFunction = () => {
 };
 
 export const VideoWrapper: FC<{ identifier: string }> = (props) => {
-  const setActivateExitButton = useLaunchStore((e) => e.setActivateExitButton);
+  const blockExit = useLaunchStore((e) => e.blockExit);
+  const releaseExit = useLaunchStore((e) => e.releaseExit);
   useEffect(() => {
-    setActivateExitButton(false);
+    blockExit();
     return () => {
-      setActivateExitButton(true);
+      releaseExit();
     };
   }, []);
 

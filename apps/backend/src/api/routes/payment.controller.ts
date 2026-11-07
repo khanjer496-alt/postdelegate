@@ -1,6 +1,7 @@
 import {
   Controller,
   HttpException,
+  HttpStatus,
   Param,
   Post,
   RawBodyRequest,
@@ -19,8 +20,9 @@ export class PaymentController {
     @Param('provider') provider: string,
     @Req() req: RawBodyRequest<Request>
   ) {
+    let result: any;
     try {
-      return await this._paymentService.webhook(
+      result = await this._paymentService.webhook(
         provider,
         req.rawBody,
         // @ts-ignore
@@ -32,5 +34,17 @@ export class PaymentController {
       }
       throw new HttpException(e, 500);
     }
+
+    // The event could not be stored (see SubscriptionWriteResult): a non-2xx
+    // answer makes the provider send it again instead of losing it, like
+    // StripeController
+    if (result?.retry) {
+      throw new HttpException(
+        'The event could not be processed, please retry',
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+
+    return result;
   }
 }

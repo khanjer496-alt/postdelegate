@@ -232,7 +232,11 @@ const ReviewCard: FC<{
               disabled={busy}
               onClick={() =>
                 run(() =>
-                  actions.approve({ id: item.id, publishDate: item.publishDate })
+                  actions.approve({
+                    id: item.id,
+                    publishDate: item.publishDate,
+                    updatedAt: item.updatedAt,
+                  })
                 )
               }
               className={clsx(

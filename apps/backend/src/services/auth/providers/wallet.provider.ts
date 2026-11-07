@@ -27,29 +27,57 @@ function hexToUint8Array(hex) {
   return uint8Array;
 }
 
+// How long a verified wallet stays usable for the rest of the sign in: an
+// existing account signs in right away, a new one still has to register
+const VERIFIED_TTL = 3600;
+
+const parse = (token: string) => {
+  try {
+    return JSON.parse(Buffer.from(token, 'base64').toString()) || {};
+  } catch {
+    return {};
+  }
+};
+
 @AuthProvider({ provider: 'WALLET' })
 export class WalletProvider extends AuthProviderAbstract {
+  // A pending challenge is never replaced: anyone can ask for one for any
+  // public key, and replacing it would break the sign in of the wallet's
+  // owner. Asking again within the minute gets the same challenge
   async generateLink(params: { publicKey: string }) {
     if (!params.publicKey) {
       return;
     }
 
+    const key = `wallet:${params.publicKey}`;
     const challenge = randomBytes(32).toString('hex');
-    await ioRedis.set(`wallet:${params.publicKey}`, challenge, 'EX', 60);
+    if (await ioRedis.set(key, challenge, 'EX', 60, 'NX')) {
+      return challenge;
+    }
 
+    const pending = await ioRedis.get(key);
+    if (pending) {
+      return pending;
+    }
+
+    // expired in between
+    await ioRedis.set(key, challenge, 'EX', 60);
     return challenge;
   }
 
+  // Verifies the signed challenge and spends it, so the signed code can't be
+  // replayed: of two requests with the same code only one deletes the
+  // challenge. What comes back is a token for the rest of this sign in
+  // (getUser, and the registration of a new account)
   async getToken(code: string, _redirectUri?: string) {
-    const { publicKey, challenge, signature } = JSON.parse(
-      Buffer.from(code, 'base64').toString()
-    );
+    const { publicKey, challenge, signature } = parse(code);
 
     if (!publicKey || !challenge || !signature) {
       return '';
     }
 
-    const redisGet = await ioRedis.get(`wallet:${publicKey}`);
+    const key = `wallet:${publicKey}`;
+    const redisGet = await ioRedis.get(key);
     if (redisGet !== challenge) {
       return '';
     }
@@ -67,20 +95,38 @@ export class WalletProvider extends AuthProviderAbstract {
       return '';
     }
 
-    return code;
+    if ((await ioRedis.del(key)) !== 1) {
+      return '';
+    }
+
+    const verified = randomBytes(32).toString('hex');
+    await ioRedis.set(
+      `wallet:verified:${verified}`,
+      publicKey,
+      'EX',
+      VERIFIED_TTL
+    );
+
+    return Buffer.from(JSON.stringify({ verified })).toString('base64');
   }
 
+  // Takes the token getToken returned, or a signed challenge (which is
+  // verified and spent here)
   async getUser(providerToken: string) {
-    if ((await this.getToken(providerToken)) === '') {
+    const token = parse(providerToken).verified
+      ? providerToken
+      : await this.getToken(providerToken);
+    const { verified } = parse(token);
+    const publicKey = verified
+      ? await ioRedis.get(`wallet:verified:${verified}`)
+      : null;
+
+    if (!publicKey) {
       return {
         id: '',
         email: '',
       };
     }
-
-    const { publicKey } = JSON.parse(
-      Buffer.from(providerToken, 'base64').toString()
-    );
 
     return {
       id: String(`wallet_${publicKey}`),

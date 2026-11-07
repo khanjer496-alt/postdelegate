@@ -12,6 +12,8 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useClickOutside } from '@mantine/hooks';
 import clsx from 'clsx';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 import {
   TagIcon,
   DropdownArrowIcon,
@@ -71,6 +73,7 @@ export const TagsComponentInner: FC<{
     })
   );
   const modals = useModals();
+  const toaster = useToaster();
 
   const ref = useClickOutside(() => {
     if (!isOpen || !allowClose) {
@@ -83,6 +86,8 @@ export const TagsComponentInner: FC<{
     const val: string | undefined = await new Promise((resolve) => {
       modals.openModal({
         title: t('add_new_tag', 'Add New Tag'),
+        // closing with X adds nothing
+        onClose: () => resolve(undefined),
         children: (close) => (
           <ShowModal tag="" close={close} resolve={resolve} />
         ),
@@ -189,6 +194,7 @@ export const TagsComponentInner: FC<{
         const confirmed: boolean = await new Promise((resolve) => {
           modals.openModal({
             title: t('delete_tag', 'Delete Tag'),
+            onClose: () => resolve(false),
             children: (close) => (
               <ConfirmDeleteModal
                 tagName={tag.name}
@@ -203,9 +209,19 @@ export const TagsComponentInner: FC<{
           return;
         }
 
-        await fetch(`/posts/tags/${tag.id}`, {
+        const response = await fetch(`/posts/tags/${tag.id}`, {
           method: 'DELETE',
         });
+        if (!response.ok) {
+          toaster.show(
+            await errorMessage(
+              response,
+              t('error_occurred', 'An error occurred. Please try again.')
+            ),
+            'warning'
+          );
+          return;
+        }
 
         // Remove the tag from current selection if it was selected
         const modify = tagValue.filter((a) => a.id !== tag.id);
@@ -623,14 +639,26 @@ const ShowModal: FC<{
   const fetch = useFetch();
   const [color, setColor] = useState<string>(theColor || '#942828');
   const [tagName, setTagName] = useState<string>(tag);
+  const toaster = useToaster();
   const save = useCallback(async () => {
-    await fetch(id ? `/posts/tags/${id}` : '/posts/tags', {
+    const response = await fetch(id ? `/posts/tags/${id}` : '/posts/tags', {
       method: id ? 'PUT' : 'POST',
       body: JSON.stringify({
         name: tagName,
         color,
       }),
     });
+    // the modal stays open with the name, so it can be saved again
+    if (!response.ok) {
+      toaster.show(
+        await errorMessage(
+          response,
+          t('error_occurred', 'An error occurred. Please try again.')
+        ),
+        'warning'
+      );
+      return;
+    }
     resolve(tagName);
     close();
   }, [tagName, color, id]);

@@ -94,11 +94,12 @@ export const LinkedinCompany: FC<{
   id: string;
 }> = (props) => {
   const { onClose, onSelect, id } = props;
-  const setActivateExitButton = useLaunchStore((e) => e.setActivateExitButton);
+  const blockExit = useLaunchStore((e) => e.blockExit);
+  const releaseExit = useLaunchStore((e) => e.releaseExit);
   useEffect(() => {
-    setActivateExitButton(false);
+    blockExit();
     return () => {
-      setActivateExitButton(true);
+      releaseExit();
     };
   }, []);
   const fetch = useFetch();

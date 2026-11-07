@@ -161,8 +161,9 @@ describe('PermissionsService channel limit', () => {
     process.env = { ...env };
   });
 
-  it('counts channels that need a reconnect or are turned off', async () => {
+  it('counts channels that need a reconnect, not ones turned off or still picking a page', async () => {
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
+    let channels: object[] = [];
     const service = new PermissionsService(
       {
         getSubscriptionByOrganizationId: jest.fn().mockResolvedValue({
@@ -176,10 +177,7 @@ describe('PermissionsService channel limit', () => {
       } as any,
       {} as any,
       {
-        getIntegrationsList: jest.fn().mockResolvedValue([
-          { id: 'a', refreshNeeded: true },
-          { id: 'b', disabled: true },
-        ]),
+        getIntegrationsList: jest.fn(async () => channels),
       } as any,
       {} as any,
       { hasCredential: jest.fn() } as any
@@ -189,7 +187,18 @@ describe('PermissionsService channel limit', () => {
       options: { channel: 2 },
     });
 
+    channels = [
+      { id: 'a', refreshNeeded: true },
+      { id: 'b' },
+    ];
     expect(await service.canAddChannel('org', new Date())).toBe(false);
+
+    channels = [
+      { id: 'a', refreshNeeded: true },
+      { id: 'b', disabled: true },
+      { id: 'c', inBetweenSteps: true },
+    ];
+    expect(await service.canAddChannel('org', new Date())).toBe(true);
   });
 });
 
@@ -229,7 +238,13 @@ describe('PermissionsService channel limit wording', () => {
         { id: 'a', refreshNeeded: true },
         { id: 'b' },
       ]).channelLimitMessage('org')
-    ).toContain('1 of them needs a reconnect or is turned off. Reconnect or remove a channel first');
+    ).toContain('1 of them needs a reconnect. Reconnect, turn off or remove a channel first');
+  });
+
+  it('does not count a channel turned off, it frees its slot', async () => {
+    expect(
+      await serviceWith([{ id: 'a', disabled: true }, { id: 'b' }]).channelLimitMessage('org')
+    ).toBeUndefined();
   });
 
   it('keeps the usual wording when every channel works', async () => {

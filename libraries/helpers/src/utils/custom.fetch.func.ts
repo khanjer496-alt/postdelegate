@@ -1,3 +1,13 @@
+// afterRequest already answered the response itself (the trial or billing
+// dialog), so the caller only has to stop: its catch and finally blocks run,
+// SWR keeps the error, and no success message follows the dialog
+export class HandledResponseError extends Error {
+  constructor(public response: Response) {
+    super(`The response of ${response.url} was already handled`);
+    this.name = 'HandledResponseError';
+  }
+}
+
 export interface Params {
   baseUrl: string;
   beforeRequest?: (url: string, options: RequestInit) => Promise<RequestInit>;
@@ -80,8 +90,7 @@ export const customFetch = (
       return fetchRequest;
     }
 
-    // @ts-ignore
-    return new Promise((res) => {}) as Response;
+    throw new HandledResponseError(fetchRequest);
   };
 };
 

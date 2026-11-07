@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useMemo } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
 import { IntegrationContext } from '@gitroom/frontend/components/launches/helpers/use.integration';
@@ -8,6 +8,9 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { continueProviderList } from '@gitroom/frontend/components/new-launch/providers/continue-provider/list';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 export const Null: FC<{
   onSave: (data: any) => Promise<void>;
   existingId: string[];
@@ -71,16 +74,43 @@ const ModalContent: FC<{
   integrations: string[];
 }> = ({ continueId, added, provider: Provider, closeModal, integrations }) => {
   const fetch = useFetch();
+  const toaster = useToaster();
+  const t = useT();
+  const [isSaving, setIsSaving] = useState(false);
 
+  // the modal stays open on a failure, so the page can be picked again
   const onSave = useCallback(
     async (data: any) => {
-      await fetch(`/integrations/provider/${continueId}/connect`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-      closeModal();
+      setIsSaving(true);
+      try {
+        const response = await fetch(
+          `/integrations/provider/${continueId}/connect`,
+          {
+            method: 'POST',
+            body: JSON.stringify(data),
+          }
+        );
+        if (!response.ok) {
+          toaster.show(
+            await errorMessage(
+              response,
+              t('error_occurred', 'An error occurred. Please try again.')
+            ),
+            'warning'
+          );
+          return;
+        }
+        closeModal();
+      } catch (e) {
+        toaster.show(
+          t('error_occurred', 'An error occurred. Please try again.'),
+          'warning'
+        );
+      } finally {
+        setIsSaving(false);
+      }
     },
-    [continueId, closeModal]
+    [continueId, closeModal, toaster, t]
   );
 
   return (
@@ -109,7 +139,11 @@ const ModalContent: FC<{
         },
       }}
     >
-      <Provider onSave={onSave} existingId={integrations} />
+      <Provider
+        onSave={onSave}
+        existingId={integrations}
+        isSaving={isSaving}
+      />
     </IntegrationContext.Provider>
   );
 };

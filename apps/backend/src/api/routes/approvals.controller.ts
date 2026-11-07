@@ -22,6 +22,7 @@ import { userActor } from '@gitroom/nestjs-libraries/database/prisma/approvals/a
 import {
   ActivityListDto,
   ApprovalCommentDto,
+  ApproveDto,
   CreateApprovalLinkDto,
   RequestChangesDto,
   ReviewQueueDto,
@@ -82,13 +83,14 @@ export class ApprovalsController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: ApprovalCommentDto
+    @Body() body: ApproveDto
   ) {
     return this._approvalsService.approve(
       org.id,
       id,
       userActor(user, org as any),
-      body.comment
+      body.comment,
+      body.expectedUpdatedAt
     );
   }
 

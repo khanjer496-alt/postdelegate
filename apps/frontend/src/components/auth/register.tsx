@@ -158,39 +158,44 @@ export function RegisterAfter({
   const fetchData = useFetch();
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
-    await fetchData('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...data,
-        datafast_visitor_id,
-        ...(ref ? { ref } : {}),
-      }),
-    })
-      .then(async (response) => {
-        setLoading(false);
-        if (response.status === 200) {
-          fireEvents('register');
-          return track(TrackEnum.CompleteRegistration).then(() => {
-            if (response.headers.get('activate') === 'true') {
-              router.push('/auth/activate');
-            } else {
-              router.push('/auth/login');
-            }
-          });
-        } else {
-          form.setError('email', {
-            message: await response.text(),
-          });
-        }
-      })
-      .catch((e) => {
-        form.setError('email', {
-          message:
-            'General error: ' +
-            e.toString() +
-            '. Please check your browser console.',
-        });
+    try {
+      const response = await fetchData('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          datafast_visitor_id,
+          ...(ref ? { ref } : {}),
+        }),
       });
+      if (response.status === 200) {
+        fireEvents('register');
+        await track(TrackEnum.CompleteRegistration).catch(() => {});
+        if (response.headers.get('activate') === 'true') {
+          router.push('/auth/activate');
+        } else {
+          router.push('/auth/login');
+        }
+        return;
+      }
+      form.setError('email', {
+        message:
+          response.status === 400
+            ? (await response.text()) ||
+              t('error_occurred', 'An error occurred. Please try again.')
+            : response.status === 429
+            ? t(
+                'too_many_attempts',
+                'Too many attempts. Please wait a few minutes and try again.'
+              )
+            : t('error_occurred', 'An error occurred. Please try again.'),
+      });
+    } catch (e) {
+      form.setError('email', {
+        message: t('error_occurred', 'An error occurred. Please try again.'),
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <FormProvider {...form}>

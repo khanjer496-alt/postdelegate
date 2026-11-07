@@ -2097,6 +2097,7 @@
   "resend_activation_email": "Aktivierungs-E-Mail erneut senden",
   "failed_to_resend": "Aktivierungs-E-Mail konnte nicht erneut gesendet werden",
   "error_occurred": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+  "too_many_attempts": "Zu viele Versuche. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
   "didnt_receive_email": "Keine E-Mail erhalten?",
   "activation_email_sent": "Die Aktivierungs-E-Mail wurde gesendet! Bitte prüfen Sie Ihren Posteingang.",
   "resend_available_in": "Erneut senden möglich in",

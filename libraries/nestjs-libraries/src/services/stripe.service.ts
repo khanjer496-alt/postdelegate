@@ -259,6 +259,19 @@ const NOT_ENTITLED_STATUSES: Stripe.Subscription.Status[] = [
   'incomplete_expired',
 ];
 
+// Statuses after which a subscription never comes back: a late or replayed
+// created/updated event for it must not store the plan again
+const ENDED_STATUSES: Stripe.Subscription.Status[] = [
+  'canceled',
+  'incomplete_expired',
+];
+
+// Organization.paymentId is a Stripe customer, except on plans an admin set
+// before (a member's user id was stored there) - those have no customer and
+// must never reach Stripe
+export const stripeCustomerOf = (paymentId?: string | null) =>
+  paymentId?.startsWith('cus_') ? paymentId : undefined;
+
 export const TRIAL_DAYS = 7;
 
 const DECLINED_EXTRA_CHANNELS =
@@ -630,7 +643,8 @@ export class StripeService extends PaymentProviderAbstract {
 
       if (paymentIntent.status !== 'requires_capture') {
         console.error('Cant charge');
-        await stripe.paymentMethods.detach(paymentMethods.data[0].id);
+        // the card that was just tried, not whichever the list returns first
+        await stripe.paymentMethods.detach(latestMethod.id);
         await stripe.subscriptions.cancel(event.data.object.id as string);
         return false;
       }
@@ -639,7 +653,7 @@ export class StripeService extends PaymentProviderAbstract {
       return true;
     } catch (err) {
       try {
-        await stripe.paymentMethods.detach(paymentMethods.data[0].id);
+        await stripe.paymentMethods.detach(latestMethod.id);
         await stripe.subscriptions.cancel(event.data.object.id as string);
       } catch (err) {
         /*dont do anything*/
@@ -708,6 +722,10 @@ export class StripeService extends PaymentProviderAbstract {
       currentPlan.period || period,
       current.cancel_at
     );
+    // not stored: Stripe sends the event again, the notices go out then
+    if (result?.retry) {
+      return result;
+    }
 
     if (isCardlessTrial(event.data.object)) {
       await this.notifyTrialStarted(event.data.object).catch((err) => {
@@ -750,6 +768,12 @@ export class StripeService extends PaymentProviderAbstract {
     }
 
     const current = await this.currentSubscription(event.data.object);
+    // A late or replayed update of a subscription that has ended since: its
+    // deleted event already removed the plan, storing it again would bring a
+    // canceled plan back
+    if (ENDED_STATUSES.includes(current.status)) {
+      return { ok: true };
+    }
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
       return this.deleteSubscription(event);
     }
@@ -784,10 +808,14 @@ export class StripeService extends PaymentProviderAbstract {
         !NOT_ENTITLED_STATUSES.includes(f.status)
     );
     if (!survivor) {
-      await this._subscriptionService.deleteSubscription(
+      const deleted = await this._subscriptionService.deleteSubscription(
         customer,
         STRIPE_PROVIDER
       );
+      // not applied: Stripe sends the event again
+      if (deleted?.retry) {
+        return deleted;
+      }
       if (
         event.type === 'customer.subscription.deleted' &&
         this.isCardlessTrialEnded(event.data.object)
@@ -1091,9 +1119,12 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
+  // A workspace whose paymentId is not a Stripe customer (a plan an admin set
+  // before) gets a real one the first time it goes through checkout
   async createOrGetCustomer(organization: Organization) {
-    if (organization.paymentId) {
-      return organization.paymentId;
+    const existing = stripeCustomerOf(organization.paymentId);
+    if (existing) {
+      return existing;
     }
 
     const users = await this._organizationService.getTeam(organization.id);
@@ -1211,10 +1242,13 @@ export class StripeService extends PaymentProviderAbstract {
   }
 
   async getCustomerSubscriptions(organizationId: string) {
-    const org = (await this._organizationService.getOrgById(organizationId))!;
-    const customer = org.paymentId;
+    const org = await this._organizationService.getOrgById(organizationId);
+    const customer = stripeCustomerOf(org?.paymentId);
+    if (!customer) {
+      return { data: [] as Stripe.Subscription[] };
+    }
     return stripe.subscriptions.list({
-      customer: customer!,
+      customer,
       status: 'all',
     });
   }
@@ -1238,32 +1272,53 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
-  async setToCancel(organizationId: string) {
+  // `intent` says what the customer asked for, and every subscription of the
+  // workspace follows it. Without it (older clients) the first subscription
+  // decides, as the route always toggled
+  async setToCancel(
+    organizationId: string,
+    intent?: 'cancel' | 'reactivate'
+  ) {
     const id = makeId(10);
     const org = await this._organizationService.getOrgById(organizationId);
-    const customer = await this.createOrGetCustomer(org!);
+    // never creates a customer: without one there is nothing to cancel
+    const customer = stripeCustomerOf(org?.paymentId);
     const subscriptions = await this.getLiveSubscriptions(customer);
 
     const sub = subscriptions[0];
 
-    if (!sub) {
+    if (!sub || !customer) {
       throw new BadRequestException('No active subscription found');
     }
 
-    // If the user is toggling back (un-cancelling), just remove the cancel
-    if (sub.cancel_at_period_end) {
+    const reactivate = intent
+      ? intent === 'reactivate'
+      : !!sub.cancel_at_period_end;
+
+    // Un-cancelling removes the cancel on each subscription that has one:
+    // at the period end, or on an explicit date (only an explicit intent
+    // clears that one, the old toggle never saw it)
+    if (reactivate) {
       let cancel_at: number | null = null;
       for (const s of subscriptions) {
-        const updated = await stripe.subscriptions.update(s.id, {
-          cancel_at_period_end: false,
-          metadata: { service: 'gitroom', id },
-        });
+        const updated = s.cancel_at_period_end
+          ? await stripe.subscriptions.update(s.id, {
+              cancel_at_period_end: false,
+              metadata: { service: 'gitroom', id },
+            })
+          : intent && s.cancel_at
+          ? await stripe.subscriptions.update(s.id, {
+              cancel_at: '',
+              metadata: { service: 'gitroom', id },
+            })
+          : s;
         cancel_at = cancel_at || updated.cancel_at;
       }
       await this._subscriptionService.updateCancelAt(organizationId, cancel_at);
 
       return {
         id,
+        action: 'reactivate' as const,
         cancel_at: cancel_at ? new Date(cancel_at * 1000) : undefined,
       };
     }
@@ -1290,6 +1345,7 @@ export class StripeService extends PaymentProviderAbstract {
 
       return {
         id,
+        action: 'cancel' as const,
         cancel_at: new Date(),
       };
     }
@@ -1309,6 +1365,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     return {
       id,
+      action: 'cancel' as const,
       cancel_at: cancel_at ? new Date(cancel_at * 1000) : undefined,
     };
   }
@@ -1320,12 +1377,14 @@ export class StripeService extends PaymentProviderAbstract {
     // getOrgById must not filter deletedAt, this can run for an organization
     // that was already soft deleted by an account deletion
     const org = await this._organizationService.getOrgById(organizationId);
-    if (!org?.paymentId) {
+    // a plan an admin set has no Stripe customer, nothing to cancel there
+    const customer = stripeCustomerOf(org?.paymentId);
+    if (!customer) {
       return;
     }
 
     const subscriptions = await stripe.subscriptions.list({
-      customer: org.paymentId,
+      customer,
       status: 'all',
       limit: 100,
     });
@@ -1337,7 +1396,7 @@ export class StripeService extends PaymentProviderAbstract {
     }
 
     await this._subscriptionService.deleteSubscription(
-      org.paymentId,
+      customer,
       STRIPE_PROVIDER
     );
   }
@@ -1354,9 +1413,10 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
+  // the workspace's Stripe customer, undefined when it has none
   async getCustomerByOrganizationId(organizationId: string) {
-    const org = (await this._organizationService.getOrgById(organizationId))!;
-    return org.paymentId;
+    const org = await this._organizationService.getOrgById(organizationId);
+    return stripeCustomerOf(org?.paymentId);
   }
 
   async createBillingPortalLink(customer: string) {
@@ -1628,6 +1688,11 @@ export class StripeService extends PaymentProviderAbstract {
 
   async portalLink(organizationId: string) {
     const customer = await this.getCustomerByOrganizationId(organizationId);
+    if (!customer) {
+      throw new BadRequestException(
+        'There is no billing account for this workspace yet'
+      );
+    }
     return this.createBillingPortalLink(customer);
   }
 
@@ -1648,6 +1713,11 @@ export class StripeService extends PaymentProviderAbstract {
   // converts when it ends
   async addPaymentMethodLink(organizationId: string) {
     const customer = await this.getCustomerByOrganizationId(organizationId);
+    if (!customer) {
+      throw new BadRequestException(
+        'There is no billing account for this workspace yet'
+      );
+    }
     return stripe.billingPortal.sessions.create({
       customer,
       return_url: process.env['FRONTEND_URL'] + '/billing',
@@ -1668,7 +1738,7 @@ export class StripeService extends PaymentProviderAbstract {
 
   async getInvoices(organizationId: string): Promise<PaymentInvoice[]> {
     const customer = await this.getCustomerByOrganizationId(organizationId);
-    if (!customer || !customer.startsWith('cus_')) {
+    if (!customer) {
       return [];
     }
 
@@ -1711,14 +1781,21 @@ export class StripeService extends PaymentProviderAbstract {
   }
 
   async finishTrial(organization: Organization) {
+    const customer = stripeCustomerOf(organization.paymentId);
+    if (!customer) {
+      throw new Error('The workspace has no Stripe customer');
+    }
     const list = (
       await stripe.subscriptions.list({
-        customer: organization.paymentId,
+        customer,
       })
     ).data;
 
     const trialing = list.find((f) => f.status === 'trialing');
     if (!trialing) {
+      if (!list[0]) {
+        throw new Error('The workspace has no subscription');
+      }
       const subscription = await stripe.subscriptions.retrieve(list[0].id, {
         expand: ['latest_invoice'],
       });
@@ -1790,7 +1867,7 @@ export class StripeService extends PaymentProviderAbstract {
   }
 
   async checkDiscount(organization: Organization) {
-    const customer = organization.paymentId;
+    const customer = stripeCustomerOf(organization.paymentId);
     if (!process.env.STRIPE_DISCOUNT_ID || !customer) {
       return false;
     }
@@ -1814,7 +1891,7 @@ export class StripeService extends PaymentProviderAbstract {
       ).data.find((f) => f.status === 'active' || f.status === 'trialing'),
     };
 
-    if (!currentUserSubscription) {
+    if (!currentUserSubscription.data) {
       return false;
     }
 
@@ -1830,9 +1907,9 @@ export class StripeService extends PaymentProviderAbstract {
   }
 
   async applyDiscount(organization: Organization) {
-    const customer = organization.paymentId;
+    const customer = stripeCustomerOf(organization.paymentId);
     const check = await this.checkDiscount(organization);
-    if (!check) {
+    if (!check || !customer) {
       return false;
     }
 
@@ -1845,6 +1922,9 @@ export class StripeService extends PaymentProviderAbstract {
         })
       ).data.find((f) => f.status === 'active' || f.status === 'trialing'),
     };
+    if (!currentUserSubscription.data) {
+      return false;
+    }
 
     await stripe.subscriptions.update(currentUserSubscription.data.id, {
       discounts: [
@@ -2057,14 +2137,12 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
-  // Webhooks can arrive late or be replayed: on a tier that sells extra
-  // channels the subscription is read again, and the stored plan (tier,
-  // period, status, cancel date, extra channels) follows it as it is now.
+  // Webhooks can arrive late or be replayed: the subscription is read again,
+  // on every tier, and the stored plan (tier, period, status, cancel date,
+  // extra channels) follows it as it is now - a subscription.updated sent
+  // before a cancellation must not bring the canceled plan back.
   // Never throws: a failed read keeps the event's subscription
   private async currentSubscription(subscription: Stripe.Subscription) {
-    if (!allowsExtraChannels(subscription.metadata?.billing)) {
-      return subscription;
-    }
     try {
       const fresh = await stripe.subscriptions.retrieve(subscription.id);
       return fresh?.id ? fresh : subscription;
@@ -2130,7 +2208,7 @@ export class StripeService extends PaymentProviderAbstract {
 
     const org = await this._organizationService.getOrgById(organizationId);
     const [subscription] = (
-      await this.getLiveSubscriptions(org?.paymentId)
+      await this.getLiveSubscriptions(stripeCustomerOf(org?.paymentId))
     ).filter((f) => f.status === 'active' || f.status === 'trialing');
 
     return { current, subscription };
@@ -2600,12 +2678,13 @@ export class StripeService extends PaymentProviderAbstract {
 
   async getCharges(organizationId: string) {
     const org = await this._organizationService.getOrgById(organizationId);
-    if (!org?.paymentId) {
+    const customer = stripeCustomerOf(org?.paymentId);
+    if (!customer) {
       return [];
     }
 
     const charges = await stripe.charges.list({
-      customer: org.paymentId,
+      customer,
       limit: 100,
     });
 
@@ -2651,7 +2730,7 @@ export class StripeService extends PaymentProviderAbstract {
 
   async refundCharges(organizationId: string, chargeIds: string[]) {
     const org = await this._organizationService.getOrgById(organizationId);
-    if (!org?.paymentId) {
+    if (!stripeCustomerOf(org?.paymentId)) {
       throw new Error('No payment customer found for this organization');
     }
 
@@ -2672,11 +2751,10 @@ export class StripeService extends PaymentProviderAbstract {
 
   async cancelSubscription(organizationId: string) {
     const org = await this._organizationService.getOrgById(organizationId);
-    if (!org?.paymentId) {
+    const customer = stripeCustomerOf(org?.paymentId);
+    if (!customer) {
       throw new Error('No payment customer found for this organization');
     }
-
-    const customer = org.paymentId;
 
     const subscriptions = await this.getLiveSubscriptions(customer);
 
@@ -2757,7 +2835,7 @@ export class StripeService extends PaymentProviderAbstract {
     if (stripeSubscription) {
       try {
         const preview = await stripe.invoices.createPreview({
-          customer: org!.paymentId!,
+          customer: stripeCustomerOf(org?.paymentId)!,
           subscription: stripeSubscription.id,
         });
         nextPayment = preview.total / 100;
@@ -2948,20 +3026,27 @@ export class StripeService extends PaymentProviderAbstract {
       const nextPackage = !getCurrentSubscription ? 'STANDARD' : 'PRO';
       const findPricing = pricing[nextPackage];
 
-      await this._subscriptionService.createOrUpdateSubscription(
-        STRIPE_PROVIDER,
-        false,
-        makeId(10),
-        organizationId,
-        getCurrentSubscription?.subscriptionTier === 'PRO'
-          ? getCurrentSubscription.totalChannels + 5
-          : findPricing.channel!,
-        nextPackage,
-        'MONTHLY',
-        null,
-        testCode,
-        organizationId
-      );
+      const result =
+        await this._subscriptionService.createOrUpdateSubscription(
+          STRIPE_PROVIDER,
+          false,
+          makeId(10),
+          organizationId,
+          getCurrentSubscription?.subscriptionTier === 'PRO'
+            ? getCurrentSubscription.totalChannels + 5
+            : findPricing.channel!,
+          nextPackage,
+          'MONTHLY',
+          null,
+          testCode,
+          organizationId
+        );
+      // another redeem of the same code won the race, or the write failed
+      if (result?.retry || result?.codeUsed) {
+        return {
+          success: false,
+        };
+      }
       return {
         success: true,
       };

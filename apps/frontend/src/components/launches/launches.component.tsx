@@ -38,6 +38,7 @@ import { Button } from '@gitroom/react/form/button';
 import { NeedsAttention } from '@gitroom/frontend/components/activation/needs.attention';
 import { FirstRunChecklist } from '@gitroom/frontend/components/activation/first.run.checklist';
 import { ChannelHealthBadge } from '@gitroom/frontend/components/activation/channel.health.badge';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 
 export const SVGLine = () => {
   return (
@@ -503,12 +504,22 @@ export const LaunchesComponent = () => {
         }),
         false
       );
-      await fetch(`/integrations/${id}/group`, {
+      const response = await fetch(`/integrations/${id}/group`, {
         method: 'PUT',
         body: JSON.stringify({
           group,
         }),
       });
+      if (!response.ok) {
+        toast.show(
+          await errorMessage(
+            response,
+            t('could_not_save_group', 'Could not save the group.')
+          ),
+          'warning'
+        );
+      }
+      // also puts the channel back in its group when the move failed
       mutate();
     },
     [integrations]
@@ -542,9 +553,12 @@ export const LaunchesComponent = () => {
     if (shouldReload) {
       setReload(true);
     }
-    await mutate();
-    if (shouldReload) {
-      setReload(false);
+    try {
+      await mutate();
+    } finally {
+      if (shouldReload) {
+        setReload(false);
+      }
     }
   }, []);
   const continueIntegration = useCallback(
@@ -585,43 +599,74 @@ export const LaunchesComponent = () => {
           return;
         }
 
-        const { url } = await (
-          await fetch(
-            `/integrations/social/${integration.identifier}?refresh=${integration.internalId}`,
-            {
-              method: 'GET',
-            }
-          )
-        ).json();
+        const response = await fetch(
+          `/integrations/social/${
+            integration.identifier
+          }?refresh=${encodeURIComponent(integration.internalId)}`,
+          {
+            method: 'GET',
+          }
+        );
+        const { url } = response.ok
+          ? await response.json().catch(() => ({} as any))
+          : ({} as any);
+        if (!url) {
+          toast.show(
+            t(
+              'could_not_connect_to_platform',
+              'Could not connect to the platform'
+            ),
+            'warning'
+          );
+          return;
+        }
         window.location.href = url;
       },
     []
   );
+  // A channel connect lands here with ?msg (and ?added on success). The
+  // producer says whether msg is a success or an error, and the params are
+  // removed once read so a reload does not show them or count them again.
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
-    if (search.get('msg')) {
-      toast.show(search.get('msg')!, 'success');
-      window?.opener?.postMessage(
+    const msg = search.get('msg');
+    const isError = !!msg && search.get('msgType') !== 'success';
+    // ?added together with ?continue is the page picker, which reads both
+    const added = search.get('continue') ? null : search.get('added');
+    if (msg) {
+      toast.show(msg, isError ? 'warning' : 'success');
+      // only an opener on this app's own origin receives the result
+      window.opener?.postMessage(
         {
-          msg: search.get('msg')!,
-          success: false,
+          msg,
+          success: !isError,
         },
-        '*'
+        window.location.origin
       );
     }
-    if (search.get('added')) {
+    if (added) {
       fireEvents('channel_added');
-      window?.opener?.postMessage(
+      window.opener?.postMessage(
         {
           msg: t('channel_added', 'Channel added'),
           success: true,
         },
-        '*'
+        window.location.origin
       );
     }
-    if (window.opener) {
+    if (msg || added) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('msg');
+      url.searchParams.delete('msgType');
+      if (added) {
+        url.searchParams.delete('added');
+      }
+      router.replace(url.pathname + url.search);
+    }
+    // an error stays on screen, the person has to read it
+    if (window.opener && !isError) {
       window.close();
     }
   }, []);

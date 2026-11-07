@@ -27,6 +27,7 @@ import { Slider } from '@gitroom/react/form/slider';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 export function convertBackRegex(s: string) {
   const matches = s.match(/\/(.*)\/([a-z]*)/);
   const pattern = matches?.[1] || '';
@@ -118,7 +119,7 @@ export const PlugPop: FC<{
     mode: 'all',
   });
   const submit: SubmitHandler<any> = useCallback(async (data) => {
-    await fetch(`/integrations/${settings.providerId}/plugs`, {
+    const response = await fetch(`/integrations/${settings.providerId}/plugs`, {
       method: 'POST',
       body: JSON.stringify({
         func: plug.methodName,
@@ -128,6 +129,14 @@ export const PlugPop: FC<{
         })),
       }),
     });
+    // the form stays open with what was typed, so it can be saved again
+    if (!response.ok) {
+      toaster.show(
+        await errorMessage(response, 'Could not update the plug'),
+        'warning'
+      );
+      return;
+    }
     toaster.show('Plug updated', 'success');
     closeAll();
   }, []);
@@ -182,9 +191,10 @@ export const PlugItem: FC<{
     setActivated(!!data?.activated);
   }, [data?.activated]);
   const fetch = useFetch();
+  const toaster = useToaster();
   const changeActivated = useCallback(
     async (status: 'on' | 'off') => {
-      await fetch(`/integrations/plugs/${data?.id}/activate`, {
+      const response = await fetch(`/integrations/plugs/${data?.id}/activate`, {
         body: JSON.stringify({
           status: status === 'on',
         }),
@@ -193,6 +203,14 @@ export const PlugItem: FC<{
           'Content-Type': 'application/json',
         },
       });
+      // the switch stays where it was when the change was refused
+      if (!response.ok) {
+        toaster.show(
+          await errorMessage(response, 'Could not change the plug'),
+          'warning'
+        );
+        return;
+      }
       setActivated(status === 'on');
     },
     [activated]

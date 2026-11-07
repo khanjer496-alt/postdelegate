@@ -37,17 +37,20 @@ interface StoreState {
   repeater?: number;
   isCreateSet: boolean;
   totalChars: number;
-  activateExitButton: boolean;
+  // how many open windows inside the composer hold its close button
+  exitBlockers: number;
   tags: { label: string; value: string }[];
   tab: 0 | 1;
   current: string;
   comments: boolean | 'no-media';
+  // true while any upload or AI generation in `locks` still runs
   locked: boolean;
+  locks: string[];
   publishBlocked: Record<string, boolean>;
   // why a channel blocks publishing, shown on the disabled actions
   publishBlockedReason: Record<string, string | undefined>;
   hide: boolean;
-  setLocked: (locked: boolean) => void;
+  setLocked: (locked: boolean, owner?: string) => void;
   setPublishBlocked: (
     integrationId: string,
     blocked: boolean,
@@ -138,7 +141,8 @@ interface StoreState {
     media: { id: string; path: string }[]
   ) => void;
   setPostComment: (postComment: PostComment) => void;
-  setActivateExitButton?: (activateExitButton: boolean) => void;
+  blockExit: () => void;
+  releaseExit: () => void;
   setDummy: (dummy: boolean) => void;
   setEditor: (editor: 'none' | 'normal' | 'markdown' | 'html') => void;
   setInlineImages: (inlineImages: boolean) => void;
@@ -154,8 +158,9 @@ const initialState = {
   loaded: true,
   dummy: false,
   comments: true,
-  activateExitButton: true,
+  exitBlockers: 0,
   date: newDayjs(),
+  repeater: undefined as number | undefined,
   channelDates: {} as Record<string, dayjs.Dayjs>,
   postComment: PostComment.ALL,
   tags: [] as { label: string; value: string }[],
@@ -164,6 +169,7 @@ const initialState = {
   isCreateSet: false,
   current: 'global',
   locked: false,
+  locks: [] as string[],
   publishBlocked: {} as Record<string, boolean>,
   publishBlockedReason: {} as Record<string, string | undefined>,
   hide: false,
@@ -200,6 +206,10 @@ export const useLaunchStore = create<StoreState>()((set) => ({
             : {}),
           loaded: false,
           selectedIntegrations: selectedList,
+          // a channel picked again starts from the global content
+          internal: state.internal.filter(
+            (i) => i.integration.id !== existing.integration.id
+          ),
           ...(selectedList.length === 0
             ? {
                 current: 'global',
@@ -539,10 +549,16 @@ export const useLaunchStore = create<StoreState>()((set) => ({
     set((state) => ({
       tab: tab,
     })),
-  setLocked: (locked: boolean) =>
-    set((state) => ({
-      locked: locked,
-    })),
+  // every upload or generation locks with its own owner, so the first one
+  // to finish does not unlock the composer while another still runs
+  setLocked: (locked: boolean, owner = 'composer') =>
+    set((state) => {
+      const locks = state.locks.filter((p) => p !== owner);
+      if (locked) {
+        locks.push(owner);
+      }
+      return { locks, locked: locks.length > 0 };
+    }),
   setPublishBlocked: (
     integrationId: string,
     blocked: boolean,
@@ -651,9 +667,15 @@ export const useLaunchStore = create<StoreState>()((set) => ({
     set((state) => ({
       postComment,
     })),
-  setActivateExitButton: (activateExitButton: boolean) =>
+  // nested windows can be open together, the composer closes only once all
+  // of them released it
+  blockExit: () =>
     set((state) => ({
-      activateExitButton,
+      exitBlockers: state.exitBlockers + 1,
+    })),
+  releaseExit: () =>
+    set((state) => ({
+      exitBlockers: Math.max(0, state.exitBlockers - 1),
     })),
   setDummy: (dummy: boolean) =>
     set((state) => ({

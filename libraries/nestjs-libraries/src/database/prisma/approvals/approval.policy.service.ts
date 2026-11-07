@@ -406,6 +406,14 @@ export class ApprovalPolicyService {
   }
 }
 
+// A scheduled post whose time came may be going out right now: its publish
+// workflow is running, so it can't be held, moved or restarted without risking
+// a second copy on the channel.
+export const isBeingPublished = (post?: ExistingPost | null) =>
+  post?.state === 'QUEUE' &&
+  !!post.publishDate &&
+  dayjs(post.publishDate).isBefore(dayjs());
+
 // An in-place update can only hold a post that is scheduled for later or
 // already in the review flow; published, failed, publishing and plain drafts
 // are left as they are.
@@ -416,11 +424,7 @@ export const updateCanHold = (existing?: ExistingPost | null) => {
   if (existing.state === 'PUBLISHED' || existing.state === 'ERROR') {
     return false;
   }
-  if (
-    existing.state === 'QUEUE' &&
-    existing.publishDate &&
-    dayjs(existing.publishDate).isBefore(dayjs())
-  ) {
+  if (isBeingPublished(existing)) {
     return false;
   }
   if (

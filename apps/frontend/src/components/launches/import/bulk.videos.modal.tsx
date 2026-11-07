@@ -12,6 +12,7 @@ import React, {
 import clsx from 'clsx';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { Button } from '@gitroom/react/form/button';
@@ -25,7 +26,6 @@ import {
   TimezoneHint,
 } from '@gitroom/frontend/components/launches/helpers/date.picker';
 import { useUppyUploader } from '@gitroom/frontend/components/media/new.uploader';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import {
   Avatar,
   StatusChip,
@@ -450,12 +450,12 @@ export const BulkVideosModal: FC<{
     };
   }, [uppy]);
 
-  // closing the window stops the upload that is running
+  // closing the window stops the upload that is running, the uploader
+  // releases its lock of the composer when it is cancelled
   useEffect(
     () => () => {
       if (active.current) {
         uppy.cancelAll();
-        useLaunchStore.getState().setLocked(false);
       }
     },
     [uppy]
@@ -735,6 +735,12 @@ export const BulkVideosModal: FC<{
           body: payload,
         });
       } catch (err) {
+        // the trial or billing dialog already answered it, nothing was created
+        if (err instanceof HandledResponseError) {
+          setPreviewKey('');
+          pending.current = '';
+          return 'error';
+        }
         return 'running';
       }
       if (response.status === 409) {
@@ -784,12 +790,11 @@ export const BulkVideosModal: FC<{
   );
 
   // Follows a request that may still be running, now and then every 5
-  // seconds. "none" is only final once the create request itself answered
-  // (or after a minute: "Move to billing" never answers it). Still running
+  // seconds, once the create request itself answered. Still running
   // after 15 minutes, past the time a stopped run is taken over, the create
   // is sent once more so a crashed run resumes. It gives up at 20 minutes.
   const follow = useCallback(
-    async (payload: string, answered: () => boolean) => {
+    async (payload: string) => {
       setRunning(true);
       const started = Date.now();
       let resent = false;
@@ -813,10 +818,7 @@ export const BulkVideosModal: FC<{
           showResult(status.result);
           return;
         }
-        if (
-          status?.status === 'none' &&
-          (answered() || waited > 60 * 1000)
-        ) {
+        if (status?.status === 'none') {
           setError(
             t(
               'bulk_videos_not_created',
@@ -846,28 +848,9 @@ export const BulkVideosModal: FC<{
     sentKeys.current = ready.map((video) => video.key);
     pending.current = createKey;
     statusKey.current = '';
-    // "Move to billing" in the payment dialog never answers the request:
-    // coming back to the page while it is still waiting follows the status
-    let hidden = false;
-    let onVisible = () => undefined as void;
-    const back = new Promise<'running'>((resolve) => {
-      onVisible = () => {
-        if (document.visibilityState === 'hidden') {
-          hidden = true;
-        } else if (hidden) {
-          resolve('running');
-        }
-      };
-      document.addEventListener('visibilitychange', onVisible);
-    });
-    let answered = false;
-    const request = send(createKey).finally(() => {
-      answered = true;
-    });
-    const outcome = await Promise.race([request, back]);
-    document.removeEventListener('visibilitychange', onVisible);
+    const outcome = await send(createKey);
     if (outcome === 'running') {
-      await follow(createKey, () => answered);
+      await follow(createKey);
     }
     pending.current = '';
     setRunning(false);

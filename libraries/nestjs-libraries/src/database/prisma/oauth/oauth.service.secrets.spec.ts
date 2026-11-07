@@ -43,12 +43,25 @@ const fakeRepository = () => {
           (row) => row.accessToken && values.includes(row.accessToken)
         ) ?? null
     ),
-    exchangeCodeForToken: jest.fn(async (id: string, storedToken: string) => {
-      const row = authorizations.find((candidate) => candidate.id === id);
-      row.accessToken = storedToken;
-      row.authorizationCode = null;
-      return { organizationId: 'org-1', organization: { paymentId: 'cus_1' } };
-    }),
+    // like the database's conditional update: only while the row still holds
+    // the code it was looked up with
+    exchangeCodeForToken: jest.fn(
+      async (id: string, storedCode: string, storedToken: string) => {
+        const row = authorizations.find(
+          (candidate) =>
+            candidate.id === id && candidate.authorizationCode === storedCode
+        );
+        if (!row) {
+          return null;
+        }
+        row.accessToken = storedToken;
+        row.authorizationCode = null;
+        return {
+          organizationId: 'org-1',
+          organization: { paymentId: 'cus_1' },
+        };
+      }
+    ),
     updateClientSecret: jest.fn(async (orgId: string, stored: string) => {
       apps.find((app) => app.organizationId === orgId).clientSecret = stored;
     }),
@@ -285,6 +298,35 @@ describe('OAuth secrets at rest', () => {
       expect(clientSecret.startsWith('pcs_')).toBe(true);
       expect(repository.apps[0].clientSecret.startsWith('h1:')).toBe(true);
       expect(repository.apps[0].clientSecret).not.toContain(clientSecret);
+    });
+
+    it('lets only one exchange of a code win', async () => {
+      const { service, repository } = setup();
+      const secret = 'pcs_right';
+      const code = 'the-code';
+      repository.apps.push(appWith(SecretCrypto.hash(secret, OAUTH_SECRET_LABELS.clientSecret)));
+      const stored = SecretCrypto.hash(code, OAUTH_SECRET_LABELS.code);
+      repository.authorizations.push(codeRow(stored));
+      // both requests looked the code up before either spent it
+      repository.findByCode.mockResolvedValue({ ...codeRow(stored) });
+
+      await expect(
+        service.exchangeCodeForToken(code, 'pca_app', secret)
+      ).resolves.toMatchObject({ token_type: 'bearer' });
+      await expect(
+        service.exchangeCodeForToken(code, 'pca_app', secret)
+      ).rejects.toMatchObject({ response: { error: 'invalid_grant' } });
+    });
+
+    it('refuses a second app for the organization', async () => {
+      const { service, repository } = setup();
+      repository.createApp.mockResolvedValueOnce(null as any);
+      await expect(
+        service.createApp('org-1', {
+          name: 'App',
+          redirectUrl: 'https://example.com/cb',
+        } as any)
+      ).rejects.toMatchObject({ status: 400 });
     });
 
     it('stores the access token hashed when a code is exchanged', async () => {

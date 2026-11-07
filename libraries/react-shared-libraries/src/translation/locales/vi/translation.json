@@ -2097,6 +2097,7 @@
   "resend_activation_email": "Gửi lại email kích hoạt",
   "failed_to_resend": "Không thể gửi lại email kích hoạt",
   "error_occurred": "Đã xảy ra lỗi. Vui lòng thử lại.",
+  "too_many_attempts": "Quá nhiều lần thử. Vui lòng đợi vài phút rồi thử lại.",
   "didnt_receive_email": "Không nhận được email?",
   "activation_email_sent": "Đã gửi email kích hoạt! Vui lòng kiểm tra hộp thư đến.",
   "resend_available_in": "Bạn có thể gửi lại sau",

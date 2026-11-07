@@ -3,6 +3,7 @@ import 'reflect-metadata';
 
 import React, { FC, Fragment, useCallback, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import useSWR from 'swr';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Button } from '@gitroom/react/form/button';
@@ -18,16 +19,23 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 const SaveSetModal: FC<{
   postData: any;
   initialValue?: string;
-  onSave: (name: string) => void;
+  onSave: (name: string) => Promise<void>;
   onCancel: () => void;
 }> = ({ postData, onSave, onCancel, initialValue }) => {
   const [name, setName] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
   const t = useT();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onSave(name.trim());
+    if (!name.trim() || saving) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(name.trim());
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -49,7 +57,7 @@ const SaveSetModal: FC<{
         <Button type="button" secondary onClick={onCancel}>
           {t('cancel', 'Cancel')}
         </Button>
-        <Button type="submit" disabled={!name.trim()}>
+        <Button type="submit" disabled={!name.trim()} loading={saving}>
           {t('save', 'Save')}
         </Button>
       </div>
@@ -111,6 +119,7 @@ export const Sets: FC = () => {
             {...(params?.id ? { set: JSON.parse(params.content) } : {})}
             addEditSets={(data) => {
               modal.openModal({
+                id: 'save-set',
                 title: 'Save as Set',
                 children: (
                   <SaveSetModal
@@ -118,7 +127,7 @@ export const Sets: FC = () => {
                     postData={data}
                     onSave={async (name: string) => {
                       try {
-                        await fetch('/sets', {
+                        const response = await fetch('/sets', {
                           method: 'POST',
                           body: JSON.stringify({
                             ...(params?.id ? { id: params.id } : {}),
@@ -126,14 +135,22 @@ export const Sets: FC = () => {
                             content: JSON.stringify(data),
                           }),
                         });
+                        if (!response.ok) {
+                          toaster.show('Failed to save set', 'warning');
+                          return;
+                        }
                         modal.closeAll();
                         mutate();
                         toaster.show('Set saved successfully', 'success');
                       } catch (error) {
-                        toaster.show('Failed to save set', 'warning');
+                        // a dialog already told the user why it stopped
+                        if (!(error instanceof HandledResponseError)) {
+                          toaster.show('Failed to save set', 'warning');
+                        }
                       }
                     }}
-                    onCancel={() => modal.closeAll()}
+                    // back to the set, it keeps everything typed in it
+                    onCancel={() => modal.closeById('save-set')}
                   />
                 ),
               });
@@ -153,10 +170,14 @@ export const Sets: FC = () => {
   const deleteSet = useCallback(
     (data: any) => async () => {
       if (await deleteDialog(`Are you sure you want to delete ${data.name}?`)) {
-        await fetch(`/sets/${data.id}`, {
+        const response = await fetch(`/sets/${data.id}`, {
           method: 'DELETE',
         });
         mutate();
+        if (!response.ok) {
+          toaster.show('Failed to delete set', 'warning');
+          return;
+        }
         toaster.show('Set deleted successfully', 'success');
       }
     },

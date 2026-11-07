@@ -1,6 +1,13 @@
 'use client';
 
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Subscription } from '@prisma/client';
@@ -37,6 +44,7 @@ import { useTrack } from '@gitroom/react/helpers/use.track';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { FinishTrial } from '@gitroom/frontend/components/billing/finish.trial';
+import { countPlanChannels } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { fromUtc } from '@gitroom/frontend/components/layout/set.timezone';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
@@ -418,9 +426,25 @@ const Accept: FC<{ resolve: (res: boolean) => void }> = ({ resolve }) => {
 
   const apply = useCallback(async () => {
     setLoading(true);
-    await fetch('/billing/apply-discount', {
-      method: 'POST',
-    });
+    let applied = false;
+    try {
+      const response = await fetch('/billing/apply-discount', {
+        method: 'POST',
+      });
+      applied = response.ok && !!(await response.json())?.applied;
+    } catch (err) {
+      applied = false;
+    }
+
+    // only said once Stripe took it; otherwise the choice stays open
+    if (!applied) {
+      setLoading(false);
+      toaster.show(
+        'We could not apply the discount, please try again',
+        'warning'
+      );
+      return;
+    }
 
     resolve(true);
     toaster.show('50% discount applied successfully');
@@ -507,7 +531,17 @@ export const MainBillingComponent: FC<{
   const [finishTrial, setFinishTrial] = useState(
     !!queryParams.get('finishTrial')
   );
+  // confirmed in the app (finishTrialNow); a link or a reload of
+  // ?finishTrial=true still asks in the FinishTrial window before charging
+  const [finishTrialConfirmed, setFinishTrialConfirmed] = useState(false);
   const { data: renewal } = useRenewal();
+
+  // the param only opens the window once, a reload never opens it again
+  useEffect(() => {
+    if (queryParams.get('finishTrial')) {
+      router.replace('/billing');
+    }
+  }, []);
   const addPaymentMethod = useAddPaymentMethod();
   const startTrial = useStartTrial();
 
@@ -557,6 +591,7 @@ export const MainBillingComponent: FC<{
         t('trial', 'Trial')
       )
     ) {
+      setFinishTrialConfirmed(true);
       setFinishTrial(true);
     }
   }, []);
@@ -567,6 +602,9 @@ export const MainBillingComponent: FC<{
   const [loading, setLoading] = useState<boolean>(false);
   // which button started the request, so only that one shows a spinner
   const [clicked, setClicked] = useState('');
+  // one plan change at a time: set before any dialog, so a second click
+  // while the confirm, discount or feedback dialog is open does nothing
+  const busy = useRef(false);
   const [period, setPeriod] = useState<'MONTHLY' | 'YEARLY'>(
     subscription?.period || 'MONTHLY'
   );
@@ -621,7 +659,23 @@ export const MainBillingComponent: FC<{
     []
   );
   const updatePayment = useCallback(async () => {
-    const { portal } = await (await fetch('/billing/portal')).json();
+    let portal: string | undefined;
+    try {
+      const response = await fetch('/billing/portal');
+      portal = response.ok ? (await response.json())?.portal : undefined;
+    } catch (err) {
+      portal = undefined;
+    }
+    if (!portal) {
+      toast.show(
+        t(
+          'billing_portal_unavailable',
+          'We could not open the billing portal, please try again'
+        ),
+        'warning'
+      );
+      return;
+    }
     window.location.href = portal;
   }, []);
   const currentPackage = useMemo(() => {
@@ -639,295 +693,324 @@ export const MainBillingComponent: FC<{
   const moveToCheckout = useCallback(
     (billing: 'STANDARD' | 'PRO' | 'FREE', reactivate = false) =>
       async () => {
-        if (reactivate) {
-          setLoading(true);
-          const { cancel_at } = await (
-            await fetch('/billing/cancel', {
+        if (busy.current) {
+          return;
+        }
+        busy.current = true;
+        try {
+          if (reactivate) {
+            setLoading(true);
+            const response = await fetch('/billing/cancel', {
               method: 'POST',
               body: JSON.stringify({
                 feedback: '',
+                intent: 'reactivate',
               }),
               headers: {
                 'Content-Type': 'application/json',
               },
-            })
-          ).json();
-          setSubscription((subs) => ({
-            ...subs!,
-            cancelAt: cancel_at,
-          }));
-
-          toast.show(
-            cancel_at
-              ? 'Your subscription was already active, so it is now set to cancel. Click Reactivate subscription again to keep it.'
-              : 'Subscription reactivated successfully'
-          );
-          setLoading(false);
-          return;
-        }
-
-        const messages = [];
-        if (
-          !pricing[billing].team_members &&
-          pricing[subscription?.subscriptionTier!]?.team_members
-        ) {
-          let hasMembers = true;
-          try {
-            const team = await (await fetch('/settings/team')).json();
-            hasMembers =
-              !Array.isArray(team?.users) ||
-              team.users.some(
-                (member: { user: { id: string } }) =>
-                  member.user.id !== user?.id
-              );
-          } catch (err: any) {
-            // keep the warning when the team cannot be loaded
-          }
-          if (hasMembers) {
-            messages.push(
-              `Your team members will be disabled and lose access to your organization until you upgrade to a plan that includes team members again`
-            );
-          }
-        }
-        const fromTier = subscription?.subscriptionTier || 'FREE';
-        if (
-          billing !== 'FREE' &&
-          allowsExtraChannels(fromTier) &&
-          !allowsExtraChannels(billing) &&
-          (subscription?.totalChannels || 0) > (pricing[fromTier]?.channel || 0)
-        ) {
-          messages.push(
-            `Your extra channels will be removed and the unused time credited to your next invoice`
-          );
-        }
-        // a switch between two plans that sell extra channels (monthly and
-        // yearly Ultimate) keeps them, so the limit stays the same
-        const newLimit =
-          allowsExtraChannels(fromTier) && allowsExtraChannels(billing)
-            ? subscription?.totalChannels || 0
-            : pricing[billing].channel || 0;
-        if (
-          billing !== 'FREE' &&
-          newLimit < (subscription?.totalChannels || 0)
-        ) {
-          try {
-            const { integrations } = await (
-              await fetch('/integrations/list')
-            ).json();
-            const active = (integrations || []).filter(
-              (p: { disabled: boolean }) => !p.disabled
-            ).length;
-            if (active > newLimit) {
-              const plan = pricing[billing].label || capitalize(billing);
-              const disabled = active - newLimit;
-              messages.push(
-                `${disabled} of your ${active} active channels will be disabled, as the ${plan} plan includes ${newLimit}`
-              );
-            }
-          } catch (err: any) {
-            // the change still disables the channels above the new limit
-          }
-        }
-        if (billing === 'FREE') {
-          if (
-            subscription?.cancelAt ||
-            (await deleteDialog(
-              `Are you sure you want to cancel your subscription?
-              ${messages.join(', ')}`,
-              'Yes, cancel',
-              'Cancel Subscription',
-              'No, keep it'
-            ))
-          ) {
-            const checkDiscount = await (
-              await fetch('/billing/check-discount')
-            ).json();
-            if (checkDiscount.offerCoupon) {
-              const info = await new Promise((res) => {
-                modal.openModal({
-                  title: 'Before you cancel',
-                  withCloseButton: true,
-                  classNames: {
-                    modal: 'bg-transparent text-textColor',
-                  },
-                  children: <Accept resolve={res} />,
-                });
-              });
-
-              modal.closeAll();
-
-              if (info) {
-                return;
-              }
-            }
-
-            const info = await new Promise((res) => {
-              modal.openModal({
-                title: t(
-                  'we_are_sorry_to_see_you_go',
-                  'We are sorry to see you go :('
-                ),
-                withCloseButton: true,
-                classNames: {
-                  modal: 'bg-transparent text-textColor',
-                },
-                children: <Info proceed={(e) => res(e)} />,
-              });
             });
-
-            setLoading(true);
-            const { cancel_at } = await (
-              await fetch('/billing/cancel', {
-                method: 'POST',
-                body: JSON.stringify({
-                  feedback: info,
-                }),
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              })
-            ).json();
+            if (!response.ok) {
+              toast.show(
+                'We could not reactivate your subscription, please try again',
+                'warning'
+              );
+              return;
+            }
+            const { cancel_at } = await response.json();
             setSubscription((subs) => ({
               ...subs!,
               cancelAt: cancel_at,
             }));
-            toast.show(
-              cancel_at
-                ? 'Subscription set to canceled successfully'
-                : 'Your subscription was already set to cancel, so it has been reactivated. Click Cancel subscription again to cancel it.'
-            );
-            setLoading(false);
-          }
-          return;
-        }
-        if (
-          messages.length &&
-          !(await deleteDialog(messages.join(', '), 'Yes, continue'))
-        ) {
-          return;
-        }
-        setLoading(true);
-        if (!subscription && user?.allowTrial) {
-          await startTrial(
-            billing,
-            monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'
-          );
-          setLoading(false);
-          return;
-        }
-        const {
-          url,
-          portal,
-          blocked,
-          requiresAction,
-          clientSecret,
-          error,
-          needsPaymentMethod,
-        } = await (
-          await fetch('/billing/subscribe', {
-            method: 'POST',
-            body: JSON.stringify({
-              period: monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY',
-              utm,
-              billing,
-              ...(skipTrial ? { skipTrial: true } : {}),
-              ...(dub ? { dub } : {}),
-              ...(fbc && hasConsent('analytics') ? { fbc } : {}),
-              ...(fbp && hasConsent('analytics') ? { fbp } : {}),
-              ...(pulse_vid ? { pulse_vid } : {}),
-            }),
-          })
-        ).json();
-        if (error) {
-          setLoading(false);
-          toast.show(error, 'warning');
-          return;
-        }
-        // a bigger plan during a trial without a card needs the card first
-        if (needsPaymentMethod) {
-          setLoading(false);
-          if (
-            await deleteDialog(
-              t(
-                'billing_trial_upgrade_add_card_first',
-                "Add a card to move to a bigger plan during your free trial. You are not charged until the trial ends, then the first payment is the new plan's price."
-              ),
-              t('add_a_card', 'Add a card'),
-              t('trial', 'Trial')
-            )
-          ) {
-            addPaymentMethod();
-          }
-          return;
-        }
-        if (blocked) {
-          setLoading(false);
-          await deleteDialog(
-            t(
-              'billing_other_account_subscribed',
-              'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
-            ),
-            t('ok', 'OK'),
-            t('already_subscribed', 'Already subscribed')
-          );
-          return;
-        }
-        if (url) {
-          await track(TrackEnum.InitiateCheckout, {
-            value:
-              pricing[billing][
-                monthlyOrYearly === 'on' ? 'year_price' : 'month_price'
-              ],
-            currency: 'USD',
-          });
-          window.location.href = url;
-          return;
-        }
-        if (portal) {
-          if (
-            await deleteDialog(
-              'We could not charge your credit card, please update your payment method',
-              'Update',
-              'Payment Method Required'
-            )
-          ) {
-            window.open(portal);
-          }
-        } else {
-          if (requiresAction) {
-            const { error } = await paymentAction(clientSecret);
-            if (error) {
-              toast.show(error, 'warning');
-              setLoading(false);
+
+            // only said once no cancel date is left
+            if (cancel_at) {
+              toast.show(
+                'Your subscription is still set to cancel, please try again or contact support',
+                'warning'
+              );
               return;
             }
+            toast.show('Subscription reactivated successfully');
+            return;
           }
-          setPeriod(monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY');
-          setSubscription((subs) => ({
-            ...subs!,
-            subscriptionTier: billing,
-            cancelAt: null,
-          }));
-          mutate(
-            '/user/self',
-            {
-              ...user,
-              tier: billing,
-            },
-            {
-              revalidate: false,
+
+          const messages = [];
+          if (
+            !pricing[billing].team_members &&
+            pricing[subscription?.subscriptionTier!]?.team_members
+          ) {
+            let hasMembers = true;
+            try {
+              const team = await (await fetch('/settings/team')).json();
+              hasMembers =
+                !Array.isArray(team?.users) ||
+                team.users.some(
+                  (member: { user: { id: string } }) =>
+                    member.user.id !== user?.id
+                );
+            } catch (err: any) {
+              // keep the warning when the team cannot be loaded
             }
-          );
-          mutate('/billing/invoices');
-          mutate('/billing/renewal');
-          mutate('/billing/extra-channels');
-          showConfirmedPlan(
-            billing,
-            monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'
-          );
-          toast.show('Subscription updated successfully');
+            if (hasMembers) {
+              messages.push(
+                `Your team members will be disabled and lose access to your organization until you upgrade to a plan that includes team members again`
+              );
+            }
+          }
+          const fromTier = subscription?.subscriptionTier || 'FREE';
+          if (
+            billing !== 'FREE' &&
+            allowsExtraChannels(fromTier) &&
+            !allowsExtraChannels(billing) &&
+            (subscription?.totalChannels || 0) > (pricing[fromTier]?.channel || 0)
+          ) {
+            messages.push(
+              `Your extra channels will be removed and the unused time credited to your next invoice`
+            );
+          }
+          // a switch between two plans that sell extra channels (monthly and
+          // yearly Ultimate) keeps them, so the limit stays the same
+          const newLimit =
+            allowsExtraChannels(fromTier) && allowsExtraChannels(billing)
+              ? subscription?.totalChannels || 0
+              : pricing[billing].channel || 0;
+          if (
+            billing !== 'FREE' &&
+            newLimit < (subscription?.totalChannels || 0)
+          ) {
+            try {
+              const { integrations } = await (
+                await fetch('/integrations/list')
+              ).json();
+              // counted like the server does when it applies the new plan
+              const active = countPlanChannels(integrations || []);
+              if (active > newLimit) {
+                const plan = pricing[billing].label || capitalize(billing);
+                const disabled = active - newLimit;
+                messages.push(
+                  `${disabled} of your ${active} active channels will be disabled, as the ${plan} plan includes ${newLimit}`
+                );
+              }
+            } catch (err: any) {
+              // the change still disables the channels above the new limit
+            }
+          }
+          if (billing === 'FREE') {
+            if (
+              subscription?.cancelAt ||
+              (await deleteDialog(
+                `Are you sure you want to cancel your subscription?
+                ${messages.join(', ')}`,
+                'Yes, cancel',
+                'Cancel Subscription',
+                'No, keep it'
+              ))
+            ) {
+              const checkDiscount = await (
+                await fetch('/billing/check-discount')
+              ).json();
+              if (checkDiscount.offerCoupon) {
+                // closing the window (X) keeps the subscription as it is
+                const accepted = await new Promise<boolean | 'closed'>(
+                  (res) => {
+                    modal.openModal({
+                      title: 'Before you cancel',
+                      withCloseButton: true,
+                      onClose: () => res('closed'),
+                      classNames: {
+                        modal: 'bg-transparent text-textColor',
+                      },
+                      children: <Accept resolve={res} />,
+                    });
+                  }
+                );
+
+                modal.closeAll();
+
+                if (accepted !== false) {
+                  return;
+                }
+              }
+
+              // closing the window (X) keeps the subscription as it is
+              const info = await new Promise<string | null>((res) => {
+                modal.openModal({
+                  title: t(
+                    'we_are_sorry_to_see_you_go',
+                    'We are sorry to see you go :('
+                  ),
+                  withCloseButton: true,
+                  onClose: () => res(null),
+                  classNames: {
+                    modal: 'bg-transparent text-textColor',
+                  },
+                  children: <Info proceed={(e) => res(e)} />,
+                });
+              });
+
+              if (info === null) {
+                return;
+              }
+
+              setLoading(true);
+              const response = await fetch('/billing/cancel', {
+                method: 'POST',
+                body: JSON.stringify({
+                  feedback: info,
+                  intent: 'cancel',
+                }),
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
+              if (!response.ok) {
+                toast.show(
+                  'We could not cancel your subscription, please try again',
+                  'warning'
+                );
+                return;
+              }
+              const { cancel_at } = await response.json();
+              setSubscription((subs) => ({
+                ...subs!,
+                cancelAt: cancel_at,
+              }));
+              toast.show('Subscription set to canceled successfully');
+            }
+            return;
+          }
+          if (
+            messages.length &&
+            !(await deleteDialog(messages.join(', '), 'Yes, continue'))
+          ) {
+            return;
+          }
+          setLoading(true);
+          if (!subscription && user?.allowTrial) {
+            await startTrial(
+              billing,
+              monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'
+            );
+            setLoading(false);
+            return;
+          }
+          const {
+            url,
+            portal,
+            blocked,
+            requiresAction,
+            clientSecret,
+            error,
+            needsPaymentMethod,
+          } = await (
+            await fetch('/billing/subscribe', {
+              method: 'POST',
+              body: JSON.stringify({
+                period: monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY',
+                utm,
+                billing,
+                ...(skipTrial ? { skipTrial: true } : {}),
+                ...(dub ? { dub } : {}),
+                ...(fbc && hasConsent('analytics') ? { fbc } : {}),
+                ...(fbp && hasConsent('analytics') ? { fbp } : {}),
+              ...(pulse_vid ? { pulse_vid } : {}),
+              }),
+            })
+          ).json();
+          if (error) {
+            setLoading(false);
+            toast.show(error, 'warning');
+            return;
+          }
+          // a bigger plan during a trial without a card needs the card first
+          if (needsPaymentMethod) {
+            setLoading(false);
+            if (
+              await deleteDialog(
+                t(
+                  'billing_trial_upgrade_add_card_first',
+                  "Add a card to move to a bigger plan during your free trial. You are not charged until the trial ends, then the first payment is the new plan's price."
+                ),
+                t('add_a_card', 'Add a card'),
+                t('trial', 'Trial')
+              )
+            ) {
+              addPaymentMethod();
+            }
+            return;
+          }
+          if (blocked) {
+            setLoading(false);
+            await deleteDialog(
+              t(
+                'billing_other_account_subscribed',
+                'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
+              ),
+              t('ok', 'OK'),
+              t('already_subscribed', 'Already subscribed')
+            );
+            return;
+          }
+          if (url) {
+            await track(TrackEnum.InitiateCheckout, {
+              value:
+                pricing[billing][
+                  monthlyOrYearly === 'on' ? 'year_price' : 'month_price'
+                ],
+              currency: 'USD',
+            });
+            window.location.href = url;
+            return;
+          }
+          if (portal) {
+            if (
+              await deleteDialog(
+                'We could not charge your credit card, please update your payment method',
+                'Update',
+                'Payment Method Required'
+              )
+            ) {
+              window.open(portal);
+            }
+          } else {
+            if (requiresAction) {
+              const { error } = await paymentAction(clientSecret);
+              if (error) {
+                toast.show(error, 'warning');
+                setLoading(false);
+                return;
+              }
+            }
+            setPeriod(monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY');
+            setSubscription((subs) => ({
+              ...subs!,
+              subscriptionTier: billing,
+              cancelAt: null,
+            }));
+            mutate(
+              '/user/self',
+              {
+                ...user,
+                tier: billing,
+              },
+              {
+                revalidate: false,
+              }
+            );
+            mutate('/billing/invoices');
+            mutate('/billing/renewal');
+            mutate('/billing/extra-channels');
+            showConfirmedPlan(
+              billing,
+              monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'
+            );
+            toast.show('Subscription updated successfully');
+          }
+        } finally {
+          busy.current = false;
+          setLoading(false);
         }
-        setLoading(false);
       },
     [
       monthlyOrYearly,
@@ -1020,10 +1103,12 @@ export const MainBillingComponent: FC<{
 
   return (
     <div className="flex flex-col gap-[24px]">
-      {finishTrial && renewal?.needsPaymentMethod !== true && (
+      {finishTrial && !!renewal && renewal.needsPaymentMethod !== true && (
         <FinishTrial
+          confirmed={finishTrialConfirmed}
           close={() => {
             setFinishTrial(false);
+            setFinishTrialConfirmed(false);
             mutate('/user/self');
             mutate('/billing/invoices');
             mutate('/billing/renewal');

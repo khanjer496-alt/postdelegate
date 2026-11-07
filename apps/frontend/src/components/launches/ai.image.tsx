@@ -3,6 +3,8 @@ import { FC, useCallback, useState } from 'react';
 import clsx from 'clsx';
 import Loading from '@gitroom/frontend/components/layout/loading';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
+import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
@@ -46,15 +48,16 @@ const AiImageModal: FC<{
       return;
     }
 
+    // every generation holds its own lock of the composer
+    const lockOwner = makeId(10);
     setLoading(true);
     close();
-    setLocked(true);
+    setLocked(true, lockOwner);
     try {
-      const image = await (
-        await fetch('/media/generate-image-with-prompt', {
-          method: 'POST',
-          body: JSON.stringify({
-            prompt: `
+      const response = await fetch('/media/generate-image-with-prompt', {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: `
 <!-- description -->
 ${prompt}
 <!-- /description -->
@@ -64,15 +67,36 @@ ${style}
 <!-- /style -->
 
 `,
-          }),
-        })
-      ).json();
+        }),
+      });
+      if (!response.ok) {
+        // a plan limit or a missing AI key already showed its own dialog
+        if (response.status !== 402) {
+          const { message } = await response.json().catch(() => ({}));
+          toaster.show(
+            (typeof message === 'string' && message) ||
+              t('image_generation_failed', 'Could not generate the image'),
+            'warning'
+          );
+        }
+        return;
+      }
+      const image = await response.json();
       if (image) {
         onChange(image);
       }
-    } catch (e) {}
-    setLocked(false);
-    setLoading(false);
+    } catch (e) {
+      // a dialog already told the user why it stopped
+      if (!(e instanceof HandledResponseError)) {
+        toaster.show(
+          t('image_generation_failed', 'Could not generate the image'),
+          'warning'
+        );
+      }
+    } finally {
+      setLocked(false, lockOwner);
+      setLoading(false);
+    }
   }, [prompt, style, onChange]);
 
   return (

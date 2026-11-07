@@ -9,6 +9,24 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { Organization } from '@prisma/client';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import {
+  channelState,
+  countPlanChannels,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
+
+type Tier = 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
+
+// What a subscription write tells the payment webhook that asked for it:
+// `retry` - the plan could not be read or stored (a database error), the
+// webhook answers non-2xx so the provider sends the event again (every step
+// is safe to run twice); `codeUsed` - a lifetime code was redeemed by someone
+// else first. Skipped events (unknown customer, a lifetime plan, another
+// provider's plan) are not failures and return neither, and neither is a
+// plan change that fails on what the event carries (an unknown plan in its
+// metadata): it is logged and acknowledged, a retry would fail the same way
+export type SubscriptionWriteResult =
+  | { retry?: boolean; codeUsed?: boolean }
+  | undefined;
 
 // The plan month `at` falls in: k whole months after the anchor, both ends
 // taken from the anchor, so months that clamp (an anchor on the 29th to 31st)
@@ -63,19 +81,33 @@ export class SubscriptionService {
     return !current || current.provider === provider;
   }
 
-  async deleteSubscription(customerId: string, provider: string) {
-    if (!(await this.isManagedBy(customerId, provider))) {
-      return { count: 0 };
+  // Reached from payment webhooks: never throws. A lifetime plan is never
+  // removed by a customer-keyed cancellation, like deleteSubscriptionByOrgId
+  async deleteSubscription(
+    customerId: string,
+    provider: string
+  ): Promise<{ count: number; retry?: boolean }> {
+    try {
+      const current =
+        await this._subscriptionRepository.getSubscriptionByCustomerId(
+          customerId
+        );
+      if (current && (current.provider !== provider || current.isLifetime)) {
+        return { count: 0 };
+      }
+      await this.modifySubscription(
+        customerId,
+        pricing.FREE.channel || 0,
+        'FREE'
+      );
+      return await this._subscriptionRepository.deleteSubscriptionByCustomerId(
+        customerId,
+        provider
+      );
+    } catch (err) {
+      console.error('Error deleting subscription:', err);
+      return { count: 0, retry: true };
     }
-    await this.modifySubscription(
-      customerId,
-      pricing.FREE.channel || 0,
-      'FREE'
-    );
-    return this._subscriptionRepository.deleteSubscriptionByCustomerId(
-      customerId,
-      provider
-    );
   }
 
   // Store-managed subscriptions (RevenueCat etc.) have no Stripe customer, they are keyed by org
@@ -122,29 +154,89 @@ export class SubscriptionService {
   async modifySubscriptionByOrg(
     organizationId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    billing: Tier
   ) {
     if (!organizationId) {
       return false;
     }
 
     const getCurrentSubscription =
-      (await this._subscriptionRepository.getSubscriptionByOrgId(
-        organizationId
-      ))!;
+      await this._subscriptionRepository.getSubscriptionByOrgId(organizationId);
 
-    const from = pricing[getCurrentSubscription?.subscriptionTier || 'FREE'];
+    await this.applyPlanChange(
+      organizationId,
+      getCurrentSubscription,
+      totalChannels,
+      billing
+    );
+
+    return true;
+  }
+
+  async modifySubscription(
+    customerId: string,
+    totalChannels: number,
+    billing: Tier
+  ) {
+    if (!customerId) {
+      return false;
+    }
+
+    const getOrgByCustomerId =
+      await this._subscriptionRepository.getOrganizationByCustomerId(
+        customerId
+      );
+
+    const getCurrentSubscription =
+      await this._subscriptionRepository.getSubscriptionByCustomerId(
+        customerId
+      );
+
+    if (
+      !getOrgByCustomerId ||
+      (getCurrentSubscription && getCurrentSubscription?.isLifetime)
+    ) {
+      return false;
+    }
+
+    await this.applyPlanChange(
+      getOrgByCustomerId.id,
+      getCurrentSubscription,
+      totalChannels,
+      billing
+    );
+
+    return true;
+  }
+
+  // What moving from the `current` plan to `billing` does to the workspace:
+  // channels over the new limit are turned off (newest first), channels a
+  // lapse turned off come back when the new plan holds them all, team members
+  // follow the plan, and a plan without AutoPost stops it. Channels are
+  // counted with countPlanChannels, like every other limit check
+  private async applyPlanChange(
+    organizationId: string,
+    current: { subscriptionTier: Tier; totalChannels: number } | null,
+    totalChannels: number,
+    billing: Tier
+  ) {
+    const from = pricing[current?.subscriptionTier || 'FREE'];
     const to = pricing[billing];
 
     const allChannels = await this._integrationService.getIntegrationsList(
       organizationId
     );
-    const currentTotalChannels = allChannels.filter((f) => !f.disabled);
+    const activeChannels = countPlanChannels(allChannels);
+    // every channel the workspace has, on or off, but not the temporary row
+    // of a connect that still has a page to pick
+    const keptChannels = allChannels.filter(
+      (f) => channelState(f) !== 'incomplete'
+    ).length;
 
-    if (currentTotalChannels.length > totalChannels) {
+    if (activeChannels > totalChannels) {
       await this._integrationService.disableIntegrations(
         organizationId,
-        currentTotalChannels.length - totalChannels
+        activeChannels - totalChannels
       );
     }
 
@@ -154,9 +246,9 @@ export class SubscriptionService {
     // disabled on purpose)
     if (
       billing !== 'FREE' &&
-      currentTotalChannels.length < allChannels.length &&
-      allChannels.length <= totalChannels &&
-      totalChannels > (getCurrentSubscription?.totalChannels || 0)
+      activeChannels < keptChannels &&
+      keptChannels <= totalChannels &&
+      totalChannels > (current?.totalChannels || 0)
     ) {
       try {
         await this._integrationService.enableAllIntegrations(organizationId);
@@ -185,94 +277,9 @@ export class SubscriptionService {
     if (billing === 'FREE') {
       await this._integrationService.changeActiveCron(organizationId);
     }
-
-    return true;
   }
 
-  async modifySubscription(
-    customerId: string,
-    totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
-  ) {
-    if (!customerId) {
-      return false;
-    }
-
-    const getOrgByCustomerId =
-      await this._subscriptionRepository.getOrganizationByCustomerId(
-        customerId
-      );
-
-    const getCurrentSubscription =
-      (await this._subscriptionRepository.getSubscriptionByCustomerId(
-        customerId
-      ))!;
-
-    if (
-      !getOrgByCustomerId ||
-      (getCurrentSubscription && getCurrentSubscription?.isLifetime)
-    ) {
-      return false;
-    }
-
-    const from = pricing[getCurrentSubscription?.subscriptionTier || 'FREE'];
-    const to = pricing[billing];
-
-    const allChannels = await this._integrationService.getIntegrationsList(
-      getOrgByCustomerId?.id!
-    );
-    const currentTotalChannels = allChannels.filter((f) => !f.disabled);
-
-    if (currentTotalChannels.length > totalChannels) {
-      await this._integrationService.disableIntegrations(
-        getOrgByCustomerId?.id!,
-        currentTotalChannels.length - totalChannels
-      );
-    }
-
-    // channels are auto-disabled when a subscription lapses; once the new plan
-    // can hold all of them and the limit grew, enable everything back (partial
-    // enabling or same-plan updates would risk enabling channels the user
-    // disabled on purpose)
-    if (
-      billing !== 'FREE' &&
-      currentTotalChannels.length < allChannels.length &&
-      allChannels.length <= totalChannels &&
-      totalChannels > (getCurrentSubscription?.totalChannels || 0)
-    ) {
-      try {
-        await this._integrationService.enableAllIntegrations(
-          getOrgByCustomerId?.id!
-        );
-      } catch (err) {
-        console.error(
-          'Error enabling channels after subscription change:',
-          err
-        );
-      }
-    }
-
-    if (from.team_members && !to.team_members) {
-      await this._organizationService.disableOrEnableNonSuperAdminUsers(
-        getOrgByCustomerId?.id!,
-        true
-      );
-    }
-
-    if (!from.team_members && to.team_members) {
-      await this._organizationService.disableOrEnableNonSuperAdminUsers(
-        getOrgByCustomerId?.id!,
-        false
-      );
-    }
-
-    if (billing === 'FREE') {
-      await this._integrationService.changeActiveCron(getOrgByCustomerId?.id!);
-    }
-
-    return true;
-  }
-
+  // Reached from payment webhooks: never throws, see SubscriptionWriteResult
   async createOrUpdateSubscription(
     provider: string,
     isTrailing: boolean,
@@ -284,39 +291,114 @@ export class SubscriptionService {
     cancelAt: number | null,
     code?: string,
     org?: string
-  ) {
-    if (!code) {
+  ): Promise<SubscriptionWriteResult> {
+    if (code) {
+      return this.redeemLifetimeCode(
+        provider,
+        identifier,
+        totalChannels,
+        billing,
+        period,
+        code,
+        org || customerId
+      );
+    }
+
+    try {
       if (!(await this.isManagedBy(customerId, provider))) {
         return {};
       }
-      try {
-        const load = await this.modifySubscription(
-          customerId,
-          totalChannels,
-          billing
-        );
-        if (!load) {
-          return {};
-        }
-      } catch (e) {
-        console.error('Error modifying subscription:', e);
+    } catch (e) {
+      console.error('Error reading the subscription:', e);
+      return { retry: true };
+    }
+
+    try {
+      const load = await this.modifySubscription(
+        customerId,
+        totalChannels,
+        billing
+      );
+      if (!load) {
         return {};
       }
+    } catch (e) {
+      console.error('Error modifying subscription:', e);
+      return {};
     }
-    return this._subscriptionRepository.createOrUpdateSubscription(
-      provider,
-      isTrailing,
-      identifier,
-      customerId,
-      totalChannels,
-      billing,
-      period,
-      cancelAt,
-      code,
-      org ? { id: org } : undefined
-    );
+
+    try {
+      await this._subscriptionRepository.createOrUpdateSubscription(
+        provider,
+        isTrailing,
+        identifier,
+        customerId,
+        totalChannels,
+        billing,
+        period,
+        cancelAt,
+        undefined,
+        org ? { id: org } : undefined
+      );
+      return undefined;
+    } catch (e) {
+      console.error('Error storing subscription:', e);
+      return { retry: true };
+    }
   }
 
+  // The code is checked and spent in the same transaction as the plan is
+  // written, so two redeems of one code can't both win. The workspace then
+  // gets what any upgrade gives it (applyPlanChange): channels a lapse turned
+  // off come back when the plan holds them, team members are enabled
+  private async redeemLifetimeCode(
+    provider: string,
+    identifier: string,
+    totalChannels: number,
+    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    period: 'MONTHLY' | 'YEARLY',
+    code: string,
+    organizationId: string
+  ): Promise<SubscriptionWriteResult> {
+    let previous: { subscriptionTier: Tier; totalChannels: number } | null =
+      null;
+    try {
+      previous = await this._subscriptionRepository.getSubscriptionByOrgId(
+        organizationId
+      );
+      const redeemed =
+        await this._subscriptionRepository.createOrUpdateLifetimeSubscription(
+          provider,
+          identifier,
+          totalChannels,
+          billing,
+          period,
+          code,
+          organizationId
+        );
+      if (!redeemed) {
+        return { codeUsed: true };
+      }
+    } catch (e) {
+      console.error('Error redeeming lifetime code:', e);
+      return { retry: true };
+    }
+
+    // the plan is already stored: a failure here is logged, the code is spent
+    try {
+      await this.applyPlanChange(
+        organizationId,
+        previous,
+        totalChannels,
+        billing
+      );
+    } catch (e) {
+      console.error('Error applying the lifetime plan:', e);
+    }
+    return undefined;
+  }
+
+  // Reached from payment webhooks: never throws, see SubscriptionWriteResult
   async createOrUpdateSubscriptionByOrg(
     isTrailing: boolean,
     organizationId: string,
@@ -326,12 +408,18 @@ export class SubscriptionService {
     billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null
-  ) {
-    const current = await this._subscriptionRepository.getSubscriptionByOrgId(
-      organizationId
-    );
-    if (current && (current.isLifetime || current.provider !== provider)) {
-      return {};
+  ): Promise<SubscriptionWriteResult> {
+    try {
+      const current =
+        await this._subscriptionRepository.getSubscriptionByOrgId(
+          organizationId
+        );
+      if (current && (current.isLifetime || current.provider !== provider)) {
+        return {};
+      }
+    } catch (e) {
+      console.error('Error reading the subscription:', e);
+      return { retry: true };
     }
 
     try {
@@ -348,26 +436,34 @@ export class SubscriptionService {
       return {};
     }
 
-    return this._subscriptionRepository.createOrUpdateSubscription(
-      provider,
-      isTrailing,
-      identifier,
-      '',
-      totalChannels,
-      billing,
-      period,
-      cancelAt,
-      undefined,
-      { id: organizationId }
-    );
+    try {
+      await this._subscriptionRepository.createOrUpdateSubscription(
+        provider,
+        isTrailing,
+        identifier,
+        '',
+        totalChannels,
+        billing,
+        period,
+        cancelAt,
+        undefined,
+        { id: organizationId }
+      );
+      return undefined;
+    } catch (e) {
+      console.error('Error storing subscription:', e);
+      return { retry: true };
+    }
   }
+
+
 
   // Channels that count against the limit right now, the ones a lower limit
   // would disable (modifySubscription)
   async getActiveChannelsCount(organizationId: string) {
-    return (
+    return countPlanChannels(
       await this._integrationService.getIntegrationsList(organizationId)
-    ).filter((f) => !f.disabled).length;
+    );
   }
 
   getSubscriptionByIdentifier(identifier: string) {
@@ -485,24 +581,49 @@ export class SubscriptionService {
     };
   }
 
+  // A plan a super admin sets, keyed by the workspace. It never touches
+  // Organization.paymentId: that holds the workspace's Stripe customer, and
+  // writing the admin's user id there broke every later Stripe call
+  // (cancelling on account deletion, checkout). The `admin_` identifier tells
+  // these plans apart from paid ones. A workspace on a lifetime plan or on
+  // another provider's plan is left as it is, and the admin is told why
   async addSubscription(
     orgId: string,
-    userId: string,
     subscription: any,
     provider: string
-  ) {
-    await this._subscriptionRepository.setCustomerId(orgId, userId);
-    return this.createOrUpdateSubscription(
-      provider,
+  ): Promise<{ added: boolean; reason?: string }> {
+    const current = await this._subscriptionRepository.getSubscriptionByOrgId(
+      orgId
+    );
+    if (current?.isLifetime) {
+      return {
+        added: false,
+        reason: 'This workspace has a lifetime plan, it was left as it is',
+      };
+    }
+    if (current && current.provider !== provider) {
+      return {
+        added: false,
+        reason: `This workspace's plan is managed by ${current.provider}, it was left as it is`,
+      };
+    }
+
+    const result = await this.createOrUpdateSubscriptionByOrg(
       false,
-      makeId(5),
-      userId,
+      orgId,
+      provider,
+      `admin_${makeId(5)}`,
       pricing[subscription].channel!,
       subscription,
       'MONTHLY',
-      null,
-      undefined,
-      orgId
+      null
     );
+    if (result) {
+      return {
+        added: false,
+        reason: 'The plan could not be saved, please try again',
+      };
+    }
+    return { added: true };
   }
 }

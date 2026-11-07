@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 type Inputs = {
   password: string;
   repeatPassword: string;
@@ -30,23 +31,48 @@ export function ForgotReturn({ token }: { token: string }) {
   const fetchData = useFetch();
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
-    const response = await fetchData('/auth/forgot-return', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...data,
-      }),
-    });
-    const { reset } = await response.json().catch(() => ({ reset: false }));
-    setLoading(false);
-    // success only when the password really changed
-    if (!response.ok || !reset) {
+    try {
+      const response = await fetchData('/auth/forgot-return', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+        }),
+      });
+      if (!response.ok) {
+        form.setError('password', {
+          type: 'manual',
+          // a 400 carries the password rule that failed
+          message:
+            response.status === 429
+              ? t(
+                  'too_many_attempts',
+                  'Too many attempts. Please wait a few minutes and try again.'
+                )
+              : await errorMessage(
+                  response,
+                  t('error_occurred', 'An error occurred. Please try again.')
+                ),
+        });
+        return false;
+      }
+      const { reset } = await response.json().catch(() => ({ reset: false }));
+      // success only when the password really changed
+      if (!reset) {
+        form.setError('password', {
+          type: 'manual',
+          message: t('password_reset_link_expired', 'Your password reset link has expired. Please try again.'),
+        });
+        return false;
+      }
+      setState(true);
+    } catch (e) {
       form.setError('password', {
         type: 'manual',
-        message: t('password_reset_link_expired', 'Your password reset link has expired. Please try again.'),
+        message: t('error_occurred', 'An error occurred. Please try again.'),
       });
-      return false;
+    } finally {
+      setLoading(false);
     }
-    setState(true);
   };
   return (
     <FormProvider {...form}>

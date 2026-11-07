@@ -119,12 +119,13 @@ await client.deletePost('POST_ID');
 await client.deletePostByGroup(posts[0].group);
 ```
 
-### `changePostStatus(id, status)` - move between draft and scheduled
+### `changePostStatus(id, status, options?)` - move between draft and scheduled
 
-`PUT /posts/:id/status` with `'draft'` or `'schedule'`.
+`PUT /posts/:id/status` with `'draft'` or `'schedule'`. The comments of a thread move with it. A post that was already published, or is being published right now, is refused unless you pass `{ republish: true }`, since scheduling it can publish it again.
 
 ```typescript
 await client.changePostStatus('POST_ID', 'schedule');
+await client.changePostStatus('POST_ID', 'schedule', { republish: true });
 ```
 
 ### `upload(file, filenameOrExtension, options?)` - upload a file

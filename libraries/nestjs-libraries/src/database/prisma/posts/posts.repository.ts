@@ -530,7 +530,8 @@ export class PostsRepository {
   updatePost(id: string, postId: string, releaseURL: string, expectedIntegrationId?: string) {
     return this.updateActivePost(
       id,
-      { state: 'PUBLISHED', releaseURL, releaseId: postId },
+      // a post published on a retry must not keep the earlier attempt's error
+      { state: 'PUBLISHED', releaseURL, releaseId: postId, error: null },
       expectedIntegrationId ? { integrationId: expectedIntegrationId } : {}
     );
   }
@@ -573,37 +574,8 @@ export class PostsRepository {
     );
   }
 
-  async changeState(id: string, state: State, err?: any, body?: any) {
-    const updated = await this.updateActivePost(
-      id,
-      {
-        state,
-        ...(err
-          ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
-          : {}),
-      },
-      {},
-      true
-    );
-    if (state === 'ERROR' && err && body) {
-      try {
-        // Audit logging remains best-effort, but this second transaction must
-        // lock and recheck the original channel/post before retaining payloads.
-        await this.updateActivePost(
-          id,
-          { deletedAt: null },
-          { integrationId: updated!.integrationId },
-          true,
-          {
-            message: typeof err === 'string' ? err : JSON.stringify(err),
-            body: typeof body === 'string' ? body : JSON.stringify(body),
-          }
-        );
-      } catch {
-        // The state transition committed independently of audit availability.
-      }
-    }
-    return updated;
+  changeState(id: string, state: State, err?: any, body?: any) {
+    return this.writeState(id, state, err, body);
   }
 
   getErrorsByPostIds(postIds: string[]) {
@@ -622,24 +594,73 @@ export class PostsRepository {
     isDraft: boolean,
     action: 'schedule' | 'update' = 'schedule'
   ) {
-    return this._post.model.post.update({
+    const data = {
+      publishDate: dayjs(date).toDate(),
+      // schedule: set state to QUEUE (or DRAFT if it was a draft), the
+      // error and release of an earlier attempt no longer describe it
+      // update: don't change the state
+      ...(action === 'schedule'
+        ? {
+            state: isDraft ? ('DRAFT' as const) : ('QUEUE' as const),
+            error: null,
+            releaseId: null,
+            releaseURL: null,
+          }
+        : {}),
+    };
+    return this._transaction.model.$transaction(async (tx) => {
+      const updated = await tx.post.update({
+        where: {
+          organizationId: orgId,
+          id,
+        },
+        data,
+      });
+      // the comments of a thread share the main post's date and state, like
+      // createOrUpdatePost stores them
+      await tx.post.updateMany({
+        where: {
+          organizationId: orgId,
+          group: updated.group,
+          integrationId: updated.integrationId,
+          deletedAt: null,
+          id: { not: id },
+        },
+        data,
+      });
+      return updated;
+    });
+  }
+
+  // Moves a post and its comments to a state together, the comments of a
+  // thread publish with the main post. Leaving ERROR clears its error; queued
+  // again, the release of an earlier attempt is cleared too, like changeDate.
+  // Without `republish` a post published since it was read is left alone.
+  async changeGroupState(
+    orgId: string,
+    post: { group: string; integrationId: string },
+    state: 'DRAFT' | 'QUEUE',
+    republish = false
+  ) {
+    const changed = await this._post.model.post.updateMany({
       where: {
         organizationId: orgId,
-        id,
+        group: post.group,
+        integrationId: post.integrationId,
+        deletedAt: null,
+        integration: { deletedAt: null },
+        ...(republish ? {} : { state: { not: 'PUBLISHED' as const } }),
       },
       data: {
-        publishDate: dayjs(date).toDate(),
-        // schedule: set state to QUEUE (or DRAFT if it was a draft)
-        // update: don't change the state
-        ...(action === 'schedule'
-          ? {
-              state: isDraft ? 'DRAFT' : 'QUEUE',
-              releaseId: null,
-              releaseURL: null,
-            }
-          : {}),
+        state,
+        error: null,
+        ...(state === 'QUEUE' ? { releaseId: null, releaseURL: null } : {}),
       },
     });
+    if (!changed.count) {
+      throw new BadRequestException('Post is no longer available.');
+    }
+    return changed;
   }
 
   countPostsFromDay(orgId: string, date: Date) {
@@ -888,6 +909,13 @@ export class PostsRepository {
           : {
               state:
                 state === 'draft' ? ('DRAFT' as const) : ('QUEUE' as const),
+              // no longer failed: the error of an earlier attempt goes
+              error: null,
+              // queued again: so does the release of an earlier publish,
+              // like changeDate on a reschedule
+              ...(state === 'draft'
+                ? {}
+                : { releaseId: null, releaseURL: null }),
             }),
         image: JSON.stringify(value.image),
         settings: JSON.stringify(body.settings),
@@ -1010,11 +1038,12 @@ export class PostsRepository {
     return { previousPost, posts };
   }
 
-  // Keeps a post and its comments as a draft until an approver approves it
+  // Keeps a post and its comments as a draft until an approver approves it.
+  // A failed post held this way is no longer failed, its old error goes.
   holdForReview(orgId: string, group: string) {
     return this._post.model.post.updateMany({
       where: { organizationId: orgId, group, deletedAt: null },
-      data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' },
+      data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW', error: null },
     });
   }
 
@@ -1477,5 +1506,137 @@ export class PostsRepository {
         },
       },
     });
+  }
+
+  // Like changeState, but only while the post is still in one of the expected
+  // states: the state check and the write are one conditional updateMany (see
+  // updateActivePost), so a run racing another writer - the user, the
+  // missing-posts sweep, another run - can never overwrite what that one
+  // recorded. A post that is gone or no longer in those states is not a
+  // failure, there is just nothing to write: it returns null.
+  // A retried activity whose earlier attempt committed but never reported
+  // finds the row already in the target state with the same error: that is
+  // this write, so it reports it as written (without writing again).
+  async changeStateIf(
+    id: string,
+    expectedStates: State[],
+    state: State,
+    err?: any,
+    body?: any,
+    release?: { releaseId: string; releaseURL?: string }
+  ) {
+    try {
+      return await this.writeState(
+        id,
+        state,
+        err,
+        body,
+        { state: { in: expectedStates } },
+        release
+      );
+    } catch (e) {
+      if (!(e instanceof BadRequestException)) {
+        throw e;
+      }
+
+      return this._post.model.post.findFirst({
+        where: {
+          id,
+          state,
+          ...(err
+            ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
+            : {}),
+          deletedAt: null,
+          integration: { deletedAt: null },
+        },
+        select: { id: true },
+      });
+    }
+  }
+
+  private async writeState(
+    id: string,
+    state: State,
+    err?: any,
+    body?: any,
+    conditions: Prisma.PostWhereInput = {},
+    release?: { releaseId: string; releaseURL?: string }
+  ) {
+    const updated = await this.updateActivePost(
+      id,
+      {
+        state,
+        ...(err
+          ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
+          : // queued again or back to draft: the last failure no longer applies
+          state === 'QUEUE' || state === 'DRAFT'
+          ? { error: null }
+          : {}),
+        // a post that went out and then failed keeps where it went out
+        ...(release
+          ? {
+              releaseId: String(release.releaseId),
+              ...(release.releaseURL ? { releaseURL: release.releaseURL } : {}),
+            }
+          : {}),
+      },
+      conditions,
+      true
+    );
+    if (state === 'ERROR' && err && body) {
+      try {
+        // Audit logging remains best-effort, but this second transaction must
+        // lock and recheck the original channel/post before retaining payloads.
+        await this.updateActivePost(
+          id,
+          { deletedAt: null },
+          { integrationId: updated!.integrationId },
+          true,
+          {
+            message: typeof err === 'string' ? err : JSON.stringify(err),
+            body:
+              typeof body === 'string'
+                ? body
+                : JSON.stringify(this.auditBody(body)),
+          }
+        );
+      } catch {
+        // The state transition committed independently of audit availability.
+      }
+    }
+    return updated;
+  }
+
+  // Errors.body is a debug snapshot, read by the admin errors view and the
+  // post debug export. The workflows pass the posts they were publishing, and
+  // those carry the decrypted integration (token, refreshToken,
+  // customInstanceDetails) - never store it: keep only what names the channel,
+  // and drop anything else that looks like a credential.
+  private auditBody(body: any): any {
+    const strip = (item: any) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return item;
+      }
+
+      const { integration, submittedForOrder, ...rest } = item;
+      return {
+        ...Object.fromEntries(
+          Object.entries(rest).filter(
+            ([key]) => !/token|secret|password/i.test(key)
+          )
+        ),
+        ...(integration && typeof integration === 'object'
+          ? {
+              integration: {
+                id: integration.id,
+                name: integration.name,
+                providerIdentifier: integration.providerIdentifier,
+              },
+            }
+          : {}),
+      };
+    };
+
+    return Array.isArray(body) ? body.map(strip) : strip(body);
   }
 }

@@ -1,7 +1,9 @@
 'use client';
 
 import { ReactNode, useCallback } from 'react';
+import { SWRConfig } from 'swr';
 import { FetchWrapperComponent } from '@gitroom/helpers/utils/custom.fetch';
+import { HandledResponseError } from '@gitroom/helpers/utils/custom.fetch.func';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { areYouSure } from '@gitroom/frontend/components/layout/new-modal';
 import { useReturnUrl } from '@gitroom/frontend/app/(app)/auth/return.url.component';
@@ -14,6 +16,21 @@ export default function LayoutContext(params: { children: ReactNode }) {
   }
   return <></>;
 }
+// a request whose dialog already answered it (trial, billing) is not retried,
+// a retry would only open the same dialog again
+const swrConfig = {
+  onErrorRetry: (
+    ...args: Parameters<typeof SWRConfig.defaultValue.onErrorRetry>
+  ) => {
+    if (args[0] instanceof HandledResponseError) {
+      return;
+    }
+    SWRConfig.defaultValue.onErrorRetry(...args);
+  },
+};
+// endpoints whose 406 is their own error, shown by the caller, not the trial
+// wall; the trial 406 has no marker in its body to tell them apart
+const OWN_NOT_ACCEPTABLE = ['/integrations/social-connect/'];
 export function setCookie(cname: string, cvalue: string, exdays: number) {
   if (typeof document === 'undefined') {
     return;
@@ -93,7 +110,10 @@ function LayoutContextInner(params: { children: ReactNode }) {
         }
         window.location.href = '/';
       }
-      if (response.status === 406) {
+      if (
+        response.status === 406 &&
+        !OWN_NOT_ACCEPTABLE.some((path) => url.startsWith(path))
+      ) {
         if (
           await deleteDialog(
             "This feature is not available during the trial. You can end the trial now: your plan's first payment is charged today instead of at the end of the trial.",
@@ -169,11 +189,13 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
       return true;
     },
-    [t]
+    [t, returnUrl, isGeneral, isSecured]
   );
   return (
-    <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>
-      {params?.children || <></>}
-    </FetchWrapperComponent>
+    <SWRConfig value={swrConfig}>
+      <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>
+        {params?.children || <></>}
+      </FetchWrapperComponent>
+    </SWRConfig>
   );
 }

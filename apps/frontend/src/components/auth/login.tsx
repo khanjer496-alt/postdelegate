@@ -45,23 +45,48 @@ export function Login() {
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
     setNotActivated(false);
-    const login = await fetchData('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...data,
-        provider: 'LOCAL',
-      }),
-    });
-    if (login.status === 400) {
-      const errorMessage = await login.text();
-      if (errorMessage === 'User is not activated') {
-        setNotActivated(true);
-      } else {
-        form.setError('email', {
-          message: errorMessage,
-        });
+    // a successful login reloads the page, the button keeps loading until then
+    let signedIn = false;
+    try {
+      const login = await fetchData('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          provider: 'LOCAL',
+        }),
+      });
+      if (login.ok) {
+        signedIn = true;
+        return;
       }
-      setLoading(false);
+      if (login.status === 400) {
+        const errorMessage = await login.text();
+        if (errorMessage === 'User is not activated') {
+          setNotActivated(true);
+        } else {
+          form.setError('email', {
+            message: errorMessage,
+          });
+        }
+        return;
+      }
+      form.setError('email', {
+        message:
+          login.status === 429
+            ? t(
+                'too_many_attempts',
+                'Too many attempts. Please wait a few minutes and try again.'
+              )
+            : t('error_occurred', 'An error occurred. Please try again.'),
+      });
+    } catch (e) {
+      form.setError('email', {
+        message: t('error_occurred', 'An error occurred. Please try again.'),
+      });
+    } finally {
+      if (!signedIn) {
+        setLoading(false);
+      }
     }
   };
   return (

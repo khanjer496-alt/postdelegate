@@ -2097,6 +2097,7 @@
   "resend_activation_email": "Aktivasyon E-postasını Tekrar Gönder",
   "failed_to_resend": "Aktivasyon e-postası tekrar gönderilemedi",
   "error_occurred": "Bir hata oluştu. Lütfen tekrar deneyin.",
+  "too_many_attempts": "Çok fazla deneme yapıldı. Lütfen birkaç dakika bekleyip tekrar deneyin.",
   "didnt_receive_email": "E-postayı almadınız mı?",
   "activation_email_sent": "Aktivasyon e-postası gönderildi! Lütfen gelen kutunuzu kontrol edin.",
   "resend_available_in": "Tekrar gönderebileceğiniz süre:",

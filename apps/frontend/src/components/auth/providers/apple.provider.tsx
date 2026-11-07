@@ -2,13 +2,28 @@
 
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const AppleProvider = () => {
   const fetch = useFetch();
   const t = useT();
+  const toaster = useToaster();
   const gotoLogin = useCallback(async () => {
-    const link = await (await fetch('/auth/oauth/APPLE')).text();
-    window.location.href = link;
+    try {
+      const response = await fetch('/auth/oauth/APPLE');
+      // an error body is not a sign-in link
+      if (!response.ok) {
+        throw new Error(
+          `Login link request failed with status ${response.status}`
+        );
+      }
+      window.location.href = await response.text();
+    } catch (e) {
+      toaster.show(
+        t('error_occurred', 'An error occurred. Please try again.'),
+        'warning'
+      );
+    }
   }, []);
   return (
     <button

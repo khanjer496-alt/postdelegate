@@ -1,4 +1,4 @@
-jest.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({ PrismaRepository: class {} }));
+jest.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({ PrismaRepository: class {}, PrismaTransaction: class {} }));
 
 import { OAuthRepository } from './oauth.repository';
 
@@ -16,6 +16,7 @@ const make = (found: any) => {
   const repository = new OAuthRepository(
     {} as any,
     { model: { oAuthAuthorization: { findFirst } } } as any,
+    {} as any,
     {} as any
   );
   return { repository, findFirst };
@@ -56,8 +57,67 @@ describe('OAuthRepository.findByAccessToken', () => {
     expect((findFirst.mock.calls[0] as any[])[0].where).toEqual({
       accessToken: { in: ['enc'] },
       revokedAt: null,
+      oauthApp: { deletedAt: null },
       user: { deletedAt: null, activated: true },
       organization: { deletedAt: null },
     });
+  });
+});
+
+describe('OAuthRepository consent and exchange', () => {
+  const make = () => {
+    const oAuthAuthorization = {
+      upsert: jest.fn(async () => ({})),
+      updateMany: jest.fn(async () => ({ count: 1 })),
+      findUnique: jest.fn(async () => ({
+        organizationId: 'org-1',
+        organization: { paymentId: 'cus_1' },
+      })),
+    };
+    const repository = new OAuthRepository(
+      {} as any,
+      { model: { oAuthAuthorization } } as any,
+      {} as any,
+      {} as any
+    );
+    return { repository, oAuthAuthorization };
+  };
+
+  it('a new consent keeps the working token and never lifts a revocation', async () => {
+    const { repository, oAuthAuthorization } = make();
+    await repository.createAuthorization({
+      oauthAppId: 'app',
+      userId: 'u1',
+      organizationId: 'org-1',
+      authorizationCode: 'code',
+      codeExpiresAt: new Date(),
+    });
+    const { update } = (oAuthAuthorization.upsert.mock.calls[0] as any[])[0];
+    expect(update).not.toHaveProperty('accessToken');
+    expect(update).not.toHaveProperty('revokedAt');
+    expect(update.authorizationCode).toBe('code');
+  });
+
+  it('spends the code only while it is still that code and not expired', async () => {
+    const { repository, oAuthAuthorization } = make();
+    expect(
+      await repository.exchangeCodeForToken('a1', 'stored-code', 'token')
+    ).toEqual({ organizationId: 'org-1', organization: { paymentId: 'cus_1' } });
+    const args = (oAuthAuthorization.updateMany.mock.calls[0] as any[])[0];
+    expect(args.where).toMatchObject({
+      id: 'a1',
+      authorizationCode: 'stored-code',
+      codeExpiresAt: { gt: expect.any(Date) },
+    });
+    expect(args.data).toMatchObject({
+      accessToken: 'token',
+      revokedAt: null,
+      authorizationCode: null,
+    });
+
+    oAuthAuthorization.updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(
+      await repository.exchangeCodeForToken('a1', 'stored-code', 'token')
+    ).toBeNull();
   });
 });

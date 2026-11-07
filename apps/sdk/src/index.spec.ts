@@ -118,6 +118,15 @@ describe('PostDelegate SDK', () => {
     expect(JSON.parse(fn.mock.calls[3][1].body as string)).toEqual({ status: 'draft' });
   });
 
+  it('asks to republish only when told to', async () => {
+    const fn = mockFetch(200, {});
+    await make(fn).changePostStatus('p1', 'schedule', { republish: true });
+    expect(JSON.parse(fn.mock.calls[0][1].body as string)).toEqual({
+      status: 'schedule',
+      republish: true,
+    });
+  });
+
   it('throws PostDelegateError with the server message and status', async () => {
     await expect(make(mockFetch(401, { msg: 'Invalid API key' })).me()).rejects.toMatchObject({
       name: 'PostDelegateError',
