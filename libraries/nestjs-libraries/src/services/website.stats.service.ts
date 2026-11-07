@@ -53,7 +53,11 @@ export interface WebsiteSearch {
 }
 
 const TOP = 10;
-const RUM_RETENTION_DAYS = 180;
+// Cloudflare's own limits for this dataset: 184 days of history, 93 days
+// in one query
+const RUM_RETENTION_DAYS = 184;
+const RUM_MAX_RANGE_DAYS = 93;
+const UPSTREAM_TIMEOUT_MS = 15000;
 const SEARCH_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 
 const cacheSeconds = () =>
@@ -63,6 +67,9 @@ const cacheSeconds = () =>
 const eachDay = (from: string, to: string) => {
   const days: string[] = [];
   const last = dayjs(to);
+  if (!last.isValid() || !dayjs(from).isValid()) {
+    return days;
+  }
   for (let day = dayjs(from); !day.isAfter(last); day = day.add(1, 'day')) {
     days.push(day.format('YYYY-MM-DD'));
   }
@@ -165,12 +172,16 @@ export class WebsiteStatsService {
       return { connected: false };
     }
 
-    const oldest = dayjs()
+    const to = dayjs(params.to).format('YYYY-MM-DD');
+    const retained = dayjs()
       .subtract(RUM_RETENTION_DAYS - 1, 'day')
       .format('YYYY-MM-DD');
+    const longest = dayjs(params.to)
+      .subtract(RUM_MAX_RANGE_DAYS - 1, 'day')
+      .format('YYYY-MM-DD');
+    const oldest = retained > longest ? retained : longest;
     const requested = dayjs(params.from).format('YYYY-MM-DD');
     const from = requested < oldest ? oldest : requested;
-    const to = dayjs(params.to).format('YYYY-MM-DD');
 
     return this.cached<WebsiteVisitors>(
       `admin:website:visitors:${from}:${to}`,
@@ -210,6 +221,7 @@ export class WebsiteStatsService {
                   days: days.length,
                 },
               }),
+              signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
             }
           );
           const body = res.ok ? await res.json() : undefined;
@@ -275,11 +287,24 @@ export class WebsiteStatsService {
     return this.cached<WebsiteSearch>(
       `admin:website:search:${from}:${to}`,
       async () => {
-        let rows: SearchApiRow[][];
+        let account: { client_email?: string; private_key?: string };
         try {
-          const account = JSON.parse(
+          account = JSON.parse(
             Buffer.from(credentials, 'base64').toString('utf8')
           );
+        } catch {
+          // the parse error quotes the input, which is the private key
+          console.error('website_search_failed', {
+            err: 'credentials are not base64 service-account JSON',
+          });
+          return {
+            connected: true,
+            error: 'Search Console could not be reached',
+          };
+        }
+
+        let rows: SearchApiRow[][];
+        try {
           const auth = new JWT({
             email: account.client_email,
             key: account.private_key,
@@ -304,6 +329,7 @@ export class WebsiteStatsService {
                   ...(dimensions.length ? { dimensions } : {}),
                   rowLimit,
                 }),
+                signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
               }
             );
             if (!res.ok) {

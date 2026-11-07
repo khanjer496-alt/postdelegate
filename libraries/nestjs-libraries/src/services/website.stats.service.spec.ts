@@ -256,7 +256,7 @@ describe('WebsiteStatsService', () => {
     );
   });
 
-  it('moves a from older than Cloudflare keeps up to its oldest day', async () => {
+  it('moves a from older than Cloudflare allows in one query up', async () => {
     connectAll();
     fetchMock.mockResolvedValue(new Response(JSON.stringify(rumFixture())));
 
@@ -265,10 +265,22 @@ describe('WebsiteStatsService', () => {
       to: day(0),
     });
 
-    expect(visitors).toMatchObject({ from: iso(179), to: iso(0) });
+    expect(visitors).toMatchObject({ from: iso(92), to: iso(0) });
     expect(
       JSON.parse(fetchMock.mock.calls[0][1].body).variables.filter
-    ).toEqual(expect.objectContaining({ date_geq: iso(179) }));
+    ).toEqual(expect.objectContaining({ date_geq: iso(92) }));
+  });
+
+  it('never asks Cloudflare for days older than it keeps', async () => {
+    connectAll();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(rumFixture())));
+
+    const visitors = await new WebsiteStatsService().getVisitors({
+      from: day(250),
+      to: day(170),
+    });
+
+    expect(visitors).toMatchObject({ from: iso(183), to: iso(170) });
   });
 
   it('answers from the cache without asking Cloudflare', async () => {

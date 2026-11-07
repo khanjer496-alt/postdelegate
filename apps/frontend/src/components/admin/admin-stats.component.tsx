@@ -493,7 +493,7 @@ const WebsiteTable: FC<{
       ) : (
         rows.map((row) => (
           <div
-            key={row.name}
+            key={row.title || row.name}
             className={`grid ${grid} gap-[12px] px-[12px] py-[10px] text-[13px] border-b border-newTableBorder last:border-b-0`}
           >
             <div className="truncate" title={row.title || row.name}>
@@ -576,7 +576,7 @@ const WebsiteSection: FC<{ range: { from: string; to: string } }> = ({
               <SummaryCard
                 label="Visits"
                 value={visitors.totals.visits}
-                title="Page views that came from another website"
+                title="Page views that started a visit (from another site or opened directly)"
               />
               <SummaryCard
                 label="Page views"
