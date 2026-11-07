@@ -12,7 +12,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import { TRIAL_DAYS } from '../../data/plans';
 import { networkStatus, type Network } from '../../data/networks';
 import { CHECKED, IMAGE_SIZES, resizerGroupsFor } from '../../data/image-sizes';
-import { COUNTERS, UNIT_NOTES, MASTODON_NOTE, COUNTER_NETWORKS, RESIZER_NETWORKS, counterHref, resizerHref, toolName } from '../../data/network-tools';
+import { article, COUNTERS, UNIT_NOTES, MASTODON_NOTE, COUNTER_NETWORKS, RESIZER_NETWORKS, counterHref, resizerHref, toolName } from '../../data/network-tools';
 import { AGENTS, NETWORK_ASKS, agentGuideHref } from '../../data/agent-guides';
 import { SCHEDULERS } from '../../data/schedulers';
 interface Props { kind: 'counter' | 'resizer'; network: Network }
@@ -25,29 +25,30 @@ const groups = resizerGroupsFor(network.key);
 const status = networkStatus(network);
 const pending = SCHEDULERS.find((item) => item.key === network.key)?.pending;
 const href = kind === 'counter' ? counterHref(network) : resizerHref(network);
+const a = article(n), A = a === 'an' ? 'An' : 'A';
 const unitNote = network.urlCost ? MASTODON_NOTE : UNIT_NOTES[network.unit] ?? UNIT_NOTES.codepoints;
 // Bluesky and X publish no post image size; their presets are common shapes.
 const commonShapes = ['bluesky', 'x'].includes(network.key);
 
 const title = kind === 'counter' ? `${n} character counter (free) | PostDelegate` : `${n} image resizer: free and private | PostDelegate`;
 const description = kind === 'counter'
-  ? `Count a ${n} ${counter.what} against its ${limit}-character limit as you type, the way ${n} counts. Free, in your browser.`
+  ? `Count ${a} ${n} ${counter.what} against its ${limit}-character limit as you type, the way ${n} counts. Free, in your browser.`
   : `Resize an image to ${n} sizes and download it as JPEG or PNG. Free, in your browser: the image never leaves your device.`;
 const h1 = kind === 'counter' ? `${n} character counter` : `${n} image resizer`;
 const lead = kind === 'counter'
-  ? `Check a ${n} ${counter.what} against the ${limit}-character limit as you type. Your text stays in this browser.`
+  ? `Check ${a} ${n} ${counter.what} against the ${limit}-character limit as you type. Your text stays in this browser.`
   : `Resize an image to the right ${n} size and save it as JPEG or PNG. Everything happens in your browser: the image never leaves your device.`;
 
 const faq = kind === 'counter'
   ? [
-      { q: `What is the ${n} character limit?`, a: `A ${n} ${counter.what} can have up to ${limit} characters. ${counter.detail ?? ''}`.trim() },
+      { q: `What is the ${n} character limit?`, a: `${A} ${n} ${counter.what} can have up to ${limit} characters. ${counter.detail ?? ''}`.trim() },
       { q: `Do emoji and links count on ${n}?`, a: unitNote },
       { q: 'Is my text saved anywhere?', a: 'No. The count runs in your browser. Nothing you type is sent or stored.' },
       { q: 'Is this the exact count the platform uses?', a: `It follows the counting rule above and is a close planning estimate. ${n} checks the final post itself.` },
     ]
   : [
       { q: 'Is my image uploaded anywhere?', a: 'No. The image is read and resized by your browser on your own device. It is never uploaded, and nothing is saved after you close the page.' },
-      { q: `Where do these ${n} sizes come from?`, a: commonShapes ? `${n} does not publish a recommended size for images in posts, so the post preset uses a common shape. Every other size here is one ${n} states on its own help pages.` : `From ${n}’s own help pages, listed below with links, checked ${CHECKED}.` },
+      { q: `Where do these ${n} sizes come from?`, a: network.key === 'dribbble' ? 'They are the two sizes PostDelegate’s Dribbble connection posts at: images of at least 400×300 are cropped from the centre to 800×600 or 400×300.' : commonShapes ? `${n} does not publish a recommended size for images in posts, so the post preset uses a common shape.${groups.flatMap((group) => group.items).length > 1 ? ` Every other size here is one ${n} states on its own help pages.` : ''}` : `From ${n}’s own help pages, listed below with links, checked ${CHECKED}.` },
       { q: 'What is the difference between cover and contain?', a: '<strong>Cover</strong> fills the whole size and crops what does not fit. <strong>Contain</strong> fits the whole image inside the size and fills the leftover space with a colour you choose.' },
     ];
 const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name: h1, applicationCategory: kind === 'counter' ? 'UtilitiesApplication' : 'MultimediaApplication', operatingSystem: 'Any', offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, url: `${SITE.url}${href}` };
@@ -77,8 +78,8 @@ const otherKind = kind === 'counter' ? RESIZER_NETWORKS.find((other) => other.ke
     <div class="prose-pd mt-14 max-w-3xl">
       {counter && <>
         <h2>{n} character limit</h2>
-        <p>A {n} {counter.what} can have up to {limit} characters. {counter.detail}</p>
-        <h2>How {n} counts characters</h2>
+        <p>{A} {n} {counter.what} can have up to {limit} characters. {counter.detail}</p>
+        <h2>How this counter counts</h2>
         <p>{unitNote}</p>
       </>}
       {sizes && <>
@@ -92,7 +93,7 @@ const otherKind = kind === 'counter' ? RESIZER_NETWORKS.find((other) => other.ke
       </>}
       {otherKind && <p>Also for {n}: the free <a href={otherKind}>{kind === 'counter' ? `${n} image resizer` : `${n} character counter`}</a>.</p>}
 
-      <h2>Schedule {n} posts</h2>
+      <h2>{status === 'unavailable' ? `${n} and PostDelegate` : `Schedule ${n} posts`}</h2>
       {status === 'live'
         ? <p>PostDelegate publishes to {n} today. Plan posts on one calendar and schedule them with the <a href={`/${network.scheduler}`}>{n} scheduler</a>{NETWORK_ASKS[network.key] && <>, or have your assistant draft them: {AGENTS.map((agent, i) => <>{i > 0 && ' · '}<a href={agentGuideHref(agent, network)}>{agent.name}</a></>)}</>}. <a href={SITE.signup}>{CTA_LABEL}</a>, no card needed.</p>
         : status === 'waiting'
