@@ -1,5 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import { auditErrorBody } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.audit.body';
 
 const UNKNOWN_TOKEN = 'An unknown error occurred';
 
@@ -34,8 +35,15 @@ export class ErrorsRepository {
     return where;
   }
 
-  private get include() {
+  // The columns the admin errors view shows, and no others.
+  private get select() {
     return {
+      id: true,
+      message: true,
+      body: true,
+      platform: true,
+      postId: true,
+      createdAt: true,
       organization: {
         select: {
           id: true,
@@ -49,6 +57,11 @@ export class ErrorsRepository {
       },
       post: { select: { id: true, content: true } },
     } as const;
+  }
+
+  // rows written before the allowlist can still hold whole post rows
+  private audited<T extends { body: string }>(items: T[]): T[] {
+    return items.map((item) => ({ ...item, body: auditErrorBody(item.body) }));
   }
 
   async listPlatforms() {
@@ -65,7 +78,7 @@ export class ErrorsRepository {
     const limit = Math.min(Math.max(1, params.limit || 20), 100);
     const skip = page * limit;
     const where = this.buildWhere(params);
-    const include = this.include;
+    const select = this.select;
 
     if (!params.unknownFirst) {
       const [items, total] = await Promise.all([
@@ -74,12 +87,12 @@ export class ErrorsRepository {
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
-          include,
+          select,
         }),
         this._errors.model.errors.count({ where }),
       ]);
       return {
-        items,
+        items: this.audited(items),
         total,
         page,
         limit,
@@ -108,7 +121,7 @@ export class ErrorsRepository {
         orderBy: { createdAt: 'desc' },
         skip,
         take: takeUnknown,
-        include,
+        select,
       });
       const remaining = limit - unknownItems.length;
       if (remaining > 0) {
@@ -117,7 +130,7 @@ export class ErrorsRepository {
           orderBy: { createdAt: 'desc' },
           skip: 0,
           take: remaining,
-          include,
+          select,
         });
       }
     } else {
@@ -126,11 +139,11 @@ export class ErrorsRepository {
         orderBy: { createdAt: 'desc' },
         skip: skip - unknownTotal,
         take: limit,
-        include,
+        select,
       });
     }
 
-    const items = [...unknownItems, ...knownItems];
+    const items = this.audited([...unknownItems, ...knownItems]);
     const total = unknownTotal + knownTotal;
     return {
       items,
