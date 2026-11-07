@@ -9,10 +9,10 @@ import {
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { ListmonkDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/listmonk.dto';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import slugify from 'slugify';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { readCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 
 @Rules(
   'ListMonk sends the content as an email: pictures go inside the content as <img src="..."> where they should appear, the src must be a picture from the media library (upload it with uploadFromUrlTool first), attachments are not sent'
@@ -127,7 +127,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
   ) {
     const body: { url: string; username: string; password: string } =
       JSON.parse(
-        AuthService.fixedDecryption(integration.customInstanceDetails!)
+        readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
       );
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
@@ -154,7 +154,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
   ) {
     const body: { url: string; username: string; password: string } =
       JSON.parse(
-        AuthService.fixedDecryption(integration.customInstanceDetails!)
+        readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
       );
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
@@ -183,7 +183,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
   ): Promise<PostResponse[]> {
     const body: { url: string; username: string; password: string } =
       JSON.parse(
-        AuthService.fixedDecryption(integration.customInstanceDetails!)
+        readCustomInstanceDetails(integration.customInstanceDetails) ?? ''
       );
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(

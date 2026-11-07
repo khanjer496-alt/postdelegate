@@ -1,6 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import {
+  AI_CREDENTIAL_LABEL,
+} from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.repository';
+import {
+  readLegacySecret,
+} from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
 import { AiCredentialRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.repository';
 import { AiCredentialDto } from '@gitroom/nestjs-libraries/dtos/ai-credentials/ai.credential.dto';
 
@@ -21,7 +26,9 @@ export class AiCredentialService {
 
     return {
       provider: credential.provider,
-      maskedKey: mask(AuthService.fixedDecryption(credential.apiKey)),
+      maskedKey: mask(
+        readLegacySecret(credential.apiKey, AI_CREDENTIAL_LABEL) || ''
+      ),
     };
   }
 
@@ -63,7 +70,12 @@ export class AiCredentialService {
       throw new BadRequestException(MISSING_AI_KEY);
     }
 
-    return AuthService.fixedDecryption(credential.apiKey);
+    const key = readLegacySecret(credential.apiKey, AI_CREDENTIAL_LABEL);
+    if (!key) {
+      throw new BadRequestException(MISSING_AI_KEY);
+    }
+
+    return key;
   }
 
   async getOpenAiClient(orgId: string) {

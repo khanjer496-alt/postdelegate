@@ -13,6 +13,7 @@ import { Integration } from '@prisma/client';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { SkoolDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/skool.dto';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { readCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
 
 export class SkoolProvider extends SocialAbstract implements SocialProvider {
   identifier = 'skool';
@@ -35,7 +36,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
     const stored = integration.customInstanceDetails!;
     try {
       // Current format: credentials stored as at-rest AES-encrypted JSON.
-      return JSON.parse(AuthService.fixedDecryption(stored)) as {
+      return JSON.parse(readCustomInstanceDetails(stored) ?? '') as {
         client_id: string;
         auth_token: string;
       };

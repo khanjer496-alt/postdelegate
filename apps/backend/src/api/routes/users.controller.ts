@@ -125,7 +125,7 @@ export class UsersController {
         organization?.users[0]?.role === 'SUPERADMIN' ||
         // @ts-ignore
         organization?.users[0]?.role === 'ADMIN'
-          ? organization?.apiKey
+          ? this._orgService.readApiKey(organization)
           : '',
     };
   }
@@ -247,7 +247,10 @@ export class UsersController {
   @Post('/api-key/rotate')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async rotateApiKey(@GetOrgFromRequest() organization: Organization) {
-    return this._orgService.updateApiKey(organization.id);
+    // updateApiKey returns the new key; the caller re-reads it from
+    // /user/self, so it is deliberately not echoed in this response.
+    await this._orgService.updateApiKey(organization.id);
+    return { success: true };
   }
 
   @Get('/subscription')

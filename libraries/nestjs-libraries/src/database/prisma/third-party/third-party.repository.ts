@@ -1,6 +1,9 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { writeSecret } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
+
+// Folded into the AAD of a third-party integration's key.
+export const THIRD_PARTY_KEY_LABEL = 'third-party-key';
 
 @Injectable()
 export class ThirdPartyRepository {
@@ -48,7 +51,7 @@ export class ThirdPartyRepository {
         name: data.name,
         internalId: data.id,
         identifier,
-        apiKey: AuthService.fixedEncryption(apiKey),
+        apiKey: writeSecret(apiKey, THIRD_PARTY_KEY_LABEL),
         deletedAt: null,
       },
       update: {
@@ -56,7 +59,7 @@ export class ThirdPartyRepository {
         name: data.name,
         internalId: data.id,
         identifier,
-        apiKey: AuthService.fixedEncryption(apiKey),
+        apiKey: writeSecret(apiKey, THIRD_PARTY_KEY_LABEL),
         deletedAt: null,
       },
     });
