@@ -84,6 +84,20 @@ describe('the committed compose file', () => {
     expect(caddy).toContain('/etc/postiz/caddy.env');
   });
 
+  // Caddy reverse-proxies staging.postdelegate.com to a container in the
+  // separate staging project. While this was an attachment made by hand,
+  // recreating caddy dropped it and every staging page became a 502.
+  it('puts caddy on the staging project network as well as its own', () => {
+    const caddy = compose.slice(
+      compose.indexOf('\n  caddy:'),
+      compose.indexOf('\nnetworks:')
+    );
+    expect(caddy).toMatch(/networks:\s*\n\s*- default\s*\n\s*- staging/);
+    const networks = compose.slice(compose.indexOf('\nnetworks:'));
+    // external, so this project never creates or removes the staging network
+    expect(networks).toMatch(/staging:\s*\n\s*external: true\s*\n\s*name: postdelegate-staging/);
+  });
+
   it('publishes no database or cache port to the host', () => {
     // only Caddy may be reachable from outside the Compose network
     const published = compose
