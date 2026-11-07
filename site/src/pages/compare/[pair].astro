@@ -1,0 +1,24 @@
+---
+import CompareTool from '../../components/CompareTool.astro';
+import { TOOLS } from '../../data/tools';
+import { COMPARE_PAIRS, PAIR_FIT, pairHref } from '../../data/compare-pairs';
+export function getStaticPaths() { return COMPARE_PAIRS.map((pair) => ({ params: { pair: `${pair.a}-vs-${pair.b}` }, props: { pair } })); }
+const { pair } = Astro.props;
+const name = (slug: string) => TOOLS[slug].name;
+// Related: the other pairs with either tool, PostDelegate's own page for either, then the hubs.
+const versus = new Set(['buffer', 'hootsuite', 'later', 'post-bridge', 'postiz', 'publer', 'sprout-social']);
+const links = [
+  ...COMPARE_PAIRS.filter((other) => other !== pair && [other.a, other.b].some((slug) => slug === pair.a || slug === pair.b))
+    .slice(0, 6).map((other) => ({ href: pairHref(other), label: `${name(other.a)} vs ${name(other.b)}` })),
+  ...[pair.a, pair.b].filter((slug) => versus.has(slug)).map((slug) => ({ href: `/compare/${slug}`, label: `PostDelegate vs ${name(slug)}` })),
+  { href: '/compare', label: 'All comparisons' },
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/pricing', label: 'PostDelegate pricing' },
+];
+---
+<CompareTool
+  a={pair.a} b={pair.b} published={pair.published}
+  title={pair.title} description={pair.description} h1={pair.h1}
+  shortAnswer={pair.shortAnswer} costIntro={pair.costIntro} fitIntro={PAIR_FIT}
+  faq={pair.faq} links={links}
+/>
