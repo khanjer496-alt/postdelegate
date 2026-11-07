@@ -197,10 +197,13 @@ export class OAuthRepository {
     });
   }
 
-  findByCode(encryptedCode: string) {
+  // Takes every stored form the presented secret could have (hashes under the
+  // current and retired keys, plus the legacy ciphertext until the backfill has
+  // run) and matches any of them. An empty list matches nothing.
+  findByCode(storedCodes: string[]) {
     return this._oauthAuth.model.oAuthAuthorization.findFirst({
       where: {
-        authorizationCode: encryptedCode,
+        authorizationCode: { in: storedCodes },
         revokedAt: null,
       },
     });
@@ -231,11 +234,11 @@ export class OAuthRepository {
   // A token only works while the person who approved it is still an active,
   // activated member of the organization it was approved for (not removed,
   // disabled or deleted), otherwise it is as good as revoked
-  async findByAccessToken(encryptedToken: string) {
+  async findByAccessToken(storedTokens: string[]) {
     const authorization = await this._oauthAuth.model.oAuthAuthorization.findFirst(
       {
         where: {
-          accessToken: encryptedToken,
+          accessToken: { in: storedTokens },
           revokedAt: null,
           user: {
             deletedAt: null,
@@ -392,10 +395,10 @@ export class OAuthRepository {
     );
   }
 
-  findSelfHostedByCode(encryptedCode: string) {
+  findSelfHostedByCode(storedCodes: string[]) {
     return this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.findFirst({
       where: {
-        authorizationCode: encryptedCode,
+        authorizationCode: { in: storedCodes },
         revokedAt: null,
       },
       select: {
@@ -425,10 +428,10 @@ export class OAuthRepository {
     });
   }
 
-  findSelfHostedByAccessToken(encryptedToken: string) {
+  findSelfHostedByAccessToken(storedTokens: string[]) {
     return this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.findFirst({
       where: {
-        accessToken: encryptedToken,
+        accessToken: { in: storedTokens },
         revokedAt: null,
       },
       select: {
@@ -440,10 +443,10 @@ export class OAuthRepository {
     });
   }
 
-  findSelfHostedUserInfo(encryptedToken: string) {
+  findSelfHostedUserInfo(storedTokens: string[]) {
     return this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.findFirst({
       where: {
-        accessToken: encryptedToken,
+        accessToken: { in: storedTokens },
         revokedAt: null,
       },
       select: {
