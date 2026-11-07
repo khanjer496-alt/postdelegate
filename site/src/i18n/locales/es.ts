@@ -53,7 +53,7 @@ const dict: Dict = {
     subprocessors: 'Subencargados', licenses: 'Licencias', cookieSettings: 'Configuración de cookies',
     follow: 'Sigue a PostDelegate', featuredOn: 'Destacado en',
     rights: 'Todos los derechos reservados.',
-    source: 'Código fuente (AGPL-3.0)',
+    source: 'Código fuente',
     trademarks: 'Los nombres y logotipos de las redes pertenecen a sus respectivos propietarios.',
   },
   cookies: {
@@ -190,7 +190,7 @@ const dict: Dict = {
     },
     {
       q: '¿Mis datos están seguros?',
-      a: 'Los tokens de conexión y las credenciales que introduces se cifran en reposo, la app y el servidor de medios usan HTTPS, y las copias de seguridad externas se cifran antes de salir del servidor. Los archivos subidos se sirven desde enlaces públicos, así que sube solo lo que quieras publicar. Lee la <a href="https://app.postdelegate.com/legal/privacy/">política de privacidad</a>, el <a href="https://app.postdelegate.com/legal/dpa/">anexo de tratamiento de datos</a>, la lista de <a href="https://app.postdelegate.com/legal/subprocessors/">subencargados</a> y el <a href="https://app.postdelegate.com/source">código fuente (AGPL-3.0)</a>.',
+      a: 'Los tokens de conexión y las credenciales que introduces se cifran en reposo, la app y el servidor de medios usan HTTPS, y las copias de seguridad externas se cifran antes de salir del servidor. Los archivos subidos se sirven desde enlaces públicos, así que sube solo lo que quieras publicar. Lee la <a href="https://app.postdelegate.com/legal/privacy/">política de privacidad</a>, el <a href="https://app.postdelegate.com/legal/dpa/">anexo de tratamiento de datos</a>, la lista de <a href="https://app.postdelegate.com/legal/subprocessors/">subencargados</a> y el <a href="/licenses">código fuente (AGPL-3.0)</a>.',
     },
   ],
   home: {

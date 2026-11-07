@@ -53,7 +53,7 @@ const dict: Dict = {
     subprocessors: 'Sous-traitants', licenses: 'Licences', cookieSettings: 'Paramètres des cookies',
     follow: 'Suivre PostDelegate', featuredOn: 'Vu sur',
     rights: 'Tous droits réservés.',
-    source: 'Code source (AGPL-3.0)',
+    source: 'Code source',
     trademarks: 'Les noms et logos des réseaux appartiennent à leurs propriétaires respectifs.',
   },
   cookies: {
@@ -170,7 +170,7 @@ const dict: Dict = {
     { q: 'Quand Instagram, TikTok et LinkedIn seront-ils disponibles ?', a: 'Chaque réseau examine une application avant de l’autoriser à publier pour ses utilisateurs. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest et Reddit attendent l’approbation de leur plateforme. X n’est pas disponible sur PostDelegate. Nous ne communiquons pas de dates, car les délais dépendent de chaque réseau. Suivez la <a href="/roadmap">feuille de route</a> et l’<a href="/platforms">état des plateformes</a>.' },
     { q: 'Le nombre de publications est-il limité ?', a: 'Non. Chaque forfait inclut des publications illimitées chaque mois. L’API publique accepte jusqu’à 30 requêtes de création de publication par heure et par espace de travail ; consultez les <a href="/docs/api#rate-limits">limites de requêtes</a>.' },
     { q: 'Mes clients peuvent-ils approuver les publications ?', a: 'Oui. Partagez un lien d’approbation client : votre client voit la publication telle qu’elle apparaîtra, puis l’approuve ou demande des modifications, sans créer de compte. La publication ne part pas tant qu’elle est en attente. Consultez les <a href="/docs/approvals">approbations</a>.' },
-    { q: 'Mes données sont-elles en sécurité ?', a: 'Les jetons de connexion et les identifiants que vous saisissez sont chiffrés au repos, l’application et l’hébergement des médias utilisent HTTPS, et les sauvegardes externes sont chiffrées avant de quitter le serveur. Les médias importés sont servis via des liens publics : n’importez donc que ce que vous comptez publier. Lisez la <a href="https://app.postdelegate.com/legal/privacy/">politique de confidentialité</a>, l’<a href="https://app.postdelegate.com/legal/dpa/">accord de traitement des données</a>, la liste des <a href="https://app.postdelegate.com/legal/subprocessors/">sous-traitants</a> et le <a href="https://app.postdelegate.com/source">code source (AGPL-3.0)</a>.' },
+    { q: 'Mes données sont-elles en sécurité ?', a: 'Les jetons de connexion et les identifiants que vous saisissez sont chiffrés au repos, l’application et l’hébergement des médias utilisent HTTPS, et les sauvegardes externes sont chiffrées avant de quitter le serveur. Les médias importés sont servis via des liens publics : n’importez donc que ce que vous comptez publier. Lisez la <a href="https://app.postdelegate.com/legal/privacy/">politique de confidentialité</a>, l’<a href="https://app.postdelegate.com/legal/dpa/">accord de traitement des données</a>, la liste des <a href="https://app.postdelegate.com/legal/subprocessors/">sous-traitants</a> et le <a href="/licenses">code source (AGPL-3.0)</a>.' },
   ],
   home: {
     title: 'PostDelegate : planificateur social pour équipes et IA',

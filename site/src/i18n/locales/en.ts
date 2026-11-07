@@ -72,7 +72,7 @@ const en = {
     subprocessors: 'Sub-processors', licenses: 'Licenses', cookieSettings: 'Cookie settings',
     follow: 'Follow PostDelegate', featuredOn: 'Featured on',
     rights: 'All rights reserved.',
-    source: 'Source code (AGPL-3.0)',
+    source: 'Source code',
     trademarks: 'Network names and logos belong to their respective owners.',
   },
   cookies: {

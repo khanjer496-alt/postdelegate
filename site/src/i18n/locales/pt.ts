@@ -53,7 +53,7 @@ const dict: Dict = {
     subprocessors: 'Suboperadores', licenses: 'Licenças', cookieSettings: 'Configurações de cookies',
     follow: 'Siga o PostDelegate', featuredOn: 'Em destaque no',
     rights: 'Todos os direitos reservados.',
-    source: 'Código-fonte (AGPL-3.0)',
+    source: 'Código-fonte',
     trademarks: 'Os nomes e logotipos das redes pertencem aos seus respectivos donos.',
   },
   cookies: {
@@ -190,7 +190,7 @@ const dict: Dict = {
     },
     {
       q: 'Meus dados estão seguros?',
-      a: 'Os tokens de conexão e as credenciais que você informa são criptografados em repouso, o app e o servidor de mídia usam HTTPS, e os backups externos são criptografados antes de sair do servidor. A mídia enviada é servida por links públicos, então envie apenas o que você pretende publicar. Leia a <a href="https://app.postdelegate.com/legal/privacy/">política de privacidade</a>, o <a href="https://app.postdelegate.com/legal/dpa/">adendo de processamento de dados</a>, a lista de <a href="https://app.postdelegate.com/legal/subprocessors/">suboperadores</a> e o <a href="https://app.postdelegate.com/source">código-fonte (AGPL-3.0)</a>.',
+      a: 'Os tokens de conexão e as credenciais que você informa são criptografados em repouso, o app e o servidor de mídia usam HTTPS, e os backups externos são criptografados antes de sair do servidor. A mídia enviada é servida por links públicos, então envie apenas o que você pretende publicar. Leia a <a href="https://app.postdelegate.com/legal/privacy/">política de privacidade</a>, o <a href="https://app.postdelegate.com/legal/dpa/">adendo de processamento de dados</a>, a lista de <a href="https://app.postdelegate.com/legal/subprocessors/">suboperadores</a> e o <a href="/licenses">código-fonte (AGPL-3.0)</a>.',
     },
   ],
   home: {
