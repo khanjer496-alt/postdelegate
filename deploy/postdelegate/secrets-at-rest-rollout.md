@@ -9,8 +9,9 @@ be read back). Both keys derive from the **already-deployed**
 `TOKEN_ENCRYPTION_KEY`; no new environment variable. Nothing a customer holds
 changes.
 
-**This is two deploys.** Read §6 before starting: there is a point after which
-rolling the image back locks every customer out of the public API.
+**This is two deploys, and it is effectively one-way.** Read §6 before
+starting: the safe rollback window closes at the first new-format write, which
+is the moment this release serves traffic — not at the backfill.
 
 ---
 
@@ -37,7 +38,11 @@ run before letting it run:
 npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma --script
 ```
 
-## 2. Deploy
+## 2. Back up, then deploy
+
+Take the database backup **here**, before the deploy — not before the backfill.
+§6 explains why: the rollback window closes at the first new-format write, which
+is the moment this release serves traffic.
 
 This release **writes only the new form** and **reads either**. Nothing
 dual-writes. A customer whose rows the backfill has not reached authenticates
@@ -119,21 +124,35 @@ It will also invalidate any authorization code issued in the preceding ten
 minutes, since those are the one thing the backfill does not convert. The
 affected customer retries the connect flow.
 
-## 6. The rollback window
+## 6. The rollback window closes at the first new-format write
 
-Before the backfill, rolling the image back is safe.
+**Not at the backfill.** `TOKEN_ENCRYPTION_KEY` is already set in production, so
+this release starts writing the new forms the moment it serves traffic — long
+before §3. Each of these flips a row, with no backfill involved:
 
-**After the backfill it is not.** `Organization.apiKey` then holds `enc:v1:…`
-for every workspace, and the previous release matches that column by plain
-equality — so a rollback would:
+| Event | Column, new value |
+|---|---|
+| A workspace signs up, rotates its key, or simply makes a request while having no key yet (`AuthMiddleware` mints one) | `Organization.apiKey` → `enc:v1:…`, `apiKeyHash` set |
+| Any OAuth authorization, code exchange, token refresh, or client-secret rotation | `accessToken` / `authorizationCode` / `clientSecret` → `h1:…` |
+| A customer saves an AI key or a third-party key | `apiKey` → `enc:v1:…` |
+| Anyone connects or reconnects a Bluesky, Lemmy, Listmonk, custom Mastodon or Skool channel, or the extension | `customInstanceDetails` → `enc:v1:…` |
 
-- reject every customer's API key on the public API,
-- break every configured `/mcp/<apiKey>` URL in Claude and ChatGPT, and
-- show each customer a ciphertext where their key used to be.
+The previous release matches and decrypts only the legacy forms, so rolling the
+image back after any of those writes would, for the affected rows:
 
-So: take the backup before §3, and if something is wrong after the backfill,
-roll **forward** with a fix rather than back. Restoring the pre-backfill
-database would also undo it, at the cost of everything written since.
+- reject that workspace's API key on the public API, break its configured
+  `/mcp/<apiKey>` URLs, and show the customer a ciphertext where the key was;
+- reject OAuth access tokens, so connected apps stop working;
+- fail to read AI keys, third-party keys and custom-instance credentials, so
+  those integrations and channels break.
+
+After the backfill this is true of **every** workspace rather than the recently
+active ones, but the difference is scope, not kind.
+
+**So, in practice:** take the backup **before §2**, not before §3. Once the
+release is serving traffic, treat rollback as unavailable — recovery is to roll
+*forward* with a fix. Restoring the pre-deploy database would also work, at the
+cost of everything written since.
 
 ## 7. Rotating `TOKEN_ENCRYPTION_KEY`
 
