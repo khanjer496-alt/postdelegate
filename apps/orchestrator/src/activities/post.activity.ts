@@ -155,7 +155,7 @@ export class PostActivity {
     for (const post of list) {
       await this._temporalService.client
         .getRawClient()
-        .workflow.signalWithStart('postWorkflowV112', {
+        .workflow.signalWithStart('postWorkflowV113', {
           workflowId: `post_${post.id}`,
           taskQueue: 'main',
           signal: 'poke',
@@ -606,6 +606,42 @@ export class PostActivity {
   @ActivityMethod()
   async changeState(id: string, state: State, err?: any, body?: any) {
     await this._postService.changeState(id, state, err, body);
+  }
+
+  // Used by postWorkflowV113 and up: writes the state only while the post is
+  // still in one of the expected states and not deleted, so a late run, a
+  // duplicate run or a retried failure never overwrites a post that was
+  // published, moved to draft or already failed. Returns whether it wrote.
+  // `release` keeps the platform id / URL of an item that went out.
+  @ActivityMethod()
+  async changeStateIf(
+    id: string,
+    expectedStates: State[],
+    state: State,
+    err?: any,
+    body?: any,
+    release?: { releaseId: string; releaseURL?: string }
+  ) {
+    return !!(await this._postService.changeStateIf(
+      id,
+      expectedStates,
+      state,
+      err,
+      body,
+      release
+    ));
+  }
+
+  // getPost / getPostsList return nothing both for a deleted post and for an
+  // organization without an active subscription: postWorkflowV113 asks this
+  // to tell the two apart.
+  @ActivityMethod()
+  async hasActiveSubscription(orgId: string) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return true;
+    }
+
+    return !!(await this._subscriptionService.getSubscription(orgId));
   }
 
   @ActivityMethod()

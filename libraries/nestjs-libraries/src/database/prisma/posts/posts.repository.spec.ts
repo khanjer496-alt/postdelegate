@@ -256,3 +256,147 @@ describe('PostsRepository channel-state scoping', () => {
     expect(post.findMany.mock.calls[0][0].where.integration).toEqual(ready);
   });
 });
+
+describe('PostsRepository state writes', () => {
+  const makeStateRepo = (matched = 1) => {
+    const row = {
+      id: 'p-1',
+      integrationId: 'int-1',
+      organizationId: 'org-1',
+      state: 'QUEUE',
+    };
+    const tx = {
+      post: {
+        findUnique: jest.fn().mockResolvedValue(row),
+        updateMany: jest.fn().mockResolvedValue({ count: matched }),
+      },
+      integration: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ providerIdentifier: 'x' }),
+      },
+      errors: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const transaction = {
+      model: { $transaction: jest.fn((cb: any) => cb(tx)) },
+    };
+    const repo = new PostsRepository(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      transaction as any,
+      {} as any
+    );
+    return { repo, tx };
+  };
+
+  it('changeStateIf writes only while the post is in an expected state', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await expect(
+      repo.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom')
+    ).resolves.toMatchObject({ id: 'p-1' });
+
+    const [args] = tx.post.updateMany.mock.calls[0];
+    expect(args.where).toMatchObject({
+      id: 'p-1',
+      AND: [{ state: { in: ['QUEUE'] } }, { integrationId: 'int-1' }],
+      deletedAt: null,
+    });
+    expect(args.data).toEqual({ state: 'ERROR', error: 'boom' });
+  });
+
+  it('changeStateIf is a no-op for a post that moved on or is gone', async () => {
+    const { repo, tx } = makeStateRepo(0);
+
+    await expect(
+      repo.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom', [{ id: 'p-1' }])
+    ).resolves.toBeNull();
+    expect(tx.errors.create).not.toHaveBeenCalled();
+  });
+
+  it('changeStateIf lets a database failure through, so the activity retries', async () => {
+    const { repo, tx } = makeStateRepo();
+    tx.post.updateMany.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      repo.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'boom')
+    ).rejects.toThrow('db down');
+  });
+
+  it('changeStateIf keeps the release of a post that went out', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await repo.changeStateIf('p-1', ['QUEUE'], 'ERROR', 'unconfirmed', undefined, {
+      releaseId: 'x-1',
+      releaseURL: 'https://x.com/1',
+    });
+
+    expect(tx.post.updateMany.mock.calls[0][0].data).toEqual({
+      state: 'ERROR',
+      error: 'unconfirmed',
+      releaseId: 'x-1',
+      releaseURL: 'https://x.com/1',
+    });
+  });
+
+  it('never stores the integration credentials in the error log', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await repo.changeState('p-1', 'ERROR', 'boom', [
+      {
+        id: 'p-1',
+        content: 'hello',
+        accessToken: 'leak',
+        integration: {
+          id: 'int-1',
+          name: 'X account',
+          providerIdentifier: 'x',
+          token: 'access-secret',
+          refreshToken: 'refresh-secret',
+          customInstanceDetails: 'client-secret',
+        },
+      },
+    ]);
+
+    const { body } = tx.errors.create.mock.calls[0][0].data;
+    expect(JSON.parse(body)).toEqual([
+      {
+        id: 'p-1',
+        content: 'hello',
+        integration: { id: 'int-1', name: 'X account', providerIdentifier: 'x' },
+      },
+    ]);
+    expect(body).not.toContain('secret');
+    expect(body).not.toContain('leak');
+  });
+
+  it('clears the last error when a post is queued again or moved to draft', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await repo.changeState('p-1', 'QUEUE');
+    await repo.changeState('p-1', 'DRAFT');
+    await repo.changeState('p-1', 'ERROR');
+
+    expect(tx.post.updateMany.mock.calls.map(([args]: any) => args.data)).toEqual([
+      { state: 'QUEUE', error: null },
+      { state: 'DRAFT', error: null },
+      { state: 'ERROR' },
+    ]);
+  });
+
+  it('updatePost clears the error of an earlier attempt', async () => {
+    const { repo, tx } = makeStateRepo();
+
+    await repo.updatePost('p-1', 'x-1', 'https://x.com/1');
+
+    expect(tx.post.updateMany.mock.calls[0][0].data).toEqual({
+      state: 'PUBLISHED',
+      releaseURL: 'https://x.com/1',
+      releaseId: 'x-1',
+      error: null,
+    });
+  });
+});

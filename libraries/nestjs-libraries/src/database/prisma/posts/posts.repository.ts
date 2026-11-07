@@ -530,7 +530,8 @@ export class PostsRepository {
   updatePost(id: string, postId: string, releaseURL: string, expectedIntegrationId?: string) {
     return this.updateActivePost(
       id,
-      { state: 'PUBLISHED', releaseURL, releaseId: postId },
+      // a post published on a retry must not keep the earlier attempt's error
+      { state: 'PUBLISHED', releaseURL, releaseId: postId, error: null },
       expectedIntegrationId ? { integrationId: expectedIntegrationId } : {}
     );
   }
@@ -573,37 +574,8 @@ export class PostsRepository {
     );
   }
 
-  async changeState(id: string, state: State, err?: any, body?: any) {
-    const updated = await this.updateActivePost(
-      id,
-      {
-        state,
-        ...(err
-          ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
-          : {}),
-      },
-      {},
-      true
-    );
-    if (state === 'ERROR' && err && body) {
-      try {
-        // Audit logging remains best-effort, but this second transaction must
-        // lock and recheck the original channel/post before retaining payloads.
-        await this.updateActivePost(
-          id,
-          { deletedAt: null },
-          { integrationId: updated!.integrationId },
-          true,
-          {
-            message: typeof err === 'string' ? err : JSON.stringify(err),
-            body: typeof body === 'string' ? body : JSON.stringify(body),
-          }
-        );
-      } catch {
-        // The state transition committed independently of audit availability.
-      }
-    }
-    return updated;
+  changeState(id: string, state: State, err?: any, body?: any) {
+    return this.writeState(id, state, err, body);
   }
 
   getErrorsByPostIds(postIds: string[]) {
@@ -1477,5 +1449,122 @@ export class PostsRepository {
         },
       },
     });
+  }
+
+  // Like changeState, but only while the post is still in one of the expected
+  // states: the state check and the write are one conditional updateMany (see
+  // updateActivePost), so a run racing another writer - the user, the
+  // missing-posts sweep, another run - can never overwrite what that one
+  // recorded. A post that is gone or no longer in those states is not a
+  // failure, there is just nothing to write: it returns null.
+  async changeStateIf(
+    id: string,
+    expectedStates: State[],
+    state: State,
+    err?: any,
+    body?: any,
+    release?: { releaseId: string; releaseURL?: string }
+  ) {
+    try {
+      return await this.writeState(
+        id,
+        state,
+        err,
+        body,
+        { state: { in: expectedStates } },
+        release
+      );
+    } catch (e) {
+      if (e instanceof BadRequestException) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  private async writeState(
+    id: string,
+    state: State,
+    err?: any,
+    body?: any,
+    conditions: Prisma.PostWhereInput = {},
+    release?: { releaseId: string; releaseURL?: string }
+  ) {
+    const updated = await this.updateActivePost(
+      id,
+      {
+        state,
+        ...(err
+          ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
+          : // queued again or back to draft: the last failure no longer applies
+          state === 'QUEUE' || state === 'DRAFT'
+          ? { error: null }
+          : {}),
+        // a post that went out and then failed keeps where it went out
+        ...(release
+          ? {
+              releaseId: String(release.releaseId),
+              ...(release.releaseURL ? { releaseURL: release.releaseURL } : {}),
+            }
+          : {}),
+      },
+      conditions,
+      true
+    );
+    if (state === 'ERROR' && err && body) {
+      try {
+        // Audit logging remains best-effort, but this second transaction must
+        // lock and recheck the original channel/post before retaining payloads.
+        await this.updateActivePost(
+          id,
+          { deletedAt: null },
+          { integrationId: updated!.integrationId },
+          true,
+          {
+            message: typeof err === 'string' ? err : JSON.stringify(err),
+            body:
+              typeof body === 'string'
+                ? body
+                : JSON.stringify(this.auditBody(body)),
+          }
+        );
+      } catch {
+        // The state transition committed independently of audit availability.
+      }
+    }
+    return updated;
+  }
+
+  // Errors.body is a debug snapshot, read by the admin errors view and the
+  // post debug export. The workflows pass the posts they were publishing, and
+  // those carry the decrypted integration (token, refreshToken,
+  // customInstanceDetails) - never store it: keep only what names the channel,
+  // and drop anything else that looks like a credential.
+  private auditBody(body: any): any {
+    const strip = (item: any) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return item;
+      }
+
+      const { integration, submittedForOrder, ...rest } = item;
+      return {
+        ...Object.fromEntries(
+          Object.entries(rest).filter(
+            ([key]) => !/token|secret|password/i.test(key)
+          )
+        ),
+        ...(integration && typeof integration === 'object'
+          ? {
+              integration: {
+                id: integration.id,
+                name: integration.name,
+                providerIdentifier: integration.providerIdentifier,
+              },
+            }
+          : {}),
+      };
+    };
+
+    return Array.isArray(body) ? body.map(strip) : strip(body);
   }
 }
