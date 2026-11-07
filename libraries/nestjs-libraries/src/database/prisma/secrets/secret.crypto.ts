@@ -238,6 +238,21 @@ export const SecretCrypto = {
   },
 };
 
+// How a recoverable credential is stored. With a key configured that is this
+// module's AES-GCM; without one it is the legacy scheme, never plaintext, so a
+// self-hosted instance with no TOKEN_ENCRYPTION_KEY is no worse off than before.
+export const writeSecret = <T extends string | null | undefined>(
+  value: T,
+  label: string
+): T => {
+  if (!value || SecretCrypto.isEncrypted(value)) {
+    return value;
+  }
+  return SecretCrypto.isEnabled()
+    ? SecretCrypto.encrypt(value, label)
+    : (AuthService.fixedEncryption(value as string) as T);
+};
+
 // Reads a credential whichever scheme wrote it: this module's AES-GCM, or the
 // AuthService.fixedEncryption of releases before it. null and '' read as null,
 // so an erased row needs no special case at the call site. Callers that parse

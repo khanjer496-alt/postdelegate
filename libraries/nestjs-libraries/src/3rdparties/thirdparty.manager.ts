@@ -25,6 +25,12 @@ export class ThirdPartyManager {
       }));
   }
 
+  // The readable key for a saved integration. The controller never sees the
+  // stored form.
+  readApiKey(thirdParty?: { apiKey?: string | null } | null) {
+    return this._thirdPartyService.readApiKey(thirdParty);
+  }
+
   getThirdPartyByName(
     identifier: string
   ): (ThirdPartyParams & { instance: ThirdPartyAbstract }) | undefined {

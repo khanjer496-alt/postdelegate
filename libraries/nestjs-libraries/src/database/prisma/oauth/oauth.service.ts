@@ -5,7 +5,11 @@ import { UpdateOAuthAppDto } from '@gitroom/nestjs-libraries/dtos/oauth/update-o
 import { RegisterClientDto } from '@gitroom/nestjs-libraries/dtos/oauth/register-client.dto';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import { SecretCrypto } from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
+import {
+  readLegacySecret,
+  SecretCrypto,
+  writeSecret,
+} from '@gitroom/nestjs-libraries/database/prisma/secrets/secret.crypto';
 import { extractBearerToken } from '@gitroom/nestjs-libraries/chat/oauth-types';
 import { createHash } from 'crypto';
 import { OAuthApp } from '@prisma/client';
@@ -110,6 +114,10 @@ const isAllowedPrivateScheme = (protocol: string) => {
 // lifted from one column into another. The refresh token has no label of its
 // own: a connection's refresh token *is* its access token (see refreshFields),
 // stored in the same column.
+// The API key of a self-hosted instance a cloud connection relays to: it is
+// replayed to that instance, so it has to be readable.
+export const MCP_RELAY_KEY_LABEL = 'mcp-relay-key';
+
 export const OAUTH_SECRET_LABELS = {
   accessToken: 'oauth-access-token',
   code: 'oauth-code',
@@ -572,7 +580,7 @@ export class OAuthService {
     await this._oauthRepository.createSelfHostedAuthorization({
       oauthAppId,
       mcpUrl: instance.mcpUrl,
-      apiKey: AuthService.fixedEncryption(instance.apiKey),
+      apiKey: writeSecret(instance.apiKey, MCP_RELAY_KEY_LABEL),
       email: instance.email,
       authorizationCode: this.storedSecret(code, OAUTH_SECRET_LABELS.code),
       codeExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
@@ -863,7 +871,7 @@ export class OAuthService {
     return {
       id: authorization.id,
       mcpUrl: authorization.mcpUrl,
-      apiKey: AuthService.fixedDecryption(authorization.apiKey),
+      apiKey: readLegacySecret(authorization.apiKey, MCP_RELAY_KEY_LABEL),
     };
   }
 

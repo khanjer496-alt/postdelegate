@@ -1,6 +1,7 @@
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import {
   readLegacySecret,
+  writeSecret,
   SECRET_HASH_PREFIX,
   SecretCrypto,
   SecretCryptoError,
@@ -154,6 +155,47 @@ describe('SecretCrypto', () => {
     );
     expect(SecretCrypto.isHashed(null)).toBe(false);
     expect(SecretCrypto.isEncrypted(undefined)).toBe(false);
+  });
+});
+
+describe('writeSecret', () => {
+  const env = { ...process.env };
+
+  beforeEach(() => {
+    process.env.TOKEN_ENCRYPTION_KEY = KEY;
+    delete process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS;
+    process.env.JWT_SECRET = 'jwt-secret-for-the-legacy-path';
+    SecretCrypto.reset();
+  });
+
+  afterAll(() => {
+    process.env = { ...env };
+    SecretCrypto.reset();
+  });
+
+  it('encrypts with the new scheme when a key is configured', () => {
+    const stored = writeSecret('v', 'a');
+    expect(SecretCrypto.isEncrypted(stored)).toBe(true);
+    expect(readLegacySecret(stored, 'a')).toBe('v');
+  });
+
+  // Without a key the new scheme cannot encrypt. It must fall back to the
+  // legacy scheme, NOT store the secret in the clear - a self-hosted instance
+  // with no key configured is no worse off than before.
+  it('falls back to the legacy scheme rather than storing plaintext', () => {
+    delete process.env.TOKEN_ENCRYPTION_KEY;
+    SecretCrypto.reset();
+
+    const stored = writeSecret('v', 'a');
+    expect(stored).not.toBe('v');
+    expect(stored).not.toContain('v');
+    expect(readLegacySecret(stored, 'a')).toBe('v');
+  });
+
+  it('leaves null, undefined and the erased sentinel alone', () => {
+    expect(writeSecret(null, 'a')).toBe(null);
+    expect(writeSecret(undefined, 'a')).toBe(undefined);
+    expect(writeSecret('', 'a')).toBe('');
   });
 });
 
