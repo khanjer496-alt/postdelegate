@@ -69,7 +69,7 @@ const dict: Dict = {
     attribution: 'الإحالات',
     attributionText: 'تنسب الفضل لمن أحالك.',
     analytics: 'التحليلات',
-    analyticsText: 'تتعرّف على الزيارات المتكررة.',
+    analyticsText: 'تحسب الزيارات المتكررة وتنسب التسجيلات إلى مصدرها.',
     reject: 'رفض',
     customize: 'تخصيص',
     accept: 'قبول',

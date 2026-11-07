@@ -50,8 +50,15 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/postdelegate-apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <!-- Pulse: our self-hosted, cookie-free analytics. It stores nothing on the
-         device, so it needs no cookie-banner choice; public/_headers allows it. -->
+    <!-- Pulse: our self-hosted analytics, cookie-free unless the visitor agreed
+         to Analytics in the cookie banner (CookieConsent.astro owns that choice).
+         An earlier "yes" is queued before the tracker loads, so Pulse applies it
+         before its first pageview; public/_headers allows both scripts. -->
+    <script is:inline>
+      // v1: keep in step with CONSENT_VERSION in libraries/helpers/src/consent/consent.cookie.ts
+      if (/(?:^|; )pd_consent=v1\|(?:[^;|]*\|)*analytics:1(?:[|;]|$)/.test(document.cookie))
+        (window.pulse = window.pulse || function () { (window.pulse.q = window.pulse.q || []).push(arguments); })('consent', true);
+    </script>
     <script defer src="https://pulse.nasidaapps.com/js/script.js" data-site="postdelegate"></script>
     <meta property="og:site_name" content="PostDelegate" />
     <meta property="og:type" content={type} />
@@ -89,7 +96,8 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
     
       // Pulse's visitor id rides along in this visit's links to the app's sign-up
       // and sign-in, and the app saves it on the Stripe checkout (pulse_vid) so
-      // the revenue is credited to the visit. Nothing is stored on the device.
+      // the revenue is credited to the visit. With Analytics consent the id is
+      // derived from Pulse's pulse_vid cookie; without it, it is that day's cookie-free id.
       // Without Pulse (blocked, or no visitor id to give) the links stay as they
       // are.
       type Pulse = { visitorId?: () => Promise<string> };
