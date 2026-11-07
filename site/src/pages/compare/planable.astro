@@ -85,7 +85,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="Planable alternative: PostDelegate vs Planable compared" description="PostDelegate vs Planable: flat channel plans against per-workspace pricing, approval layers, 50 free posts, MCP that publishes or only drafts, and add-on costs." h1="PostDelegate vs Planable." eyebrow="Compare" lead="Planable is built around approvals: multiple layers of them, with unlimited users on Basic and Pro. PostDelegate is built around a calendar and an API. The question is whether you are paying for the review process or the publishing." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit Planable</a>
 
   <h2>At a glance</h2>

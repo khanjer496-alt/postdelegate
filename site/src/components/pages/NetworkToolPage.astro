@@ -95,7 +95,7 @@ const otherKind = kind === 'counter' ? RESIZER_NETWORKS.find((other) => other.ke
 
       <h2>{status === 'unavailable' ? `${n} and PostDelegate` : `Schedule ${n} posts`}</h2>
       {status === 'live'
-        ? <p>PostDelegate publishes to {n} today. Plan posts on one calendar and schedule them with the <a href={`/${network.scheduler}`}>{n} scheduler</a>{NETWORK_ASKS[network.key] && <>, or have your assistant draft them: {AGENTS.map((agent, i) => <>{i > 0 && ' · '}<a href={agentGuideHref(agent, network)}>{agent.name}</a></>)}</>}. <a href={SITE.signup} data-pulse-goal="trial_started">{CTA_LABEL}</a>, no card needed.</p>
+        ? <p>PostDelegate publishes to {n} today. Plan posts on one calendar and schedule them with the <a href={`/${network.scheduler}`}>{n} scheduler</a>{NETWORK_ASKS[network.key] && <>, or have your assistant draft them: {AGENTS.map((agent, i) => <>{i > 0 && ' · '}<a href={agentGuideHref(agent, network)}>{agent.name}</a></>)}</>}. <a href={SITE.signup} data-pulse-goal="trial_clicked">{CTA_LABEL}</a>, no card needed.</p>
         : status === 'waiting'
           ? <p>{n} publishing on PostDelegate opens once {pending ?? `${n} approves PostDelegate`}. Until then you can plan posts for the networks that are live today; see <a href="/platforms">platform status</a>.</p>
           : <p>PostDelegate does not publish to {n}. See the <a href="/platforms">networks it publishes to</a>.</p>}

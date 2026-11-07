@@ -36,7 +36,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title={p.title} description={p.description} h1={p.h1} eyebrow={p.eyebrow} lead={p.lead} jsonLd={[crumbs, faqLd]} lang={lang}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{t.common.ctaLabel}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{t.common.ctaLabel}</a>
   <a slot="actions" href={href('/pricing')} class="button button-outline">{p.seePricing}</a>
   <h2>{p.comparisonsTitle}</h2>
   <div class="document-grid">

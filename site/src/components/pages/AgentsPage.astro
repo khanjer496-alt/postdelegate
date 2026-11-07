@@ -10,7 +10,7 @@ const p = t.agentsPage;
 const guides = ['/mcp', '/api', '/claude-cowork', '/codex'].map((href, index) => ({ ...p.guides[index], href: localeHref(lang, href) }));
 ---
 <Doc title={p.title} description={p.description} h1={p.h1} eyebrow={p.eyebrow} lead={p.lead} lang={lang}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{t.common.ctaLabel}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{t.common.ctaLabel}</a>
   <a slot="actions" href="/docs" class="button button-outline">{p.readDocs}</a>
   <div class="document-grid">
     {guides.map((guide) => <a href={guide.href} class="document-card"><h2>{guide.title}</h2><p>{guide.text}</p><span>{p.explore}</span></a>)}

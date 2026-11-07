@@ -47,7 +47,7 @@ const otherAgents = AGENTS.filter((other) => other.slug !== agent.slug);
 const otherNetworks = GUIDE_NETWORKS.filter((other) => other.key !== network.key);
 ---
 <Doc title={title} description={description} h1={`Post to ${n} from ${a}`} eyebrow={`${a} + ${n}`} lead={`Connect ${a} to PostDelegate once, then ask it for ${n} posts ${agent.where}. Ask for a draft and it waits on your calendar until you schedule it.`} jsonLd={[crumbs, howToLd, faqLd]}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">Start your {TRIAL_DAYS}-day free trial</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">Start your {TRIAL_DAYS}-day free trial</a>
   <a slot="actions" href={agent.docs} class="button button-outline">{a} setup guide</a>
   <div class="ag-head">
     <NetworkBadge n={network} size="lg" />

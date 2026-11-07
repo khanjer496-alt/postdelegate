@@ -68,9 +68,9 @@ const current = LANGUAGES[lang];
           {languages.map((language) => <li><a href={language.href} hreflang={language.code} lang={language.code} aria-current={language.code === lang ? 'true' : undefined}><Flag code={language.flag} /><span dir={language.dir === 'rtl' ? 'rtl' : undefined}>{language.name}</span><small aria-hidden="true">{language.short}</small></a></li>)}
         </ul>
       </div>
-      <a href={SITE.login} class="sign-in">{h.signIn}</a><a href={SITE.signup} class="create-account" data-pulse-goal="signup_started" data-pulse-goal-location="header">{t.common.ctaShort} <span aria-hidden="true">↗</span></a>
+      <a href={SITE.login} class="sign-in">{h.signIn}</a><a href={SITE.signup} class="create-account" data-pulse-goal="signup_clicked" data-pulse-goal-location="header">{t.common.ctaShort} <span aria-hidden="true">↗</span></a>
     </div>
-    <a href={SITE.signup} class="mobile-cta" data-pulse-goal="signup_started" data-pulse-goal-location="header">{t.common.ctaShort}</a>
+    <a href={SITE.signup} class="mobile-cta" data-pulse-goal="signup_clicked" data-pulse-goal-location="header">{t.common.ctaShort}</a>
     <details class="mobile-menu" data-mobile-menu>
       <summary class="mobile-toggle" aria-label={h.openMenu} data-open-label={h.openMenu} data-close-label={h.closeMenu}><span class="menu-label">{h.menu}</span><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14" /></svg></summary>
       <div class="mobile-panel">
@@ -80,7 +80,7 @@ const current = LANGUAGES[lang];
           <a class="mobile-direct" href="/docs" aria-current={path === '/docs' || path.startsWith('/docs/') ? 'page' : undefined}>{h.docs}</a>
           <details class="mobile-group mobile-lang"><summary><span class="mobile-lang-label">{h.language}<span class="mobile-lang-current"><Flag code={current.flag} />{current.name}</span></span><span class="mobile-plus" aria-hidden="true">+</span></summary><div>{languages.map((language) => <a href={language.href} hreflang={language.code} lang={language.code} aria-current={language.code === lang ? 'true' : undefined}><Flag code={language.flag} /><span dir={language.dir === 'rtl' ? 'rtl' : undefined}>{language.name}</span></a>)}</div></details>
         </nav>
-        <div class="mobile-actions"><a href={SITE.login} class="sign-in">{h.signIn}</a><a href={SITE.signup} class="create-account" data-pulse-goal="signup_started" data-pulse-goal-location="menu">{t.common.ctaShort} <span aria-hidden="true">↗</span></a></div>
+        <div class="mobile-actions"><a href={SITE.login} class="sign-in">{h.signIn}</a><a href={SITE.signup} class="create-account" data-pulse-goal="signup_clicked" data-pulse-goal-location="menu">{t.common.ctaShort} <span aria-hidden="true">↗</span></a></div>
       </div>
     </details>
   </div>

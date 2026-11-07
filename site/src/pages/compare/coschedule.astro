@@ -84,7 +84,7 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
 const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
 ---
 <Doc title="CoSchedule alternative: PostDelegate vs CoSchedule compared" description="PostDelegate vs CoSchedule: flat channel plans against a calendar with per-profile add-ons, the X surcharge, no public API and no MCP server." h1="PostDelegate vs CoSchedule." eyebrow="Compare" lead="CoSchedule is a marketing calendar with social publishing attached. PostDelegate is a social scheduler with an API attached. The three things to check are the per-profile add-ons, the X surcharge, and whether you mind giving a card to start a trial." jsonLd={[crumbs, faqLd]}>
-  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_started" class="button">{CTA_LABEL}</a>
+  <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href={them.site} class="button button-outline" target="_blank" rel="noreferrer">Visit CoSchedule</a>
 
   <h2>At a glance</h2>
