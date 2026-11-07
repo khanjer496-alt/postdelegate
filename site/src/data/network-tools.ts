@@ -4,6 +4,7 @@
 // DEV.to, Nostr, ...) get none. A resizer exists for every network with a preset in image-sizes.ts.
 import { NETWORKS, type Network } from './networks';
 import { RESIZER_GROUPS } from './image-sizes';
+import { ogCardFor } from './og-cards.mjs';
 
 /** What the limit applies to, and anything a writer should know about it. */
 export const COUNTERS: Record<string, { what: string; detail?: string }> = {
@@ -46,3 +47,7 @@ export const counterHref = (n: Network) => `/tools/${slug(n)}-character-counter`
 export const resizerHref = (n: Network) => `/tools/${slug(n)}-image-resizer`;
 export const COUNTER_NETWORKS = NETWORKS.filter((n) => COUNTERS[n.key]);
 export const RESIZER_NETWORKS = NETWORKS.filter((n) => RESIZER_GROUPS.some((group) => group.items.some((item) => item[4] === n.key)));
+// scripts/og.mjs cannot see the pages a dynamic route generates, so every one must have a share
+// card in og-cards.mjs or the build fails here.
+const noCard = [...COUNTER_NETWORKS.map(counterHref), ...RESIZER_NETWORKS.map(resizerHref)].filter((href) => !ogCardFor(href));
+if (noCard.length) throw new Error(`these tool pages have no share card - add them to src/data/og-cards.mjs:\n  ${noCard.join('\n  ')}`);

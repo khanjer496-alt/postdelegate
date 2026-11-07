@@ -113,6 +113,8 @@ const checkEveryPageHasOne = async () => {
       // foo.md.ts as a page, and index is the section's own card
       if (name.startsWith('_') || name.startsWith('index.')) continue;
       if (name.includes('.') && !/\.(astro|md|mdx)$/.test(name)) continue;
+      // a dynamic route checks its own generated pages, as tools/[tool] does in network-tools.ts
+      if (name.startsWith('[')) continue;
       const path = `/${section}/${name.replace(/\.(astro|md|mdx)$/, '')}`;
       if (!OG_CARDS[path]) missing.push(path);
     }
