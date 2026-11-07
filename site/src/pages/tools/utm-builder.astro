@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import PageHero from '../../components/PageHero.astro';
 import CtaBand from '../../components/CtaBand.astro';
+import AppShot from '../../components/AppShot.astro';
 const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'UTM link builder', applicationCategory: 'UtilitiesApplication', operatingSystem: 'Any', offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, url: 'https://postdelegate.com/tools/utm-builder' };
 ---
 <Base title="UTM link builder for social posts | PostDelegate" description="Free UTM link builder: add source, medium and campaign to a URL so your analytics shows where social visits came from. Runs in your browser." jsonLd={[app]}>
@@ -19,6 +20,10 @@ const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name:
       <p id="msg" class="mt-2 min-h-5 text-sm text-ink-3" aria-live="polite"></p>
     </div>
     <div class="prose-pd mt-10"><h2>Good to know</h2><ul><li>The rest of your link, including other query parameters and the URL fragment, is kept exactly as you typed it.</li><li>An existing utm_source, utm_medium or utm_campaign is replaced by the value you enter. Leave a field empty to keep that parameter as it is.</li><li>Your analytics tool must support UTM attribution to report these visits.</li></ul></div>
+    <AppShot
+      shot="composer"
+      caption="Where the link ends up: a post being written in PostDelegate, with the preview of it beside the editor."
+    />
   </div></section>
   <CtaBand />
 </Base>

@@ -5,6 +5,7 @@ import CtaBand from '../../components/CtaBand.astro';
 import Faq from '../../components/Faq.astro';
 import { NETWORKS } from '../../data/networks';
 import { SITE, CTA_LABEL } from '../../data/site';
+import AppShot from '../../components/AppShot.astro';
 // The description rule comes from NETWORKS (5,000 UTF-8 bytes). Title and tag limits follow the
 // YouTube Data API reference: title 100 characters, tags 500 characters including commas.
 const youtube = NETWORKS.find((n) => n.key === 'youtube')!;
@@ -81,6 +82,10 @@ const meters = [meter('title', rules.title.limit, 'characters'), meter('descript
       </ul>
       <p>Ready to plan your uploads? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
     </div>
+    <AppShot
+      shot="composer"
+      caption="Writing the post in PostDelegate, with the per-network limit counted as you type."
+    />
   </div></section>
   <CtaBand title="Plan your next upload." text="Write the title and description, then schedule the video on one calendar. Try PostDelegate free for 7 days, no card needed." />
 </Base>

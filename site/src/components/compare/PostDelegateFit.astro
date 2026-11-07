@@ -6,6 +6,7 @@ import { AVAILABLE_NETWORKS, WAITING_NETWORKS } from '../../data/networks';
 import { TRIAL_DAYS } from '../../data/plans';
 import { SITE, CTA_LABEL } from '../../data/site';
 import FactCell from './FactCell.astro';
+import AppShot from '../AppShot.astro';
 interface Props { intro: string }
 const { intro } = Astro.props;
 const pd = tool('postdelegate');
@@ -23,6 +24,10 @@ const pending = WAITING_NETWORKS.map((n) => n.name).join(', ');
     <div><dt>API and MCP</dt><dd><FactCell fact={pd.mcp} vendor="PostDelegate" /></dd></div>
     <div><dt>AI</dt><dd><FactCell fact={pd.ai} vendor="PostDelegate" /></dd></div>
   </dl>
+  <AppShot
+    shot="calendar"
+    caption="PostDelegate's calendar in month view: the connected channels down the side, and what is scheduled, day by day."
+  />
   <p class="pd-fit-actions"><a href={SITE.signup} class="button">{CTA_LABEL}</a><a href="/mcp" class="button button-outline">How MCP works</a></p>
 </section>
 <style>

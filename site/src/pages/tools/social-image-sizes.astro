@@ -3,6 +3,7 @@ import Doc from '../../layouts/Doc.astro';
 import Faq from '../../components/Faq.astro';
 import { NETWORKS, networkStatus } from '../../data/networks';
 import { SITE, CTA_LABEL } from '../../data/site';
+import AppShot from '../../components/AppShot.astro';
 import { CHECKED, IMAGE_SIZES as sections } from '../../data/image-sizes';
 const byKey = new Map(NETWORKS.map((n) => [n.key, n]));
 const rows = sections.map((s) => ({ ...s, network: byKey.get(s.key)! }));
@@ -48,6 +49,10 @@ const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', it
   </ul>
   <p>Ready to plan the posts these images go with? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
   <p>Platform names belong to their owners. PostDelegate is not affiliated with or endorsed by any of the platforms listed.</p>
+  <AppShot
+    shot="composer"
+    caption="Composing a post in PostDelegate: Insert Media attaches the image, and the preview beside the editor is what goes out."
+  />
 </Doc>
 <style>
   .status { margin: -6px 0 6px; font-size: 14px; }

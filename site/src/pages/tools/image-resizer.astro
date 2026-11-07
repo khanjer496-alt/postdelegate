@@ -6,6 +6,7 @@ import Faq from '../../components/Faq.astro';
 import ImageResizer from '../../components/ImageResizer.astro';
 import { RESIZER_GROUPS } from '../../data/image-sizes';
 import { SITE, CTA_LABEL } from '../../data/site';
+import AppShot from '../../components/AppShot.astro';
 const url = `${SITE.url}/tools/image-resizer`;
 const app = { '@context': 'https://schema.org', '@type': 'WebApplication', name: 'Social media image resizer', applicationCategory: 'MultimediaApplication', operatingSystem: 'Any', offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, url };
 const faq = [
@@ -47,6 +48,10 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
       </ul>
       <p>Ready to schedule the post that goes with it? <a href={SITE.signup}>{CTA_LABEL}</a>. No card is needed.</p>
     </div>
+    <AppShot
+      shot="composer"
+      caption="Composing a post in PostDelegate: Insert Media attaches the resized image, and the preview beside the editor is what goes out."
+    />
   </div></section>
   <CtaBand title="Put your images to work." text="Keep images in the media library and schedule them with your posts on one calendar. Try PostDelegate free for 7 days, no card needed." />
 </Base>

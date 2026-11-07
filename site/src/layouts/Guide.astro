@@ -3,10 +3,13 @@ import Doc from './Doc.astro';
 import { GUIDES } from '../data/guides';
 import { SITE, CTA_LABEL } from '../data/site';
 import { ogCardFor } from '../data/og-cards.mjs';
+import AppShot from '../components/AppShot.astro';
 // Markdown guides pass { frontmatter }; .astro guides pass the same prop by hand.
-interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string } }
+// `shot` is opt-in: the same picture on all eighteen guides is wallpaper, so a
+// guide asks for one only where it shows what that guide is describing.
+interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string; shot?: 'calendar' | 'composer'; shotCaption?: string } }
 const { frontmatter } = Astro.props;
-const { title, description, metaTitle, date = '2026-11-01' } = frontmatter;
+const { title, description, metaTitle, date = '2026-11-01', shot, shotCaption } = frontmatter;
 const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
 const url = new URL(path, SITE.url).href;
 const more = GUIDES.filter((guide) => `/guides/${guide.slug}` !== path);
@@ -27,6 +30,7 @@ const jsonLd = [
   <a slot="actions" href={SITE.signup} class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/guides" class="button button-outline">All guides</a>
   <div class="guide-body"><slot /></div>
+  {shot && shotCaption && <AppShot shot={shot} caption={shotCaption} />}
   <h2>More guides</h2>
   <ul>{more.map((guide) => <li><a href={`/guides/${guide.slug}`}>{guide.title}</a></li>)}</ul>
 </Doc>

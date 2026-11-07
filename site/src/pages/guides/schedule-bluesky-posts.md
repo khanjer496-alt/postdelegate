@@ -4,6 +4,8 @@ title: "How to schedule Bluesky posts and threads"
 metaTitle: "How to Schedule Bluesky Posts and Threads | PostDelegate"
 description: "Connect Bluesky with an app password, then schedule posts, threads, images and video from one calendar. Includes time slots, repeats and the API."
 date: "2026-11-01"
+shot: "composer"
+shotCaption: "Writing a Bluesky post in PostDelegate: the counter follows the network you picked, here 205 of Bluesky's 300 characters, and the preview beside it is what goes out."
 ---
 
 If you want a Bluesky post to go out at 9am while you are asleep or offline, you need a tool that holds it and publishes it for you. This guide shows how to do that in PostDelegate: connect your account safely, write a post or a thread, attach media, and choose when it goes out.
