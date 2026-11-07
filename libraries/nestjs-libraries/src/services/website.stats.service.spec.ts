@@ -21,12 +21,14 @@ const ENV = [
   'CLOUDFLARE_WEB_ANALYTICS_SITE_TAG',
   'GOOGLE_SEARCH_CONSOLE_SITE',
   'GOOGLE_SEARCH_CONSOLE_CREDENTIALS',
+  'FRONTEND_URL',
 ];
 
 const connectAll = () => {
   process.env.CLOUDFLARE_ANALYTICS_TOKEN = 'cf-secret-token';
   process.env.CLOUDFLARE_ACCOUNT_ID = 'account_1';
   process.env.CLOUDFLARE_WEB_ANALYTICS_SITE_TAG = 'site_1';
+  process.env.FRONTEND_URL = 'https://app.postdelegate.com';
   process.env.GOOGLE_SEARCH_CONSOLE_SITE = 'sc-domain:postdelegate.com';
   process.env.GOOGLE_SEARCH_CONSOLE_CREDENTIALS = Buffer.from(
     JSON.stringify({
@@ -220,12 +222,19 @@ describe('WebsiteStatsService', () => {
     expect(init.headers.Authorization).toBe('Bearer cf-secret-token');
     expect(JSON.parse(init.body).variables).toEqual({
       accountTag: 'account_1',
-      filter: { siteTag: 'site_1', bot: 0, date_geq: iso(2), date_leq: iso(0) },
+      filter: {
+        siteTag: 'site_1',
+        bot: 0,
+        date_geq: iso(2),
+        date_leq: iso(0),
+        requestHost_notin: ['app.postdelegate.com', 'localhost', '127.0.0.1'],
+      },
       referrerFilter: {
         siteTag: 'site_1',
         bot: 0,
         date_geq: iso(2),
         date_leq: iso(0),
+        requestHost_notin: ['app.postdelegate.com', 'localhost', '127.0.0.1'],
         refererHost_neq: '',
       },
       days: 3,

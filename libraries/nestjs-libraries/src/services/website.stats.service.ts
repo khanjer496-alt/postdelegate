@@ -63,6 +63,14 @@ const SEARCH_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const cacheSeconds = () =>
   !process.env.NODE_ENV || process.env.NODE_ENV === 'development' ? 1 : 900;
 
+const appHost = () => {
+  try {
+    return new URL(process.env.FRONTEND_URL || '').hostname;
+  } catch {
+    return '';
+  }
+};
+
 // every day of the range, days without data included
 const eachDay = (from: string, to: string) => {
   const days: string[] = [];
@@ -200,8 +208,18 @@ export class WebsiteStatsService {
           };
         }
 
-        // bots are left out, like the Web Analytics dashboard does
-        const filter = { siteTag, bot: 0, date_geq: from, date_leq: to };
+        // bots are left out, like the Web Analytics dashboard does, and so
+        // are the app itself and local test runs: the site tag covers every
+        // host of the zone
+        const filter = {
+          siteTag,
+          bot: 0,
+          date_geq: from,
+          date_leq: to,
+          requestHost_notin: [appHost(), 'localhost', '127.0.0.1'].filter(
+            Boolean
+          ),
+        };
         let accounts: Record<string, RumGroup[]>[];
         try {
           const res = await fetch(
