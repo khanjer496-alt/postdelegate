@@ -110,7 +110,7 @@ The same file is only imported once. To add the skipped rows, fix them and impor
 ## Limits
 
 - Up to 200 posts per file, and up to 1 MB. Split larger plans into several files.
-- Imported posts count like any other post. Paid plans have no practical monthly post limit.
+- Imported posts count like any other post. Paid plans include unlimited posts per month.
 
 ## Imports and approvals
 

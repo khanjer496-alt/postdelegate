@@ -124,9 +124,9 @@ const dict: Dict = {
     ultimate: 'Per tantissimi canali.',
   },
   perks: {
-    team: 'Invita i membri del tuo team',
+    team: 'Membri del team illimitati',
     solo: 'Solo tu', soloNote: 'Nessun posto per il team in questo piano',
-    posts: 'Nessun limite pratico ai post',
+    posts: 'Post illimitati ogni mese',
     agent: 'Claude, ChatGPT e script', agentNote: 'Server MCP e API REST pubblica',
     webhooks: (count: string) => `${count} webhook`, webhooksNote: 'Avvisa i tuoi strumenti quando un post viene pubblicato',
     studio: 'Video verticali con Content Studio', studioNote: 'Uso corretto',
@@ -154,6 +154,9 @@ const dict: Dict = {
     customText: (max: string) => `Ti servono più di ${max} canali? Parliamone.`,
     customSubject: 'Piano su misura',
     talkToUs: 'Contattaci',
+    // the checklist under every plan card; each item is documented under /docs
+    everyPlanTitle: 'In ogni piano',
+    everyPlan: ['Post in serie e commenti', 'Post ricorrenti ed evergreen', 'Link di approvazione per i clienti', 'Importazione in blocco da CSV', 'Gruppi di clienti', 'Analisi', 'Set e firme', 'Viste giorno, settimana, mese ed elenco'],
     whyTitle: 'Perché niente crediti IA?',
     whyText: 'Usi la tua chiave OpenAI, o l’assistente che paghi già, quindi paghi le tariffe di OpenAI senza alcun ricarico da parte nostra e senza un tetto mensile di crediti.',
     note: 'Prezzi in dollari USA. L’IA funziona con la tua chiave OpenAI o con l’assistente che usi già tramite <a href="/docs/mcp">MCP</a>, e PostDelegate non la fa mai pagare. Content Studio è incluso in ogni piano a pagamento, con uso corretto. Una sola prova gratuita per indirizzo email. Consulta <a href="/docs/billing">piani e fatturazione</a>.',
@@ -177,7 +180,7 @@ const dict: Dict = {
     },
     {
       q: 'C’è un limite ai post?',
-      a: 'Non c’è alcun limite pratico ai post, in nessun piano. L’API pubblica accetta fino a 30 richieste di creazione post all’ora per workspace; vedi i <a href="/docs/api#rate-limits">limiti di frequenza</a>.',
+      a: 'No. Ogni piano include post illimitati ogni mese. L’API pubblica accetta fino a 30 richieste di creazione post all’ora per workspace; vedi i <a href="/docs/api#rate-limits">limiti di frequenza</a>.',
     },
     {
       q: 'I miei clienti possono approvare i post?',
@@ -264,7 +267,7 @@ const dict: Dict = {
     rowYearly: 'Prezzo annuale',
     rowChannels: 'Canali',
     channelsExtra: (channels: number, price: number, max: string) => `${channels}, poi $${price}/mese per ogni canale extra, fino a ${max}`,
-    rowPosts: 'Post al mese', postsValue: 'Nessun limite pratico',
+    rowPosts: 'Post al mese', postsValue: 'Illimitati',
     rowTeam: 'Membri del team',
     rowApi: 'API pubblica e MCP',
     rowStudio: 'Content Studio (uso corretto)',
