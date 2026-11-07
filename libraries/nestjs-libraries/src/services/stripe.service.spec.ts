@@ -2715,3 +2715,107 @@ describe('admin growth stats', () => {
     });
   });
 });
+
+// A renewal that fails was handled by nobody: Stripe was not subscribed to
+// invoice.payment_failed and the switch had no case for it, so a customer whose
+// card expired heard nothing until the subscription vanished.
+describe('StripeService failed renewal', () => {
+  const organizationService = { getOrgByCustomerId: jest.fn() };
+  const notificationService = {
+    inAppNotification: jest.fn(),
+    sendEmailsToOrgAdmins: jest.fn(),
+  };
+  const service = new StripeService(
+    {} as any,
+    organizationService as any,
+    {} as any,
+    { track: jest.fn() } as any,
+    {} as any,
+    notificationService as any
+  );
+
+  const event = (over: any = {}) =>
+    ({
+      id: 'evt_1',
+      type: 'invoice.payment_failed',
+      data: { object: { id: 'in_1', ...over } },
+    } as any);
+
+  const invoice = (over: any = {}) => ({
+    id: 'in_1',
+    customer: 'cus_1',
+    status: 'open',
+    next_payment_attempt: 1793600000,
+    ...over,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.FRONTEND_URL = 'https://app.example.com';
+    organizationService.getOrgByCustomerId.mockResolvedValue({ id: 'org-1' });
+    mockStripe.invoices.retrieve.mockResolvedValue(invoice());
+  });
+
+  it('tells the workspace and the admins, and says when the retry is', async () => {
+    await expect(service.paymentFailed(event())).resolves.toEqual({ ok: true });
+
+    expect(notificationService.inAppNotification).toHaveBeenCalledTimes(1);
+    expect(notificationService.sendEmailsToOrgAdmins).toHaveBeenCalledTimes(1);
+    const [orgId, subject, message] =
+      notificationService.inAppNotification.mock.calls[0];
+    expect(orgId).toBe('org-1');
+    expect(subject).toMatch(/payment/i);
+    expect(message).toMatch(/try again/i);
+    // the retry date, so the message is actionable
+    expect(message).toContain('2026');
+  });
+
+  it('says the plan will be cancelled when there is no further attempt', async () => {
+    mockStripe.invoices.retrieve.mockResolvedValue(
+      invoice({ next_payment_attempt: null })
+    );
+
+    await service.paymentFailed(event());
+
+    const [, , message] = notificationService.inAppNotification.mock.calls[0];
+    expect(message).toMatch(/cancel/i);
+    expect(message).not.toMatch(/try again/i);
+  });
+
+  // a retried webhook can arrive days later, by which time the card may have
+  // worked: alarming the customer then would be worse than silence
+  it('stays quiet when the invoice has since been paid', async () => {
+    mockStripe.invoices.retrieve.mockResolvedValue(invoice({ status: 'paid' }));
+
+    await expect(service.paymentFailed(event())).resolves.toEqual({ ok: true });
+
+    expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+    expect(notificationService.sendEmailsToOrgAdmins).not.toHaveBeenCalled();
+  });
+
+  it('stays quiet for an invoice with no organisation behind it', async () => {
+    organizationService.getOrgByCustomerId.mockResolvedValue(null);
+
+    await expect(service.paymentFailed(event())).resolves.toEqual({ ok: true });
+
+    expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+  });
+
+  it('never throws out of the webhook, whatever Stripe returns', async () => {
+    mockStripe.invoices.retrieve.mockRejectedValue(new Error('stripe down'));
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(service.paymentFailed(event())).resolves.toEqual({ ok: true });
+
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it('is wired into the webhook switch', () => {
+    const source = require('fs').readFileSync(
+      require('path').join(__dirname, 'stripe.service.ts'),
+      'utf8'
+    );
+    expect(source).toContain("case 'invoice.payment_failed':");
+  });
+});
