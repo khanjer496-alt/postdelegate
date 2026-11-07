@@ -1,0 +1,24 @@
+{
+  "name": "SocialBee",
+  "slug": "socialbee",
+  "site": "https://socialbee.com",
+  "pricingUrl": "https://socialbee.com/pricing/",
+  "checked": "2026-11-07",
+  "kind": { "value": "Social media scheduling built around reusable content categories, with AI content generation, analytics, an engagement inbox and team collaboration", "src": "https://socialbee.com/pricing/" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://socialbee.com/pricing/" },
+  "pricingModel": { "value": "Flat tiers by number of connected social profiles, each with its own user and workspace caps. Add-ons bought in the app: 1 extra user $10/month, 1 extra workspace $10/month, a set of 5 extra profiles $15/month (monthly billing)", "src": "https://socialbee.com/pricing/" },
+  "freeOption": { "value": "No free plan; the FAQ states posting stops automatically once the 14-day trial expires", "src": "https://socialbee.com/pricing/" },
+  "trial": { "value": "14-day free trial with full Pro access, no credit card required, plus a 30-day money-back guarantee", "src": "https://socialbee.com/pricing/" },
+  "entryPaid": { "value": "Bootstrap, $29/month on monthly billing, up to 5 social profiles", "src": "https://socialbee.com/pricing/" },
+  "plans": { "value": "Bootstrap $29 (5 profiles), Accelerate $49 (10), Pro $99 (25); agency tiers Pro50 $179 (50), Pro100 $329 (100), Pro150 $449 (150). Monthly billing, before VAT", "note": "The cards open on the yearly toggle, which shows $24.20, $40.80 and $82.50; the figures here are the monthly-billing prices the comparison table also lists.", "src": "https://socialbee.com/pricing/" },
+  "cost": {
+    "3": { "value": "$29", "note": "Bootstrap covers up to 5 profiles on monthly billing, so 3 needs no add-on.", "src": "https://socialbee.com/pricing/" },
+    "10": { "value": "$49", "note": "Accelerate includes exactly 10 profiles. Bootstrap at $29 plus one 5-profile add-on at $15 also reaches 10 for $44, but keeps Bootstrap's lower limits on categories, sources and analytics history.", "src": "https://socialbee.com/pricing/" },
+    "30": { "value": "$114", "note": "Pro is $99 for 25 profiles and a 5-profile add-on is $15 a month, so 30 profiles come to $114. The next published tier without add-ons is Pro50 at $179.", "src": "https://socialbee.com/pricing/" }
+  },
+  "networks": { "value": "Facebook (profiles, pages, groups), Instagram, Threads, LinkedIn (profiles and pages), X, Pinterest, TikTok, YouTube, Google Business Profile and Bluesky. Universal Posting through the mobile app adds WhatsApp, Telegram, Mastodon, Quora and others", "src": "https://socialbee.com/pricing/" },
+  "api": { "value": "No public API on the pricing page; the automation integrations listed are Zapier, Pabbly and Make", "note": "SocialBee's help-centre article on API access could not be read (a bot challenge blocks it), so this reflects the pricing page only.", "src": "https://socialbee.com/pricing/" },
+  "mcp": { "value": "No MCP server is mentioned on the pricing page", "src": "https://socialbee.com/pricing/" },
+  "ai": { "value": "Unlimited AI content generation on every plan, plus an AI Copilot that drafts a posting strategy; no credit limits are stated", "src": "https://socialbee.com/pricing/" },
+  "teams": { "value": "1 user and 1 workspace on Bootstrap and Accelerate; 3 users and 5 workspaces on Pro; 5 users per workspace on the agency tiers. Post approval from Accelerate up, internal notes from Pro. Extra users and workspaces are $10/month each", "src": "https://socialbee.com/pricing/" }
+}

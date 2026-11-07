@@ -28,6 +28,22 @@ const PAIRS = [
   { href: '/compare/publer-vs-metricool', tools: ['Publer', 'Metricool'] },
   { href: '/alternatives/postiz', tools: ['Postiz', 'PostDelegate'] },
 ].map((card, index) => ({ ...card, ...p.pairs[index], href: localeHref(lang, card.href) }));
+// The newer head-to-heads. The cards above take their copy from the localised
+// `versus` and `pairs` arrays by position, so adding to those would need a
+// translation for every locale before the page could build; these pages are
+// English only, so they are listed as plain links on the English page.
+const MORE = [
+  ['/compare/metricool', 'Metricool'],
+  ['/compare/sendible', 'Sendible'],
+  ['/compare/agorapulse', 'Agorapulse'],
+  ['/compare/socialbee', 'SocialBee'],
+  ['/compare/loomly', 'Loomly'],
+  ['/compare/planable', 'Planable'],
+  ['/compare/vista-social', 'Vista Social'],
+  ['/compare/zoho-social', 'Zoho Social'],
+  ['/compare/coschedule', 'CoSchedule'],
+  ['/compare/typefully', 'Typefully'],
+];
 ---
 <Doc title={p.title} description={p.description} h1={p.h1} eyebrow={p.eyebrow} lead={p.lead} lang={lang}>
   <div class="compare-grid">
@@ -42,6 +58,15 @@ const PAIRS = [
     <h2>{p.morePairsTitle}</h2>
     <ul class="pair-links">{COMPARE_PAIRS.map((pair) => <li><a href={pairHref(pair)}>{TOOLS[pair.a].name} vs {TOOLS[pair.b].name}</a></li>)}</ul>
   </>}
+  {lang === 'en' && (
+    <Fragment>
+      <h2>More comparisons</h2>
+      <p>Each of these reads the other tool's own pricing page for its prices, says where that tool is the better pick, and works out what it costs at ten and thirty accounts wherever the vendor publishes enough to do so.</p>
+      <ul>
+        {MORE.map(([href, name]) => <li><a href={href}>PostDelegate vs {name}</a></li>)}
+      </ul>
+    </Fragment>
+  )}
   <Fragment set:html={localizeLinks(lang, p.body)} />
 </Doc>
 <style>

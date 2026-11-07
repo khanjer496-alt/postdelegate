@@ -1,0 +1,18 @@
+{
+  "name": "Typefully",
+  "slug": "typefully",
+  "site": "https://typefully.com",
+  "pricingUrl": "https://typefully.com/pricing",
+  "checked": "2026-11-07",
+  "kind": { "value": "Writing and scheduling workspace for X, LinkedIn, Threads, Bluesky, Mastodon and Substack, with a calendar, X analytics, editorial AI and team collaboration", "src": "https://typefully.com/pricing" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://typefully.com/pricing" },
+  "pricingModel": { "value": "Per social set, which is a collection of accounts for one person or brand with its own drafts, calendar and analytics. Free and Creator cover one set and one user; Business is priced per set for up to 50, with unlimited users", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8717684-social-sets-and-accounts"] },
+  "freeOption": { "value": "Free plan: 1 social set, 1 user, 10 posts a month, with agents, API and MCP access included", "src": "https://typefully.com/pricing" },
+  "entryPaid": { "value": "Creator, $99 a year — the page marks it annual billing only, so there is no monthly price", "src": "https://typefully.com/pricing" },
+  "plans": { "value": "Free $0 (1 set, 10 posts a month); Creator $99 a year, annual billing only (1 set, 1,000 posts a month); Business $18 per social set a month billed yearly (up to 50 sets, unlimited users, 1,500 posts a month). There is no monthly billing option and no monthly toggle", "src": "https://typefully.com/pricing" },
+  "networks": { "value": "X, Bluesky, LinkedIn, Threads, Mastodon and Substack", "note": "The help centre's social-sets article lists five of these and does not mention Mastodon.", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8717684-social-sets-and-accounts"] },
+  "api": { "value": "A public API on every plan including Free, with higher rate limits on Business", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8718287-typefully-api"] },
+  "mcp": { "value": "An MCP server on every plan including Free, with setup guides for Claude, ChatGPT, Notion, Claude Code and Cursor, and for any assistant that speaks remote MCP over streamable HTTP", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/13128440-typefully-mcp-server"] },
+  "ai": { "value": "Editorial AI: a writing assistant, rewrite and improve, and AI image descriptions. Listed as a Creator addition over Free, with higher included usage on Business", "src": "https://typefully.com/pricing" },
+  "teams": { "value": "Teams, roles and permissions on Business, with unlimited users and up to 50 social sets; Free and Creator are one user each. Roles are read-only, write, write and publish, and admin", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8717333-collaborating-in-teams"] }
+}
