@@ -194,3 +194,85 @@ describe('PostActivity monthly cap backstop', () => {
     ).resolves.toEqual([{ id: 'p-1', status: 'pending' }]);
   });
 });
+
+describe('PostActivity refresh failure cause', () => {
+  const integration = {
+    id: 'i-1',
+    organizationId: 'org-1',
+    providerIdentifier: 'bluesky',
+    token: 'token',
+  } as any;
+
+  const make = (thrown: unknown) => {
+    const refreshIntegrationService = {
+      refresh: jest.fn().mockRejectedValue(thrown),
+      setBetweenSteps: jest.fn().mockResolvedValue(undefined),
+    };
+    const integrationService = {
+      getIntegrationById: jest.fn().mockResolvedValue(integration),
+    };
+    const integrationManager = {
+      getSocialIntegration: jest.fn().mockReturnValue({ refreshWait: false }),
+    };
+    const activity = new PostActivity(
+      {} as any,
+      {} as any,
+      integrationManager as any,
+      integrationService as any,
+      refreshIntegrationService as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return { activity, refreshIntegrationService };
+  };
+
+  // the cause ends up in the "connect it again" notification the customer
+  // reads, so a failure of ours must not travel with it
+  it('passes on a message the platform sent', async () => {
+    const { activity, refreshIntegrationService } = make(
+      new Error('Refresh token has expired')
+    );
+    await expect(activity.refreshToken(integration)).resolves.toBe(false);
+    expect(refreshIntegrationService.setBetweenSteps).toHaveBeenCalledWith(
+      integration,
+      'Refresh token has expired'
+    );
+  });
+
+  it('drops a failure of our own, and keeps the provider cause when there is one', async () => {
+    const decrypt = Object.assign(
+      new Error('error:1C800064:Provider routines::bad decrypt'),
+      { code: 'ERR_OSSL_BAD_DECRYPT' }
+    );
+    const { activity, refreshIntegrationService } = make(decrypt);
+    await expect(activity.refreshToken(integration)).resolves.toBe(false);
+    expect(refreshIntegrationService.setBetweenSteps).toHaveBeenCalledWith(
+      integration,
+      ''
+    );
+
+    const typed = make(new TypeError('Cannot read properties of null'));
+    await expect(
+      typed.activity.refreshTokenWithCause(integration, '')
+    ).resolves.toBe(false);
+    expect(typed.refreshIntegrationService.setBetweenSteps).toHaveBeenCalledWith(
+      integration,
+      ''
+    );
+
+    const withCause = make(new TypeError('Cannot read properties of null'));
+    await expect(
+      withCause.activity.refreshTokenWithCause(
+        integration,
+        'Please re-authenticate your YouTube account'
+      )
+    ).resolves.toBe(false);
+    expect(
+      withCause.refreshIntegrationService.setBetweenSteps
+    ).toHaveBeenCalledWith(
+      integration,
+      'Please re-authenticate your YouTube account'
+    );
+  });
+});

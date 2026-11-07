@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
 import { decryptIntegrationOf } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
 import { evergreenOccurrences } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
@@ -180,32 +181,6 @@ export class PostsRepository {
     });
   }
 
-  // Post.error persists the raw serialized workflow failure; only curated
-  // provider messages are surfaced to the calendar and the public API —
-  // bad_body failures whose message came from a provider handleErrors
-  // mapping or a hand-written provider throw (unmapped API responses carry
-  // the 'Unknown Error' placeholder instead). Internal debug strings (e.g.
-  // 'Refresh channel needed') and unmapped failures come out as null.
-  private curatedError(error?: string | null): string | null {
-    if (!error) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(error);
-      const [type, message] = parsed?.cause?.failure?.message
-        ? [parsed?.cause?.type, parsed?.cause?.failure?.message]
-        : [
-            parsed?.failure?.cause?.applicationFailureInfo?.type,
-            parsed?.failure?.cause?.message,
-          ];
-      return type === 'bad_body' && message && message !== 'Unknown Error'
-        ? message
-        : null;
-    } catch (err) {
-      return null;
-    }
-  }
-
   // withPreview adds the media of the posts, for the calendar preview
   async getPosts(orgId: string, query: GetPostsDto, withPreview = false) {
     // Use the provided start and end dates directly
@@ -291,7 +266,7 @@ export class PostsRepository {
     const result: any[] = [];
 
     for (const row of list) {
-      const post = { ...row, error: this.curatedError(row.error) };
+      const post = { ...row, error: curatedPostError(row.error) };
       if (!post.intervalInDays || post.intervalInDays < 1) {
         result.push(post);
         continue;

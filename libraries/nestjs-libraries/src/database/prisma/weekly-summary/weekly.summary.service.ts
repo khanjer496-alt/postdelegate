@@ -13,6 +13,7 @@ import {
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -389,12 +390,16 @@ export class WeeklySummaryService {
       post.integration.providerIdentifier,
       post.integration.name
     );
+    const curated = curatedPostError(post.error);
     return {
       channel: channel.name,
       icon: channel.icon,
       text: snippet(post.content),
       date: post.publishDate,
-      error: post.error ? snippet(post.error, 200) : undefined,
+      // the same curation the calendar and the public API use: the raw column
+      // holds the serialized workflow failure, which can carry anything the
+      // runtime put in the message
+      error: curated ? snippet(curated, 200) : undefined,
     };
   }
 
