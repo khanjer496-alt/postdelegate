@@ -1,0 +1,24 @@
+{
+  "name": "Planable",
+  "slug": "planable",
+  "site": "https://planable.io",
+  "pricingUrl": "https://planable.io/pricing/",
+  "checked": "2026-11-07",
+  "kind": { "value": "Collaboration-first social media planning tool built around workspaces and approval workflows, with feed, calendar, grid and list views; analytics, inbox and listening are add-ons", "src": "https://planable.io/pricing/" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://planable.io/pricing/" },
+  "pricingModel": { "value": "Per workspace per month with unlimited users. Each workspace has its own limits on social pages, posts and campaigns, and the price multiplies by the number of workspaces. Analytics, inbox and listening are priced separately per workspace", "src": "https://planable.io/pricing/" },
+  "freeOption": { "value": "No permanent free plan: a one-time allowance of 50 free posts that does not reset each month", "src": "https://planable.io/pricing/" },
+  "trial": { "value": "The first 50 posts are free, with no time limit and no credit card. It is a post allowance rather than a timed trial; the add-ons have their own 30-day trial", "src": "https://planable.io/pricing/" },
+  "entryPaid": { "value": "Basic, $39 per workspace per month on monthly billing", "src": "https://planable.io/pricing/" },
+  "plans": { "value": "Basic $39 per workspace per month (4 social pages, 60 posts), Pro $59 (10 pages, 150 posts), Enterprise custom (50 pages, unlimited posts). Add-ons per workspace per month: analytics $14, inbox $9, listening $99", "note": "The billing toggle opens on yearly, where Basic and Pro show $33 and $49; these are the monthly-billing figures.", "src": "https://planable.io/pricing/" },
+  "cost": {
+    "3": { "value": "$39", "note": "Basic includes 4 social pages in one workspace, with unlimited users.", "src": "https://planable.io/pricing/" },
+    "10": { "value": "$59", "note": "Basic's 4 pages would need 3 workspaces at $117; Pro includes 10 pages in a single workspace for $59, so Pro is the cheaper route.", "src": "https://planable.io/pricing/" },
+    "30": { "value": "$177", "note": "Pro includes 10 pages per workspace, so 30 needs 3 workspaces at $59 each. Basic would need 8 workspaces for $312. Analytics or inbox, if wanted, are extra per workspace.", "src": "https://planable.io/pricing/" }
+  },
+  "networks": { "value": "Facebook pages, LinkedIn profiles and pages, Instagram business and creator accounts, X, Google Business Profile, YouTube, TikTok, Pinterest business accounts and Threads", "src": "https://help.planable.io/hc/en-us/articles/21715422567708-Social-media-platforms-supported" },
+  "api": { "value": "A public API on Pro and Enterprise; the comparison table marks it as not included on Basic", "src": "https://planable.io/pricing/" },
+  "mcp": { "value": "An MCP connector on all paid plans. It browses workspaces and pages, reads the calendar, creates and edits drafts, handles approvals and pulls analytics where the analytics add-on is bought, but it cannot publish directly", "src": ["https://planable.io/pricing/", "https://planable.io/guides/planable-mcp/"] },
+  "ai": { "value": "AI post generation, rewriting and AI replies on every plan, with no credit limits published. AI replies live in the inbox, which is a paid add-on", "src": "https://planable.io/pricing/" },
+  "teams": { "value": "Unlimited users on Basic and Pro; the Enterprise block does not state a user count. Approval types grow by tier: none and optional on Basic, required on Pro, multi-level on Enterprise. Bulk approval is Pro and above, SSO is Enterprise only", "src": "https://planable.io/pricing/" }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Agorapulse",
+  "slug": "agorapulse",
+  "site": "https://www.agorapulse.com",
+  "pricingUrl": "https://www.agorapulse.com/pricing/",
+  "checked": "2026-11-07",
+  "kind": { "value": "Social media management suite centred on a unified inbox, publishing, listening, reporting and social ROI measurement", "src": "https://www.agorapulse.com/pricing/" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://www.agorapulse.com/pricing/" },
+  "pricingModel": { "value": "Per user per month, with 10 social profiles included on each published plan. Extra profiles are $15/month each on monthly billing. Advanced listening, advocacy, benchmarking and X access are separate add-ons quoted on request", "src": "https://www.agorapulse.com/pricing/" },
+  "freeOption": { "value": "The pricing FAQ says you can keep using a free plan after the trial with no automatic charge; the page gives no limits for it", "src": "https://www.agorapulse.com/pricing/" },
+  "trial": { "value": "Free for 30 days, no credit card required", "src": "https://www.agorapulse.com/pricing/" },
+  "entryPaid": { "value": "Standard, $99 per user per month on monthly billing, with 10 social profiles", "src": "https://www.agorapulse.com/pricing/" },
+  "plans": { "value": "Standard $99, Professional $149, Advanced $199, all per user per month on monthly billing with 10 profiles each; Custom is quoted, with unlimited profiles", "note": "The toggle opens on annual billing, which shows $79, $119 and $149 per user per month.", "src": "https://www.agorapulse.com/pricing/" },
+  "cost": {
+    "3": { "value": "$99", "note": "One user on Standard, monthly billing. The plan already includes 10 profiles, so 3 needs no extras.", "src": "https://www.agorapulse.com/pricing/" },
+    "10": { "value": "$99", "note": "Standard includes exactly 10 profiles, so one user is $99 with no add-ons.", "src": "https://www.agorapulse.com/pricing/" },
+    "30": { "value": "$399", "note": "One user on Standard ($99) plus 20 profiles beyond the 10 included at $15 each: $99 + $300. Every extra teammate adds another $99, because the plan is priced per user.", "src": "https://www.agorapulse.com/pricing/" }
+  },
+  "networks": { "value": "Facebook, Instagram, LinkedIn (pages and profiles), TikTok, X, YouTube, Threads, Pinterest, Bluesky, Reddit and Google Business", "src": "https://www.agorapulse.com/pricing/" },
+  "api": { "value": "A reports open API, for pushing social data into BI tools, on the Custom plan only", "src": "https://www.agorapulse.com/pricing/" },
+  "mcp": { "value": "An MCP connector for Claude, ChatGPT and Copilot Studio on all four current plans, excluding Legacy plan holders. It reads the inbox, listening, analytics and organisation data and creates drafts and calendar notes, but does not publish or schedule posts, and it needs your own paid assistant subscription", "src": ["https://www.agorapulse.com/pricing/", "https://support.agorapulse.com/en/articles/12960496-model-context-protocol-mcp-integration-explained"] },
+  "ai": { "value": "An AI writing assistant, alt-text generator, organisation context and AI report digests on all four current plans; AI reply suggestions are Custom only. No credit allowance is stated", "src": "https://www.agorapulse.com/pricing/" },
+  "teams": { "value": "Seats are bought individually, since the plan is per user. Internal comments, one-step approval and assignment start on Professional; bulk approve and shared calendars on Advanced; multi-step approval chains, custom roles and SSO on Custom only", "src": "https://www.agorapulse.com/pricing/" }
+}

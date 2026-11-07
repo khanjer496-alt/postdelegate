@@ -1,0 +1,24 @@
+{
+  "name": "Zoho Social",
+  "slug": "zoho-social",
+  "site": "https://www.zoho.com/social/",
+  "pricingUrl": "https://www.zoho.com/social/pricing.html",
+  "checked": "2026-11-07",
+  "kind": { "value": "Social media management tool with publishing, scheduling, monitoring, analytics, an inbox and collaboration, plus separate agency plans for client brands", "src": "https://www.zoho.com/social/pricing.html" },
+  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://www.zoho.com/social/pricing.html" },
+  "pricingModel": { "value": "Per brand: each business plan includes one brand with a channel allowance (6 on Free, 14 on Standard and Professional, 16 on Premium). Extra brands are an add-on on Professional ($17) and Premium ($23) only, and extra team members are $12 each a month", "src": "https://www.zoho.com/social/pricing.html" },
+  "freeOption": { "value": "A forever free plan: 1 brand with 6 channels, 1 team member and 5 AI credits a month", "src": "https://www.zoho.com/social/pricing.html" },
+  "trial": { "value": "15-day all-access trial, no credit card required; the account drops to the free plan when it ends", "src": "https://www.zoho.com/social/pricing.html" },
+  "entryPaid": { "value": "Standard, $15/month on monthly billing, 1 brand with 14 channels and 1 team member", "src": "https://www.zoho.com/social/pricing.html" },
+  "plans": { "value": "Free $0, Standard $15, Professional $40, Premium $65 a month; agency plans $320 (10 clients, 160 channels) and $460 (20 clients, 320 channels). Monthly billing in US dollars, before local taxes", "note": "The page opens on yearly billing, which it advertises as saving up to 33%, and it prices in the local currency unless the US dollar is chosen with its own currency switch; the figures here are the monthly US dollar list prices read with that switch set.", "src": "https://www.zoho.com/social/pricing.html" },
+  "cost": {
+    "3": { "value": "$0 or $15", "note": "3 channels fit the free plan's allowance of 6, so this can cost nothing; the cheapest paid tier is Standard at $15.", "src": "https://www.zoho.com/social/pricing.html" },
+    "10": { "value": "$15", "note": "Standard's single brand holds 14 channels, so 10 fit with no add-on. The free plan does not, because it stops at 6.", "src": "https://www.zoho.com/social/pricing.html" },
+    "30": { "value": "$74 to $88", "note": "30 channels exceed one brand, and extra brands are sold only on Professional and Premium. Professional holds 14 a brand, so three brands cost $40 plus two add-ons at $17, which is $74; Premium holds 16, so two brands cost $65 plus $23, which is $88.", "src": "https://www.zoho.com/social/pricing.html" }
+  },
+  "networks": { "value": "Facebook, X, LinkedIn, Instagram, WhatsApp, Google Business Profile, YouTube, Pinterest, TikTok, Mastodon, Threads, Bluesky, Telegram, Snapchat and Arattai, subject to regional restrictions", "src": "https://www.zoho.com/social/pricing.html" },
+  "api": { "value": "A REST API using OAuth 2.0, open to developers, agencies and partners by request: you submit a form and Zoho reviews it within two business days. No plan requirement is stated", "src": ["https://www.zoho.com/social/api.html", "https://www.zoho.com/social/api/introduction.html"] },
+  "mcp": { "value": "No Zoho Social MCP server is documented: it is not among the apps on Zoho's own MCP page, and the pricing page does not mention one", "src": ["https://www.zoho.com/mcp/", "https://www.zoho.com/social/pricing.html"] },
+  "ai": { "value": "The Zia assistant, metered by AI credits a month: 5 on Free, 40 on Standard and Professional, 80 on Premium and on both agency plans", "src": "https://www.zoho.com/social/pricing.html" },
+  "teams": { "value": "1 team member on Free, Standard and Professional; 3 on Premium; 5 on the agency plans. Extra members are $12 each a month. Content approvals, workflow and custom roles start on Premium", "src": "https://www.zoho.com/social/pricing.html" }
+}
