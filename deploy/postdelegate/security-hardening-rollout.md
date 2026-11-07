@@ -55,3 +55,25 @@ needs the **container restarted**, not reloaded — a reload is a no-op here.
 6. `curl -sI https://staging.postdelegate.com | grep -i -E 'permissions-policy|content-security'`
    shows the new headers. Remember Caddy needs the container **restarted**, not
    reloaded.
+
+## Host housekeeping done on 7 Nov (audit D2), and one landmine found
+
+- The 17 `Caddyfile.*` backups in `/opt/postiz` moved to
+  `/opt/postiz/caddyfile-history/`, so only the live `Caddyfile` sits beside
+  the compose file. Nothing was deleted.
+- `/opt/postdelegate` (an earlier deployment layout, nothing running from it)
+  now carries a `SUPERSEDED.md` saying so. Kept rather than removed.
+- **The 8 pending apt updates are not security updates.** Four are Docker CE
+  and four are `noble-updates`; `unattended-upgrades` is configured for
+  `noble` and `noble-security` only, so it is working as designed. Upgrading
+  `docker-ce` restarts every container, so it belongs in a planned window, not
+  a security fix.
+- **Landmine, now documented at `/opt/postiz/VOLUME-WARNING.md`:** the live
+  TLS private keys and certificates for app, staging and both rerun hosts live
+  in the Docker volume `postdelegate-prod_caddy_data` — named after a Compose
+  project that **no longer exists**. The running project is
+  `postdelegate-postiz`. So `docker compose -p postdelegate-prod down -v`, or
+  any tidy-up of "the old prod project", deletes them; and `docker volume
+  prune` is safe only while the caddy container is running, since that is what
+  keeps the volume from being dangling. Recoverable (Caddy re-issues) but with
+  rate limits and no TLS in the meantime.
