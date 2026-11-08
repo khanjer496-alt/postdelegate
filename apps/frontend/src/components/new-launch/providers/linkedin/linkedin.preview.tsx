@@ -277,11 +277,8 @@ export const LinkedinPreview: FC<{
                         />
                       </svg>
                     </div>
-                    <div>19</div>
                     <div>|</div>
                     <div className="font-[700]">Reply</div>
-                    <div>•</div>
-                    <div>1 reply</div>
                   </div>
                 </div>
               </div>

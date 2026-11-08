@@ -266,7 +266,6 @@ export const FacebookPreview: FC<{
                       <div className="font-[700]">Reply</div>
                     </div>
                     <div className="flex gap-[4px]">
-                      <div>2</div>
                       <div>
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
