@@ -247,11 +247,12 @@ export async function resolveExtraChannelPrice(
 }
 
 // Events that are not created by our own Stripe objects, so they carry no
-// metadata.service. Invoices feed the pixel and the affiliate commissions, the
-// charge events reverse commissions. Anything unrelated to a commission is
-// ignored further down.
+// metadata.service. Invoices feed billing notices, the pixel and affiliate
+// commissions; charge events reverse commissions. Each handler resolves the
+// customer to one of our organizations before applying its effects.
 const EVENTS_WITHOUT_SERVICE_METADATA: string[] = [
   'invoice.payment_succeeded',
+  'invoice.payment_failed',
   'charge.refunded',
   'charge.dispute.created',
 ];

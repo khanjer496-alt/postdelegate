@@ -3326,6 +3326,26 @@ describe('StripeService failed renewal', () => {
     expect(message).toContain('2026');
   });
 
+  it('dispatches a generated renewal invoice with nested subscription metadata', async () => {
+    await expect(
+      service.dispatchWebhook(event({
+        metadata: {},
+        parent: {
+          type: 'subscription_details',
+          subscription_details: {
+            subscription: 'sub_1',
+            metadata: { service: 'gitroom' },
+          },
+        },
+      }))
+    ).resolves.toEqual({ ok: true });
+
+    expect(notificationService.inAppNotification).toHaveBeenCalledWith(
+      'org-1', expect.stringMatching(/payment/i), expect.stringMatching(/try again/i)
+    );
+    expect(notificationService.sendEmailsToOrgAdmins).toHaveBeenCalledTimes(1);
+  });
+
   it('says the plan will be cancelled when there is no further attempt', async () => {
     mockStripe.invoices.retrieve.mockResolvedValue(
       invoice({ next_payment_attempt: null })
