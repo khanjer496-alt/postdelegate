@@ -107,12 +107,20 @@ UNION ALL SELECT 'Integration.customInstanceDetails', count(*)
 
 ## 5. Deploy #2: stop accepting the legacy form
 
-Two things to delete, and nothing else:
+After all eight counts in section 4 are zero, release the lookup hardening:
 
-1. the `{ apiKey: api }` arm of the `OR` in
-   `OrganizationRepository.getOrgByApiKey`, and
-2. the `AuthService.fixedEncryption(value)` entry in
-   `OAuthService.lookupSecrets`.
+1. With `TOKEN_ENCRYPTION_KEY` configured,
+   `OrganizationRepository.getOrgByApiKey` matches only `apiKeyHash` under the
+   current/retired keys. It never compares the presented key to `apiKey`.
+2. `OAuthService.lookupSecrets` likewise uses only current/retired hashes when
+   the encryption key is configured, for tokens, codes and client secrets.
+
+No-key self-hosted installations keep their existing authentication format.
+The API-key equality lookup is limited to rows with no hash, and values marked
+`enc:v1:` or `h1:` are always refused as presented API keys. Removing the
+encryption key therefore cannot turn a migrated readable copy into a bearer
+credential. Do not remove the encryption key to get around an incomplete
+backfill: finish the backfill before approving this release.
 
 Until that deploy, **the `apiKey` column is still a directly usable bearer
 token**: the lookup accepts the stored value verbatim, so a database read is
@@ -120,9 +128,11 @@ still enough to authenticate. The spec's goal of "Pattern B stops storing a
 bearer token in the clear" lands with *this* deploy, not the first one. Do not
 let it drift after launch.
 
-It will also invalidate any authorization code issued in the preceding ten
-minutes, since those are the one thing the backfill does not convert. The
-affected customer retries the connect flow.
+This invalidates any *legacy-form* authorization code issued in the preceding
+ten minutes, since those are the one thing the backfill does not convert. Codes
+already issued in hashed form still work. The affected customer retries the
+connect flow. This change needs no schema or configuration changes; it must
+still follow the separately approved staging/production release process.
 
 ## 6. The rollback window closes at the first new-format write
 

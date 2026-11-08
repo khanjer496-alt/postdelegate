@@ -9,18 +9,12 @@ const KEY = Buffer.alloc(32, 5).toString('base64');
 
 // Matches rows the way Postgres does: exact equality on the column, or
 // membership of the candidate list.
-const matches = (row: any, where: any) => {
-  if (where.OR) {
-    return where.OR.some((clause: any) => matches(row, clause));
-  }
-  if (where.apiKeyHash?.in) {
-    return !!row.apiKeyHash && where.apiKeyHash.in.includes(row.apiKeyHash);
-  }
-  if (where.apiKey !== undefined) {
-    return !!row.apiKey && row.apiKey === where.apiKey;
-  }
-  return false;
-};
+const matches = (row: any, where: any): boolean =>
+  Object.entries(where).every(([field, value]: [string, any]) => {
+    if (field === 'OR') return value.some((clause: any) => matches(row, clause));
+    if (value?.in) return value.in.includes(row[field]);
+    return row[field] === value;
+  });
 
 const setup = () => {
   const rows: any[] = [];
@@ -28,7 +22,7 @@ const setup = () => {
     if (where.deletedAt !== null) {
       throw new Error('every API key lookup must exclude deleted orgs');
     }
-    return rows.find((row) => matches(row, where)) ?? null;
+    return rows.find((row) => matches({ deletedAt: null, ...row }, where)) ?? null;
   });
   const update = jest.fn(async ({ where, data }: any) => {
     const row = rows.find((candidate) => candidate.id === where.id);
@@ -102,14 +96,58 @@ describe('Organization API keys', () => {
 
     // The pre-migration row holds the key itself: the random id was discarded
     // and the ciphertext is what the customer was handed.
-    it('finds an organization whose key was issued before this change', async () => {
+    it('rejects an unbackfilled key when encryption is configured', async () => {
       const { repository, rows } = setup();
       const legacyKey = AuthService.fixedEncryption('discarded-random-id');
       rows.push({ id: 'org-legacy', apiKey: legacyKey, apiKeyHash: null });
 
       await expect(
         repository.getOrgByApiKey(legacyKey)
-      ).resolves.toMatchObject({ id: 'org-legacy' });
+      ).resolves.toBeNull();
+    });
+
+    it.each([false, true])(
+      'rejects the stored encrypted copy even when the encryption key is missing: %s',
+      async (missingKey) => {
+        const { repository, rows } = setup();
+        const { stored, hash } = repository.issueApiKey();
+        rows.push({ id: 'org-new', apiKey: stored, apiKeyHash: hash });
+        if (missingKey) {
+          delete process.env.TOKEN_ENCRYPTION_KEY;
+          SecretCrypto.reset();
+        }
+
+        await expect(repository.getOrgByApiKey(stored)).resolves.toBeNull();
+        await expect(repository.getOrgByApiKey(hash!)).resolves.toBeNull();
+      }
+    );
+
+    it('accepts a backfilled legacy customer key through its hash', async () => {
+      const { repository, rows } = setup();
+      const key = AuthService.fixedEncryption('discarded-random-id');
+      rows.push({
+        id: 'org-backfilled',
+        apiKey: SecretCrypto.encrypt(key, ORG_API_KEY_LABEL),
+        apiKeyHash: SecretCrypto.hash(key, ORG_API_KEY_LABEL),
+      });
+
+      await expect(repository.getOrgByApiKey(key)).resolves.toMatchObject({
+        id: 'org-backfilled',
+      });
+    });
+
+    it('keeps no-key self-hosted keys working without matching migrated rows', async () => {
+      const { repository, rows } = setup();
+      delete process.env.TOKEN_ENCRYPTION_KEY;
+      SecretCrypto.reset();
+      const { key, stored, hash } = repository.issueApiKey();
+      rows.push({ id: 'org-self-hosted', apiKey: stored, apiKeyHash: hash });
+      rows.push({ id: 'org-hashed', apiKey: 'stored-copy-only', apiKeyHash: 'h1:other' });
+
+      await expect(repository.getOrgByApiKey(key)).resolves.toMatchObject({
+        id: 'org-self-hosted',
+      });
+      await expect(repository.getOrgByApiKey('stored-copy-only')).resolves.toBeNull();
     });
 
     it('does not find an organization for an unknown key', async () => {

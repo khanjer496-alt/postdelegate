@@ -137,18 +137,17 @@ export class OAuthService {
       : AuthService.fixedEncryption(value);
   }
 
-  // Every stored form a presented secret could match: the hash under the
-  // current key, one per retired key, and the legacy ciphertext for rows the
-  // backfill has not converted yet. Empty for an empty secret, so a blank
-  // credential never reaches the database.
+  // Keyed installations accept only hashes under the current/retired keys.
+  // Legacy encryption remains only for no-key self-hosted installations,
+  // matching storedSecret; keyed installations must finish their backfill
+  // before this release. Empty secrets never reach the database.
   private lookupSecrets(value: string | undefined | null, label: string) {
     if (!value || !value.trim()) {
       return [];
     }
-    return [
-      ...SecretCrypto.hashCandidates(value, label),
-      AuthService.fixedEncryption(value),
-    ];
+    return SecretCrypto.isEnabled()
+      ? SecretCrypto.hashCandidates(value, label)
+      : [AuthService.fixedEncryption(value)];
   }
 
   private secretMatches(
