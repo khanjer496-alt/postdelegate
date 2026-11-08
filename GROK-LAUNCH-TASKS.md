@@ -290,29 +290,38 @@ Statuses: `todo` · `in progress` · `blocked: <reason>` · `creds in vault` · 
 
 | Item | Public app/client ID | Callback added | Status | Notes |
 |---|---|---|---|---|
-| Meta business verification | — | — | todo | |
-| Facebook + Instagram (FB app) | 1106117725538645 | ? | todo | |
-| Instagram standalone | 2280201996094538 | ? | todo | |
-| Threads | 1119176243809209 | ? | todo | |
-| TikTok | 7700045361989224500 / awr6csyl2s6b7itb | no | todo | verify media.postdelegate.com |
-| LinkedIn | — | — | blocked: email unconfirmed | |
-| Pinterest | 1629300 | ? | todo | trial access |
-| X | 33577748 | ? | blocked: owner spend decision | |
-| Reddit | — | — | blocked: approval pending | |
-| Discord | — | — | blocked: CAPTCHA (owner) | |
-| Slack | A0CBU48N3PC | ? | todo | |
-| Telegram | @PostDelegateBot | n/a | todo | |
-| Twitch | 5o6cie5cz538bafc5q1cbkdu2jtlg9 | ? | todo | |
-| Kick | 01M5PYHZ65SRE1QA6N9MD5HTNJ | ? | todo | |
-| Dribbble | 271295 | ? | todo | |
-| Tumblr | — | ? | todo | |
-| Mastodon | — | — | todo | |
-| Google Business Profile | project postdelegate | ? | todo | |
-| Google sensitive-scope video | — | — | todo | |
-| Stripe keys in vault | — | — | todo | |
-| Resend | — | — | todo | |
-| Support inbox test | — | — | todo | |
-| R2 backup bucket + token | — | — | todo | |
-| ntfy topic | — | — | todo | |
+| Meta business verification | — | — | todo | Needs a US phone number (see 2.1) |
+| Facebook + Instagram (FB app) | 1106117725538645 | ? | creds installed | `FACEBOOK_APP_ID`/`_SECRET` on server; a `facebook` channel is connected. Still HIDDEN — no approval email seen |
+| Instagram standalone | 2280201996094538 | ? | creds installed | `INSTAGRAM_APP_ID`/`_SECRET` on server. Still HIDDEN |
+| Threads | 1119176243809209 | ? | creds installed | `THREADS_APP_ID`/`_SECRET` on server. Still HIDDEN |
+| TikTok | 7700045361989224500 / awr6csyl2s6b7itb | ? | creds installed | `TIKTOK_CLIENT_ID`/`_SECRET` on server; a `tiktok` channel is connected. Still HIDDEN — no approval email seen |
+| LinkedIn (personal) | app 265074899 / 77abjoilly0lcd | yes | **approved 2026-11-08, LIVE** | Share on LinkedIn + Sign In OIDC granted instantly. Channel connected and working. See 2.3 |
+| LinkedIn Pages | app 265083777 / 77ss9ytd5m0vo7 | yes | review submitted 2026-11-07 | Community Management API "Review in progress". Page-verified; business email verified. Stays HIDDEN until approved **and** its scope list is reconciled |
+| Pinterest | 1629300 | ? | **trial approved 2026-10-25; Standard review submitted 2026-11-08** | Receipt email 08:33Z 8 Nov. Creds installed, a `pinterest` channel is connected. Stays HIDDEN: Trial is a developer tier, not general availability |
+| X | 33577748 | ? | creds installed, blocked: owner spend decision | `X_API_KEY`/`_SECRET` on server. Still HIDDEN |
+| Reddit | — | — | blocked: approval pending | No credentials on server |
+| Discord | — | yes | **LIVE** | Creds installed, channel connected, visible to users |
+| Slack | A0CBU48N3PC | yes | **LIVE** | Creds installed, channel connected, visible to users |
+| Telegram | @PostDelegateBot | n/a | **LIVE** | `TELEGRAM_TOKEN` on server, visible to users |
+| Twitch | 5o6cie5cz538bafc5q1cbkdu2jtlg9 | yes | **LIVE** | Creds installed, channel connected, visible to users |
+| Kick | 01M5PYHZ65SRE1QA6N9MD5HTNJ | ? | **LIVE** | Creds installed, visible to users |
+| Dribbble | 271295 | ? | **LIVE** | Creds installed, visible to users |
+| Tumblr | — | ? | **LIVE** | `TUMBLR_CLIENT_ID`/`_SECRET` on server, visible to users |
+| Mastodon | — | ? | **LIVE** | Creds installed, visible to users (plus `mastodon-custom`) |
+| Google Business Profile | project 325521386136 | yes | **approved 2026-11-04, LIVE** | Allowlisted, 300 QPM. Uses `YOUTUBE_CLIENT_ID`/`_SECRET` by fallback — no separate GMB vars needed. Don't imply a Google partnership in launch copy |
+| Google sensitive-scope video | — | — | todo | YouTube itself is live (readonly + upload approved 2 Nov) |
+| Stripe keys in vault | — | — | **done** | Live keys + webhook installed 31 Oct; billing live |
+| Resend | — | — | **done** | `RESEND_API_KEY` on server |
+| Support inbox test | — | — | **done** | support@postdelegate.com forwards to the owner's Gmail (verified in use) |
+| R2 backup bucket + token | — | — | **done** | Off-site backups running to `postdelegate-backups` |
+| ntfy topic | — | — | **done** | Healthcheck posts to ntfy every 10 min |
+
+Providers with no app review needed and no credentials required — all **LIVE**: Bluesky, Dev.to,
+Hashnode, Lemmy, Listmonk, Medium, Moltbook, Nostr, WordPress, Whop.
+
+**Customer-visible total as of 8 Nov 2026: 21 platforms.** Everything else is in
+`HIDDEN_PROVIDERS` and must stay there until it is approved at a tier that permits third-party
+users — a trial/dev tier is not enough, because a customer clicking the channel would hit
+failures.
 
 When you finish a block, commit only this file (`docs: update Grok launch status`) on a branch and open a PR to `khanjer496-alt/postdelegate`, or tell the owner to pass the update to Claude.
