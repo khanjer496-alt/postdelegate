@@ -184,6 +184,10 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     scope: 'user',
     note: 'deleted when it has no commission; otherwise kept with payoutEmail removed and the vanity code replaced, so the ledger keeps its foreign key',
   },
+  PaymentWebhookEvent: {
+    scope: 'none',
+    note: 'global replay protection: provider event ids and lease tokens only; no organization/user keys or customer payloads',
+  },
   AffiliateCommission: {
     scope: 'retain',
     note: 'financial ledger, never deleted; it holds only a random organization id, Stripe invoice id, amounts and a payment reference, no personal data',
