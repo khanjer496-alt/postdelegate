@@ -67,7 +67,7 @@ const en = {
     codex: 'Codex & coding agents', mcp: 'MCP', restApi: 'REST API', apiReference: 'API reference', mcpSetup: 'MCP setup',
     schedulers: 'Social schedulers', moreNetworks: 'See all networks and their status',
     resources: 'Resources', guides: 'Guides', tools: 'Free tools', captionChecker: 'Caption checker', compare: 'Compare',
-    alternatives: 'Alternatives', changelog: 'Changelog', roadmap: 'Roadmap', about: 'About', brand: 'Brand', support: 'Support', status: 'Status',
+    alternatives: 'Alternatives', best: 'Best-of lists', changelog: 'Changelog', roadmap: 'Roadmap', about: 'About', brand: 'Brand', support: 'Support', status: 'Status',
     legal: 'Legal', privacy: 'Privacy policy', terms: 'Terms of service', dataDeletion: 'Data deletion', dpa: 'DPA',
     subprocessors: 'Sub-processors', licenses: 'Licenses', cookieSettings: 'Cookie settings',
     follow: 'Follow PostDelegate', featuredOn: 'Featured on',

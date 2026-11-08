@@ -14,5 +14,8 @@
   "api": { "value": "A public API on every plan including Free, with higher rate limits on Business", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8718287-typefully-api"] },
   "mcp": { "value": "An MCP server on every plan including Free, with setup guides for Claude, ChatGPT, Notion, Claude Code and Cursor, and for any assistant that speaks remote MCP over streamable HTTP", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/13128440-typefully-mcp-server"] },
   "ai": { "value": "Editorial AI: a writing assistant, rewrite and improve, and AI image descriptions. Listed as a Creator addition over Free, with higher included usage on Business", "src": "https://typefully.com/pricing" },
-  "teams": { "value": "Teams, roles and permissions on Business, with unlimited users and up to 50 social sets; Free and Creator are one user each. Roles are read-only, write, write and publish, and admin", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8717333-collaborating-in-teams"] }
+  "teams": { "value": "Teams, roles and permissions on Business, with unlimited users and up to 50 social sets; Free and Creator are one user each. Roles are read-only, write, write and publish, and admin", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8717333-collaborating-in-teams"] },
+  "cost": {
+    "3": { "value": "$0", "note": "Free plan, if the 3 accounts belong to one person or brand: its 1 social set cross-posts to X, LinkedIn, Threads, Bluesky, Mastodon and Substack, with 10 posts a month. Accounts for more people or brands need more sets, which only Business sells, at $18 a month per set billed yearly. Creator is $99 a year, annual billing only", "src": ["https://typefully.com/pricing", "https://support.typefully.com/en/articles/8717684-social-sets-and-accounts"] }
+  }
 }

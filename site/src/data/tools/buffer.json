@@ -21,8 +21,8 @@
     "src": "https://buffer.com/pricing"
   },
   "trial": {
-    "value": "14-day trial of Essentials and Team",
-    "src": "https://buffer.com/pricing"
+    "value": "14-day trial of Essentials and Team. Neither the pricing page nor the help centre says whether a card is needed to start it; the help centre says an account with no card details moves to the Free plan when the trial ends",
+    "src": ["https://buffer.com/pricing", "https://support.buffer.com/article/549-information-about-free-trials"]
   },
   "entryPaid": {
     "value": "Essentials, $6 per channel/month on monthly billing ($5 on yearly)",

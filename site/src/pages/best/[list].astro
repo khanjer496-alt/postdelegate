@@ -1,0 +1,7 @@
+---
+import BestList from '../../components/BestList.astro';
+import { BEST_LISTS } from '../../data/best-lists';
+export function getStaticPaths() { return BEST_LISTS.map((list) => ({ params: { list: list.slug }, props: { list } })); }
+const { list } = Astro.props;
+---
+<BestList list={list} />

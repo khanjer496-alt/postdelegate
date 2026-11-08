@@ -1,0 +1,21 @@
+---
+import Doc from '../../layouts/Doc.astro';
+import { TOOLS } from '../../data/tools';
+import { BEST_LISTS, bestHref, bestIncluded } from '../../data/best-lists';
+import { SITE } from '../../data/site';
+const list = { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'PostDelegate best-of lists', url: `${SITE.url}/best`, hasPart: BEST_LISTS.map((l) => ({ '@type': 'Article', headline: l.h1, url: `${SITE.url}${bestHref(l)}` })) };
+---
+<Doc title="Best Social Media Schedulers, MCP Servers and APIs, Sourced" description="Lists of social media schedulers, MCP servers and APIs that meet one stated rule, with every fact linked to the vendor's own page. PostDelegate makes them and is on them." h1="Best-of lists, with a rule and a source for every fact" eyebrow="Best of" lead="Each list says which tools got on it and why, and in what order. Every fact links to the page it was read from." jsonLd={[list]}>
+  <a slot="actions" href="/compare" class="button button-outline">All comparisons</a>
+  <p class="doc-note"><strong>PostDelegate makes these lists, and it appears on them wherever it meets the rule.</strong> It is placed by the same rules as every other tool and marked “Ours”. There are no ratings, scores or reviews, and no vendor paid to be listed.</p>
+  <div class="document-grid">
+    {BEST_LISTS.map((l) => <a class="document-card" href={bestHref(l)}><h2>{l.h1}</h2><p>{l.description}</p><span>See the {bestIncluded(l).length} tools</span></a>)}
+  </div>
+  <h2>How these lists work</h2>
+  <ul>
+    <li>Every list starts from the same {Object.keys(TOOLS).length} tools in our comparison data, the ones we also use on the <a href="/compare">comparison pages</a>.</li>
+    <li>One rule decides which tools are on a list, such as “the vendor documents an MCP server”. Tools that miss it are shown at the bottom, with what their own pages say.</li>
+    <li>A second rule sets the order, such as price at 30 accounts or trial length. Where no measure fits, the order is alphabetical.</li>
+    <li>Each fact links to the vendor page it came from, and each entry shows the date it was checked.</li>
+  </ul>
+</Doc>

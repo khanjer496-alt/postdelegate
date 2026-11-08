@@ -4,6 +4,7 @@ import CompareCard from '../CompareCard.astro';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
 import { TOOLS } from '../../data/tools';
 import { COMPARE_PAIRS, pairHref } from '../../data/compare-pairs';
+import { BEST_LISTS, bestHref } from '../../data/best-lists';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const p = strings(lang).comparePage;
@@ -64,6 +65,11 @@ const MORE = [
       <p>Each of these reads the other tool's own pricing page for its prices, says where that tool is the better pick, and works out what it costs at ten and thirty accounts wherever the vendor publishes enough to do so.</p>
       <ul>
         {MORE.map(([href, name]) => <li><a href={href}>PostDelegate vs {name}</a></li>)}
+      </ul>
+      <h2>Best-of lists</h2>
+      <p>Lists of the tools in this comparison data that meet one stated rule, such as documenting an MCP server, in an order set by a second rule. PostDelegate is on them where it meets the rule, placed like everyone else.</p>
+      <ul>
+        {BEST_LISTS.map((list) => <li><a href={bestHref(list)}>{list.h1}</a></li>)}
       </ul>
     </Fragment>
   )}

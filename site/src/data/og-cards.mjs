@@ -81,6 +81,15 @@ export const OG_CARDS = {
   '/compare/coschedule': { kicker: 'Compare', title: 'PostDelegate vs CoSchedule' },
   '/compare/metricool': { kicker: 'Compare', title: 'PostDelegate vs Metricool' },
 
+  // The best-of lists from src/pages/best/[list].astro; best-lists.ts fails the build if one of
+  // its pages is missing here.
+  '/best/social-media-mcp-servers': { kicker: 'Best of', title: 'Social media MCP servers for AI assistants' },
+  '/best/social-media-scheduling-apis': { kicker: 'Best of', title: 'Social media scheduling APIs you can switch on yourself' },
+  '/best/social-media-schedulers-for-multiple-accounts': { kicker: 'Best of', title: 'Social media schedulers for 30 accounts, cheapest first' },
+  '/best/social-media-schedulers-free-trial-no-credit-card': { kicker: 'Best of', title: 'Schedulers with a free trial and no credit card' },
+  '/best/bluesky-schedulers': { kicker: 'Best of', title: 'Bluesky schedulers, cheapest first' },
+  '/best/mastodon-schedulers': { kicker: 'Best of', title: 'Mastodon schedulers, cheapest first' },
+
   '/tools/caption-checker': { kicker: 'Free tool', title: 'Caption checker' },
   '/tools/image-resizer': { kicker: 'Free tool', title: 'Social media image resizer' },
   '/tools/post-preview': { kicker: 'Free tool', title: 'Social media post preview' },
@@ -126,6 +135,7 @@ export const OG_CARDS = {
   '/alternatives/postiz': { kicker: 'Compare', title: 'Postiz alternatives: hosted, self-hosted and API' },
   '/guides': { kicker: 'Guides', title: 'Guides for scheduling social media' },
   '/compare': { kicker: 'Compare', title: 'PostDelegate compared to every scheduler' },
+  '/best': { kicker: 'Best of', title: 'Best-of lists with a source for every fact' },
   '/tools': { kicker: 'Free tools', title: 'Free tools for social media posts' },
   '/docs': { kicker: 'Documentation', title: 'PostDelegate documentation' },
 };
