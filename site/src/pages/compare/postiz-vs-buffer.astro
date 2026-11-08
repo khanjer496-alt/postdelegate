@@ -30,7 +30,7 @@ const links = [
   h1="Postiz vs Buffer: which scheduler fits how you post?"
   shortAnswer="Pick Buffer if you run one to three channels and want a free plan. Pick Postiz if you manage ten or more channels, want team members without per-channel fees, or want open-source code you can self-host. At 10 channels, Postiz Team costs $39 a month; Buffer costs $60 (Essentials) or $120 (Team)."
   costIntro="The two price in opposite ways. Buffer charges for every channel, with a lower rate past the tenth. Postiz sells a fixed number of channels per plan. So Buffer is cheaper for a handful of channels and Postiz pulls ahead as the count grows."
-  fitIntro="PostDelegate is a hosted service built on Postiz and run by Nasida Apps LLC. Each plan costs $10 to $20 a month less than the matching Postiz Cloud plan, and the trial needs no card. The trade-off today is reach: Instagram, Facebook, Threads, TikTok, LinkedIn and Pinterest are still waiting for platform approval, and X is not available."
+  fitIntro="PostDelegate is a hosted, open-source service run by Nasida Apps LLC. Each plan costs $10 to $20 a month less than the matching Postiz Cloud plan, and the trial needs no card. The trade-off today is reach: Instagram, Facebook, Threads, TikTok, LinkedIn and Pinterest are still waiting for platform approval, and X is not available."
   faq={faq} links={links}
 >
   <h2>Networks</h2>
@@ -39,7 +39,7 @@ const links = [
 
   <h2>Self-hosting and licensing</h2>
   <p>Buffer is a hosted service only. Postiz gives you a choice: use Postiz Cloud, or run the open-source code on your own server. Its license is AGPL-3.0. In plain words, you may run, read and change the code for free. If you change it and offer your changed version to other people over a network, you must make your source code available to them. Running it for your own team, unchanged, carries no extra duty.</p>
-  <p>Self-hosting is free of license fees, not free of work. We run Postiz in production for PostDelegate, so we can describe the job concretely:</p>
+  <p>Self-hosting is free of license fees, not free of work. We run this kind of stack in production for PostDelegate, so we can describe the job concretely:</p>
   <ul>
     <li><strong>The stack.</strong> The official Docker Compose file starts the Postiz app, PostgreSQL, Redis and Temporal, which brings its own PostgreSQL and Elasticsearch. Plan for a server with room for all of them, plus backups.</li>
     <li><strong>A developer app per network.</strong> Each network wants its own registered app, keys and callback addresses before it lets your server post.</li>

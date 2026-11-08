@@ -35,7 +35,7 @@ export const GET: APIRoute = () => {
 - You want AI credits included in the plan, or AI video generation. PostDelegate does neither.
 - You need a shared social inbox for replies and messages, or social listening.
 - You need it at no cost for good. There is a ${TRIAL_DAYS}-day trial with no card, then a paid plan.
-- You want to run the software on your own server. PostDelegate is hosted; the upstream open-source Postiz project can be self-hosted.
+- You want to run the software on your own server. PostDelegate is hosted; a self-hosted tool such as Postiz or Mixpost suits that better.
 
 ## Connect over MCP (copy and paste)
 Server address (sign in with PostDelegate, OAuth): https://app.postdelegate.com/mcp-oauth-dynamic
