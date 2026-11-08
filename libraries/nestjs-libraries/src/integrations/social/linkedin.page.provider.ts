@@ -6,7 +6,6 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { NotEnoughScopes } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
 import dayjs from 'dayjs';
@@ -29,28 +28,50 @@ export class LinkedinPageProvider
   override isBetweenSteps = true;
   override refreshWait = true;
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
-  // The Community Management API set. This provider posts as the
-  // organization. Page discovery uses the admin grant; no personal OpenID
-  // product is requested by this CMA-only app. Analytics is separately opt-in.
+  // CMA is the only product on the Pages app: it grants r_basicprofile,
+  // not the OpenID Connect scopes used by the personal app. Verify these
+  // permissions in the approved app before removing it from HIDDEN_PROVIDERS.
   override optionalScopes = ['r_organization_social'];
-  override get analyticsAvailable() {
-    return this.scopes.includes('r_organization_social');
-  }
+  override get analyticsAvailable() { return this.scopes.includes('r_organization_social'); }
   override get scopes() {
-    return this.requestedScopes([
-      'rw_organization_admin',
-      'w_organization_social',
-    ]);
+    return this.requestedScopes(['r_basicprofile', 'rw_organization_admin', 'w_organization_social']);
   }
 
   // Pages live in their own LinkedIn app, because LinkedIn grants the
   // Community Management API only to an app that holds no other product.
   // An install whose single app holds every product can leave these unset.
   protected override credentials() {
-    const { clientId, clientSecret } = super.credentials();
+    const clientId = process.env.LINKEDIN_PAGE_CLIENT_ID;
+    const clientSecret = process.env.LINKEDIN_PAGE_CLIENT_SECRET;
+    if (!clientId && !clientSecret) return super.credentials();
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        'Set both LINKEDIN_PAGE_CLIENT_ID and LINKEDIN_PAGE_CLIENT_SECRET'
+      );
+    }
+    return { clientId, clientSecret };
+  }
+
+  private async memberInformation(accessToken: string) {
+    const response = await fetch(
+      'https://api.linkedin.com/v2/me?projection=(id,localizedFirstName,localizedLastName,profilePicture(displayImage~:playableStreams))',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!response.ok)
+      throw new Error(
+        'LinkedIn Page member lookup failed; reconnect with r_basicprofile'
+      );
+    const member = await response.json();
+    if (!member.id)
+      throw new Error('LinkedIn Page member lookup returned no identity');
     return {
-      clientId: process.env.LINKEDIN_PAGE_CLIENT_ID || clientId,
-      clientSecret: process.env.LINKEDIN_PAGE_CLIENT_SECRET || clientSecret,
+      id: member.id as string,
+      name: [member.localizedFirstName, member.localizedLastName]
+        .filter(Boolean)
+        .join(' '),
+      picture:
+        member.profilePicture?.['displayImage~']?.elements?.slice(-1)[0]
+          ?.identifiers?.[0]?.identifier || '',
     };
   }
 
@@ -148,15 +169,16 @@ export class LinkedinPageProvider
       })
     ).json();
 
-    // Refresh persists only tokens; the selected organization's identity is
-    // preserved by RefreshIntegrationService. No OpenID product is needed.
+    const { name, id, picture } = await this.memberInformation(accessToken);
+
     return {
-      id: '',
-      name: '',
-      username: '',
+      id,
       accessToken,
       refreshToken,
       expiresIn: expires_in,
+      name,
+      picture,
+      username: id,
     };
   }
 
@@ -309,24 +331,21 @@ export class LinkedinPageProvider
     ).json();
 
     this.checkScopes(this.scopes, scope);
-    const pages = await this.companies(accessToken);
-    const firstPage = pages[0];
-    if (!firstPage)
-      throw new NotEnoughScopes(
-        'No managed LinkedIn Pages are available for this account.'
-      );
+    const scopeWarnings = this.scopeWarnings(scope);
+
+    const { name, id, picture } = await this.memberInformation(accessToken);
 
     return {
-      // An unfinished Page-picker row must not collide with a connected Page.
-      // Discovery supplies a stable temporary identity without OpenID access.
-      id: `${this.identifier}_${firstPage.id}`,
+      scopeWarnings,
+      // namespaced placeholder so the in-between row never collides with the
+      // personal LinkedIn channel row (same org + same member sub)
+      id: `${this.identifier}_${id}`,
       accessToken,
       refreshToken,
       expiresIn,
-      name: 'Choose a LinkedIn Page',
-      picture: '',
-      username: '',
-      scopeWarnings: this.scopeWarnings(scope),
+      name,
+      picture,
+      username: id,
     };
   }
 

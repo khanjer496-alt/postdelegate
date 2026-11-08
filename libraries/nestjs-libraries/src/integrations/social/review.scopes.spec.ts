@@ -26,7 +26,10 @@ const cases = [
   ],
   [ThreadsProvider, ['threads_basic', 'threads_content_publish']],
   [TiktokProvider, ['user.info.basic', 'video.publish', 'video.upload']],
-  [LinkedinPageProvider, ['rw_organization_admin', 'w_organization_social']],
+  [
+    LinkedinPageProvider,
+    ['r_basicprofile', 'rw_organization_admin', 'w_organization_social'],
+  ],
 ] as const;
 
 describe('review scope policy', () => {
@@ -95,9 +98,21 @@ describe('review scope policy', () => {
     expect(p.analyticsAvailable).toBe(false);
     if (p.identifier !== 'tiktok') expect(p.plugsAvailable).toBe(false);
   });
-  it.each([new FacebookProvider(), new InstagramProvider(), new InstagramStandaloneProvider(), new ThreadsProvider()])('rejects optional comment automation before a network call for %p', async p => {
-    await expect(p.comment('review', 'post', undefined, 'test', [] as any, {} as any)).rejects.toMatchObject({ message: expect.stringContaining('permission') });
-  });
+  it.each([
+    new FacebookProvider(),
+    new InstagramProvider(),
+    new InstagramStandaloneProvider(),
+    new ThreadsProvider(),
+  ])(
+    'rejects optional comment automation before a network call for %p',
+    async (p) => {
+      await expect(
+        p.comment('review', 'post', undefined, 'test', [] as any, {} as any)
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('permission'),
+      });
+    }
+  );
   it('connects the Pages-only LinkedIn app without requesting a separate OpenID product', async () => {
     const p = new LinkedinPageProvider();
     const requests: string[] = [];
@@ -106,29 +121,27 @@ describe('review scope policy', () => {
       .mockImplementation(async (url: any) => {
         requests.push(String(url));
         return {
-          json: async () => ({
-            access_token: 'test',
-            refresh_token: 'refresh',
-            scope: 'rw_organization_admin,w_organization_social',
-            expires_in: 3600,
-          }),
+          ok: true,
+          json: async () =>
+            String(url).includes('/v2/me?')
+              ? {
+                  id: 'member-review',
+                  localizedFirstName: 'Review',
+                  localizedLastName: 'Member',
+                }
+              : {
+                  access_token: 'test',
+                  refresh_token: 'refresh',
+                  scope:
+                    'r_basicprofile,rw_organization_admin,w_organization_social',
+                  expires_in: 3600,
+                },
         } as any;
       });
-    jest
-      .spyOn(p, 'companies')
-      .mockResolvedValue([
-        {
-          id: '123',
-          page: '123',
-          username: 'review',
-          name: 'Review page',
-          picture: '',
-        },
-      ] as any);
     try {
       expect(
         await p.authenticate({ code: 'code', codeVerifier: 'state' })
-      ).toMatchObject({ id: 'linkedin-page_123' });
+      ).toMatchObject({ id: 'linkedin-page_member-review' });
       await p.refreshToken('refresh');
       expect(requests.some((u) => u.includes('userinfo'))).toBe(false);
     } finally {
@@ -145,7 +158,19 @@ describe('review scope policy', () => {
         return {
           status: 200,
           json: async () =>
-            String(url).includes('creator_info') ? { data: { creator_username: 'review_account', privacy_level_options: ['SELF_ONLY'], comment_disabled: false, duet_disabled: false, stitch_disabled: false, max_video_post_duration_sec: 60 }, error: { code: 'ok' } } : String(url).includes('/oauth/token/')
+            String(url).includes('creator_info')
+              ? {
+                  data: {
+                    creator_username: 'review_account',
+                    privacy_level_options: ['SELF_ONLY'],
+                    comment_disabled: false,
+                    duet_disabled: false,
+                    stitch_disabled: false,
+                    max_video_post_duration_sec: 60,
+                  },
+                  error: { code: 'ok' },
+                }
+              : String(url).includes('/oauth/token/')
               ? {
                   access_token: 'test',
                   refresh_token: 'test-refresh',
@@ -165,7 +190,11 @@ describe('review scope policy', () => {
     try {
       expect(
         await p.authenticate({ code: 'code', codeVerifier: 'state' })
-      ).toMatchObject({ id: 'testuser', name: 'Reviewer', username: 'review_account' });
+      ).toMatchObject({
+        id: 'testuser',
+        name: 'Reviewer',
+        username: 'review_account',
+      });
       await p.refreshToken('test-refresh');
       expect(
         requests

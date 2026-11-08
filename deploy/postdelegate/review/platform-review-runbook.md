@@ -16,7 +16,7 @@ These sets supersede the older broad lists in GROK-LAUNCH-TASKS.md for this bran
 | Instagram standalone | instagram_business_basic, instagram_business_content_publish | instagram_business_manage_comments, instagram_business_manage_insights |
 | Threads | threads_basic, threads_content_publish | threads_manage_replies, threads_manage_insights |
 | TikTok | user.info.basic, video.publish, video.upload | video.list, user.info.profile, user.info.stats |
-| LinkedIn Pages | rw_organization_admin, w_organization_social | r_organization_social |
+| LinkedIn Pages | r_basicprofile, rw_organization_admin, w_organization_social | r_organization_social |
 | Pinterest | boards:read, boards:write, pins:read, pins:write, user_accounts:read | none |
 
 TikTok retains video.upload because the shipping composer supports inbox upload.
@@ -36,9 +36,11 @@ Reconnect with a new consent before testing an enabled optional feature. Missing
 optional consent returns a publishing-success warning; missing minimum consent
 still rejects the connect. Older broad grants are not revoked by changing env.
 
-LinkedIn Pages uses its own CMA-only application. Page discovery uses the admin
-scope and supplies the temporary page-picker identity; connect and refresh do not
-call the OpenID /userinfo endpoint. Reconcile the organization's scopes against
+LinkedIn Pages uses its own CMA-only application. This incorporates the existing
+[PR #181](https://github.com/khanjer496-alt/postdelegate/pull/181) member-identity
+fix: r_basicprofile reads /v2/me for the stable app-scoped member id; connect and
+refresh do not call the OpenID /userinfo endpoint. The optional analytics trim is
+added here. The two drafts overlap and must be reconciled before either merges. Reconcile the organization's scopes against
 the actual approved product before enabling Pages in production. Personal LinkedIn
 and the approved Google clients are unchanged.
 
