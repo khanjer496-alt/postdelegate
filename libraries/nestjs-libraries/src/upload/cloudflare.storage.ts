@@ -15,9 +15,7 @@ import mime from 'mime-types';
 import { getExtension } from 'mime';
 import { IUploadProvider, UploadedStream } from './upload.interface';
 import axios from 'axios';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
-import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
+import { simpleUploadBody } from './simple.upload.body';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { fileTypeFromBuffer } = require('file-type');
 
@@ -88,21 +86,8 @@ class CloudflareStorage implements IUploadProvider {
   }
 
   async uploadSimple(path: string) {
-    const dataUrl = path.startsWith('data:') ? parseDataUrl(path) : null;
+    const body = await simpleUploadBody(path);
 
-    let body: Buffer;
-    if (dataUrl) {
-      body = dataUrl.buffer;
-    } else {
-      if (!(await isSafePublicHttpsUrl(path))) {
-        throw new Error('Unsafe URL');
-      }
-      const loadImage = await fetch(path, {
-        // @ts-ignore — undici option, not in lib.dom fetch types
-        dispatcher: ssrfSafeDispatcher,
-      });
-      body = Buffer.from(await loadImage.arrayBuffer());
-    }
     const detected = await fileTypeFromBuffer(body);
     if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
       throw new Error('Unsupported file type.');

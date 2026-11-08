@@ -1,5 +1,5 @@
 const mockStripe = {
-  prices: { list: jest.fn(), create: jest.fn() },
+  prices: { list: jest.fn(), create: jest.fn(), retrieve: jest.fn() },
   products: { list: jest.fn(), create: jest.fn() },
   subscriptions: {
     list: jest.fn(),
@@ -28,6 +28,8 @@ jest.mock('stripe', () => ({
   __esModule: true,
   default: jest.fn(() => mockStripe),
 }));
+jest.mock('@sentry/nestjs', () => ({ captureMessage: jest.fn() }));
+import * as Sentry from '@sentry/nestjs';
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service',
   () => ({ SubscriptionService: class {} })
@@ -63,7 +65,7 @@ import {
 } from '@gitroom/nestjs-libraries/services/stripe.service';
 
 beforeEach(() => {
-  jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => sub.metadata as any);
+  jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
 });
 afterEach(() => jest.restoreAllMocks());
 
@@ -496,7 +498,7 @@ describe('StripeService affiliate events', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => sub.metadata as any);
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockStripe.invoices.retrieve.mockImplementation(async id => ({ ...invoiceEvent().data.object, id, status: 'paid' }));
   });
@@ -1423,7 +1425,7 @@ describe('isTrialing', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => sub.metadata as any);
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
     organizationService.getOrgById.mockResolvedValue({
       id: 'org_1',
       paymentId: 'cus_1',
@@ -1602,7 +1604,7 @@ describe('extra channels', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => sub.metadata as any);
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     organizationService.getOrgById.mockResolvedValue({
@@ -3182,7 +3184,7 @@ describe('admin growth stats', () => {
 
     beforeEach(() => {
       jest.resetAllMocks();
-    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => sub.metadata as any);
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
       (service as any)._growthSubscriptions = null;
       process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
     });
@@ -3400,11 +3402,13 @@ describe('Stripe webhook security boundaries', () => {
   const service = new StripeService({} as any, {} as any, {} as any, {} as any);
   const subscription = () => ({ metadata: { billing: 'STANDARD', period: 'MONTHLY', uniqueId: 'u1' },
     items: { data: [{ quantity: 1, price: { id: 'price_starter' } }] } }) as any;
-  const price = { id: 'price_starter', unit_amount: 1900, currency: 'usd', recurring: { interval: 'month' } };
+  const price = { id: 'price_starter', product: 'prod_starter', unit_amount: 1900, currency: 'usd', recurring: { interval: 'month' } };
   beforeEach(() => {
     jest.restoreAllMocks();
-    mockStripe.prices.list.mockReset().mockResolvedValue({ data: [price] });
+    mockStripe.prices.list.mockReset().mockImplementation(async params => ({ data: params.lookup_keys?.[0] === 'postdelegate_starter_month' ? [price] : [] }));
+    mockStripe.prices.retrieve.mockReset().mockResolvedValue(price);
     mockStripe.products.list.mockResolvedValue({ data: [] });
+    (Sentry.captureMessage as jest.Mock).mockClear();
   });
   it('accepts catalog-backed metadata', async () => {
     await expect(service.validatedPlan(subscription())).resolves.toMatchObject({ billing: 'STANDARD' });
@@ -3424,6 +3428,51 @@ describe('Stripe webhook security boundaries', () => {
   it('rejects forged add-on entitlements', async () => {
     const sub = subscription(); sub.items.data.push({ quantity: 100, price: { id: 'forged', lookup_key: 'postdelegate_extra_channel_month' } });
     await expect(service.validatedPlan(sub)).rejects.toThrow();
+  });
+  it('accepts an inactive historical price of the registered plan product', async () => {
+    const sub = subscription(); sub.items.data[0].price.id = 'price_old';
+    mockStripe.prices.retrieve.mockResolvedValue({ ...price, id: 'price_old', active: false, unit_amount: 1500 });
+    await expect(service.validatedPlan(sub)).resolves.toMatchObject({ billing: 'STANDARD', period: 'MONTHLY' });
+  });
+  it('recognizes an archived named legacy product after its lookup key is removed', async () => {
+    mockStripe.prices.list.mockResolvedValue({ data: [] });
+    mockStripe.products.list.mockResolvedValue({ data: [{ id: 'prod_starter', name: 'STANDARD', active: false }] });
+    mockStripe.prices.retrieve.mockResolvedValue({ ...price, active: false, unit_amount: 1500 });
+    await expect(service.validatedPlan(subscription())).resolves.toMatchObject({ billing: 'STANDARD' });
+  });
+  it('counts historical add-ons without lookup keys even when the add-on is first', async () => {
+    const base = { ...price, id: 'price_old_ultimate', product: 'prod_ultimate', active: false, unit_amount: 6900 };
+    const extra = { ...price, id: 'price_old_extra', product: 'prod_extra', active: false, unit_amount: 80, lookup_key: null };
+    mockStripe.prices.list.mockImplementation(async params => ({ data: params.lookup_keys[0].includes('extra_channel') ? [extra] : [base] }));
+    mockStripe.prices.retrieve.mockImplementation(async id => id === extra.id ? extra : base);
+    const sub = { ...subscription(), id: 'sub_old', customer: 'cus_1', status: 'active', metadata: { billing: 'ULTIMATE', period: 'MONTHLY', uniqueId: 'u1' },
+      items: { data: [{ quantity: 7, price: extra }, { quantity: 1, price: base }] } } as any;
+    const write = jest.fn();
+    const svc = new StripeService({ createOrUpdateSubscription: write } as any, {} as any, {} as any, {} as any);
+    jest.spyOn(svc, 'checkValidCard').mockResolvedValue(true);
+    jest.spyOn(svc as any, 'liveSubscription').mockResolvedValue(sub);
+    await svc.updateSubscription({ data: { object: sub } } as any);
+    expect(write.mock.calls[0][4]).toBe(107);
+  });
+  it('does not claim or complete an event rejected by the service metadata filter', async () => {
+    const processPaymentEvent = jest.fn(async (_provider, _id, handler) => handler());
+    const svc = new StripeService({ processPaymentEvent } as any, {} as any, {} as any, {} as any);
+    await expect(svc.processWebhook({ id: 'evt_filtered', type: 'customer.subscription.updated', data: { object: { metadata: {} } } } as any)).resolves.toMatchObject({ ok: true });
+    expect(processPaymentEvent).not.toHaveBeenCalled();
+  });
+  it.each(['customer.subscription.updated', 'customer.subscription.deleted'])('acknowledges, logs and alerts a catalog mismatch on %s without writing entitlements', async type => {
+    const processPaymentEvent = jest.fn(async (_provider, _id, handler) => handler());
+    const write = jest.fn(); const remove = jest.fn();
+    const svc = new StripeService({ processPaymentEvent, createOrUpdateSubscription: write, deleteSubscription: remove } as any, {} as any, {} as any, {} as any);
+    const sub = { ...subscription(), id: 'sub_1', customer: 'cus_1', status: 'active', metadata: { service: 'gitroom', billing: 'ULTIMATE', period: 'MONTHLY', uniqueId: 'u1' } };
+    jest.spyOn(svc, 'checkValidCard').mockResolvedValue(true);
+    jest.spyOn(svc as any, 'liveSubscription').mockResolvedValue(sub);
+    jest.spyOn(svc, 'getLiveSubscriptions').mockResolvedValue([sub]);
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(svc.processWebhook({ id: 'evt_mismatch', type, data: { object: { ...sub, id: type.endsWith('deleted') ? 'sub_deleted' : sub.id } } } as any)).resolves.toMatchObject({ ok: true });
+    expect(logged).toHaveBeenCalledWith('stripe_catalog_mismatch', expect.objectContaining({ stripe_event_id: 'evt_mismatch' }));
+    expect(Sentry.captureMessage).toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled();
   });
   it('deduplicates an event through the persistent ledger boundary', async () => {
     const done = new Set();

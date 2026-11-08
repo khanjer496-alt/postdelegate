@@ -50,3 +50,12 @@ it('releases retryable failures instead of marking them complete', async () => {
   await repo.processPaymentEvent('stripe', 'evt_retry', handler);
   expect(handler).toHaveBeenCalledTimes(2);
 });
+
+it('leaves a thrown catalog mismatch replayable for an outer 2xx acknowledgement', async () => {
+  const handler = jest.fn().mockRejectedValueOnce(new Error('catalog mismatch')).mockResolvedValueOnce({ ok: true });
+  await expect(repo.processPaymentEvent('stripe', 'evt_catalog', handler)).rejects.toThrow('catalog mismatch');
+  const rows = await client.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PaymentWebhookEvent" WHERE "eventId" = 'evt_catalog'`;
+  expect(Number(rows[0].count)).toBe(0);
+  await expect(repo.processPaymentEvent('stripe', 'evt_catalog', handler)).resolves.toEqual({ ok: true });
+  expect(handler).toHaveBeenCalledTimes(2);
+});

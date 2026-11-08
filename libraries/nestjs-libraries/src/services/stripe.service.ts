@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import * as Sentry from '@sentry/nestjs';
 import { BadRequestException } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
@@ -35,6 +36,15 @@ import dayjs from 'dayjs';
 import { emailButton } from '@gitroom/nestjs-libraries/services/email.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
+
+class StripeCatalogMismatch extends Error {}
+
+const HANDLED_WEBHOOK_EVENTS = new Set([
+  'invoice.payment_succeeded', 'invoice.payment_failed',
+  'customer.subscription.created', 'customer.subscription.updated',
+  'customer.subscription.deleted', 'customer.subscription.trial_will_end',
+  'charge.refunded', 'charge.dispute.created',
+]);
 
 const isPaidTier = (value: string): value is 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE' =>
   ['STANDARD', 'TEAM', 'PRO', 'ULTIMATE'].includes(value);
@@ -627,23 +637,39 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
-  async processWebhook(event: Stripe.Event) {
-    if (!event.id) throw new BadRequestException('Missing Stripe event id');
-    return this._subscriptionService.processPaymentEvent(
-      STRIPE_PROVIDER, event.id, () => this.dispatchWebhook(event)
+  private handlesWebhook(event: Stripe.Event) {
+    return HANDLED_WEBHOOK_EVENTS.has(event.type) && (
+      (event.data?.object as { metadata?: { service?: string } })?.metadata?.service === 'gitroom' ||
+      EVENTS_WITHOUT_SERVICE_METADATA.includes(event.type)
     );
   }
 
-  async dispatchWebhook(event: Stripe.Event) {
-    // Maybe it comes from another stripe webhook
-    if (
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      event?.data?.object?.metadata?.service !== 'gitroom' &&
-      !EVENTS_WITHOUT_SERVICE_METADATA.includes(event.type)
-    ) {
+  async processWebhook(event: Stripe.Event) {
+    if (!event.id) throw new BadRequestException('Missing Stripe event id');
+    // A filtered delivery must remain replayable after its metadata is fixed.
+    if (!this.handlesWebhook(event)) return { ok: true };
+    try {
+      return await this._subscriptionService.processPaymentEvent(
+        STRIPE_PROVIDER, event.id, () => this.dispatchWebhook(event)
+      );
+    } catch (err) {
+      if (!(err instanceof StripeCatalogMismatch)) throw err;
+      // The ledger releases its claim on a thrown error. Acknowledge a logical
+      // mismatch without entitlements or a completed marker; operators can fix
+      // the catalog and replay it. Transport/database failures still retry.
+      const details = { stripe_event_id: event.id, stripe_event_type: event.type,
+        stripe_subscription_id: (event.data.object as { id?: string })?.id,
+        reason: err.message };
+      console.error('stripe_catalog_mismatch', details);
+      try {
+        Sentry.captureMessage('stripe_catalog_mismatch', { level: 'error', extra: details });
+      } catch { console.error('stripe_catalog_mismatch_alert_failed', { stripe_event_id: event.id }); }
       return { ok: true };
     }
+  }
+
+  async dispatchWebhook(event: Stripe.Event) {
+    if (!this.handlesWebhook(event)) return { ok: true };
 
     switch (event.type) {
       case 'invoice.payment_succeeded':
@@ -745,44 +771,69 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
-  // Match entitlement metadata to a price registered in the server's Stripe
-  // catalog. Never create products/prices while processing a webhook.
+  // Identify products from server-owned lookup keys and known legacy names.
+  // Include archived products; current lookup keys alone lose older prices.
+  private async catalogProductIds(slug: string, names: string[]) {
+    const prices = await stripe.prices.list({
+      lookup_keys: [`postdelegate_${slug}_month`, `postdelegate_${slug}_year`], limit: 100,
+    });
+    const ids = new Set(prices.data.map(p => typeof p.product === 'string' ? p.product : p.product?.id).filter(Boolean));
+    const knownNames = new Set(names.map(name => name.toUpperCase()));
+    let after: string | undefined;
+    for (;;) {
+      const page = await stripe.products.list({ limit: 100, ...(after ? { starting_after: after } : {}) });
+      for (const product of page.data) {
+        if (knownNames.has(product.name?.toUpperCase())) ids.add(product.id);
+      }
+      if (!page.has_more || !page.data.length) break;
+      after = page.data[page.data.length - 1].id;
+    }
+    return ids;
+  }
+
+  // Match product identity and actual billing interval, rather than today's
+  // amount or active flag: existing customers may retain retired prices.
   async validatedPlan(subscription: Stripe.Subscription) {
     const { billing, period, uniqueId } = subscription.metadata || {};
     const plan = Object.prototype.hasOwnProperty.call(pricing, billing) && pricing[billing];
-    if (!plan || !isPaidTier(billing) || !['MONTHLY', 'YEARLY'].includes(period) || !uniqueId) {
-      throw new BadRequestException('Invalid subscription plan metadata');
+    const mismatch = (reason: string): never => { throw new StripeCatalogMismatch(reason); };
+    if (!plan || !plan.slug || !isPaidTier(billing) || !['MONTHLY', 'YEARLY'].includes(period) || !uniqueId) {
+      return mismatch('Invalid subscription plan metadata');
     }
     const interval = period === 'YEARLY' ? 'year' : 'month';
-    const item = planItemOf(subscription);
-    if (!item || item.quantity !== 1) throw new BadRequestException('Missing subscription plan item');
-    const { data } = await stripe.prices.list({
-      lookup_keys: [`postdelegate_${plan.slug}_${interval}`], limit: 100,
-    });
-    let registered = data;
-    if (!registered.some(p => p.id === item.price.id)) {
-      // Older self-hosted catalogs use named products without lookup keys.
-      const products = await stripe.products.list({ active: true, limit: 100 });
-      const product = products.data.find(p => p.name.toUpperCase() === billing);
-      registered = product ? (await stripe.prices.list({ product: product.id, limit: 100 })).data : [];
-    }
-    const price = registered.find(p => p.id === item.price.id);
-    const amount = (period === 'YEARLY' ? plan.year_price : plan.month_price) * 100;
-    if (!price || price.unit_amount !== amount || price.currency !== 'usd' ||
-        price.recurring?.interval !== interval || (price.recurring.interval_count || 1) !== 1) {
-      throw new BadRequestException('Subscription price does not match plan');
-    }
-    // Add-on quantity also affects entitlements: accept only the catalog price.
-    const extras = (subscription.items?.data || []).filter(p => p !== item);
-    if (extras.length > 1) throw new BadRequestException('Invalid subscription add-ons');
-    for (const extra of extras) {
-      const expected = await resolveExtraChannelPrice(stripe, billing, period as 'MONTHLY' | 'YEARLY');
-      if (!expected || extra.price.id !== expected.id || !Number.isInteger(extra.quantity) ||
-          extra.quantity < 1 || extra.quantity > MAX_EXTRA_CHANNELS) {
-        throw new BadRequestException('Invalid subscription add-on price');
+    const items = subscription.items?.data || [];
+    if (!items.length || items.length > 2) return mismatch('Invalid subscription items');
+    const knownPlans = await this.catalogProductIds(plan.slug, [billing, plan.label || billing, `PostDelegate ${plan.label || billing}`]);
+    const resolved: Array<{ item: Stripe.SubscriptionItem; price: Stripe.Price; product: string }> = [];
+    for (const item of items) {
+      let price: Stripe.Price;
+      try { price = await stripe.prices.retrieve(item.price.id); }
+      catch (err) {
+        if ((err as { code?: string }).code === 'resource_missing') return mismatch('Unknown subscription price');
+        throw err;
       }
+      if (price.id !== item.price.id || price.currency !== 'usd' || price.recurring?.interval !== interval ||
+          (price.recurring.interval_count ?? 1) !== 1 || price.unit_amount == null || price.unit_amount < 0) {
+        return mismatch('Subscription price does not match plan');
+      }
+      const product = typeof price.product === 'string' ? price.product : price.product?.id;
+      resolved.push({ item, price, product });
     }
-    return { billing, period: period as 'MONTHLY' | 'YEARLY', uniqueId };
+    const base = resolved.filter(p => knownPlans.has(p.product));
+    if (base.length !== 1 || base[0].item.quantity !== 1) return mismatch('Missing subscription plan item');
+    const extras = resolved.filter(p => p !== base[0]);
+    let extraChannels = 0;
+    if (extras.length) {
+      if (!allowsExtraChannels(billing)) return mismatch('Plan does not allow add-ons');
+      const knownExtras = await this.catalogProductIds('extra_channel', ['Extra channel', 'PostDelegate Extra channel']);
+      const extra = extras[0];
+      if (!knownExtras.has(extra.product) || !Number.isInteger(extra.item.quantity) ||
+          extra.item.quantity < 1 || extra.item.quantity > MAX_EXTRA_CHANNELS) {
+        return mismatch('Invalid subscription add-on price');
+      }
+      extraChannels = extra.item.quantity;
+    }
+    return { billing, period: period as 'MONTHLY' | 'YEARLY', uniqueId, extraChannels };
   }
 
   async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
@@ -823,14 +874,14 @@ export class StripeService extends PaymentProviderAbstract {
       return { ok: true };
     }
     const currentPlan = await this.validatedPlan(current);
-    const { uniqueId, billing, period } = currentPlan;
+    const { uniqueId, billing, period, extraChannels } = currentPlan;
 
     const result = await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
       isTrialOf(current),
       uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(billing, extraChannelsOf(current)),
+      totalChannelsOf(billing, extraChannels),
       billing,
       period,
       current.cancel_at,
@@ -886,14 +937,14 @@ export class StripeService extends PaymentProviderAbstract {
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
       return fresh ? this.deleteSubscription(event) : { retry: true };
     }
-    const { uniqueId, billing, period } = await this.validatedPlan(current);
+    const { uniqueId, billing, period, extraChannels } = await this.validatedPlan(current);
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
       isTrialOf(current),
       uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(billing, extraChannelsOf(current)),
+      totalChannelsOf(billing, extraChannels),
       billing,
       period,
       current.cancel_at,
@@ -948,7 +999,7 @@ export class StripeService extends PaymentProviderAbstract {
       return;
     }
 
-    const { uniqueId, billing, period } = await this.validatedPlan(survivor);
+    const { uniqueId, billing, period, extraChannels } = await this.validatedPlan(survivor);
     console.log('stripe_subscription_deleted_survivor_kept', {
       stripe_event_type: event.type,
       stripe_event_id: event.id,
@@ -966,7 +1017,7 @@ export class StripeService extends PaymentProviderAbstract {
       uniqueId,
       customer,
       // the survivor comes from a fresh list, not from the event
-      totalChannelsOf(billing, extraChannelsOf(survivor)),
+      totalChannelsOf(billing, extraChannels),
       billing,
       period,
       survivor.cancel_at,
