@@ -8,7 +8,7 @@ PostDelegate is a hosted social media scheduler. You write a post once, pick the
 
 <div class="callout">
 
-**Early access.** Today you can connect YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram, Discord, Mastodon and Google Business Profile. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and Reddit are waiting on platform approval. X is not available on PostDelegate. See [Channels overview](/docs/channels) for the current list.
+**Early access.** Today you can connect LinkedIn personal profiles, YouTube, Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr, WordPress, Kick, Twitch, Tumblr, Dribbble, Slack, Telegram, Discord, Mastodon and Google Business Profile. Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, Pinterest and Reddit are waiting on platform approval. X is not available on PostDelegate. See [Channels overview](/docs/channels) for the current list.
 
 </div>
 

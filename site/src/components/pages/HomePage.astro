@@ -12,7 +12,7 @@ import OrbitAccent from '../OrbitAccent.astro';
 import NetworkGrid from '../NetworkGrid.astro';
 import Testimonials from '../Testimonials.astro';
 import Pricing from '../Pricing.astro';
-import { NETWORKS, AVAILABLE_NETWORKS, WAITING_KEYS, type Network } from '../../data/networks';
+import { NETWORKS, AVAILABLE_NETWORKS, WAITING_NETWORKS, type Network } from '../../data/networks';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
@@ -32,7 +32,7 @@ const appLd = { '@context': 'https://schema.org', '@type': 'SoftwareApplication'
 const innerKeys = ['youtube', 'bluesky', 'wordpress', 'devto'];
 const orbitInner = AVAILABLE_NETWORKS.filter((n) => innerKeys.includes(n.key));
 const orbitMiddle = AVAILABLE_NETWORKS.filter((n) => !innerKeys.includes(n.key));
-const orbitOuter = WAITING_KEYS.map((k) => NETWORKS.find((n) => n.key === k)).filter((n): n is Network => Boolean(n));
+const orbitOuter = WAITING_NETWORKS;
 // The comet sits in the gap halfway round the middle ring, whatever its size.
 const cometAngle = (Math.floor(orbitMiddle.length / 2) - 0.5) * 360 / orbitMiddle.length;
 const orbitLabel = h.orbitLabel(liveCount, AVAILABLE_NETWORKS.map((n) => n.name).join(', '));
