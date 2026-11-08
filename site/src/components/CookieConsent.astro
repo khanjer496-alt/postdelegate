@@ -24,7 +24,6 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     </button>
   </div>
   <p>{c.text} <a href={privacy}>{c.learnMore}</a></p>
-  <p class="cc-note" data-cc-referral hidden>{c.referral}</p>
   <div class="cc-categories" data-cc-view="customize" hidden>
     <div class="cc-row">
       <div><span id="cc-necessary">{c.necessary}</span><small id="cc-necessary-text">{c.necessaryText}</small></div>
@@ -130,7 +129,6 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     const setView = (view: 'banner' | 'customize') => {
       title.textContent = (view === 'customize' ? banner.dataset.settingsTitle : banner.dataset.title) ?? '';
       banner.querySelectorAll<HTMLElement>('[data-cc-view]').forEach((part) => (part.hidden = part.dataset.ccView !== view));
-      banner.querySelector<HTMLElement>('[data-cc-referral]')!.hidden = !(ref && view === 'banner');
     };
     // The banner never sits on top of a sign-up button in the page: it moves
     // to the other corner, or on phones waits, invisible, until it scrolled away
@@ -240,13 +238,13 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   .cc{position:fixed;z-index:90;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:6px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #303030;background:#171717;box-shadow:0 -12px 40px #0008;color:#fff;font-size:12.5px;line-height:1.4}
   @media(prefers-reduced-motion:no-preference){.cc:not([hidden]){animation:cc-in .2s ease-out}}
   @keyframes cc-in{from{opacity:0;transform:translateY(8px)}}
-  .cc p{margin:0}.cc .cc-note{color:#b9b9b9}
+  .cc p{margin:0}
   .cc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .cc .cc-title{margin:0;font-size:14px;font-weight:700;line-height:1.3}.cc .cc-title:focus{outline:none}.cc .cc-title:focus-visible{outline:2px solid #c8ff4d;outline-offset:3px}
   .cc-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin-block:-4px;margin-inline-end:-6px;border:0;border-radius:8px;background:none;color:#b9b9b9}.cc-close:hover{color:#fff;background:#222}
   .cc a{color:#d1bfff;text-decoration:underline;text-underline-offset:3px}.cc a:hover{color:#fff}
   .cc-categories{display:flex;flex-direction:column;gap:8px;padding:2px 0}
-  .cc-categories:not([hidden]){display:flex}.cc [hidden]{display:none!important}
+  .cc-categories:not([hidden]){display:flex}.cc[hidden],.cc [hidden]{display:none!important}
   .cc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.cc-row>div{display:flex;flex-direction:column;gap:2px}.cc-row span{font-weight:650}.cc-row small{color:#b9b9b9;font-size:12px;line-height:1.45}
   .cc-switch{flex-shrink:0;width:44px;height:26px;padding:3px;border:1px solid #555;border-radius:99px;background:#0d0d0d}.cc-switch span{display:block;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
   .cc-switch[aria-checked="true"]{border-color:#7357ff;background:#7357ff}.cc-switch[aria-checked="true"] span{transform:translateX(18px)}:global([dir=rtl]) .cc-switch[aria-checked="true"] span{transform:translateX(-18px)}.cc-switch[aria-disabled="true"]{opacity:.6;cursor:not-allowed}

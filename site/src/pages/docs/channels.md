@@ -32,7 +32,7 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 
 ## Waiting on approval
 
-Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, Pinterest and Reddit are waiting on approval from each network. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the table above does not work today.
+Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, and Pinterest are waiting on approval from each network. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the table above does not work today.
 
 ## How connections work
 

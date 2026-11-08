@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Waiting on approval
-description: Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, Pinterest and Reddit are waiting on platform approval at PostDelegate. Why each needs approval first, and what to do now.
+description: Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, and Pinterest are waiting on platform approval at PostDelegate. Why each needs approval first, and what to do now.
 ---
 
 These networks are not live yet. **None of them can be connected on PostDelegate today.** Each network reviews apps before it lets a service publish on someone's behalf, and PostDelegate only offers a connection once that review is done and the connection is switched on.
@@ -14,7 +14,6 @@ These networks are not live yet. **None of them can be connected on PostDelegate
 | TikTok | Waiting for platform approval |
 | LinkedIn company Pages | Waiting for platform approval |
 | Pinterest | Waiting for platform approval |
-| Reddit | Waiting for platform approval |
 
 [LinkedIn personal profiles](/docs/channels/linkedin) are available now; the pending LinkedIn destination above is company Pages only. X is not available on PostDelegate.
 
