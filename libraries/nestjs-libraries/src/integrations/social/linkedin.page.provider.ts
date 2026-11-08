@@ -28,16 +28,11 @@ export class LinkedinPageProvider
   override isBetweenSteps = true;
   override refreshWait = true;
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
-  // The Community Management API set. This provider posts as the
-  // organization, so it needs no member scope; r_basicprofile belongs to a
-  // restricted product the app does not hold. openid/profile stay because
-  // authenticate() and refreshToken() read /v2/userinfo. Unverified until
-  // LinkedIn approves the pages app - checkScopes throws NotEnoughScopes on
-  // any scope the app was not granted, so reconcile this list against the
-  // granted one before taking LinkedIn Page out of HIDDEN_PROVIDERS.
+  // CMA is the only product on the Pages app: it grants r_basicprofile,
+  // not the OpenID Connect scopes used by the personal app. Verify these
+  // permissions in the approved app before removing it from HIDDEN_PROVIDERS.
   override scopes = [
-    'openid',
-    'profile',
+    'r_basicprofile',
     'rw_organization_admin',
     'w_organization_social',
     'r_organization_social',
@@ -47,10 +42,37 @@ export class LinkedinPageProvider
   // Community Management API only to an app that holds no other product.
   // An install whose single app holds every product can leave these unset.
   protected override credentials() {
-    const { clientId, clientSecret } = super.credentials();
+    const clientId = process.env.LINKEDIN_PAGE_CLIENT_ID;
+    const clientSecret = process.env.LINKEDIN_PAGE_CLIENT_SECRET;
+    if (!clientId && !clientSecret) return super.credentials();
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        'Set both LINKEDIN_PAGE_CLIENT_ID and LINKEDIN_PAGE_CLIENT_SECRET'
+      );
+    }
+    return { clientId, clientSecret };
+  }
+
+  private async memberInformation(accessToken: string) {
+    const response = await fetch(
+      'https://api.linkedin.com/v2/me?projection=(id,localizedFirstName,localizedLastName,profilePicture(displayImage~:playableStreams))',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!response.ok)
+      throw new Error(
+        'LinkedIn Page member lookup failed; reconnect with r_basicprofile'
+      );
+    const member = await response.json();
+    if (!member.id)
+      throw new Error('LinkedIn Page member lookup returned no identity');
     return {
-      clientId: process.env.LINKEDIN_PAGE_CLIENT_ID || clientId,
-      clientSecret: process.env.LINKEDIN_PAGE_CLIENT_SECRET || clientSecret,
+      id: member.id as string,
+      name: [member.localizedFirstName, member.localizedLastName]
+        .filter(Boolean)
+        .join(' '),
+      picture:
+        member.profilePicture?.['displayImage~']?.elements?.slice(-1)[0]
+          ?.identifiers?.[0]?.identifier || '',
     };
   }
 
@@ -126,7 +148,6 @@ export class LinkedinPageProvider
     }));
   }
 
-
   override async refreshToken(
     refresh_token: string
   ): Promise<AuthTokenDetails> {
@@ -149,17 +170,7 @@ export class LinkedinPageProvider
       })
     ).json();
 
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    const { name, id, picture } = await this.memberInformation(accessToken);
 
     return {
       id,
@@ -176,7 +187,7 @@ export class LinkedinPageProvider
     integration: Integration,
     originalIntegration: Integration,
     postId: string,
-    information: any,
+    information: any
   ) {
     return super.addComment(
       integration,
@@ -322,17 +333,7 @@ export class LinkedinPageProvider
 
     this.checkScopes(this.scopes, scope);
 
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    const { name, id, picture } = await this.memberInformation(accessToken);
 
     return {
       // namespaced placeholder so the in-between row never collides with the
