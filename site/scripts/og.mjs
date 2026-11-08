@@ -102,18 +102,19 @@ export const cardSvg = ({ kicker, title }) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#0d0d0d"/>${MARK}<text x="185" y="121" fill="white" font-family="sans-serif" font-size="36" font-weight="700">PostDelegate</text><text x="${MARGIN}" y="212" fill="#C8FF4D" font-family="sans-serif" font-size="26" font-weight="700" letter-spacing="2">${escape(kicker.toUpperCase())}</text>${text}<path d="M${MARGIN} 505h${Math.min(620, Math.round(textWidth(lines[0] || '', size)))}" stroke="#7357FF" stroke-width="5" stroke-linecap="round"/><text x="${MARGIN}" y="565" fill="#fff" font-family="sans-serif" font-size="24">postdelegate.com</text>${SPARK_LOW}</svg>`;
 };
 
-// A page added to guides, compare or tools without a card would quietly fall
+// A page added to guides, compare, tools or best without a card would quietly fall
 // back to the brand one, which is the thing this set exists to stop. The build
 // fails instead.
 const checkEveryPageHasOne = async () => {
   const missing = [];
-  for (const section of ['guides', 'compare', 'tools']) {
+  for (const section of ['guides', 'compare', 'tools', 'best']) {
     for (const name of await readdir(new URL(`../src/pages/${section}`, import.meta.url))) {
       // Astro routes neither an underscore-prefixed file nor an endpoint like
       // foo.md.ts as a page, and index is the section's own card
       if (name.startsWith('_') || name.startsWith('index.')) continue;
       if (name.includes('.') && !/\.(astro|md|mdx)$/.test(name)) continue;
       // a dynamic route checks its own generated pages, as tools/[tool] does in network-tools.ts
+      // and best/[list] in best-lists.ts
       if (name.startsWith('[')) continue;
       const path = `/${section}/${name.replace(/\.(astro|md|mdx)$/, '')}`;
       if (!OG_CARDS[path]) missing.push(path);

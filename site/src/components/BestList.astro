@@ -1,0 +1,102 @@
+---
+// Template for /best/{slug}: the tools that meet one stated rule, in the order a second rule sets,
+// facts from src/data/tools/*.json. The words and the rule come from src/data/best-lists.ts.
+// PostDelegate is an entry like any other, marked "Ours", and goes where the rule puts it.
+import Doc from '../layouts/Doc.astro';
+import Faq from './Faq.astro';
+import FactCell from './compare/FactCell.astro';
+import CompareNotes from './compare/CompareNotes.astro';
+import { checkedOn, comparisonJsonLd, formatDate } from '../data/tools';
+import { AVAILABLE_NETWORKS, WAITING_NETWORKS } from '../data/networks';
+import { BEST_LISTS, bestEntries, bestFact, bestHref, bestLeftOut, orderRule, type BestList } from '../data/best-lists';
+interface Props { list: BestList }
+const { list } = Astro.props;
+const tools = bestEntries(list);
+const leftOut = bestLeftOut(list);
+const checked = checkedOn(tools);
+const modified = [list.published, checked].sort().at(-1)!;
+const path = bestHref(list);
+const namesPostiz = tools.some((t) => t.slug === 'postdelegate' || t.slug === 'postiz');
+const ranked = list.order.by !== 'name';
+const ours = (slug: string) => slug === 'postdelegate';
+// Where the page's facts do not already show networks, PostDelegate's entry says what cannot be connected yet.
+const networkNote = !list.facts.some((f) => f.key === 'networks');
+const requiresLabel = list.facts.find((f) => f.key === list.requires)?.label ?? list.requires;
+// Related: PostDelegate's own page against each tool on the list, the topic's guides, the other lists, the hubs.
+const pages = Object.keys(import.meta.glob('../pages/compare/*.astro')).map((file) => file.split('/').pop()!.replace('.astro', ''));
+const links = [
+  ...tools.filter((t) => pages.includes(t.slug)).map((t) => ({ href: `/compare/${t.slug}`, label: `PostDelegate vs ${t.name}` })),
+  ...list.links,
+  ...BEST_LISTS.filter((other) => other !== list).map((other) => ({ href: bestHref(other), label: other.h1 })),
+  { href: '/best', label: 'All best-of lists' },
+  { href: '/compare', label: 'All comparisons' },
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+];
+const jsonLd = comparisonJsonLd({ path, title: list.h1, description: list.description, section: { name: 'Best of', path: '/best' }, faq: list.faq, published: list.published, modified });
+---
+<Doc title={list.title} description={list.description} h1={list.h1} eyebrow="Best of" jsonLd={jsonLd}>
+  <a slot="actions" href="#the-list" class="button button-outline">Jump to the list</a>
+  <a slot="actions" href="#how-we-chose" class="button button-outline">How we chose</a>
+  <h2>Short answer</h2>
+  <p class="short-answer">{list.shortAnswer}</p>
+  <CompareNotes tools={tools} checked={checked} namesPostiz={namesPostiz} listed />
+
+  <h2 id="the-list">The list</h2>
+  <p class="best-small">{tools.length} of the {tools.length + leftOut.length} tools in our comparison data meet the rule. {orderRule(list)}</p>
+  <ol class="best-list">
+    {tools.map((t, i) => (
+      <li class:list={['best-item', { 'best-ours': ours(t.slug) }]}>
+        <h3 class="best-name">
+          {ranked && <span class="best-rank">{i + 1}.</span>}
+          {ours(t.slug) ? <a href="/">{t.name}</a> : <a href={t.site} target="_blank" rel="noopener">{t.name}</a>}
+          {ours(t.slug) && <span class="best-badge">Ours</span>}
+        </h3>
+        <dl>
+          {list.facts.map((f) => <div><dt>{f.label}</dt><dd><FactCell fact={bestFact(t, f.key)} vendor={t.name} /></dd></div>)}
+          {ours(t.slug) && networkNote && <div><dt>Networks</dt><dd>{AVAILABLE_NETWORKS.length} live today. Waiting on platform approval, so not connectable yet: {WAITING_NETWORKS.map((n) => n.name).join(', ')}. X is not available. <a href="/platforms">Platform status</a></dd></div>}
+        </dl>
+        <p class="best-pick"><strong>Pick it if</strong> {list.picks[t.slug]}</p>
+        <p class="best-small">Facts checked on <time datetime={t.checked}>{formatDate(t.checked)}</time>.</p>
+      </li>
+    ))}
+  </ol>
+
+  <h2 id="how-we-chose">How we chose</h2>
+  <p>{list.rule}</p>
+  <p>{orderRule(list)}</p>
+  <p>PostDelegate is held to the same rule and goes where the rule puts it. Its prices come from <a href="/pricing">our pricing page</a> and its networks from <a href="/platforms">platform status</a>. Every other fact is read from the vendor's own pages and links to them; the date each tool was checked is on its entry. Nothing here is a rating, a score or a review, and no vendor paid to be listed.</p>
+
+  {leftOut.length > 0 && <>
+    <h2>Not on this list</h2>
+    <p>The other tools in our comparison data, with the "{requiresLabel}" fact that kept them off. "Not listed" means the vendor's pages we checked do not say.</p>
+    <ul class="best-out">
+      {leftOut.map((t) => <li><a href={t.site} target="_blank" rel="noopener">{t.name}</a>: <FactCell fact={bestFact(t, list.requires)} vendor={t.name} /></li>)}
+    </ul>
+  </>}
+
+  <h2>FAQ</h2>
+  <Faq items={list.faq} />
+
+  <h2>Related</h2>
+  <ul class="best-links">{links.map((link) => <li><a href={link.href}>{link.label}</a></li>)}</ul>
+  <p class="best-small">Product names are trademarks of their owners. PostDelegate is not affiliated with or endorsed by any of them. Last updated <time datetime={modified}>{modified}</time>.</p>
+</Doc>
+<style>
+  .short-answer { padding: 20px 24px; border-left: 3px solid #c8ff4d; border-radius: 0 14px 14px 0; background: #171717; color: #e6e6e6; font-size: 17px; line-height: 1.75; }
+  .best-list { display: grid; gap: 16px; margin: 22px 0 !important; padding: 0 !important; list-style: none !important; }
+  .best-item { margin: 0 !important; padding: 22px 24px !important; border: 1px solid #303030; border-radius: 18px; background: #171717; }
+  .best-ours { border-color: #4a3d8f; background: linear-gradient(180deg, #1b1630, #151515 70%); }
+  .best-name { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 6px !important; }
+  .best-rank { color: #9a9a9a; font-variant-numeric: tabular-nums; }
+  .best-badge { padding: 2px 10px; border-radius: 999px; background: #c8ff4d; color: #0d0d0d; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .best-item dl { display: grid; margin: 12px 0 0; }
+  .best-item dl > div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 16px; padding: 11px 0; border-top: 1px solid #2a2a2a; font-size: 14.5px; line-height: 1.7; }
+  .best-ours dl > div { border-top-color: #2f2a45; }
+  .best-item dt { color: #fff; font-weight: 700; }
+  .best-item dd { margin: 0; color: #c4c4c4; }
+  .best-pick { margin: 14px 0 6px !important; color: #e6e6e6; }
+  .best-small { color: #9a9a9a; font-size: 13px !important; }
+  .best-out li { font-size: 14.5px; line-height: 1.7; }
+  .best-links { columns: 2; column-gap: 32px; }
+  @media (max-width: 600px) { .best-links { columns: 1; } .short-answer { font-size: 16px; padding: 16px 18px; } .best-item { padding: 18px !important; } .best-item dl > div { grid-template-columns: 1fr; gap: 4px; } }
+</style>

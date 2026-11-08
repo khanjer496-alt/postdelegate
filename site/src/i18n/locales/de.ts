@@ -48,7 +48,7 @@ const dict: Dict = {
     codex: 'Codex & Coding-Agenten', mcp: 'MCP', restApi: 'REST API', apiReference: 'API-Referenz', mcpSetup: 'MCP-Einrichtung',
     schedulers: 'Social-Media-Planer', moreNetworks: 'Alle Netzwerke und ihren Status ansehen',
     resources: 'Ressourcen', guides: 'Anleitungen', tools: 'Gratis-Tools', captionChecker: 'Caption-Checker', compare: 'Vergleiche',
-    alternatives: 'Alternativen', changelog: 'Änderungsprotokoll', roadmap: 'Roadmap', about: 'Über uns', brand: 'Marke', support: 'Support', status: 'Status',
+    alternatives: 'Alternativen', best: 'Bestenlisten', changelog: 'Änderungsprotokoll', roadmap: 'Roadmap', about: 'Über uns', brand: 'Marke', support: 'Support', status: 'Status',
     legal: 'Rechtliches', privacy: 'Datenschutzerklärung', terms: 'Nutzungsbedingungen', dataDeletion: 'Datenlöschung', dpa: 'AVV',
     subprocessors: 'Unterauftragsverarbeiter', licenses: 'Lizenzen', cookieSettings: 'Cookie-Einstellungen',
     follow: 'PostDelegate folgen', featuredOn: 'Bekannt aus',

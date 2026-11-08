@@ -48,7 +48,7 @@ const dict: Dict = {
     codex: 'Codex y agentes de código', mcp: 'MCP', restApi: 'API REST', apiReference: 'Referencia de la API', mcpSetup: 'Configurar MCP',
     schedulers: 'Planificadores de redes', moreNetworks: 'Ver todas las redes y su estado',
     resources: 'Recursos', guides: 'Guías', tools: 'Herramientas gratis', captionChecker: 'Verificador de textos', compare: 'Comparar',
-    alternatives: 'Alternativas', changelog: 'Novedades', roadmap: 'Hoja de ruta', about: 'Acerca de', brand: 'Marca', support: 'Soporte', status: 'Estado',
+    alternatives: 'Alternativas', best: 'Las mejores herramientas', changelog: 'Novedades', roadmap: 'Hoja de ruta', about: 'Acerca de', brand: 'Marca', support: 'Soporte', status: 'Estado',
     legal: 'Legal', privacy: 'Política de privacidad', terms: 'Términos del servicio', dataDeletion: 'Eliminación de datos', dpa: 'DPA',
     subprocessors: 'Subencargados', licenses: 'Licencias', cookieSettings: 'Configuración de cookies',
     follow: 'Sigue a PostDelegate', featuredOn: 'Destacado en',

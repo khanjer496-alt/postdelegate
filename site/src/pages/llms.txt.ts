@@ -92,6 +92,7 @@ ${DOC_SECTIONS.flatMap((section) => section.items).map((item) => `- [${item.titl
 - [REST API OpenAPI 3.1 spec](${SITE.url}/openapi.json)
 - [MCP](${SITE.url}/mcp)
 - [Compare PostDelegate with other schedulers](${SITE.url}/compare)
+- [Best-of lists of schedulers, MCP servers and APIs, each fact sourced](${SITE.url}/best)
 - [Changelog](${SITE.url}/changelog)
 - [Roadmap: networks in review](${SITE.url}/roadmap)
 - [Every page (sitemap.md)](${SITE.url}/sitemap.md)

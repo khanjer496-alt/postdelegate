@@ -103,6 +103,8 @@ If you are comparing servers, these questions separate a useful one from a risky
 - Which networks can actually be connected today, and which are only on a roadmap?
 - Who pays for the AI?
 
+For how other schedulers answer some of these, our list of [social media MCP servers](/best/social-media-mcp-servers) links each vendor's own documentation, and says which plans include MCP and which servers cannot publish.
+
 ## Next steps
 
 Pick one assistant, connect it, and ask for a single draft on a channel you control. The [MCP overview](/docs/mcp) explains the server addresses and sign-in options, and the [MCP page](/mcp) summarizes the setup. For a first channel, the [Bluesky](/bluesky-scheduler) and [WordPress](/wordpress-scheduler) scheduler pages show what each connection needs. Before you let an assistant schedule on its own, read [how to let an AI agent post safely](/guides/ai-social-media-agent-guardrails).

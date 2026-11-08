@@ -1,12 +1,13 @@
 ---
 // The fine print every comparison page carries: price date, vendor pricing pages, disclosure
-// and, when Postiz is named, the AGPL attribution.
+// and, when Postiz is named, the AGPL attribution. `listed` is for the best-of lists, where
+// PostDelegate is one of the tools on the page rather than a box beside it.
 import { formatDate, type Tool } from '../../data/tools';
-interface Props { tools: Tool[]; checked: string; namesPostiz: boolean }
-const { tools, checked, namesPostiz } = Astro.props;
+interface Props { tools: Tool[]; checked: string; namesPostiz: boolean; listed?: boolean }
+const { tools, checked, namesPostiz, listed = false } = Astro.props;
 ---
 <p class="compare-meta">Prices checked on <time datetime={checked}>{formatDate(checked)}</time>, monthly billing, USD. Pricing pages: {tools.map((t, i) => <>{i > 0 && ', '}<a href={t.pricingUrl} target="_blank" rel="noopener">{t.name}</a></>)}.</p>
-<p class="compare-meta">PostDelegate makes a social media scheduler, so we have a stake. We link every source so you can check.{namesPostiz && <> PostDelegate is built on the open-source Postiz project (AGPL-3.0). See <a href="/licenses">/licenses</a>.</>}</p>
+<p class="compare-meta">{listed ? <><strong>PostDelegate makes this site and is one of the tools on this list</strong>, marked “Ours”. It is placed by the same rule as every other tool, and we link every source so you can check.</> : 'PostDelegate makes a social media scheduler, so we have a stake. We link every source so you can check.'}{namesPostiz && <> PostDelegate is built on the open-source Postiz project (AGPL-3.0). See <a href="/licenses">/licenses</a>.</>}</p>
 <style>
   .compare-meta { margin: 10px 0 !important; color: #9a9a9a; font-size: 13px; line-height: 1.7; }
 </style>

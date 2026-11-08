@@ -3,6 +3,7 @@ import { SITE, NOINDEX_PATHS } from '../data/site';
 import { DOC_SECTIONS } from '../data/docs';
 import { GUIDES } from '../data/guides';
 import { SCHEDULERS } from '../data/schedulers';
+import { BEST_LISTS, bestHref } from '../data/best-lists';
 // Every public page as a Markdown list, for AI assistants and crawlers that read llms.txt.
 // Routes come from the page files themselves, so new pages appear here without a list to update.
 const files = Object.keys(import.meta.glob(['./**/*.astro', './**/*.md', '!./**/\\[*\\].astro', '!./\\[lang\\]/**', '!./404.astro']));
@@ -13,7 +14,8 @@ const titles = new Map<string, string>([
   ...SCHEDULERS.map((scheduler) => [`/${scheduler.slug}`, `${scheduler.name} scheduler`] as [string, string]),
   ['/api', 'REST API'], ['/mcp', 'MCP server'], ['/agents', 'AI agents'], ['/claude-cowork', 'Claude'], ['/codex', 'Codex and coding agents'],
   ['/platforms', 'Platform status'], ['/docs', 'Documentation'], ['/guides', 'Guides'], ['/tools', 'Free tools'], ['/compare', 'Compare schedulers'],
-  ['/alternatives', 'Scheduler alternatives'],
+  ['/alternatives', 'Scheduler alternatives'], ['/best', 'Best-of lists'],
+  ...BEST_LISTS.map((list) => [bestHref(list), list.h1] as [string, string]),
 ]);
 const words = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 const label = (path: string) => {
@@ -26,9 +28,9 @@ const label = (path: string) => {
   return words(slug);
 };
 const groups: [string, (path: string) => boolean][] = [
-  ['Product', (p) => !/^\/(docs|guides|compare|alternatives|tools|agents)\b/.test(p) && !p.endsWith('-scheduler')],
+  ['Product', (p) => !/^\/(docs|guides|compare|alternatives|best|tools|agents)\b/.test(p) && !p.endsWith('-scheduler')],
   ['Schedulers by network', (p) => p.endsWith('-scheduler')],
-  ['Compare and alternatives', (p) => /^\/(compare|alternatives)\b/.test(p)],
+  ['Compare, alternatives and best-of lists', (p) => /^\/(compare|alternatives|best)\b/.test(p)],
   ['Guides', (p) => p.startsWith('/guides')],
   ['Documentation', (p) => p.startsWith('/docs')],
   ['Free tools', (p) => p.startsWith('/tools')],
@@ -36,7 +38,7 @@ const groups: [string, (path: string) => boolean][] = [
 ];
 
 export const GET: APIRoute = () => {
-  const paths = [...new Set([...files.map(route), ...SCHEDULERS.map((s) => `/${s.slug}`)])].filter((path) => !NOINDEX_PATHS.includes(path)).sort();
+  const paths = [...new Set([...files.map(route), ...SCHEDULERS.map((s) => `/${s.slug}`), ...BEST_LISTS.map(bestHref)])].filter((path) => !NOINDEX_PATHS.includes(path)).sort();
   const sections = groups.map(([title, test]) => {
     const items = paths.filter(test);
     return items.length ? `## ${title}\n${items.map((p) => `- [${label(p)}](${SITE.url}${p === '/' ? '' : p})`).join('\n')}` : '';

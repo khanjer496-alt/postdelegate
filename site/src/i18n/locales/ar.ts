@@ -49,7 +49,7 @@ const dict: Dict = {
     codex: 'Codex ووكلاء البرمجة', mcp: 'MCP', restApi: 'REST API', apiReference: 'مرجع API', mcpSetup: 'إعداد MCP',
     schedulers: 'أدوات جدولة الشبكات', moreNetworks: 'اطّلع على كل الشبكات وحالتها',
     resources: 'الموارد', guides: 'الأدلة', tools: 'أدوات مجانية', captionChecker: 'مدقق النصوص', compare: 'المقارنات',
-    alternatives: 'البدائل', changelog: 'سجل التغييرات', roadmap: 'خارطة الطريق', about: 'من نحن', brand: 'الهوية', support: 'الدعم', status: 'حالة الخدمة',
+    alternatives: 'البدائل', best: 'قوائم الأفضل', changelog: 'سجل التغييرات', roadmap: 'خارطة الطريق', about: 'من نحن', brand: 'الهوية', support: 'الدعم', status: 'حالة الخدمة',
     legal: 'قانوني', privacy: 'سياسة الخصوصية', terms: 'شروط الخدمة', dataDeletion: 'حذف البيانات', dpa: 'اتفاقية معالجة البيانات',
     subprocessors: 'المعالجون الفرعيون', licenses: 'التراخيص', cookieSettings: 'إعدادات ملفات تعريف الارتباط',
     follow: 'تابع PostDelegate', featuredOn: 'ظهرنا على',
