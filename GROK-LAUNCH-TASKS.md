@@ -109,22 +109,54 @@ Existing (reported): app `7700045361989224500`, client key `awr6csyl2s6b7itb`. A
 
 ### 2.3 LinkedIn: profile and company Pages (priority 1)
 
-Status: no app yet, and the company Page couldn't be created because the LinkedIn account's **email isn't confirmed**.
+Status, 8 November 2026: **personal profiles are DONE and live in production.** Pages are waiting on LinkedIn.
 
-1. Confirm the email on the owner's LinkedIn account. This may need the owner's inbox.
-2. Create the **PostDelegate** company Page (Nasida Apps LLC), with the logo and website from section 1.
-3. Create the developer app linked to that Page, and verify the app with the Page admin.
-4. Products:
-   - **Share on LinkedIn**
-   - **Sign In with LinkedIn using OpenID Connect**
-   - **Community Management API** (for company Pages; it needs its own access request)
-5. Redirect URLs, both required:
-   - `https://app.postdelegate.com/integrations/social/linkedin`
-   - `https://app.postdelegate.com/integrations/social/linkedin-page`
-6. The code requests these scopes: `openid`, `profile`, `w_member_social`, `r_basicprofile`, `rw_organization_admin`, `w_organization_social`, `r_organization_social`
-7. **Important:** LinkedIn may refuse to put Community Management API on an app that already has other products, and may require a separate app for it. If that happens, don't work around it. Record it in section 6 and Claude will add support for a second LinkedIn client.
-8. Server settings: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, and for LinkedIn Pages `LINKEDIN_PAGE_CLIENT_ID`, `LINKEDIN_PAGE_CLIENT_SECRET` (separate app)
-9. Don't accept LinkedIn's API terms without the owner's OK. It's listed as an owner decision.
+What already exists — do not recreate any of it:
+
+- Company Page **PostDelegate**, id 145417753, linkedin.com/company/postdelegate.
+- App **PostDelegate**, app id 265074899, client id `77abjoilly0lcd`. Products granted instantly:
+  Share on LinkedIn, Sign In with LinkedIn using OpenID Connect. Granted scopes are exactly
+  `openid profile w_member_social email`.
+- App **PostDelegate for Pages**, app id 265083777, client id `77ss9ytd5m0vo7`. Community Management
+  API requested; the portal shows **"Review in progress"**. Page-verified, and the business email
+  `support@postdelegate.com` is verified.
+- Both redirect URLs registered, one per app.
+- `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` are set on the server, `linkedin` is out of
+  `HIDDEN_PROVIDERS`, and a real channel is connected and working.
+
+Item 7 of the old version was right: LinkedIn **does** refuse Community Management API on an app
+holding any other product ("requires that it be the only product on the application"). Hence two
+apps, and the code now supports a second client through `LINKEDIN_PAGE_CLIENT_ID` /
+`LINKEDIN_PAGE_CLIENT_SECRET` (falling back to the personal pair when unset). Scopes were also
+trimmed per app, because `checkScopes` throws `NotEnoughScopes` on any scope the app was not
+granted — the old list in this document would have made connecting impossible.
+
+**Task for Grok — the one thing left that needs an account holder:**
+
+1. Sign in to LinkedIn in a browser as the **secondary** account (`khanjer496@gmail.com`), not the
+   owner's personal account (`khanjar.97@gmail.com`). The browser was signed out ready for this.
+2. In PostDelegate (app.postdelegate.com), Add Channel → LinkedIn, and finish the flow **promptly** —
+   the stored state expires, and a connect left for hours fails with "this connection link expired
+   or was already used". That is not a credential fault.
+3. Publish one short test post to that account and confirm it appears on LinkedIn. The secondary
+   account has no connections, so the post is effectively unseen; the LinkedIn provider hardcodes
+   `visibility: PUBLIC`, so there is no private option. Delete it afterwards from LinkedIn.
+4. Report back: whether the post published, and the exact error text if not.
+
+Notes for whoever does this:
+
+- The flow uses `prompt=none`, so if a LinkedIn session already exists it connects **that** account
+  silently with no consent screen, in about three seconds. To attach a different account you must
+  sign out of LinkedIn first.
+- Reconnecting the same account updates the existing channel; it does not create a duplicate.
+- The connected channel shows `@<memberId>` rather than a vanity name. That is expected:
+  `r_basicprofile` is not granted, so `/v2/me` cannot return `vanityName`.
+
+**Still blocked on LinkedIn, nothing to do but wait:** Community Management API review. When it is
+approved, tell Claude — the page provider's scope list must be reconciled against the actually
+granted scopes before `linkedin-page` is removed from `HIDDEN_PROVIDERS`, or every Page connect
+will throw. Watch `support@postdelegate.com` (forwards to the owner's Gmail) for a verification
+request from **Microsoft Vetting Services**; LinkedIn said it may ask for business documents.
 
 ### 2.4 Pinterest (priority 2)
 
