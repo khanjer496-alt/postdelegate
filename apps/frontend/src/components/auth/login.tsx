@@ -5,7 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import Link from 'next/link';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto';
 import { GithubProvider } from '@gitroom/frontend/components/auth/providers/github.provider';
@@ -24,6 +24,8 @@ type Inputs = {
 export function Login() {
   const t = useT();
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const [notActivated, setNotActivated] = useState(false);
   const {
     isGeneral,
@@ -91,7 +93,7 @@ export function Login() {
   };
   return (
     <FormProvider {...form}>
-      <form className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
+      <form method="post" action="/auth/login" className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex flex-col flex-1">
           <div>
             <h1 className="text-[40px] font-[500] -tracking-[0.8px] text-start cursor-pointer">
@@ -159,6 +161,7 @@ export function Login() {
                 <div className="w-full flex">
                   <Button
                     type="submit"
+                    disabled={!hydrated || loading}
                     data-primary-cta=""
                     className="flex-1 rounded-[10px] !h-[52px]"
                     loading={loading}
