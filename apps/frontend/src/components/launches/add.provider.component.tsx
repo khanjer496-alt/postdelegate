@@ -225,7 +225,7 @@ export const CustomVariables: FC<{
       if (response.status === 402) {
         return;
       }
-      const { url } = response.ok ? await response.json().catch(() => ({})) : {};
+      const { url = '' } = response.ok ? await response.json().catch(() => ({})) : {};
       const target = handoffConnectCode(identifier, url, Buffer.from(JSON.stringify(data)).toString('base64'), !!onboarding);
       if (!target) {
         showStorageError('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
