@@ -3,10 +3,9 @@ import Alternatives from '../../components/Alternatives.astro';
 import { SITE } from '../../data/site';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 const faq = [
-  { q: 'What is the best Postiz alternative?', a: 'It depends on why you are leaving. To keep Postiz without running it, use a hosted Postiz-based service. To self-host on PHP, try Mixpost. To build posting into your own product, use a social media API such as Zernio. For a simple hosted scheduler, Buffer suits a few channels and Post Bridge suits one person with up to 15 accounts.' },
-  { q: 'Is there a hosted version of Postiz?', a: 'Yes, two kinds. Postiz Cloud is run by the Postiz team, from $29 a month. PostDelegate is a separate hosted service built on the Postiz code and run by Nasida Apps LLC, from $19 a month after a 7-day free trial with no card. PostDelegate connects fewer networks today.' },
-  { q: 'Is PostDelegate a fork of Postiz?', a: `PostDelegate runs a modified copy of the Postiz code. Under AGPL-3.0 we publish our modified source at <a href="${SITE.source}">app.postdelegate.com/source</a>, and <a href="/licenses">/licenses</a> lists the details. Our changes include the no-card trial, bring-your-own AI and Content Studio. We are independent of the Postiz team.` },
-  { q: 'Which Postiz alternative is open source?', a: 'Mixpost Lite is MIT-licensed, but limited to Facebook Pages, X and Mastodon. Mixpost Pro and Enterprise are source-available under a paid license rather than open source. PostDelegate publishes its modified Postiz source under AGPL-3.0, though it is offered as a hosted service.' },
+  { q: 'What is the best Postiz alternative?', a: 'It depends on why you are leaving. To stop running your own server, use a hosted scheduler such as PostDelegate. To self-host on PHP, try Mixpost. To build posting into your own product, use a social media API such as Zernio. For a simple hosted scheduler, Buffer suits a few channels and Post Bridge suits one person with up to 15 accounts.' },
+  { q: 'Is there a hosted version of Postiz?', a: 'Yes, two kinds. Postiz Cloud is run by the Postiz team, from $29 a month. PostDelegate is a separate hosted, open-source scheduler (AGPL-3.0) run by Nasida Apps LLC, from $19 a month after a 7-day free trial with no card. PostDelegate connects fewer networks today.' },
+  { q: 'Which Postiz alternative is open source?', a: 'Mixpost Lite is MIT-licensed, but limited to Facebook Pages, X and Mastodon. Mixpost Pro and Enterprise are source-available under a paid license rather than open source. PostDelegate is open source under AGPL-3.0, though it is offered as a hosted service.' },
   { q: 'Can I move my posts from Postiz?', a: 'We could not verify a one-click import from Postiz into any tool on this page. Plan to reconnect your channels and re-create upcoming posts. PostDelegate can import up to 200 posts at a time from a CSV file; see <a href="/docs/bulk-import">bulk import</a>.' },
 ];
 const links = [
@@ -30,8 +29,8 @@ const links = [
   title="Postiz Alternatives (2026): Hosted, Self-Hosted and API"
   description="Looking past Postiz? Compare hosted schedulers, self-hosted options and social media APIs by price, networks and MCP support, with honest notes on when to stay."
   h1="Postiz alternatives: hosted, self-hosted and API options"
-  shortAnswer="To keep Postiz but stop running it, use a hosted Postiz-based service such as PostDelegate (fewer networks live today). To self-host on PHP, look at Mixpost. To build posting into your own app, use an API such as Zernio. For a simple hosted scheduler, try Buffer or Post Bridge. Or stay on Postiz Cloud."
-  fitIntro="PostDelegate is Postiz underneath, hosted and run by Nasida Apps LLC, so it is the closest swap if your issue is running Postiz rather than Postiz itself. It is cheaper than Postiz Cloud at each tier and the trial needs no card. It reaches fewer networks today."
+  shortAnswer="To stop running your own server, use a hosted scheduler such as PostDelegate (fewer networks live today). To self-host on PHP, look at Mixpost. To build posting into your own app, use an API such as Zernio. For a simple hosted scheduler, try Buffer or Post Bridge. Or stay on Postiz Cloud."
+  fitIntro="PostDelegate is a hosted, open-source scheduler run by Nasida Apps LLC, so it suits you if your issue is running a server rather than the features. It is cheaper than Postiz Cloud at each tier and the trial needs no card. It reaches fewer networks today."
   faq={faq} links={links}
 >
   <Fragment slot="before-table">
@@ -53,8 +52,8 @@ const links = [
     </ul>
   </Fragment>
 
-  <h2>Hosted Postiz-based option: PostDelegate</h2>
-  <p>We should be plain about this one, because it is ours. PostDelegate runs the Postiz code, modified and published under AGPL-3.0. What you gain over self-hosting is that we run the servers and backups, we hold the network developer apps, and you email us for support instead of debugging Temporal. What you give up is control: you do not choose the server, the code version or when upgrades land.</p>
+  <h2>Hosted option: PostDelegate</h2>
+  <p>We should be plain about this one, because it is ours. PostDelegate is open source under AGPL-3.0. What you gain over self-hosting is that we run the servers and backups, we hold the network developer apps, and you email us for support instead of debugging Temporal. What you give up is control: you do not choose the server, the code version or when upgrades land.</p>
   <p>It is not a drop-in replacement for everything Postiz Cloud does today. {AVAILABLE_NETWORKS.length} networks connect now; Instagram, Facebook, Threads, TikTok and LinkedIn are waiting for each platform's approval, and X is not available. AI runs on your own OpenAI key rather than included credits, and there is no AI video generation.</p>
 
   <h2>Self-hosted: Mixpost</h2>
