@@ -2356,3 +2356,13 @@ model AnalyticsReportSettings {
 
   @@index([frequency])
 }
+
+// Provider event leases and completion markers; no customer data or payloads.
+model PaymentWebhookEvent {
+  provider String
+  eventId String
+  processedAt DateTime?
+  claimToken String
+  claimUntil DateTime?
+  @@id([provider, eventId])
+}

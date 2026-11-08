@@ -1,0 +1,17 @@
+# Security boundary release notes
+
+This change is PR preparation only. It does not apply database changes or deploy.
+
+Before releasing the application, apply `payment-webhook-events.sql` to the application's PostgreSQL database using the approved release process. The Prisma schema describes the same table. It stores provider/event identifiers, a random claim token, claim expiry, and completion time; no webhook payload or customer data. Do not delete completed markers while replay protection is required.
+
+Concurrent deliveries claim the event in a short atomic database operation. Other workers return a retry response while it is pending. A live worker renews its 15-minute lease every minute; a crashed worker's lease becomes reclaimable. Failed financial effects remain retryable. Completed deliveries skip the handler. This is at-least-once processing: a process crash after an external side effect and before its completion marker can still repeat that effect. Existing invoice commission and reversal operations are idempotent. Qualify concurrent claims, lease expiry, failure/replay and the SQL on staging PostgreSQL before deployment.
+
+Plan metadata is matched against Stripe catalog price IDs, currency, current configured amounts, recurring interval and add-on limits. Catalogs with named legacy products are supported, but old prices with amounts that differ from the current pricing configuration need staging qualification before release. No live catalog was inspected for this PR.
+
+Every MCP tool has a server-owned required scope. Reads require `mcp:read`, mutations and unknown/new tools require `mcp:write`; the catch-all agent requires both because it may call nested tools. OAuth currently issues both MCP scopes on every authorization; this change enforces those issued grants and does not introduce a consent UI for reduced-scope grants. API keys retain workspace read/write access.
+
+The plugin uses `/api/mcp` and OAuth or an Authorization header, but the app's Agents / Dev examples and tutorial documentation still expose legacy key-in-URL setup. Keep `/mcp/:id` and SSE key-in-URL endpoints for existing clients; they now return deprecation headers and the client guide explains migration. No removal date is scheduled. Migrate app examples and audit existing client usage before separately retiring these endpoints. No production logs or usage data were read.
+
+Media URL uploads accept public HTTP(S) only, validate every redirect, pin DNS, and apply a 120-second request/body deadline. Public preview remains HTTPS-only with the same deadline. Studio normally resolves organization-owned storage objects or local files; its remote signed-storage path now uses the same SSRF helper. The explicit self-hosted `DISABLE_SSRF_PROTECTION` setting continues to opt out of private-IP filtering, but never permits non-HTTP schemes. Streamed upload caps are applied to actual bytes after MIME sniffing, independently of Content-Length; both local and R2 providers await stream completion and propagate stream errors.
+
+Public v1 business routes live in `PublicIntegrationsController`. `PublicApiModule.configure` applies `PublicAuthMiddleware` to that entire controller. It validates API keys or OAuth credentials, resolves the organization, and sets `request.org`; operator overrides require the explicit admin feature and authorization. OpenAPI discovery is deliberately public. Tests enumerate every decorated business route for anonymous rejection and assert module-wide middleware registration.

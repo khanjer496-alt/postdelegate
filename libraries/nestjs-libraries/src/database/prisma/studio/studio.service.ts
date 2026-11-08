@@ -1,3 +1,4 @@
+import { ssrfSafeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { uniq } from 'lodash';
 import { Organization } from '@prisma/client';
@@ -1364,7 +1365,7 @@ export class StudioService {
       return;
     }
 
-    const response = await fetch(source.url!, { signal });
+    const response = await ssrfSafeFetch(source.url!, { signal }, { allowHttp: true, timeoutMs: 120_000 });
     if (!response.ok || !response.body) {
       throw new Error(`Download failed with ${response.status}`);
     }

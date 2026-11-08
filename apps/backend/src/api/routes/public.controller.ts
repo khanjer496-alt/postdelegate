@@ -23,8 +23,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { Readable, pipeline } from 'stream';
 import { promisify } from 'util';
 import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { ssrfSafeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { CreatePublicCommentDto } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { PUBLIC_PREVIEW } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 
@@ -176,46 +175,13 @@ export class PublicController {
     req.on('aborted', onClose);
     res.on('close', onClose);
 
-    // Manually follow redirects so every hop is re-validated against
-    // the SSRF blocklist (see GHSA-34w8-5j2v-h6ww). `fetch` defaults to
-    // `redirect: 'follow'`, which bypasses the DTO-level URL check.
-    const MAX_REDIRECTS = 5;
-    let currentUrl = url;
-    let r: globalThis.Response | undefined;
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      if (!(await isSafePublicHttpsUrl(currentUrl))) {
-        return res.status(400).send('Blocked URL');
-      }
-
-      r = await fetch(currentUrl, {
-        signal: ac.signal,
-        redirect: 'manual',
-        // @ts-ignore — undici option, not in lib.dom fetch types
-        dispatcher: ssrfSafeDispatcher,
-      });
-
-      if (r.status >= 300 && r.status < 400) {
-        const location = r.headers.get('location');
-        if (!location) {
-          return res.status(502).send('Redirect without Location');
-        }
-        try {
-          currentUrl = new URL(location, currentUrl).toString();
-        } catch {
-          return res.status(400).send('Invalid redirect target');
-        }
-        continue;
-      }
-
-      break;
-    }
-
-    if (!r) {
-      return res.status(502).send('No upstream response');
-    }
-
-    if (r.status >= 300 && r.status < 400) {
-      return res.status(508).send('Too many redirects');
+    let r: globalThis.Response;
+    try {
+      r = await ssrfSafeFetch(url, { signal: ac.signal }, { timeoutMs: 120_000 });
+    } catch {
+      req.off('aborted', onClose);
+      res.off('close', onClose);
+      return res.status(400).send('Unable to fetch video URL');
     }
 
     if (!r.ok && r.status !== 206) {
@@ -239,6 +205,9 @@ export class PublicController {
 
     try {
       await pump(Readable.fromWeb(r.body as any), res);
-    } catch (err) {}
+    } catch (err) {} finally {
+      req.off('aborted', onClose);
+      res.off('close', onClose);
+    }
   }
 }

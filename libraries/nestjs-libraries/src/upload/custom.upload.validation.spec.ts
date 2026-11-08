@@ -76,6 +76,12 @@ describe('uploadStreamToStorage rules', () => {
     }),
   });
 
+  it.each([0, 1])('cuts off oversized streams with declared size %s', async declared => {
+    await expect(uploadStreamToStorage(storage() as any, web(PNG), declared, {
+      allowed: new Set(['image/png']), maxSize: () => 100,
+    })).rejects.toThrow('File is too large');
+  });
+
   it.each([
     ['mp3', MP3, 'audio/mpeg'],
     ['wav', WAV, 'audio/wav'],

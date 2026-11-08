@@ -624,6 +624,13 @@ export class StripeService extends PaymentProviderAbstract {
   }
 
   async processWebhook(event: Stripe.Event) {
+    if (!event.id) throw new BadRequestException('Missing Stripe event id');
+    return this._subscriptionService.processPaymentEvent(
+      STRIPE_PROVIDER, event.id, () => this.dispatchWebhook(event)
+    );
+  }
+
+  async dispatchWebhook(event: Stripe.Event) {
     // Maybe it comes from another stripe webhook
     if (
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -734,13 +741,47 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
-  async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
-    const { uniqueId, billing, period } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
-      period: 'MONTHLY' | 'YEARLY';
-      uniqueId: string;
-    };
+  // Match entitlement metadata to a price registered in the server's Stripe
+  // catalog. Never create products/prices while processing a webhook.
+  async validatedPlan(subscription: Stripe.Subscription) {
+    const { billing, period, uniqueId } = subscription.metadata || {};
+    const plan = Object.prototype.hasOwnProperty.call(pricing, billing) && pricing[billing];
+    if (!plan || billing === 'FREE' || !['MONTHLY', 'YEARLY'].includes(period) || !uniqueId) {
+      throw new BadRequestException('Invalid subscription plan metadata');
+    }
+    const interval = period === 'YEARLY' ? 'year' : 'month';
+    const item = planItemOf(subscription);
+    if (!item || item.quantity !== 1) throw new BadRequestException('Missing subscription plan item');
+    const { data } = await stripe.prices.list({
+      lookup_keys: [`postdelegate_${plan.slug}_${interval}`], limit: 100,
+    });
+    let registered = data;
+    if (!registered.some(p => p.id === item.price.id)) {
+      // Older self-hosted catalogs use named products without lookup keys.
+      const products = await stripe.products.list({ active: true, limit: 100 });
+      const product = products.data.find(p => p.name.toUpperCase() === billing);
+      registered = product ? (await stripe.prices.list({ product: product.id, limit: 100 })).data : [];
+    }
+    const price = registered.find(p => p.id === item.price.id);
+    const amount = (period === 'YEARLY' ? plan.year_price : plan.month_price) * 100;
+    if (!price || price.unit_amount !== amount || price.currency !== 'usd' ||
+        price.recurring?.interval !== interval || (price.recurring.interval_count || 1) !== 1) {
+      throw new BadRequestException('Subscription price does not match plan');
+    }
+    // Add-on quantity also affects entitlements: accept only the catalog price.
+    const extras = (subscription.items?.data || []).filter(p => p !== item);
+    if (extras.length > 1) throw new BadRequestException('Invalid subscription add-ons');
+    for (const extra of extras) {
+      const expected = await resolveExtraChannelPrice(stripe, billing, period as 'MONTHLY' | 'YEARLY');
+      if (!expected || extra.price.id !== expected.id || !Number.isInteger(extra.quantity) ||
+          extra.quantity < 1 || extra.quantity > MAX_EXTRA_CHANNELS) {
+        throw new BadRequestException('Invalid subscription add-on price');
+      }
+    }
+    return { billing, period: period as 'MONTHLY' | 'YEARLY', uniqueId };
+  }
 
+  async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
     const liveSubscriptions = await this.getLiveSubscriptions(
       event.data.object.customer as string
     );
@@ -777,21 +818,17 @@ export class StripeService extends PaymentProviderAbstract {
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
       return { ok: true };
     }
-    const currentPlan = (current.metadata || {}) as Partial<
-      typeof event.data.object.metadata & {
-        billing: 'STANDARD' | 'PRO';
-        period: 'MONTHLY' | 'YEARLY';
-      }
-    >;
+    const currentPlan = await this.validatedPlan(current);
+    const { uniqueId, billing, period } = currentPlan;
 
     const result = await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
       isTrialOf(current),
-      currentPlan.uniqueId || uniqueId,
+      uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
-      currentPlan.billing || billing,
-      currentPlan.period || period,
+      totalChannelsOf(billing, extraChannelsOf(current)),
+      billing,
+      period,
       current.cancel_at,
       undefined,
       undefined,
@@ -825,12 +862,6 @@ export class StripeService extends PaymentProviderAbstract {
     return result;
   }
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
-    const { uniqueId, billing, period } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
-      period: 'MONTHLY' | 'YEARLY';
-      uniqueId: string;
-    };
-
     const check = await this.checkValidCard(event);
     if (!check) {
       return { ok: false };
@@ -851,21 +882,16 @@ export class StripeService extends PaymentProviderAbstract {
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
       return fresh ? this.deleteSubscription(event) : { retry: true };
     }
-    const currentPlan = (current.metadata || {}) as Partial<
-      typeof event.data.object.metadata & {
-        billing: 'STANDARD' | 'PRO';
-        period: 'MONTHLY' | 'YEARLY';
-      }
-    >;
+    const { uniqueId, billing, period } = await this.validatedPlan(current);
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
       isTrialOf(current),
-      currentPlan.uniqueId || uniqueId,
+      uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
-      currentPlan.billing || billing,
-      currentPlan.period || period,
+      totalChannelsOf(billing, extraChannelsOf(current)),
+      billing,
+      period,
       current.cancel_at,
       undefined,
       undefined,
@@ -918,11 +944,7 @@ export class StripeService extends PaymentProviderAbstract {
       return;
     }
 
-    const { uniqueId, billing, period } = survivor.metadata as {
-      billing: 'STANDARD' | 'PRO';
-      period: 'MONTHLY' | 'YEARLY';
-      uniqueId: string;
-    };
+    const { uniqueId, billing, period } = await this.validatedPlan(survivor);
     console.log('stripe_subscription_deleted_survivor_kept', {
       stripe_event_type: event.type,
       stripe_event_id: event.id,
@@ -2561,14 +2583,10 @@ export class StripeService extends PaymentProviderAbstract {
     // only feeds the Facebook pixel, it runs in the background so it can
     // never fail or slow down the webhook
     this.trackConversion(event.data.object).catch((err) => {});
-    await this.recordAffiliateCommission(event.data.object);
-    return { ok: true };
+    return this.recordAffiliateCommission(event.data.object);
   }
 
-  // A failure here is logged with the invoice id and never fails the webhook:
-  // the subscription events are handled by the same endpoint and a failing
-  // endpoint would stop all of them. The row is unique per invoice, so a
-  // missed one can be replayed from the Stripe dashboard.
+  // A failed financial write stays retryable; the row is unique per invoice.
   private async recordAffiliateCommission(invoice: Stripe.Invoice) {
     try {
       const customerId =
@@ -2596,12 +2614,14 @@ export class StripeService extends PaymentProviderAbstract {
           (invoice.status_transitions?.paid_at || invoice.created) * 1000
         ),
       });
+      return { ok: true };
     } catch (err) {
       console.error(
         'affiliate_commission_failed',
         { stripe_invoice_id: invoice.id },
         err
       );
+      return { retry: true };
     }
   }
 
@@ -2629,11 +2649,21 @@ export class StripeService extends PaymentProviderAbstract {
     return (typeof invoice === 'string' ? invoice : invoice?.id) || null;
   }
 
+  // Stripe does not order events: create the idempotent invoice commission
+  // before reversing it, even if invoice.payment_succeeded has not arrived.
+  private async ensureInvoiceCommission(invoiceId: string) {
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    if (invoice.status !== 'paid') return false;
+    const result = await this.recordAffiliateCommission(invoice);
+    return !result?.retry;
+  }
+
   async chargeRefunded(event: Stripe.ChargeRefundedEvent) {
     try {
       const charge = event.data.object;
       const invoiceId = await this.getInvoiceIdOfCharge(charge);
       if (invoiceId) {
+        if (!(await this.ensureInvoiceCommission(invoiceId))) return { retry: true };
         // amount_refunded adds up all the refunds of the charge
         await this._affiliateService.reverseCommission({
           invoiceId,
@@ -2647,6 +2677,7 @@ export class StripeService extends PaymentProviderAbstract {
         { stripe_charge_id: event.data.object.id },
         err
       );
+      return { retry: true };
     }
     return { ok: true };
   }
@@ -2659,6 +2690,7 @@ export class StripeService extends PaymentProviderAbstract {
       );
       const invoiceId = await this.getInvoiceIdOfCharge(charge);
       if (invoiceId) {
+        if (!(await this.ensureInvoiceCommission(invoiceId))) return { retry: true };
         await this._affiliateService.reverseCommission({
           invoiceId,
           reversedCents: dispute.amount,
@@ -2671,6 +2703,7 @@ export class StripeService extends PaymentProviderAbstract {
         { stripe_dispute_id: event.data.object.id },
         err
       );
+      return { retry: true };
     }
     return { ok: true };
   }

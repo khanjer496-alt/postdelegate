@@ -53,3 +53,23 @@ describe('MediaService.saveBucketObject', () => {
     );
   });
 });
+
+describe('MediaService URL upload SSRF boundary', () => {
+  const realFetch = global.fetch;
+  afterEach(() => { global.fetch = realFetch; });
+  it.each(['file:///etc/passwd', 'data:text/plain,x', 'ftp://8.8.8.8/a'])('rejects %s before fetching', async url => {
+    global.fetch = jest.fn();
+    const service = Object.create(MediaService.prototype);
+    await expect(service.uploadFromUrl('org', url)).rejects.toThrow('Failed to fetch URL');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+  it('does not follow a redirect to a private service', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(null, {
+      status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' },
+    }));
+    const service = Object.create(MediaService.prototype);
+    await expect(service.uploadFromUrl('org', 'https://8.8.8.8/a')).rejects.toThrow('Failed to fetch URL');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('https://8.8.8.8/a', expect.objectContaining({ redirect: 'manual', signal: expect.any(AbortSignal), dispatcher: expect.anything() }));
+  });
+});

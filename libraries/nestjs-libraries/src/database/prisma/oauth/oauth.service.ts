@@ -905,7 +905,10 @@ export class OAuthService {
     if (!lookup.length) {
       return null;
     }
-    return this._oauthRepository.findByAccessToken(lookup);
+    const authorization = await this._oauthRepository.findByAccessToken(lookup);
+    // Existing grants issue both MCP scopes (see token exchange); derive the
+    // same grant here instead of accepting scopes from request headers.
+    return authorization ? { ...authorization, scope: this.grantedScope(authorization.oauthApp) } : null;
   }
 
   async getUserInfo(authorization?: string) {

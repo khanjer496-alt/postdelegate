@@ -167,3 +167,7 @@ curl -i https://app.postdelegate.com/api/mcp \
 Real clients send an `initialize` request first, so a bare `tools/list` may still return a protocol error. That is fine for this check. A `401` is what to worry about.
 
 For what the tools do, see [MCP tools](/docs/mcp/tools).
+
+### Legacy key-in-URL connections
+
+`/api/mcp/YOUR_API_KEY` and the legacy SSE key-in-URL endpoints are deprecated but remain supported for existing clients. Move to `/api/mcp` with `Authorization: Bearer YOUR_API_KEY`, or use OAuth. URLs can appear in logs and browser history. Rotate any key that was shared in a URL. No removal date is scheduled; existing clients will receive advance notice.
