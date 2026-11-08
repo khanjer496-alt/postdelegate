@@ -19,7 +19,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
-import { putExtensionCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
+import { handoffConnectCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
 const resolver = classValidatorResolver(ApiKeyDto);
 
 export const useAddProvider = (update?: () => void, invite?: boolean) => {
@@ -178,6 +178,7 @@ export const CustomVariables: FC<{
   const { close, gotoUrl, identifier, variables, onboarding, refresh } = props;
   const fetch = useFetch();
   const modals = useModals();
+  const { show: showStorageError } = useToaster();
   const schema = useMemo(() => {
     return object({
       ...variables.reduce((aIcc, item) => {
@@ -224,15 +225,16 @@ export const CustomVariables: FC<{
       if (response.status === 402) {
         return;
       }
-      const { url } = await response.json();
+      const { url } = response.ok ? await response.json().catch(() => ({})) : {};
+      const target = handoffConnectCode(identifier, url, Buffer.from(JSON.stringify(data)).toString('base64'), !!onboarding);
+      if (!target) {
+        showStorageError('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
+        return;
+      }
       modals.closeAll();
-      gotoUrl(
-        `/integrations/social/${identifier}?state=${url}&code=${Buffer.from(
-          JSON.stringify(data)
-        ).toString('base64')}${onboarding ? '&onboarding=true' : ''}`
-      );
+      gotoUrl(target);
     },
-    [variables, onboarding, refresh]
+    [variables, onboarding, refresh, identifier, gotoUrl, fetch, modals, showStorageError]
   );
 
   const t = useT();
@@ -463,9 +465,12 @@ export const AddProviderComponent: FC<{
               >
                 <Web3Providers
                   onComplete={(code, newState) => {
-                    window.location.href = `/integrations/social/${identifier}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(newState)}${
-                      onboarding ? '&onboarding=true' : ''
-                    }`;
+                    const target = handoffConnectCode(identifier, newState, code, !!onboarding);
+                    if (!target) {
+                      toaster.show('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
+                      return;
+                    }
+                    window.location.href = target;
                   }}
                   nonce={url}
                 />
@@ -653,17 +658,13 @@ export const AddProviderComponent: FC<{
             const code = Buffer.from(
               JSON.stringify(cookieResponse.cookies)
             ).toString('base64');
-            // the session cookies go to the connect page through this tab's
-            // sessionStorage, not the URL (history, logs, referrers)
-            // storage blocked (private mode): fall back to the URL
-            const codeInUrl = !putExtensionCode(url, code);
-            const params = new URLSearchParams({
-              state: url,
-              ...(codeInUrl ? { code } : {}),
-              ...(onboarding ? { onboarding: 'true' } : {}),
-            });
+            const target = handoffConnectCode(identifier, url, code, !!onboarding);
+            if (!target) {
+              toaster.show('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
+              return;
+            }
             modal.closeAll();
-            window.location.href = `/integrations/social/${identifier}?${params.toString()}`;
+            window.location.href = target;
           } catch {
             toaster.show(
               t(

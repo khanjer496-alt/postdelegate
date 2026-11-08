@@ -22,6 +22,8 @@ describe('Sentry request body scrubbing', () => {
     'https://app.example.com/api/ai-credentials/',
     'https://app.example.com/ai-credentials?x=1',
     'https://app.example.com/ai-credentials#x',
+    'https://app.example.com/api/integrations/social-connect/wordpress',
+    'https://app.example.com/integrations/extension-refresh',
   ])('drops the body of %s', (url) => {
     const event = dropSecretRequestBody({
       request: {

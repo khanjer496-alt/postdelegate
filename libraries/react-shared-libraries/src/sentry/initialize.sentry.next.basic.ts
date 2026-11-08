@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { scrubTelemetry } from '@gitroom/helpers/utils/redact.url';
 
 export const initializeSentryBasic = (environment: string, dsn: string, extension: any) => {
   if (!dsn) {
@@ -91,6 +92,10 @@ export const initializeSentryBasic = (environment: string, dsn: string, extensio
       debug: environment === 'development',
       tracesSampleRate: 0.3,
 
+      beforeBreadcrumb: (breadcrumb) => scrubTelemetry(breadcrumb),
+      beforeSendTransaction: (event) => scrubTelemetry(event),
+      beforeSendSpan: (span) => scrubTelemetry(span),
+      beforeSendLog: (log) => scrubTelemetry(log),
       beforeSend(event, hint) {
         if (isWalletExtensionRejection(hint?.originalException)) {
           return null; // Ignore the event
@@ -138,7 +143,7 @@ export const initializeSentryBasic = (environment: string, dsn: string, extensio
           }
         }
 
-        return event; // Send the event to Sentry
+        return scrubTelemetry(event); // No query strings or credentials leave via telemetry
       },
     });
 

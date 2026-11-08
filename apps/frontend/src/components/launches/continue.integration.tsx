@@ -16,6 +16,7 @@ import { errorMessage } from '@gitroom/frontend/components/launches/import/impor
 import {
   clearExtensionCode,
   readExtensionCode,
+  stripConnectCodeFromHistory,
 } from '@gitroom/frontend/components/launches/helpers/extension.code';
 
 interface TwoStepState {
@@ -349,6 +350,10 @@ export const ContinueIntegration: FC<{
   }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName]);
 
   useEffect(() => {
+    if (!stripConnectCodeFromHistory()) {
+      setState({ status: 'error', message: 'Could not secure this connection URL. Close this tab and start a new connection.' });
+      return;
+    }
     if (started.current) {
       return;
     }

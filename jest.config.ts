@@ -1,12 +1,11 @@
 export default {
   testEnvironment: 'node',
   transform: {
-    '^.+\\.[tj]s$': [
+    '^.+\\.[tj]sx?$': [
       'ts-jest',
-      { tsconfig: '<rootDir>/tsconfig.base.json', diagnostics: false, isolatedModules: true },
+      { tsconfig: '<rootDir>/tsconfig.test.json', diagnostics: false },
     ],
   },
-  // tsx only resolves, so a frontend spec can mock a React module it imports
   moduleFileExtensions: ['ts', 'js', 'json', 'tsx'],
   moduleNameMapper: {
     '^@gitroom/nestjs-libraries/(.*)$': '<rootDir>/libraries/nestjs-libraries/src/$1',
