@@ -4,7 +4,7 @@
   "site": "https://postdelegate.com",
   "pricingUrl": "https://postdelegate.com/pricing",
   "checked": "2026-11-02",
-  "kind": { "value": "Hosted scheduler built on Postiz, run by Nasida Apps LLC", "src": "https://postdelegate.com/licenses" },
+  "kind": { "value": "Hosted open-source scheduler (AGPL-3.0), run by Nasida Apps LLC", "src": "https://postdelegate.com/licenses" },
   "hosting": { "value": "Hosted only; the modified source is published under AGPL-3.0", "src": "https://postdelegate.com/licenses" },
   "license": { "value": "AGPL-3.0 (application source)", "src": "https://postdelegate.com/licenses" },
   "pricingModel": { "value": "Flat monthly plans, tiered by number of channels", "src": "https://postdelegate.com/pricing" },
