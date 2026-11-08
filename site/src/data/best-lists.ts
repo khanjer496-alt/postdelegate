@@ -82,22 +82,30 @@ export const bestHref = (list: { slug: string }) => `/best/${list.slug}`;
 export const bestIncluded = (list: BestList) => Object.keys(list.picks);
 const byName = (a: Tool, b: Tool) => a.name.localeCompare(b.name);
 
-/** The tools on a list, in the list's order; ties always go alphabetically. */
+const factLabel = (list: BestList, key: FactKey) => list.facts.find((f) => f.key === key)?.label ?? key;
+/** The tools a price-ordered list cannot rank, because the vendor publishes no figure. */
+const unpriced = (list: BestList, t: Tool) => list.order.by === 'lowest' && lowestDollars(bestFact(t, list.order.key)) === Infinity;
+
+/** The ranked tools on a list, in the list's order; ties always go alphabetically. */
 export function bestEntries(list: BestList): Tool[] {
-  const tools = bestIncluded(list).map((slug) => TOOLS[slug]);
+  const tools = bestIncluded(list).map((slug) => TOOLS[slug]).filter((t) => !unpriced(list, t));
   const order = list.order;
   if (order.by === 'lowest') return tools.sort((a, b) => lowestDollars(bestFact(a, order.key)) - lowestDollars(bestFact(b, order.key)) || byName(a, b));
   if (order.by === 'trialDays') return tools.sort((a, b) => (trialDays(b.trial) ?? 0) - (trialDays(a.trial) ?? 0) || byName(a, b));
   return tools.sort(byName);
 }
+/** Tools that meet the rule but have no figure to rank by: shown apart and unranked, never last in the ranking. */
+export const bestUnranked = (list: BestList): { title: string; tools: Tool[] } => ({
+  title: list.order.by === 'lowest' ? `No published price (${factLabel(list, list.order.key)})` : '',
+  tools: bestIncluded(list).map((slug) => TOOLS[slug]).filter((t) => unpriced(list, t)).sort(byName),
+});
 export const bestLeftOut = (list: BestList): Tool[] => Object.values(TOOLS).filter((t) => !bestIncluded(list).includes(t.slug)).sort(byName);
 
 /** One sentence on the order, for "How we chose". */
 export function orderRule(list: BestList): string {
   const order = list.order;
   if (order.by === 'lowest') {
-    const label = list.facts.find((f) => f.key === order.key)?.label ?? order.key;
-    return `Order: by the lowest dollar figure in the "${label}" fact, cheapest first. Where a price is a range, the low end counts. Ties go alphabetically, and a tool with no published figure goes last.`;
+    return `Order: by the lowest dollar figure in the "${factLabel(list, order.key)}" fact, cheapest first. Where a price is a range, the low end counts, and ties go alphabetically. The figure is what the vendor charges for its own plans: code you can self-host for free, such as Postiz or Mixpost Lite, shows under "Free option" and is not counted, since you run and pay for the server. A tool with no published figure is not ranked; it is shown in its own group after the list.`;
   }
   if (order.by === 'trialDays') return 'Order: by the length of the trial in days, longest first. Ties go alphabetically.';
   return 'Order: alphabetical. We do not rank or score these tools; the facts and the "pick it if" line are there for you to choose.';
@@ -105,7 +113,7 @@ export function orderRule(list: BestList): string {
 
 const TOOL_COUNT = Object.keys(TOOLS).length;
 // Some vendors write "including ..." before a partial list of networks.
-const networkRule = (name: string) => `Every tool in our comparison data (${TOOL_COUNT} tools) whose own network list names ${name}. For PostDelegate that means ${name} is live in the app today, not waiting on approval. Some vendors list networks as "including" a few names, so a tool under "Not on this list" may still reach ${name}; check its own site.`;
+const networkRule = (name: string) => `Every tool in our comparison data (${TOOL_COUNT} tools) whose own network list names ${name} as a network it posts to. A network reached only through a side route, such as SocialBee's Universal Posting from its mobile app, does not count. For PostDelegate that means ${name} is live in the app today, not waiting on approval. Some vendors list networks as "including" a few names, so a tool under "Not on this list" may still reach ${name}; check its own site.`;
 
 export const BEST_LISTS: BestList[] = [
   {
@@ -113,7 +121,7 @@ export const BEST_LISTS: BestList[] = [
     title: 'Best Social Media MCP Servers (2026): 13 Tools, Sourced',
     description: 'Social media schedulers whose vendors document an MCP server for Claude, ChatGPT and other assistants: which plans include it, free options, trials and price.',
     h1: 'Social media MCP servers for AI assistants',
-    shortAnswer: `To try MCP on a free plan, look at Buffer, Metricool or Typefully. If the assistant should draft but never publish, Agorapulse and Planable say their connectors cannot publish. To self-host, Mixpost Pro includes one, and to build posting into your own product, Zernio is an API with an MCP server. PostDelegate, which makes this page, has MCP on every plan from $${starter.monthly} a month.`,
+    shortAnswer: `To try MCP on a free plan, look at Buffer, Metricool or Typefully. If the assistant should draft but never publish, Agorapulse and Planable say their connectors cannot publish. To self-host, Mixpost Pro includes one, and to build posting into your own product, Zernio is an API with an MCP server. Postiz and PostDelegate list MCP on every plan.`,
     requires: 'mcp',
     rule: `Every tool in our comparison data (${TOOL_COUNT} tools) whose vendor's own site documents an MCP server or connector for AI assistants, on any plan. Tools whose sites do not mention one are under "Not on this list", with what we found.`,
     order: { by: 'name' },
@@ -157,7 +165,7 @@ export const BEST_LISTS: BestList[] = [
     title: 'Best Social Media Scheduling APIs (2026): 10 Tools, Sourced',
     description: 'Schedulers and APIs whose vendors document a public API you can switch on yourself: which plans include it, free options, MCP and price at 10 accounts.',
     h1: 'Social media scheduling APIs you can switch on yourself',
-    shortAnswer: `To build posting into your own product, Zernio is an API first, with the first 2 accounts free. For an API inside a scheduler you can start free, Buffer and Typefully include one on their free plans. Postiz and PostDelegate list a public API on every plan, and Metricool and Planable put theirs on higher plans. PostDelegate makes this page; its plans start at $${starter.monthly} a month.`,
+    shortAnswer: `To build posting into your own product, Zernio is an API first, with the first 2 accounts free. For an API inside a scheduler you can start free, Buffer and Typefully include one on their free plans. Postiz and PostDelegate list a public API on every plan, and Metricool and Planable put theirs on higher plans.`,
     requires: 'api',
     rule: `Every tool in our comparison data (${TOOL_COUNT} tools) whose vendor documents a public API you can turn on yourself, on a published plan or a free tier. We left out APIs that need a sales call, a request form or an eligibility check, APIs whose price is not published, and APIs that only export reports. Each one is under "Not on this list" with the vendor's wording.`,
     order: { by: 'name' },
@@ -193,7 +201,7 @@ export const BEST_LISTS: BestList[] = [
   {
     slug: 'social-media-schedulers-for-multiple-accounts', published: '2026-11-08',
     title: 'Best Social Media Schedulers for 30 Accounts (2026)',
-    description: 'What 17 social media schedulers cost a month for 30 accounts, cheapest first, with team seats and approvals, each figure linked to the vendor\'s pricing page.',
+    description: 'What 17 social media tools cost a month for 30 accounts, cheapest first, with team seats and approvals, each figure linked to the vendor\'s pricing page.',
     h1: 'Social media schedulers for 30 accounts, cheapest first',
     shortAnswer: `At 30 accounts the lowest published prices here are Metricool (from $25, if your accounts fit into 5 brands), PostDelegate ($${at30.monthly} on ${at30.name}) and Postiz ($49 on Pro). If you run an agency, read the team row too: on many tools the 30-account price is for a plan without approvals or extra users. PostDelegate makes this page and sits where the price puts it.`,
     requires: 'cost.30',
@@ -240,7 +248,7 @@ export const BEST_LISTS: BestList[] = [
     title: 'Social Media Schedulers With a Free Trial, No Card (2026)',
     description: 'Social media schedulers whose own sites offer a timed free trial with no credit card, longest trial first, with what happens when it ends and the entry price.',
     h1: 'Social media schedulers with a free trial and no credit card',
-    shortAnswer: `Agorapulse has the longest no-card trial here, 30 days. Zoho Social gives 15 days and then moves you to its free plan instead of charging you. Sendible, SocialBee and Vista Social give 14 days, and Loomly and PostDelegate give ${TRIAL_DAYS}. PostDelegate makes this page and sits where its trial length puts it.`,
+    shortAnswer: `Agorapulse has the longest no-card trial here, 30 days. Zoho Social gives 15 days and then moves you to its free plan instead of charging you. Sendible, SocialBee and Vista Social give 14 days, and Loomly, Post Bridge and PostDelegate give ${TRIAL_DAYS}. PostDelegate makes this page and sits where its trial length puts it.`,
     requires: 'trial',
     rule: `Every tool in our comparison data (${TOOL_COUNT} tools) whose own site offers a free trial of a set number of days and says no credit card is needed to start it. Trials that need a card, trials whose page does not say, and free post allowances with no time limit are under "Not on this list".`,
     order: { by: 'trialDays' },
@@ -257,12 +265,13 @@ export const BEST_LISTS: BestList[] = [
       socialbee: 'you want 14 days of Pro, and a 30-day money-back guarantee after that.',
       'vista-social': 'you want 14 days on a suite with an inbox, review management and listening, from $99.',
       loomly: 'you want 7 days on a calendar with approval workflows from Starter, which is $65 for 12 accounts.',
+      'post-bridge': 'you post on your own and want 7 days before Marketer, $39 a month for 15 accounts, with $0.00 due today.',
       postdelegate: `you want ${TRIAL_DAYS} days, then flat plans from $${starter.monthly} with unlimited posts and the API and MCP on every plan.`,
     },
     faq: [
       { q: 'Which scheduler has the longest free trial without a card?', a: 'Agorapulse, at 30 days with no credit card. Its pricing FAQ says you can keep using a free plan after the trial with no automatic charge.' },
       { q: 'What happens when the trial ends?', a: 'It varies. Zoho Social moves the account to its free plan. Agorapulse says you can keep using a free plan with no automatic charge. SocialBee stops posting automatically. PostDelegate asks you to add a card before the trial ends to keep your plan. For the others, see the "After the trial" fact.' },
-      { q: 'Why are Buffer, Postiz and Blotato not here?', a: 'What we recorded from Buffer\'s pricing page is a 14-day trial, with nothing on whether a card is needed. Postiz needs a payment method to start its trial, and Blotato needs a card. Their exact wording is under "Not on this list".' },
+      { q: 'Why are Buffer, Publer, Postiz and Blotato not here?', a: 'Buffer offers a 14-day trial, but neither its pricing page nor its help centre says whether a card is needed to start it; the help centre only says an account with no card details moves to the Free plan when the trial ends. Publer\'s help centre says a credit card or PayPal account is required for the free trial. Postiz needs a payment method to start its trial, and Blotato needs a card. Their exact wording is under "Not on this list".' },
     ],
     links: [
       { href: '/pricing', label: 'PostDelegate pricing' },
@@ -274,7 +283,7 @@ export const BEST_LISTS: BestList[] = [
     title: 'Best Bluesky Schedulers (2026): 16 Tools, Sourced',
     description: 'Social media schedulers whose own network lists name Bluesky, cheapest first at 3 accounts, with free plans and MCP, each fact linked to the vendor page.',
     h1: 'Bluesky schedulers, cheapest first at 3 accounts',
-    shortAnswer: `To start free, Buffer, Metricool, Publer and Zoho Social all list Bluesky and have free plans. To post to Bluesky from your own code, Zernio is an API. PostDelegate, which makes this page, has Bluesky live from $${at3.monthly} a month. Loomly and Planable do not list Bluesky on the pages we read.`,
+    shortAnswer: `To start free, Buffer, Metricool, Publer, Typefully and Zoho Social all list Bluesky and have free plans. To post to Bluesky from your own code, Zernio is an API. PostDelegate, which makes this page, has Bluesky live for posts and threads. Loomly and Planable do not list Bluesky on the pages we read.`,
     requires: 'networks',
     rule: networkRule(bluesky.name),
     order: { by: 'lowest', key: 'cost.3' },
@@ -300,7 +309,7 @@ export const BEST_LISTS: BestList[] = [
       'post-bridge': 'you cross-post on your own to up to 15 accounts for $39.',
       agorapulse: 'you need an inbox and listening as much as scheduling; plans are per user, from $99.',
       'vista-social': 'you want an inbox, review management and listening too, from $99 for 15 profiles.',
-      typefully: 'you write text-first posts and threads; the Free plan covers 1 social set and 10 posts a month.',
+      typefully: 'you write text-first posts and threads for one person or brand; the Free plan covers 1 social set and 10 posts a month.',
     },
     faq: [
       { q: 'Is there a free Bluesky scheduler?', a: 'Several tools here list Bluesky and have a free plan: Buffer (3 channels, 10 scheduled posts per channel), Metricool (1 brand, 20 posts a month), Publer (3 accounts, 10 scheduled posts each), Zoho Social (1 brand with 6 channels) and Typefully (1 social set, 10 posts a month). Postiz\'s self-hosted code is also free to run, if you host it.' },
@@ -316,10 +325,10 @@ export const BEST_LISTS: BestList[] = [
   },
   {
     slug: 'mastodon-schedulers', published: '2026-11-08', network: 'mastodon',
-    title: 'Best Mastodon Schedulers (2026): 9 Tools, Sourced',
+    title: 'Best Mastodon Schedulers (2026): 8 Tools, Sourced',
     description: 'Schedulers whose own network lists name Mastodon, cheapest first at 3 accounts, with free and self-hosted options and MCP, each fact linked to its source.',
     h1: 'Mastodon schedulers, cheapest first at 3 accounts',
-    shortAnswer: `Buffer, Publer and Zoho Social list Mastodon and have free plans. To self-host, Mixpost Lite is free and MIT-licensed, and Postiz is AGPL open source. PostDelegate, which makes this page, has Mastodon live for mastodon.social from $${at3.monthly} a month.`,
+    shortAnswer: `Buffer, Publer, Typefully and Zoho Social list Mastodon and have free plans. To self-host, Mixpost Lite is free and MIT-licensed, and Postiz is AGPL open source. PostDelegate, which makes this page, has Mastodon live for mastodon.social.`,
     requires: 'networks',
     rule: networkRule(mastodon.name),
     order: { by: 'lowest', key: 'cost.3' },
@@ -336,12 +345,12 @@ export const BEST_LISTS: BestList[] = [
       postdelegate: `you post to mastodon.social, with threads, images or a video, alongside networks such as Bluesky, Nostr and Lemmy, from $${at3.monthly} for ${at3.channels} channels.`,
       mixpost: 'you want to self-host for free: Mixpost Lite (MIT) covers Facebook Pages, X and Mastodon.',
       postiz: 'you want 30 listed networks and AGPL code you can self-host.',
-      socialbee: 'you already use SocialBee. Mastodon is not in its main network list; it is reached through Universal Posting in the mobile app.',
       coschedule: 'you plan social posts inside a marketing calendar; Starter is $39 with 3 profiles.',
-      typefully: 'you write text-first threads. Its pricing page lists Mastodon but its help centre does not, so check before you rely on it.',
+      typefully: 'you write text-first threads for one person or brand on the Free plan. Its pricing page lists Mastodon but its help centre does not, so check before you rely on it.',
     },
     faq: [
-      { q: 'Is there a free Mastodon scheduler?', a: 'Buffer, Publer and Zoho Social list Mastodon and have free plans: Buffer for 3 channels with 10 scheduled posts per channel, Publer for 3 accounts with 10 scheduled posts each, Zoho Social for 1 brand with 6 channels. Mixpost Lite is free to self-host and covers Facebook Pages, X and Mastodon, and Postiz\'s self-hosted code is free to run.' },
+      { q: 'Is there a free Mastodon scheduler?', a: 'Buffer, Publer, Typefully and Zoho Social list Mastodon and have free plans: Buffer for 3 channels with 10 scheduled posts per channel, Publer for 3 accounts with 10 scheduled posts each, Typefully for 1 social set with 10 posts a month, Zoho Social for 1 brand with 6 channels. Mixpost Lite is free to self-host and covers Facebook Pages, X and Mastodon, and Postiz\'s self-hosted code is free to run.' },
+      { q: 'Why is SocialBee not on this list?', a: 'SocialBee\'s main network list does not include Mastodon. It names Mastodon only as a network reached through Universal Posting in its mobile app, which the rule does not count.' },
       { q: 'Which Mastodon servers does PostDelegate post to?', a: 'PostDelegate\'s Mastodon connection posts to mastodon.social, with threads, images or a video. See the <a href="/mastodon-scheduler">Mastodon scheduler</a> page.' },
     ],
     links: [
@@ -358,8 +367,10 @@ export const BEST_LISTS: BestList[] = [
 // every page has a share card (scripts/og.mjs cannot see the pages of this dynamic route).
 for (const list of BEST_LISTS) {
   const where = `best-lists.ts (${list.slug})`;
-  const count = list.title.match(/(\d+) Tools/)?.[1];
-  if (count && Number(count) !== bestIncluded(list).length) throw new Error(`${where}: the title says ${count} tools but the list has ${bestIncluded(list).length}`);
+  for (const text of [list.title, list.description]) {
+    const count = text.match(/(\d+) (?:Tools|social media tools)/)?.[1];
+    if (count && Number(count) !== bestIncluded(list).length) throw new Error(`${where}: "${text}" says ${count} tools but the list has ${bestIncluded(list).length}`);
+  }
   if (list.facts.length < 2 || list.facts.length > 4) throw new Error(`${where}: show 2 to 4 facts per tool`);
   for (const slug of bestIncluded(list)) {
     const t = TOOLS[slug];
@@ -374,6 +385,30 @@ for (const list of BEST_LISTS) {
     }
   }
   if (!ogCardFor(bestHref(list))) throw new Error(`${where}: ${bestHref(list)} has no share card - add it to src/data/og-cards.mjs`);
+}
+// Numbers in the words must come from the data, so a re-priced plan fails the build until the copy
+// is updated: every dollar figure in a "pick it if" line is in that tool's own facts (PostDelegate's
+// from plans.ts), every dollar figure in a short answer or FAQ is in some tool's facts, and every
+// "N days" figure is in some tool's facts too.
+const FACT_KEYS = ['kind', 'hosting', 'license', 'pricingModel', 'freeOption', 'trial', 'entryPaid', 'plans', 'networks', 'api', 'mcp', 'ai', 'teams', 'selfHostStack', 'selfHostApps', 'cost.3', 'cost.10', 'cost.30'] as const satisfies readonly FactKey[];
+const toolText = (t: Tool) => FACT_KEYS.map((key) => bestFact(t, key)).filter(Boolean).map((f) => `${f!.value} ${f!.note ?? ''}`).join(' ')
+  + (t.slug === 'postdelegate' ? ` ${PLANS.map((plan) => `$${plan.monthly}`).join(' ')} ${TRIAL_DAYS} days` : '');
+const dollars = (text: string) => [...text.matchAll(/\$(\d[\d,]*(?:\.\d+)?)/g)].map((m) => Number(m[1].replace(/,/g, '')));
+const days = (text: string) => [...text.matchAll(/(\d+)[- ]days?\b/gi)].map((m) => Number(m[1]));
+const allText = Object.values(TOOLS).map(toolText).join(' ');
+const allDollars = new Set(dollars(allText));
+const allDays = new Set(days(allText));
+for (const list of BEST_LISTS) {
+  const where = `best-lists.ts (${list.slug})`;
+  for (const [slug, pick] of Object.entries(list.picks)) {
+    const own = new Set(dollars(toolText(TOOLS[slug])));
+    const stale = dollars(pick).filter((n) => !own.has(n));
+    if (stale.length) throw new Error(`${where}: the ${TOOLS[slug].name} line says $${stale.join(', $')}, which is not in its facts`);
+  }
+  const words = [list.shortAnswer, ...list.faq.flatMap((f) => [f.q, f.a]), ...Object.values(list.picks)].join(' ');
+  const staleDollars = dollars(words.replace(/<[^>]+>/g, '')).filter((n) => !allDollars.has(n));
+  const staleDays = days(words).filter((n) => !allDays.has(n));
+  if (staleDollars.length || staleDays.length) throw new Error(`${where}: ${[...staleDollars.map((n) => `$${n}`), ...staleDays.map((n) => `${n} days`)].join(', ')} in the words is not in any tool's facts`);
 }
 // A network list leaves out PostDelegate only while the network is not live.
 for (const list of BEST_LISTS.filter((l) => l.network)) {

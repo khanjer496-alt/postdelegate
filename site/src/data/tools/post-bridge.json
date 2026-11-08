@@ -8,7 +8,7 @@
   "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://www.post-bridge.com/pricing" },
   "pricingModel": { "value": "Flat plan by connected accounts; $1 per account above 99 on Operator", "src": "https://www.post-bridge.com/pricing" },
   "freeOption": { "value": "Free users can make 5 posts", "src": "https://www.post-bridge.com/pricing" },
-  "trial": { "value": "7-day free trial, $0 due today", "src": "https://www.post-bridge.com/pricing" },
+  "trial": { "value": "7-day free trial, $0.00 due today, no card required", "note": "The pricing page shows $0.00 due today; the no-card wording is on Post Bridge's own growth guide", "src": ["https://www.post-bridge.com/pricing", "https://www.post-bridge.com/growth-guide/scaling-system"] },
   "entryPaid": { "value": "Marketer, $39/month for 15 accounts", "src": "https://www.post-bridge.com/pricing" },
   "plans": { "value": "Marketer $39 (15 accounts), Operator $99 (99 accounts, then $1 each)", "src": "https://www.post-bridge.com/pricing" },
   "cost": {
