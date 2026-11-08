@@ -1,4 +1,8 @@
 {
+  "sign_up_trial_pause_note": "7 dias grátis · sem cartão · sem escolher um plano, o espaço fica pausado",
+  "signup_password_rules": "Use de 3 a 64 caracteres.",
+  "signup_company_help": "Usado para nomear seu espaço de trabalho. Obrigatório, de 3 a 128 caracteres.",
+  "signup_next_step": "Depois: ative sua conta se solicitado e conecte um canal.",
   "calendar": "Calendário",
   "webhooks": "Webhooks",
   "webhooks_are_a_way_to_get_notified_when_something_happens_in_postiz_via_an_http_request": "Webhooks são uma forma de ser notificado quando algo acontece no PostDelegate via uma solicitação HTTP.",

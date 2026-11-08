@@ -78,7 +78,7 @@ const frontmatter = (source: string, file: string) => {
 
 // The docs home, from DOC_SECTIONS like src/pages/docs/index.astro.
 const homeBody = () => [
-  `> **PostDelegate is in early access.** The channels listed as available in these docs are the ones you can connect today. Facebook, Instagram, Threads, TikTok, LinkedIn, Pinterest and Reddit are waiting on platform approval. X is not available on PostDelegate. Nothing here promises a connection that is not yet open.`,
+  `> **PostDelegate is in early access.** The channels listed as available in these docs are the ones you can connect today. Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, and Pinterest are waiting on platform approval. X is not available on PostDelegate. Nothing here promises a connection that is not yet open.`,
   `## Start here`,
   [
     `- [Getting started](${SITE.url}/docs/getting-started.md): Start your free trial, connect a channel and schedule your first post.`,

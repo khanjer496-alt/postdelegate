@@ -31,8 +31,11 @@ export const LANGUAGES: Record<Lang, { name: string; short: string; flag: string
 const DICTS: Record<Lang, Dict> = { en, es, pt, de, fr, ar, it };
 export const strings = (lang: Lang): Dict => DICTS[lang];
 
-// Live network pages only: pages for networks that are not live stay English.
-export const TRANSLATED_SCHEDULERS = LIVE_SCHEDULERS;
+// Publish localized scheduler routes only after every locale has its copy.
+// Newly live destinations stay on their English route until then.
+export const TRANSLATED_SCHEDULERS = LIVE_SCHEDULERS.filter((scheduler) =>
+  LOCALES.every((lang) => lang === 'en' || Boolean(DICTS[lang].schedulers[scheduler.slug]))
+);
 
 // English paths of the pages that exist in every language.
 export const TRANSLATED_PATHS = new Set([

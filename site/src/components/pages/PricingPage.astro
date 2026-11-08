@@ -47,12 +47,13 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 <Base title={p.title} description={p.description(PLANS[0].monthly, TRIAL_DAYS)} jsonLd={[productLd, faqLd]} lang={lang}>
   <PageHero eyebrow={p.eyebrow} title={p.h1(PLANS[0].monthly, TRIAL_DAYS)} lead={p.lead}>
     <a href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{t.common.ctaLabel}</a>
+    <a href="#compare-plans" class="button button-outline">{t.launch.compare}</a>
     <a href="/docs/billing" class="button button-outline">{p.billingGuide}</a>
-    <p class="trial-note"><span aria-hidden="true"></span>{p.trialNote(t.common.ctaNote)}</p>
-    <p class="hero-networks"><LogoStack networks={AVAILABLE_NETWORKS} max={8} size="sm" lang={lang} /><span set:html={p.heroNetworks(AVAILABLE_NETWORKS.length)} /></p>
+    <p class="trial-note"><span aria-hidden="true"></span>{t.launch.trial(TRIAL_DAYS)}</p>
+    <p class="hero-networks"><LogoStack networks={AVAILABLE_NETWORKS} max={8} size="sm" lang={lang} /><span set:html={t.launch.available(AVAILABLE_NETWORKS.length)} /></p>
   </PageHero>
   <section class="section"><div class="container"><Pricing heading={false} lang={lang} /></div></section>
-  <section class="plan-compare"><div class="container">
+  <section class="plan-compare" id="compare-plans"><div class="container">
     <h2>{p.compareTitle}</h2>
     <div class="compare-scroll">
       <table>

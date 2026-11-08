@@ -19,7 +19,7 @@ export const COUNTERS: Record<string, { what: string; detail?: string }> = {
   pinterest: { what: 'Pin description' },
   mastodon: { what: 'post', detail: 'That is the limit on mastodon.social. Other Mastodon servers can set their own.' },
   google_business: { what: 'update' },
-  reddit: { what: 'post body', detail: 'The title is separate and can have up to 300 characters. When Reddit opens on PostDelegate, it will send post bodies of up to 10,000 characters.' },
+  reddit: { what: 'post body', detail: 'The title is separate and can have up to 300 characters. Reddit is not available on PostDelegate.' },
   telegram: { what: 'message', detail: 'With a photo, video or file attached, the caption is limited to 1,024 characters.' },
   discord: { what: 'message', detail: 'Discord allows 2,000; PostDelegate keeps a small margin and sends up to 1,980.' },
   slack: { what: 'message', detail: 'PostDelegate sends up to 4,000 characters, the length Slack recommends for one message.' },

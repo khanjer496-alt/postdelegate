@@ -10,9 +10,10 @@ import NetworkBadge from '../NetworkBadge.astro';
 import Icon from '../Icon.astro';
 import OrbitAccent from '../OrbitAccent.astro';
 import NetworkGrid from '../NetworkGrid.astro';
+import NetworkCoverage from '../NetworkCoverage.astro';
 import Testimonials from '../Testimonials.astro';
 import Pricing from '../Pricing.astro';
-import { NETWORKS, AVAILABLE_NETWORKS, WAITING_KEYS, type Network } from '../../data/networks';
+import { NETWORKS, AVAILABLE_NETWORKS, WAITING_NETWORKS, type Network } from '../../data/networks';
 import { PLANS, TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
@@ -32,7 +33,7 @@ const appLd = { '@context': 'https://schema.org', '@type': 'SoftwareApplication'
 const innerKeys = ['youtube', 'bluesky', 'wordpress', 'devto'];
 const orbitInner = AVAILABLE_NETWORKS.filter((n) => innerKeys.includes(n.key));
 const orbitMiddle = AVAILABLE_NETWORKS.filter((n) => !innerKeys.includes(n.key));
-const orbitOuter = WAITING_KEYS.map((k) => NETWORKS.find((n) => n.key === k)).filter((n): n is Network => Boolean(n));
+const orbitOuter = WAITING_NETWORKS;
 // The comet sits in the gap halfway round the middle ring, whatever its size.
 const cometAngle = (Math.floor(orbitMiddle.length / 2) - 0.5) * 360 / orbitMiddle.length;
 const orbitLabel = h.orbitLabel(liveCount, AVAILABLE_NETWORKS.map((n) => n.name).join(', '));
@@ -58,6 +59,7 @@ const aiLinks = [
     <OrbitAccent kind="planet" class="hero-star-one" />
     <div class="home-wide hero-layout">
       <div class="hero-copy">
+        <p class="hero-workflows">{t.launch.modes}</p>
         <fieldset class="mode-toggle">
           <legend class="sr-only">{h.modeLabel}</legend>
           <input type="radio" name="home-mode" id="home-mode-ai" value="ai" checked />
@@ -68,9 +70,11 @@ const aiLinks = [
         <h1 id="hero-title"><span class="mode-ai">{h.h1}<span class="hero-mark">{h.h1Mark}<OrbitAccent kind="arc" /></span></span>{' '}<span class="mode-classic">{h.classicH1}<span class="hero-mark">{h.classicH1Mark}<OrbitAccent kind="arc" /></span></span></h1>
         <p class="hero-description mode-ai">{h.lead(liveCount)}</p>
         <p class="hero-description mode-classic">{h.classicLead(liveCount)}</p>
+        <p class="hero-availability"><strong>{t.launch.available(liveCount)}</strong><span>YouTube · Bluesky · WordPress</span></p>
         <div class="hero-actions">
-          <a class="hero-cta" href={SITE.signup} data-pulse-goal="trial_clicked"><span>{t.common.ctaLabel}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
-          <p class="hero-trial-note"><span class="note-dot" aria-hidden="true"></span>{h.trialNote(lowestPrice)}</p>
+          <a class="hero-cta" href={SITE.signup} data-pulse-goal="trial_clicked"><span class="hero-cta-long">{t.common.ctaLabel}</span><span class="hero-cta-short">{t.pricing.startTrial}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
+          <a class="text-link hero-compare" href={`${href('/pricing')}#compare-plans`}>{t.launch.compare}</a>
+          <p class="hero-trial-note">{t.launch.trial(TRIAL_DAYS)}</p>
           <a class="text-link hero-mcp mode-ai" href={href('/mcp')}>{h.mcpLink} <span aria-hidden="true">↗</span></a>
         </div>
       </div>
@@ -87,6 +91,8 @@ const aiLinks = [
       </div>
     </div>
   </section>
+
+  <div class="container"><NetworkCoverage lang={lang} /></div>
 
   <section class="relay-section" aria-labelledby="steps-title">
     <div class="container">
@@ -170,6 +176,6 @@ const aiLinks = [
     </div>
   </section>
 
-  <CtaBand eyebrow="" title={h.ctaTitle} text={h.ctaText(TRIAL_DAYS, lowestPrice)} trialNote={false} lang={lang} />
+  <CtaBand eyebrow="" title={h.ctaTitle} text={h.ctaText(TRIAL_DAYS, lowestPrice)} trialNote={true} lang={lang} />
   <a class="support-bubble" href={href('/support')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v6a3 3 0 0 1-3 3h-4M4 12v5H2v-5h2Zm16 0v5h2v-5h-2Z" /></svg>{h.supportBubble}</a>
 </Base>

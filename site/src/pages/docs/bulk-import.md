@@ -89,7 +89,7 @@ Turn a folder of videos into posts in one go. Each video becomes one post on the
 
 Every video goes through the same checks as a post made in the composer, including each network's length limit, media rules and required settings. Drafts only get the checks a draft gets in the composer, the rest run when you schedule them.
 
-Some settings are picked from a list loaded from the network, like a Discord or Slack channel. They can't be set here. A channel whose network requires one is marked **Drafts only**: picking it switches the videos to **Add them as drafts**, and you finish them in the composer. Once Pinterest, Reddit and TikTok are available, a Pinterest board or a subreddit will work the same way, and TikTok videos will go in as drafts so the composer can check your TikTok account and ask for TikTok's music confirmation.
+Some settings are picked from a list loaded from the network, like a Discord or Slack channel. They can't be set here. A channel whose network requires one is marked **Drafts only**: picking it switches the videos to **Add them as drafts**, and you finish them in the composer. Once Pinterest and TikTok are available, a Pinterest board will work the same way, and TikTok videos will go in as drafts so the composer can check your TikTok account and ask for TikTok's music confirmation.
 
 ### Limits and partial results
 

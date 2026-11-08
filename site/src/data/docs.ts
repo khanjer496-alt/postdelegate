@@ -24,6 +24,7 @@ export const DOC_SECTIONS: DocSection[] = [
   ] },
   { title: 'Connect channels', items: [
     { title: 'Channels overview', href: '/docs/channels', description: 'What you can connect today and how connections work.' },
+    { title: 'LinkedIn personal profiles', href: '/docs/channels/linkedin', description: 'Connect your personal profile; company Pages are waiting on approval.' },
     { title: 'YouTube', href: '/docs/channels/youtube', description: 'Connect a YouTube channel with Google sign-in.' },
     { title: 'Bluesky', href: '/docs/channels/bluesky', description: 'Connect with an app password.' },
     { title: 'DEV.to', href: '/docs/channels/devto', description: 'Connect with a DEV Community API key.' },

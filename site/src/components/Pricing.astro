@@ -3,8 +3,9 @@ import { PLANS, TRIAL_DAYS, planPerks } from '../data/plans';
 import { SITE } from '../data/site';
 import { AVAILABLE_NETWORKS, FEATURED_LIVE_NETWORKS } from '../data/networks';
 import LogoStack from './LogoStack.astro';
+import NetworkCoverage from './NetworkCoverage.astro';
 import Icon from './Icon.astro';
-import { localizeLinks, strings, type Lang } from '../i18n';
+import { localeHref, localizeLinks, strings, type Lang } from '../i18n';
 interface Props { heading?: boolean; lang?: Lang }
 const { heading = true, lang = 'en' } = Astro.props;
 const t = strings(lang);
@@ -37,6 +38,7 @@ const icons: Record<string, string> = {
   )}
   {/* pricing_viewed fires when half of it is on screen: the switch right above
       the plans, since half of the whole block never fits on a phone */}
+  <NetworkCoverage lang={lang} />
   <fieldset class="billing-toggle" data-pulse-scroll="pricing_viewed">
     <legend class="sr-only">{p.billingPeriod}</legend>
     <input type="radio" name="billing-period" id="billing-monthly" value="monthly" checked />
@@ -57,10 +59,10 @@ const icons: Record<string, string> = {
         <p class="plan-price price-yearly"><strong>${perMonth(plan.yearly)}</strong><span>{p.perMonth}</span></p>
         <p class="plan-yearly price-yearly">{p.billedYearly(num(plan.yearly), num(plan.monthly * 12 - plan.yearly))}</p>
         <a href={SITE.signup} class:list={['button', { 'button-outline': !plan.popular }]} data-pulse-goal="plan_clicked" data-pulse-goal-plan={plan.slug}>{p.startTrial}</a>
-        <p class="plan-trial">{p.trialNote(TRIAL_DAYS)}</p>
+        <p class="plan-trial">{t.launch.trial(TRIAL_DAYS)}</p>
         <div class="plan-channels">
           <p><strong>{plan.channels}</strong> {p.channels}{plan.extraChannelMonthly && <span class="plan-extra price-monthly">{p.extraMonthly(num(plan.extraChannelMonthly), num(plan.maxChannels || plan.channels))}</span>}{plan.extraChannelYearly && <span class="plan-extra price-yearly">{p.extraYearly(num(plan.extraChannelYearly, 2), num(plan.maxChannels || plan.channels))}</span>}</p>
-          <div class="plan-networks"><LogoStack networks={FEATURED_LIVE_NETWORKS} max={5} size="xs" decorative lang={lang} /><small>{p.anyLive(AVAILABLE_NETWORKS.length)}</small></div>
+          <div class="plan-networks"><LogoStack networks={FEATURED_LIVE_NETWORKS} max={5} size="xs" decorative lang={lang} /><small><a href={localeHref(lang, '/platforms')}>{t.launch.choose(AVAILABLE_NETWORKS.length)}</a></small></div>
         </div>
         <ul class="plan-perks">
           {planPerks(plan, t.perks, t.numberLocale).map((perk) => (
@@ -149,3 +151,5 @@ const icons: Record<string, string> = {
     .plan-custom { flex-direction: column; align-items: flex-start; }
   }
 </style>
+
+<style>.plan-networks a{color:inherit;text-decoration:underline;text-underline-offset:3px}.plan-trial{line-height:1.6}</style>

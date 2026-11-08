@@ -11,7 +11,6 @@ import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org
 import { GithubProvider } from '@gitroom/frontend/components/auth/providers/github.provider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
-import clsx from 'clsx';
 import { GoogleProvider } from '@gitroom/frontend/components/auth/providers/google.provider';
 import { AppleProvider } from '@gitroom/frontend/components/auth/providers/apple.provider';
 import { OauthProvider } from '@gitroom/frontend/components/auth/providers/oauth.provider';
@@ -208,8 +207,8 @@ export function RegisterAfter({
             {billingEnabled && (
               <div className="text-[14px] text-textItemBlur mt-[8px]">
                 {t(
-                  'sign_up_free_trial_no_card',
-                  'Start your 7-day free trial. No credit card required.'
+                  'sign_up_trial_pause_note',
+                  '7 days free · no card · workspace pauses if no plan is chosen'
                 )}
               </div>
             )}
@@ -254,6 +253,8 @@ export function RegisterAfter({
                       placeholder={t('email_address', 'Email Address')}
                     />
                     <Input
+                      id="signup-password"
+                      aria-describedby="signup-password-help signup-password-error"
                       label="Password"
                       translationKey="label_password"
                       {...form.register('password')}
@@ -261,9 +262,17 @@ export function RegisterAfter({
                       type="password"
                       placeholder={t('label_password', 'Password')}
                     />
+                    <p
+                      id="signup-password-help"
+                      className="text-[13px] leading-[20px] text-[#CBD0DB] mb-[12px]"
+                    >
+                      {t('signup_password_rules', 'Use 3–64 characters.')}
+                    </p>
                   </>
                 )}
                 <Input
+                  id="signup-company"
+                  aria-describedby="signup-company-help signup-company-error"
                   label="Company"
                   translationKey="label_company"
                   {...form.register('company')}
@@ -271,8 +280,17 @@ export function RegisterAfter({
                   type="text"
                   placeholder={t('label_company', 'Company')}
                 />
+                <p
+                  id="signup-company-help"
+                  className="text-[13px] leading-[20px] text-[#CBD0DB]"
+                >
+                  {t(
+                    'signup_company_help',
+                    'Used to name your workspace. Required, 3–128 characters.'
+                  )}
+                </p>
               </div>
-              <div className={clsx('text-[12px]')}>
+              <div className="text-[14px] leading-[24px] text-[#D5DAE5]">
                 {t(
                   'by_registering_you_agree_to_our',
                   'By registering you agree to our'
@@ -280,7 +298,7 @@ export function RegisterAfter({
                 &nbsp;
                 <a
                   href="/legal/terms/"
-                  className="underline hover:font-bold"
+                  className="inline-flex items-center min-h-[44px] px-[4px] underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2"
                   rel="nofollow"
                 >
                   {t('terms_of_service', 'Terms of Service')}
@@ -290,12 +308,18 @@ export function RegisterAfter({
                 <a
                   href="/legal/privacy/"
                   rel="nofollow"
-                  className="underline hover:font-bold"
+                  className="inline-flex items-center min-h-[44px] px-[4px] underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2"
                 >
                   {t('privacy_policy', 'Privacy Policy')}
                 </a>
                 &nbsp;
               </div>
+              <p className="text-[13px] leading-[20px] text-[#CBD0DB]">
+                {t(
+                  'signup_next_step',
+                  'Next: activate your account if prompted, then connect a channel.'
+                )}
+              </p>
               <div className="text-center mt-6">
                 <div className="w-full flex">
                   <Button

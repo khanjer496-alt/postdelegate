@@ -1,4 +1,8 @@
 {
+  "sign_up_trial_pause_note": "Miễn phí 7 ngày · không cần thẻ · không chọn gói thì không gian làm việc sẽ tạm dừng",
+  "signup_password_rules": "Dùng từ 3 đến 64 ký tự.",
+  "signup_company_help": "Dùng để đặt tên không gian làm việc. Bắt buộc, từ 3 đến 128 ký tự.",
+  "signup_next_step": "Tiếp theo: kích hoạt tài khoản nếu được yêu cầu, rồi kết nối một kênh.",
   "calendar": "Lịch",
   "webhooks": "Webhook",
   "webhooks_are_a_way_to_get_notified_when_something_happens_in_postiz_via_an_http_request": "Webhook là một cách để nhận thông báo khi có sự kiện xảy ra trong PostDelegate thông qua một yêu cầu HTTP.",

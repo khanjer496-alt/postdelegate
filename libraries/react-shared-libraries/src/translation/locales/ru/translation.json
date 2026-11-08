@@ -1,4 +1,8 @@
 {
+  "sign_up_trial_pause_note": "7 дней бесплатно · без карты · без выбранного тарифа рабочее пространство приостанавливается",
+  "signup_password_rules": "Используйте от 3 до 64 символов.",
+  "signup_company_help": "Название рабочего пространства. Обязательное поле, от 3 до 128 символов.",
+  "signup_next_step": "Далее: при необходимости активируйте аккаунт, затем подключите канал.",
   "calendar": "Календарь",
   "webhooks": "Вебхуки",
   "webhooks_are_a_way_to_get_notified_when_something_happens_in_postiz_via_an_http_request": "Вебхуки — это способ получать уведомления о событиях в PostDelegate через HTTP-запрос.",

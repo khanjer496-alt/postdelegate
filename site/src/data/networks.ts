@@ -1,7 +1,7 @@
 // Network families in the PostDelegate channel directory.
 // `available` marks networks that can be connected in the app today. WAITING_KEYS are the
 // networks that are not live yet but are on their way (waiting on platform approval or verification).
-// Every other network here (X, Farcaster) is not offered on
+// Every other network here (X, Reddit, Farcaster) is not offered on
 // PostDelegate and is listed only for the free tools' character limits.
 // Caption limits are tool estimates; providers validate the actual post.
 // unit: codepoints | utf16 | utf8_bytes | graphemes | codepoints_emoji_bytes | weighted (X)
@@ -10,13 +10,15 @@ export interface Network {
   unit: string; urlCost?: number; noMentionDomain?: boolean; scheduler?: string; note?: string; available?: boolean;
   /** The app's provider identifier (the MCP and API `platform`), when it differs from `key`. */
   identifier?: string;
+  /** Destination still pending when another account type in this family is live. */
+  pendingName?: string;
   /** Available networks: one line on what you can schedule there, from its channel guide. */
   blurb?: string;
 }
 export const NETWORKS: Network[] = [
   { key: 'instagram', name: 'Instagram', color: '#c4256e', abbr: 'Ig', limit: 2200, unit: 'codepoints', scheduler: 'instagram-scheduler' },
   { key: 'facebook', name: 'Facebook', color: '#1877f2', abbr: 'Fb', limit: 63206, unit: 'codepoints', scheduler: 'facebook-scheduler' },
-  { key: 'linkedin', name: 'LinkedIn', color: '#0a66c2', abbr: 'in', limit: 3000, unit: 'codepoints', scheduler: 'linkedin-scheduler' },
+  { key: 'linkedin', name: 'LinkedIn (personal)', color: '#0a66c2', abbr: 'in', limit: 3000, unit: 'codepoints', scheduler: 'linkedin-scheduler', available: true, pendingName: 'LinkedIn Company Pages', blurb: 'Posts to your personal profile. Company Pages are waiting on approval.' },
   { key: 'tiktok', name: 'TikTok', color: '#25f4ee', abbr: 'Tk', limit: 2200, unit: 'utf16', scheduler: 'tiktok-scheduler' },
   { key: 'youtube', name: 'YouTube', color: '#ff0000', abbr: 'Yt', limit: 5000, unit: 'utf8_bytes', scheduler: 'youtube-scheduler', available: true, blurb: 'Video uploads with a title, visibility, thumbnail and tags.' },
   { key: 'x', name: 'X', color: '#e7e7ea', abbr: 'X', limit: 280, unit: 'weighted', note: 'Premium accounts get 25,000.' },
@@ -51,11 +53,13 @@ export const FEATURED_LIVE_NETWORKS = [
   ...AVAILABLE_NETWORKS.filter((network) => !FEATURED_KEYS.includes(network.key)),
 ];
 // The networks listed on /docs/channels/coming-soon as waiting on approval, in that order.
-// None of them can be connected today. X is not one of them: it is not available on PostDelegate.
-export const WAITING_KEYS = ['facebook', 'instagram', 'threads', 'tiktok', 'linkedin', 'pinterest', 'reddit'];
+// pendingName distinguishes a pending destination from a live account type in the same family.
+// X is not one of them: it is not available on PostDelegate.
+export const WAITING_KEYS = ['facebook', 'instagram', 'threads', 'tiktok', 'linkedin', 'pinterest'];
 export const WAITING_NETWORKS = WAITING_KEYS
   .map((key) => NETWORKS.find((network) => network.key === key))
-  .filter((network): network is Network => Boolean(network));
+  .filter((network): network is Network => Boolean(network))
+  .map((network) => network.pendingName ? { ...network, name: network.pendingName, available: false } : network);
 export type NetworkStatus = 'live' | 'waiting' | 'unavailable';
 export const networkStatus = (network: Network): NetworkStatus =>
   network.available ? 'live' : WAITING_KEYS.includes(network.key) ? 'waiting' : 'unavailable';
