@@ -67,7 +67,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   // LinkedIn" products grant. checkScopes throws NotEnoughScopes when a
   // declared scope is missing from the token response, so anything listed here
   // that the app was not granted breaks the whole connect flow.
-  scopes = ['openid', 'profile', 'w_member_social'];
+  get scopes() { return ['openid', 'profile', 'w_member_social']; }
   override maxConcurrentJob = 8; // LinkedIn limits are daily budgets
   refreshWait = true;
   editor = 'normal' as const;

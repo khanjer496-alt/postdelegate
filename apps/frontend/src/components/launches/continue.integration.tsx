@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { HttpStatusCode } from 'axios';
 import { useRouter } from 'next/navigation';
 import { Redirect } from '@gitroom/frontend/components/layout/redirect';
@@ -76,6 +77,7 @@ export const ContinueIntegration: FC<{
   const { push } = useRouter();
   const t = useT();
   const fetch = useFetch();
+  const { show: showScopeWarning } = useToaster();
   const { extensionId, backendUrl } = useVariables();
   const [state, setState] = useState<ConnectState>({ status: 'loading' });
   // the OAuth code can be exchanged only once, even if the effect runs twice
@@ -284,7 +286,11 @@ export const ContinueIntegration: FC<{
       pages,
       returnURL,
       extensionToken,
+      scopeWarnings,
     } = await data.json();
+    if (scopeWarnings?.length) {
+      showScopeWarning(scopeWarnings.join(' '), 'warning');
+    }
     const onboarding = resOnboarding || searchParams.onboarding === 'true';
 
     // Store refresh token in extension for background cookie refresh
@@ -346,7 +352,7 @@ export const ContinueIntegration: FC<{
       'success',
       confirmed
     );
-  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName]);
+  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName, showScopeWarning]);
 
   useEffect(() => {
     if (started.current) {
