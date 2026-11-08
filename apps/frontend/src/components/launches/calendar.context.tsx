@@ -104,6 +104,7 @@ export const CalendarContext = createContext({
 });
 
 export interface Integrations {
+  commentsAvailable?: boolean;
   name: string;
   dataDeletionNotice?: string;
   originalName?: string;

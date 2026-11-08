@@ -254,12 +254,7 @@ export class NoAuthIntegrationsController {
         pendingRefresh
       );
       await this.checkChannelLimit(org, pendingRefresh);
-      return this.linkConfirmation(
-        req,
-        org,
-        binding,
-        integrationProvider.name
-      );
+      return this.linkConfirmation(req, org, binding, integrationProvider.name);
     }
 
     if (!integrationProvider.customFields) {
@@ -301,6 +296,7 @@ export class NoAuthIntegrationsController {
       picture,
       username,
       additionalSettings,
+      scopeWarnings,
       // eslint-disable-next-line no-async-promise-executor
     } = await new Promise<AuthTokenDetails>(async (res) => {
       try {
@@ -338,6 +334,7 @@ export class NoAuthIntegrationsController {
             // the channel breaks again as soon as the access token expires
             return res({
               ...newAuth,
+              scopeWarnings: auth.scopeWarnings,
               refreshToken: auth.refreshToken,
               expiresIn: auth.expiresIn,
             });
@@ -400,7 +397,10 @@ export class NoAuthIntegrationsController {
       String(id) !== String(refresh) &&
       !this._integrationManager.getMigrationSources(integration).length
     ) {
-      await this._integrationService.checkProviderAvailable(org.id, integration);
+      await this._integrationService.checkProviderAvailable(
+        org.id,
+        integration
+      );
       refresh = null;
     }
 
@@ -591,6 +591,7 @@ export class NoAuthIntegrationsController {
 
     return {
       ...safeIntegration,
+      scopeWarnings,
       onboarding: onboarding === 'true',
       pages,
       ...(returnURL ? { returnURL } : {}),
@@ -746,9 +747,7 @@ export class NoAuthIntegrationsController {
       undefined,
       // stored encrypted like connectSocialMedia does, never signed: the
       // cookies JSON comes from the request
-      writeCustomInstanceDetails(
-        Buffer.from(body.cookies, 'base64').toString()
-      )
+      writeCustomInstanceDetails(Buffer.from(body.cookies, 'base64').toString())
     );
 
     return { success: true };

@@ -6,6 +6,7 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { NotEnoughScopes } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
 import dayjs from 'dayjs';
@@ -29,19 +30,18 @@ export class LinkedinPageProvider
   override refreshWait = true;
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
   // The Community Management API set. This provider posts as the
-  // organization, so it needs no member scope; r_basicprofile belongs to a
-  // restricted product the app does not hold. openid/profile stay because
-  // authenticate() and refreshToken() read /v2/userinfo. Unverified until
-  // LinkedIn approves the pages app - checkScopes throws NotEnoughScopes on
-  // any scope the app was not granted, so reconcile this list against the
-  // granted one before taking LinkedIn Page out of HIDDEN_PROVIDERS.
-  override scopes = [
-    'openid',
-    'profile',
-    'rw_organization_admin',
-    'w_organization_social',
-    'r_organization_social',
-  ];
+  // organization. Page discovery uses the admin grant; no personal OpenID
+  // product is requested by this CMA-only app. Analytics is separately opt-in.
+  override optionalScopes = ['r_organization_social'];
+  override get analyticsAvailable() {
+    return this.scopes.includes('r_organization_social');
+  }
+  override get scopes() {
+    return this.requestedScopes([
+      'rw_organization_admin',
+      'w_organization_social',
+    ]);
+  }
 
   // Pages live in their own LinkedIn app, because LinkedIn grants the
   // Community Management API only to an app that holds no other product.
@@ -126,7 +126,6 @@ export class LinkedinPageProvider
     }));
   }
 
-
   override async refreshToken(
     refresh_token: string
   ): Promise<AuthTokenDetails> {
@@ -149,26 +148,15 @@ export class LinkedinPageProvider
       })
     ).json();
 
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
+    // Refresh persists only tokens; the selected organization's identity is
+    // preserved by RefreshIntegrationService. No OpenID product is needed.
     return {
-      id,
+      id: '',
+      name: '',
+      username: '',
       accessToken,
       refreshToken,
       expiresIn: expires_in,
-      name,
-      picture,
-      username: id,
     };
   }
 
@@ -176,7 +164,7 @@ export class LinkedinPageProvider
     integration: Integration,
     originalIntegration: Integration,
     postId: string,
-    information: any,
+    information: any
   ) {
     return super.addComment(
       integration,
@@ -321,29 +309,24 @@ export class LinkedinPageProvider
     ).json();
 
     this.checkScopes(this.scopes, scope);
-
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    const pages = await this.companies(accessToken);
+    const firstPage = pages[0];
+    if (!firstPage)
+      throw new NotEnoughScopes(
+        'No managed LinkedIn Pages are available for this account.'
+      );
 
     return {
-      // namespaced placeholder so the in-between row never collides with the
-      // personal LinkedIn channel row (same org + same member sub)
-      id: `${this.identifier}_${id}`,
+      // An unfinished Page-picker row must not collide with a connected Page.
+      // Discovery supplies a stable temporary identity without OpenID access.
+      id: `${this.identifier}_${firstPage.id}`,
       accessToken,
       refreshToken,
       expiresIn,
-      name,
-      picture,
-      username: id,
+      name: 'Choose a LinkedIn Page',
+      picture: '',
+      username: '',
+      scopeWarnings: this.scopeWarnings(scope),
     };
   }
 

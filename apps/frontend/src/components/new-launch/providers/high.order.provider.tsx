@@ -136,7 +136,11 @@ export const withProvider = function <T extends object>(params: {
 
       if (current) {
         setComments(
-          typeof params.comments === 'undefined' ? true : params.comments
+          selectedIntegration.integration.commentsAvailable === false
+            ? false
+            : typeof params.comments === 'undefined'
+            ? true
+            : params.comments
         );
         setEditor(selectedIntegration?.integration.editor);
         setPostComment(postComment);

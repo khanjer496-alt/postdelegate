@@ -37,7 +37,9 @@ const allowedIntegrations = [
 // the empty state never lists one that can't be added
 const useConnectableIntegrations = () => {
   const fetch = useFetch();
-  return useSWR<{ identifier: string; name: string }[]>(
+  return useSWR<
+    { identifier: string; name: string; analyticsAvailable?: boolean }[]
+  >(
     'analytics-connectable-integrations',
     async () => (await (await fetch('/integrations')).json())?.social || [],
     { revalidateOnFocus: false, fallbackData: [] }
@@ -59,6 +61,7 @@ export const PlatformAnalytics = () => {
     const int = (
       await (await fetch('/integrations/list')).json()
     ).integrations.filter((f: any) => {
+      if (f.analyticsAvailable === false) return false;
       if (['x', 'x-own-key'].includes(f.identifier) && disableXAnalytics) {
         return false;
       }
@@ -82,10 +85,9 @@ export const PlatformAnalytics = () => {
         (Array.isArray(connectable) ? connectable : [])
           .filter(
             (p) =>
+              p.analyticsAvailable !== false &&
               allowedIntegrations.includes(p.identifier) &&
-              !(
-                ['x', 'x-own-key'].includes(p.identifier) && disableXAnalytics
-              )
+              !(['x', 'x-own-key'].includes(p.identifier) && disableXAnalytics)
           )
           .map((p) => p.name || capitalize(p.identifier))
       ),

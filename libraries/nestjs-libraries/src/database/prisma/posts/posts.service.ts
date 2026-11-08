@@ -447,6 +447,7 @@ export class PostsService {
         return [];
       }
 
+      if (integrationProvider.analyticsAvailable === false) return [];
       const loadAnalytics = await integrationProvider.postAnalytics(
         getIntegration.internalId,
         getIntegration.token,
@@ -1360,6 +1361,10 @@ export class PostsService {
           );
         } catch (err: any) {
           errors = err?.message || 'Invalid media';
+        }
+
+        if (provider.plugsAvailable === false && (post.value || []).length > 1) {
+          errors = 'Comment and reply automation needs an approved optional permission. Publish one entry or reconnect after it is enabled.';
         }
 
         const maximumCharacters = provider.maxLength(

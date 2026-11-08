@@ -36,15 +36,27 @@ export class InstagramProvider
   name = 'Instagram\n(Facebook Business)';
   isBetweenSteps = true;
   toolTip = 'Instagram must be business and connected to a Facebook page';
-  scopes = [
-    'instagram_basic',
-    'pages_show_list',
-    'pages_read_engagement',
+  optionalScopes = [
     'business_management',
-    'instagram_content_publish',
     'instagram_manage_comments',
     'instagram_manage_insights',
   ];
+  override get analyticsAvailable() {
+    return ['instagram_manage_insights'].every((scope) =>
+      this.scopes.includes(scope)
+    );
+  }
+  override get plugsAvailable() {
+    return this.scopes.includes('instagram_manage_comments');
+  }
+  get scopes() {
+    return this.requestedScopes([
+      'instagram_basic',
+      'pages_show_list',
+      'pages_read_engagement',
+      'instagram_content_publish',
+    ]);
+  }
   override maxConcurrentJob = 400;
   editor = 'normal' as const;
 
@@ -440,8 +452,9 @@ export class InstagramProvider
     if (body.indexOf('too little or too many attachments') > -1) {
       return {
         type: 'bad-body' as const,
-        value: 'Instagram carousel should have between 2 and 10 media attachments',
-      }
+        value:
+          'Instagram carousel should have between 2 and 10 media attachments',
+      };
     }
 
     if (body.indexOf('2207027') > -1) {
@@ -455,7 +468,7 @@ export class InstagramProvider
       return {
         type: 'bad-body' as const,
         value:
-          "One of the collaborators could not be tagged, please check the username is correct, the account is public, and that it allows collaborator invites",
+          'One of the collaborators could not be tagged, please check the username is correct, the account is public, and that it allows collaborator invites',
       };
     }
 
@@ -548,6 +561,7 @@ export class InstagramProvider
       .filter((d: any) => d.status === 'granted')
       .map((p: any) => p.permission);
     this.checkScopes(this.scopes, permissions);
+    const scopeWarnings = this.scopeWarnings(permissions);
 
     const { id, name, picture } = await (
       await fetch(
@@ -556,6 +570,7 @@ export class InstagramProvider
     ).json();
 
     return {
+      scopeWarnings,
       id,
       name,
       accessToken: access_token,
@@ -771,7 +786,9 @@ export class InstagramProvider
       (wanted && recent.find((m) => normalize(m?.caption) === wanted)?.id) ||
       '';
     console.log(
-      `Instagram blocked media_publish for container ${containerId}: status PUBLISHED, media ${mediaId || 'not matched'}`
+      `Instagram blocked media_publish for container ${containerId}: status PUBLISHED, media ${
+        mediaId || 'not matched'
+      }`
     );
     return mediaId || containerId;
   }
@@ -832,9 +849,9 @@ export class InstagramProvider
             ? isStory
               ? `video_url=${m.path}&media_type=STORIES`
               : m?.thumbnail
-              ? `video_url=${m.path}&media_type=REELS&cover_url=${encodeURIComponent(
-                  m.thumbnail
-                )}`
+              ? `video_url=${
+                  m.path
+                }&media_type=REELS&cover_url=${encodeURIComponent(m.thumbnail)}`
               : `video_url=${m.path}&media_type=REELS&thumb_offset=${
                   m?.thumbnailTimestamp || 0
                 }`
@@ -1063,7 +1080,9 @@ export class InstagramProvider
       // re-running this is safe)
       const { id: containerId } = await (
         await this.fetch(
-          `https://${pendingData.type}/${META_GRAPH_API_VERSION}/${igId}/media?caption=${encodeURIComponent(
+          `https://${
+            pendingData.type
+          }/${META_GRAPH_API_VERSION}/${igId}/media?caption=${encodeURIComponent(
             pendingData.message || ''
           )}&media_type=CAROUSEL&children=${encodeURIComponent(
             pendingData.containers.join(',')
@@ -1210,6 +1229,10 @@ export class InstagramProvider
     integration: Integration,
     type = 'graph.facebook.com'
   ): Promise<PostResponse[]> {
+    if (type !== 'graph.instagram.com' && !this.plugsAvailable) {
+      throw new BadBody(this.identifier, '{}', '{}', 'Comment and reply automation needs an approved optional permission. Reconnect after it is enabled.');
+    }
+
     const [accessToken, userToken] = token.split('___');
     const [commentPost] = postDetails;
 
@@ -1305,7 +1328,9 @@ export class InstagramProvider
       ...(typeof followers_count === 'number'
         ? { followers: followers_count }
         : {}),
-      ...(typeof follows_count === 'number' ? { following: follows_count } : {}),
+      ...(typeof follows_count === 'number'
+        ? { following: follows_count }
+        : {}),
       ...(typeof media_count === 'number' ? { posts: media_count } : {}),
     };
   }

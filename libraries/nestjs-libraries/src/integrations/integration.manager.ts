@@ -157,6 +157,7 @@ export class IntegrationManager {
             name: p.name,
             identifier: p.identifier,
             toolTip: p.toolTip,
+            analyticsAvailable: p.analyticsAvailable,
             editor: p.editor,
             isExternal: !!p.externalUrl,
             isWeb3: !!p.isWeb3,
@@ -229,6 +230,7 @@ export class IntegrationManager {
 
   getAllPlugs() {
     return socialIntegrationList
+      .filter(p => p.plugsAvailable)
       .map((p) => {
         return {
           name: p.name,

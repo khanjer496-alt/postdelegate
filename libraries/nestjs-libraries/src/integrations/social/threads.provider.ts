@@ -24,13 +24,18 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
   identifier = 'threads';
   name = 'Threads';
   isBetweenSteps = false;
-  scopes = [
-    'threads_basic',
-    'threads_content_publish',
-    'threads_manage_replies',
-    'threads_manage_insights',
-    // 'threads_profile_discovery',
-  ];
+  optionalScopes = ['threads_manage_replies', 'threads_manage_insights'];
+  override get analyticsAvailable() {
+    return ['threads_manage_insights'].every((scope) =>
+      this.scopes.includes(scope)
+    );
+  }
+  override get plugsAvailable() {
+    return this.scopes.includes('threads_manage_replies');
+  }
+  get scopes() {
+    return this.requestedScopes(['threads_basic', 'threads_content_publish']);
+  }
   override maxConcurrentJob = 20; // Threads limits are per profile
   refreshCron = true;
 
@@ -70,8 +75,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     if (body.includes('4279013')) {
       return {
         type: 'bad-body',
-        value:
-          'User restricted',
+        value: 'User restricted',
       };
     }
     if (body.includes('The media could not be fetched from this URI')) {
@@ -589,7 +593,9 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
 
       const { id: containerId } = await (
         await this.fetch(
-          `https://graph.threads.net/v1.0/${integration.internalId}/threads?${params.toString()}`,
+          `https://graph.threads.net/v1.0/${
+            integration.internalId
+          }/threads?${params.toString()}`,
           {
             method: 'POST',
           }
@@ -614,7 +620,11 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     return {
       status: 'completed',
       postId: threadId,
-      releaseURL: await this.threadPermalink(threadId, accessToken, integration),
+      releaseURL: await this.threadPermalink(
+        threadId,
+        accessToken,
+        integration
+      ),
     };
   }
 
@@ -702,6 +712,10 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     }>[],
     integration: Integration
   ): Promise<PostResponse[]> {
+    if (!this.plugsAvailable) {
+      throw new BadBody(this.identifier, '{}', '{}', 'Comment and reply automation needs an approved optional permission. Reconnect after it is enabled.');
+    }
+
     if (!postDetails.length) {
       return [];
     }

@@ -2074,3 +2074,25 @@ describe('PostsService.getPost error curation', () => {
     expect((await load(null)).error).toBe(null);
   });
 });
+
+describe('PostsService optional comments permission', () => {
+  it('rejects an additional comment before creating any publish workflow', async () => {
+    const service = new PostsService(
+      {} as any,
+      { getSocialIntegration: () => ({
+        plugsAvailable: false, checkValidity: async () => true,
+        maxLength: () => 2200, editor: 'normal',
+      }) } as any,
+      { getIntegrationById: async () => ({
+        id: 'review-channel', name: 'Reviewer', providerIdentifier: 'instagram', additionalSettings: '[]',
+      }) } as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any
+    );
+    const [result] = await service.validatePosts('review-org', [{
+      integration: { id: 'review-channel' },
+      value: [{ content: 'Original post', image: [] }, { content: 'First comment', image: [] }],
+      settings: {},
+    }]);
+    expect(result.errors).toMatch(/optional permission/);
+  });
+});
