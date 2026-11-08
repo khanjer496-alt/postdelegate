@@ -36,6 +36,9 @@ import { emailButton } from '@gitroom/nestjs-libraries/services/email.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
+const isPaidTier = (value: string): value is 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE' =>
+  ['STANDARD', 'TEAM', 'PRO', 'ULTIMATE'].includes(value);
+
 // Resolve the Stripe price of a tier by its lookup_key (postdelegate_<slug>_<month|year>),
 // falling back to finding/creating the product and price by name for accounts without them
 export async function resolveTierPrice(
@@ -746,7 +749,7 @@ export class StripeService extends PaymentProviderAbstract {
   async validatedPlan(subscription: Stripe.Subscription) {
     const { billing, period, uniqueId } = subscription.metadata || {};
     const plan = Object.prototype.hasOwnProperty.call(pricing, billing) && pricing[billing];
-    if (!plan || billing === 'FREE' || !['MONTHLY', 'YEARLY'].includes(period) || !uniqueId) {
+    if (!plan || !isPaidTier(billing) || !['MONTHLY', 'YEARLY'].includes(period) || !uniqueId) {
       throw new BadRequestException('Invalid subscription plan metadata');
     }
     const interval = period === 'YEARLY' ? 'year' : 'month';
