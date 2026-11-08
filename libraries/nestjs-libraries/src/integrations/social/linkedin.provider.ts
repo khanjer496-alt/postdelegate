@@ -253,39 +253,6 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  @DashboardFunction()
-  async company(token: string, data: { url: string }) {
-    const { url } = data;
-    const getCompanyVanity = url.match(
-      /^https?:\/\/(?:www\.)?linkedin\.com\/company\/([^/]+)\/?$/
-    );
-    if (!getCompanyVanity || !getCompanyVanity?.length) {
-      throw new Error('Invalid LinkedIn company URL');
-    }
-
-    const { elements } = await (
-      await fetch(
-        `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${getCompanyVanity[1]}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0',
-            'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
-    ).json();
-
-    return {
-      options: elements.map((e: { localizedName: string; id: string }) => ({
-        label: e.localizedName,
-        value: `@[${e.localizedName}](urn:li:organization:${e.id})`,
-      }))?.[0],
-    };
-  }
-
   protected async uploadPicture(
     fileName: string,
     accessToken: string,
@@ -1199,39 +1166,6 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         Authorization: `Bearer ${integration.token}`,
       },
     });
-  }
-
-  @Tool({
-    description:
-      'Find a company page to tag by its exact vanity name (the part after linkedin.com/company/). Tag it in the post content with <span data-mention-id="{id}" data-mention-label="{label}">@{label}</span>',
-    dataSchema: [
-      { key: 'query', type: 'string', description: 'Company page vanity name' },
-    ],
-  })
-  override async mention(token: string, data: { query: string }) {
-    const { elements } = await (
-      await this.fetch(
-        `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${encodeURIComponent(
-          data.query
-        )}&projection=(elements*(id,localizedName,logoV2(original~:playableStreams)))`,
-        {
-          headers: {
-            'X-Restli-Protocol-Version': '2.0.0',
-            'Content-Type': 'application/json',
-            'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
-    ).json();
-
-    return elements.map((p: any) => ({
-      id: String(p.id),
-      label: p.localizedName,
-      image:
-        p.logoV2?.['original~']?.elements?.[0]?.identifiers?.[0]?.identifier ||
-        '',
-    }));
   }
 
   mentionFormat(idOrHandle: string, name: string) {
