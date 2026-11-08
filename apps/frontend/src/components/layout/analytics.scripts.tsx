@@ -4,6 +4,8 @@ import { FC, ReactNode } from 'react';
 import Script from 'next/script';
 import PlausibleProvider from 'next-plausible';
 import { useConsent } from '@gitroom/helpers/consent/use.consent';
+import { usePathname } from 'next/navigation';
+import { isSensitiveTelemetryPath } from '@gitroom/helpers/utils/redact.url';
 
 // Analytics scripts load only after the analytics choice in the cookie banner
 
@@ -12,7 +14,8 @@ export const DataFastScript: FC<{ websiteId?: string; domain: string }> = ({
   domain,
 }) => {
   const consent = useConsent();
-  if (!websiteId || !consent?.analytics) {
+  const sensitive = isSensitiveTelemetryPath(usePathname());
+  if (sensitive || !websiteId || !consent?.analytics) {
     return null;
   }
   return (
@@ -32,10 +35,11 @@ export const ConsentPlausible: FC<{ domain: string; children: ReactNode }> = ({
   children,
 }) => {
   const consent = useConsent();
+  const sensitive = isSensitiveTelemetryPath(usePathname());
   return (
     <PlausibleProvider
       domain={domain}
-      enabled={!!consent?.analytics && process.env.NODE_ENV === 'production'}
+      enabled={!sensitive && !!consent?.analytics && process.env.NODE_ENV === 'production'}
     >
       {children}
     </PlausibleProvider>
