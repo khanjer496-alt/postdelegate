@@ -109,7 +109,7 @@ export function Login() {
             ) : !isGeneral ? (
               <GithubProvider />
             ) : (
-              <div className="gap-[8px] flex flex-wrap">
+              <div className="gap-[8px] flex">
                 <GoogleProvider />
                 {!!appleClientId && <AppleProvider />}
                 {!!neynarClientId && <FarcasterProvider />}
@@ -130,14 +130,13 @@ export function Login() {
                   translationKey="label_email"
                   {...form.register('email')}
                   type="email"
-                  autoComplete="email"
                   placeholder={t('email_address', 'Email Address')}
                 />
                 <Input
                   label="Password"
                   translationKey="label_password"
                   {...form.register('password')}
-                  autoComplete="current-password"
+                  autoComplete="off"
                   type="password"
                   placeholder={t('label_password', 'Password')}
                 />

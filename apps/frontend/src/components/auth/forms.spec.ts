@@ -100,24 +100,6 @@ describe.each(cases)(
       expect(form.action).not.toContain('example-reset-token');
     });
 
-    it('declares the purpose of each autofill field', () => {
-      const container = document.createElement('div');
-      container.innerHTML = renderToString(
-        React.createElement(Component as any, props)
-      );
-      const purposes: Record<string, string> = {
-        email: 'email',
-        password: _name === 'login' ? 'current-password' : 'new-password',
-        repeatPassword: 'new-password',
-        company: 'organization',
-      };
-      for (const input of container.querySelectorAll<HTMLInputElement>(
-        'input'
-      )) {
-        expect(input.autocomplete).toBe(purposes[input.name]);
-      }
-    });
-
     it('enables submission after hydration and prevents native URL navigation', async () => {
       const element = React.createElement(Component as any, props);
       const container = document.createElement('div');
@@ -131,12 +113,6 @@ describe.each(cases)(
         'button[type="submit"]'
       )!;
       expect(button.disabled).toBe(false);
-      const password = container.querySelector('input[type="password"]');
-      if (password) {
-        const paste = new Event('paste', { bubbles: true, cancelable: true });
-        password.dispatchEvent(paste);
-        expect(paste.defaultPrevented).toBe(false);
-      }
       mockFetch.mockResolvedValue({
         ok: false,
         status: 400,

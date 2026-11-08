@@ -94,7 +94,6 @@ module.exports = {
         ai: 'var(--new-ai-btn)',
         boxHover: 'var(--new-box-hover)',
         newTableBorder: 'var(--new-table-border)',
-        newInputBorder: 'var(--new-input-border)',
         newTableHeader: 'var(--new-table-header)',
         newTableText: 'var(--new-table-text)',
         newTableTextFocused: 'var(--new-table-text-focused)',

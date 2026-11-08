@@ -224,7 +224,7 @@ export function RegisterAfter({
               (!isGeneral ? (
                 <GithubProvider />
               ) : (
-                <div className="gap-[8px] flex flex-wrap">
+                <div className="gap-[8px] flex">
                   {genericOauth && isGeneral ? (
                     <OauthProvider />
                   ) : (
@@ -253,14 +253,13 @@ export function RegisterAfter({
                       translationKey="label_email"
                       {...form.register('email')}
                       type="email"
-                      autoComplete="email"
                       placeholder={t('email_address', 'Email Address')}
                     />
                     <Input
                       label="Password"
                       translationKey="label_password"
                       {...form.register('password')}
-                      autoComplete="new-password"
+                      autoComplete="off"
                       type="password"
                       placeholder={t('label_password', 'Password')}
                     />
@@ -270,7 +269,7 @@ export function RegisterAfter({
                   label="Company"
                   translationKey="label_company"
                   {...form.register('company')}
-                  autoComplete="organization"
+                  autoComplete="off"
                   type="text"
                   placeholder={t('label_company', 'Company')}
                 />
