@@ -5,7 +5,7 @@ A plugin for Claude Code, Cursor and Grok Build that connects your assistant to 
 - **The PostDelegate MCP server** at `https://app.postdelegate.com/api/mcp` (streamable HTTP). Your assistant can list your connected channels, read each network's rules, upload media, create drafts and scheduled posts, and look at your calendar.
 - **The `postdelegate` skill**, which teaches the workflow: list channels, read the channel's rules, upload media, create a draft and wait for your OK before anything is scheduled or published.
 
-Channels you can connect today: YouTube, Bluesky, Telegram, Discord, Slack, Tumblr, Lemmy, Nostr, Twitch, Kick, Dribbble, DEV.to, Medium, WordPress, Hashnode and Listmonk. Other networks are pending platform approval and cannot be connected yet.
+Available connections include LinkedIn personal profiles, YouTube, Bluesky, Mastodon, Google Business Profile, Telegram, Discord, Slack, Tumblr, Lemmy, Nostr, Twitch, Kick, Dribbble, DEV.to, Medium, WordPress, Hashnode, Listmonk, Moltbook and Whop. LinkedIn company Pages, Facebook, Instagram, Threads, TikTok, Pinterest and Reddit remain pending platform approval. X is not offered. Check the [platform directory](https://postdelegate.com/platforms) and the channels returned by your workspace before planning a post; availability and account permissions can change.
 
 You need a PostDelegate account. Every plan starts with a 7-day trial and no credit card is needed.
 
@@ -33,12 +33,12 @@ Network endpoints this plugin uses: `https://app.postdelegate.com/api/mcp` and t
 
 ## Install
 
-These commands work once this folder is published as the root of a public repository. Replace `OWNER/REPO` with that repository.
+The public plugin repository is [khanjer496-alt/postdelegate-plugin](https://github.com/khanjer496-alt/postdelegate-plugin). Add it as a marketplace, then install the plugin:
 
 Claude Code:
 
 ```bash
-claude plugin marketplace add OWNER/REPO
+claude plugin marketplace add khanjer496-alt/postdelegate-plugin
 claude plugin install postdelegate@postdelegate
 ```
 
@@ -46,9 +46,9 @@ Then run `/mcp` in Claude Code and sign in to the `postdelegate` server.
 
 To try it from a checkout without installing: `claude --plugin-dir ./integrations/postdelegate-plugin`.
 
-Cursor: submit the repository at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish). Until it is listed, add the server from [the Cursor setup](https://postdelegate.com/docs/mcp/clients#cursor).
+Cursor: the repository contains a Cursor manifest, but this README does not establish that a marketplace listing is approved. To request listing, submit the public repository at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish). Until it is listed, add the server from [the Cursor setup](https://postdelegate.com/docs/mcp/clients#cursor).
 
-Grok Build: open a pull request to [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) that adds this entry to `.grok-plugin/marketplace.json`, with the full commit SHA of the public repository, then regenerate the index as its CONTRIBUTING guide describes:
+Grok Build: the repository contains a compatible manifest, but this README does not establish that a marketplace entry is merged. To request listing, open a pull request to [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) that adds this entry to `.grok-plugin/marketplace.json`, with the full commit SHA of the public repository, then regenerate the index as its CONTRIBUTING guide describes:
 
 ```json
 {
@@ -57,14 +57,16 @@ Grok Build: open a pull request to [xai-org/plugin-marketplace](https://github.c
   "category": "productivity",
   "source": {
     "source": "url",
-    "url": "https://github.com/OWNER/REPO.git",
-    "sha": "FULL_40_CHARACTER_COMMIT_SHA"
+    "url": "https://github.com/khanjer496-alt/postdelegate-plugin.git",
+    "sha": "8f82d30367d3623b27458747916d3cb760ed50fe"
   },
   "homepage": "https://postdelegate.com/docs/mcp",
   "keywords": ["postdelegate", "postdelegate mcp", "postdelegate posts", "postdelegate calendar"],
   "domains": ["postdelegate.com", "app.postdelegate.com"]
 }
 ```
+
+The example pins the public plugin revision checked on 8 November 2026. Before a future submission, verify the public repository revision and replace the pinned SHA when publishing a newer plugin. A marketplace submission or merge is a separate action; these instructions do not claim either is complete.
 
 ## Keeping the skill current
 
