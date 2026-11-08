@@ -125,19 +125,24 @@ export class OrganizationRepository {
     return { ...created, apiKey: api.key };
   }
 
-  // Matches the hash of the presented key (under the current key, or a retired
-  // one mid-rotation) or, until the backfill has run, the key stored as it is.
+  // Keyed installations authenticate only against hashes, never the readable
+  // copy. No-key self-hosted installations can still use their un-hashed keys,
+  // but dropping the encryption key must never make a migrated copy usable.
   async getOrgByApiKey(api: string) {
-    if (typeof api !== 'string' || !api.trim()) {
+    if (
+      typeof api !== 'string' ||
+      !api.trim() ||
+      SecretCrypto.isEncrypted(api) ||
+      SecretCrypto.isHashed(api)
+    ) {
       return null;
     }
     const hashes = SecretCrypto.hashCandidates(api, ORG_API_KEY_LABEL);
     return this._organization.model.organization.findFirst({
       where: {
-        OR: [
-          ...(hashes.length ? [{ apiKeyHash: { in: hashes } }] : []),
-          { apiKey: api },
-        ],
+        ...(hashes.length
+          ? { apiKeyHash: { in: hashes } }
+          : { apiKey: api, apiKeyHash: null }),
         deletedAt: null,
       },
       include: {

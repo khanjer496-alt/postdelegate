@@ -102,7 +102,7 @@ describe('OAuth secrets at rest', () => {
       });
     });
 
-    it('still finds one written by the previous release', async () => {
+    it('rejects legacy access-token storage when encryption is configured', async () => {
       const { service, repository } = setup();
       const token = 'pos_legacy-token';
       repository.authorizations.push({
@@ -110,9 +110,18 @@ describe('OAuth secrets at rest', () => {
         accessToken: AuthService.fixedEncryption(token),
       });
 
-      await expect(service.getOrgByOAuthToken(token)).resolves.toMatchObject({
-        id: 'auth-legacy',
-      });
+      await expect(service.getOrgByOAuthToken(token)).resolves.toBeNull();
+    });
+
+    it.each(['hashed', 'legacy'])('rejects replay of a stored %s token', async (form) => {
+      const { service, repository } = setup();
+      const token = 'pos_real-customer-token';
+      const stored = form === 'hashed'
+        ? SecretCrypto.hash(token, OAUTH_SECRET_LABELS.accessToken)
+        : AuthService.fixedEncryption(token);
+      repository.authorizations.push({ id: 'auth-stored', accessToken: stored });
+
+      await expect(service.getOrgByOAuthToken(stored)).resolves.toBeNull();
     });
 
     it('does not find an authorization for a different token', async () => {
@@ -274,18 +283,57 @@ describe('OAuth secrets at rest', () => {
       ).rejects.toMatchObject({ response: { error: 'invalid_client' } });
     });
 
-    it('accepts a secret stored by the previous release', async () => {
+    it('rejects a legacy client secret when encryption is configured', async () => {
       const { service, repository } = setup();
       const secret = 'pcs_legacy';
       const code = 'the-code';
       repository.apps.push(appWith(AuthService.fixedEncryption(secret)));
       repository.authorizations.push(
-        codeRow(AuthService.fixedEncryption(code))
+        codeRow(SecretCrypto.hash(code, OAUTH_SECRET_LABELS.code))
       );
 
       await expect(
         service.exchangeCodeForToken(code, 'pca_app', secret)
-      ).resolves.toMatchObject({ token_type: 'bearer' });
+      ).rejects.toMatchObject({ response: { error: 'invalid_client' } });
+    });
+
+    it('rejects a legacy authorization code with a valid hashed client secret', async () => {
+      const { service, repository } = setup();
+      const secret = 'pcs_right';
+      const code = 'legacy-code';
+      repository.apps.push(appWith(SecretCrypto.hash(secret, OAUTH_SECRET_LABELS.clientSecret)));
+      repository.authorizations.push(codeRow(AuthService.fixedEncryption(code)));
+
+      await expect(service.exchangeCodeForToken(code, 'pca_app', secret))
+        .rejects.toMatchObject({ response: { error: 'invalid_grant' } });
+    });
+
+    it('keeps the complete no-key self-hosted code exchange working', async () => {
+      delete process.env.TOKEN_ENCRYPTION_KEY;
+      SecretCrypto.reset();
+      const { service, repository } = setup();
+      const secret = 'pcs_self-hosted';
+      const code = 'self-hosted-code';
+      repository.apps.push(appWith(AuthService.fixedEncryption(secret)));
+      repository.authorizations.push(codeRow(AuthService.fixedEncryption(code)));
+
+      const result = await service.exchangeCodeForToken(code, 'pca_app', secret);
+
+      expect(result.token_type).toBe('bearer');
+      await expect(service.getOrgByOAuthToken(result.access_token)).resolves.toMatchObject({
+        id: 'auth-1',
+      });
+    });
+
+    it('rejects the stored client-secret hash as the presented client secret', async () => {
+      const { service, repository } = setup();
+      const stored = SecretCrypto.hash('pcs_right', OAUTH_SECRET_LABELS.clientSecret);
+      const code = 'fresh-code';
+      repository.apps.push(appWith(stored));
+      repository.authorizations.push(codeRow(SecretCrypto.hash(code, OAUTH_SECRET_LABELS.code)));
+
+      await expect(service.exchangeCodeForToken(code, 'pca_app', stored))
+        .rejects.toMatchObject({ response: { error: 'invalid_client' } });
     });
 
     it('rotates to a hashed secret and returns the new plaintext', async () => {
@@ -343,6 +391,8 @@ describe('OAuth secrets at rest', () => {
         'pca_app',
         secret
       );
+
+      await expect(service.getOrgByOAuthToken(result.access_token)).resolves.toMatchObject({ id: 'auth-1' });
 
       const stored = repository.authorizations[0].accessToken;
       expect(stored.startsWith('h1:')).toBe(true);
