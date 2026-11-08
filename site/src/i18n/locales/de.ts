@@ -5,6 +5,16 @@ import { SITE } from '../../data/site';
 
 const dict: Dict = {
   numberLocale: 'de-DE',
+  launch: {
+    available: (count: number) => `${count} Netzwerke heute verfügbar`,
+    examples: 'Darunter YouTube, Bluesky, WordPress und persönliche LinkedIn-Profile. Veröffentlichen Sie auf verbundenen Kanälen.',
+    pending: 'Demnächst · Plattformfreigabe ausstehend',
+    unavailable: 'Nicht verfügbar',
+    modes: 'KI über MCP nutzen oder Beiträge selbst planen.',
+    trial: (days: number) => `${days} Tage gratis · ohne Karte · ohne gewählten Tarif pausiert der Workspace`,
+    compare: 'Tarife vergleichen',
+    choose: (count: number) => `Aus ${count} aktuell verfügbaren Netzwerken wählen`,
+  },
   common: {
     ctaLabel: `${TRIAL_DAYS} Tage kostenlos testen`,
     ctaShort: 'Gratis testen',
@@ -198,8 +208,8 @@ const dict: Dict = {
     appDescription: (days: number) => `Ein Social-Media-Planer mit MCP-Server und REST API in jedem Plan. Claude, ChatGPT oder Ihre eigenen Skripte entwerfen Beiträge, Sie geben sie in einem visuellen Kalender frei, und PostDelegate veröffentlicht sie pünktlich. KI bringen Sie selbst mit: Verbinden Sie den Assistenten, für den Sie bereits bezahlen, über MCP oder hinterlegen Sie Ihren eigenen OpenAI-Schlüssel, und PostDelegate berechnet nie etwas für KI. Mit Content Studio für Hochformatvideos und Video-Massenplanung. Jeder Plan beginnt mit einer ${days}-tägigen kostenlosen Testphase, ganz ohne Kreditkarte.`,
     appFeatures: ['Visueller Content-Kalender', 'Beitragseditor mit Einstellungen pro Kanal', 'Content Studio: Hochformatvideos in 1080×1920 mit Hook-Zeile oder Wort-für-Wort-Untertiteln', 'Video-Massenplanung über Ihre Zeitfenster', 'Massenimport von Beiträgen aus CSV', 'Analyse der täglich gewonnenen Aufrufe für YouTube-Kanäle', 'YouTube: später veröffentlichen und KI-Inhaltskennzeichnung', 'Medienbibliothek', 'Arbeitsbereiche und Teammitglieder', 'MCP-Server und REST API in jedem Plan', 'Eigene KI: Claude oder ChatGPT über MCP oder Ihr eigener OpenAI-Schlüssel', 'Agent-Dateien für Claude, ChatGPT, Cursor und Coding-Agenten'],
     orbitLabel: (count: number, names: string) => `${count} Netzwerke sind heute verbindbar: ${names}. Instagram, LinkedIn-Unternehmensseiten, TikTok und weitere Netzwerke warten auf Genehmigung.`,
-    h1: 'Der Social-Media-Planer für ',
-    h1Mark: 'KI-Agenten.',
+    h1: "Beiträge planen. ",
+    h1Mark: "Pünktlich posten.",
     lead: (count: number) => `Claude, ChatGPT oder Ihre eigenen Skripte entwerfen Beiträge über MCP. Sie geben sie in einem Kalender frei. Dann gehen sie pünktlich auf ${count} Netzwerken live.`,
     trialNote: (price: number) => `Keine Karte nötig. Danach ab $${price}/Monat.`,
     mcpLink: 'So funktioniert MCP',
@@ -213,8 +223,8 @@ const dict: Dict = {
     modeLabel: 'Wie möchten Sie veröffentlichen?',
     modeAi: 'Mit KI-Agenten',
     modeClassic: 'Klassisch planen',
-    classicH1: 'Der Social-Media-Planer für ',
-    classicH1Mark: 'vielbeschäftigte Teams.',
+    classicH1: "Beiträge planen. ",
+    classicH1Mark: "Pünktlich posten.",
     classicLead: (count: number) => `Planen Sie jeden Beitrag in einem Kalender, lassen Sie ihn von Team oder Kunde freigeben, und er geht pünktlich auf ${count} Netzwerken live.`,
     classicCardDraftSub: 'Wartet auf Ihre Freigabe',
     classicSteps: ['Sie planen.', 'Sie oder Ihr Kunde geben frei.', 'PostDelegate veröffentlicht.'],

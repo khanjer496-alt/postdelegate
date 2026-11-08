@@ -5,6 +5,16 @@ import { SITE } from '../../data/site';
 
 const dict: Dict = {
   numberLocale: 'es-ES',
+  launch: {
+    available: (count: number) => `${count} redes disponibles hoy`,
+    examples: 'Incluye YouTube, Bluesky, WordPress y perfiles personales de LinkedIn. Publica en canales conectados.',
+    pending: 'Próximamente · pendiente de aprobación',
+    unavailable: 'No disponible',
+    modes: 'Usa IA a través de MCP o programa tus publicaciones tú mismo.',
+    trial: (days: number) => `${days} días gratis · sin tarjeta · el espacio se pausa si no eliges un plan`,
+    compare: 'Comparar planes',
+    choose: (count: number) => `Elige entre ${count} redes disponibles actualmente`,
+  },
   common: {
     ctaLabel: `Empieza tu prueba gratuita de ${TRIAL_DAYS} días`,
     ctaShort: 'Prueba gratis',
@@ -198,8 +208,8 @@ const dict: Dict = {
     appDescription: (days: number) => `Un planificador de redes sociales con servidor MCP y API REST en todos los planes. Claude, ChatGPT o tus propios scripts redactan las publicaciones, tú las apruebas en un calendario visual y PostDelegate las publica a tiempo. La IA la pones tú: conecta mediante MCP el asistente que ya pagas o agrega tu propia clave de OpenAI, y PostDelegate nunca cobra por la IA. Incluye Content Studio para videos verticales y programación masiva de videos. Todos los planes empiezan con una prueba gratuita de ${days} días sin tarjeta de crédito.`,
     appFeatures: ['Calendario visual de contenido', 'Editor de publicaciones con ajustes por canal', 'Content Studio: videos verticales de 1080×1920 con frase gancho o subtítulos palabra por palabra', 'Programación masiva de videos en tus horarios de publicación', 'Importación masiva de publicaciones desde CSV', 'Analíticas de vistas ganadas por día para canales de YouTube', 'Publicación diferida en YouTube y etiqueta de contenido con IA', 'Biblioteca de medios', 'Espacios de trabajo y miembros del equipo', 'Servidor MCP y API REST en todos los planes', 'Usa tu propia IA: Claude o ChatGPT mediante MCP, o tu propia clave de OpenAI', 'Archivos de agente para Claude, ChatGPT, Cursor y agentes de código'],
     orbitLabel: (count: number, names: string) => `${count} redes se conectan hoy: ${names}. Instagram, las páginas de empresa de LinkedIn, TikTok y otras redes están a la espera de aprobación.`,
-    h1: 'El planificador de redes sociales creado para ',
-    h1Mark: 'agentes de IA.',
+    h1: "Planifica tus posts. ",
+    h1Mark: "Publica a tiempo.",
     lead: (count: number) => `Claude, ChatGPT o tus propios scripts redactan publicaciones mediante MCP. Tú las apruebas en un solo calendario. Salen a tiempo en ${count} redes.`,
     trialNote: (price: number) => `No necesitas tarjeta. Después, desde $${price}/mes.`,
     mcpLink: 'Mira cómo funciona MCP',
@@ -213,8 +223,8 @@ const dict: Dict = {
     modeLabel: '¿Cómo quieres publicar?',
     modeAi: 'Con agentes de IA',
     modeClassic: 'Programación clásica',
-    classicH1: 'El planificador de redes sociales creado para ',
-    classicH1Mark: 'equipos ocupados.',
+    classicH1: "Planifica tus posts. ",
+    classicH1Mark: "Publica a tiempo.",
     classicLead: (count: number) => `Planifica cada publicación en un solo calendario, consigue la aprobación de tu equipo o cliente y sale a tiempo en ${count} redes.`,
     classicCardDraftSub: 'Esperando tu aprobación',
     classicSteps: ['Tú lo planificas.', 'Tú o tu cliente lo aprueban.', 'PostDelegate lo publica.'],

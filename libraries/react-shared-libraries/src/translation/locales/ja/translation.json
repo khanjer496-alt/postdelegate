@@ -1,4 +1,8 @@
 {
+  "sign_up_trial_pause_note": "7日間無料 · カード不要 · プラン未選択の場合はワークスペースが一時停止します",
+  "signup_password_rules": "3〜64文字で入力してください。",
+  "signup_company_help": "ワークスペースの名前に使います。必須、3〜128文字。",
+  "signup_next_step": "次に、案内があればアカウントを有効化し、チャンネルを接続してください。",
   "calendar": "カレンダー",
   "webhooks": "ウェブフック",
   "webhooks_are_a_way_to_get_notified_when_something_happens_in_postiz_via_an_http_request": "ウェブフックは、PostDelegateで何かが起こったときにHTTPリクエストを通じて通知を受け取る方法です。",

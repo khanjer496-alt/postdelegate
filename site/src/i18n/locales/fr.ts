@@ -5,6 +5,16 @@ import { SITE } from '../../data/site';
 
 const dict: Dict = {
   numberLocale: 'fr-FR',
+  launch: {
+    available: (count: number) => `${count} réseaux disponibles aujourd’hui`,
+    examples: 'Dont YouTube, Bluesky, WordPress et les profils LinkedIn personnels. Publiez sur vos canaux connectés.',
+    pending: 'Bientôt · en attente d’approbation',
+    unavailable: 'Non disponible',
+    modes: 'Utilisez l’IA via MCP ou programmez vous-même vos publications.',
+    trial: (days: number) => `${days} jours gratuits · sans carte · sans forfait choisi, l’espace est mis en pause`,
+    compare: 'Comparer les forfaits',
+    choose: (count: number) => `Choisissez parmi ${count} réseaux actuellement disponibles`,
+  },
   common: {
     ctaLabel: `Commencez votre essai gratuit de ${TRIAL_DAYS} jours`,
     ctaShort: 'Essai gratuit',
@@ -177,8 +187,8 @@ const dict: Dict = {
     appDescription: (days: number) => `Un outil de planification pour les réseaux sociaux, avec un serveur MCP et une API REST dans tous les forfaits. Claude, ChatGPT ou vos propres scripts rédigent les publications, vous les approuvez sur un seul calendrier visuel, et PostDelegate les publie à l’heure. Vous utilisez votre propre IA : connectez via MCP l’assistant que vous payez déjà, ou ajoutez votre propre clé OpenAI, et PostDelegate ne facture jamais l’IA. Avec Content Studio pour les vidéos verticales et la programmation de vidéos en masse. Chaque forfait commence par un essai gratuit de ${days} jours, sans carte bancaire.`,
     appFeatures: ['Calendrier de contenu visuel', 'Éditeur de publications avec paramètres par canal', 'Content Studio : vidéos verticales 1080×1920 avec phrase d’accroche ou sous-titres mot par mot', 'Programmation de vidéos en masse sur vos créneaux de publication', 'Import de publications en masse depuis un fichier CSV', 'Statistiques des vues gagnées par jour pour les chaînes YouTube', 'Publication différée sur YouTube et label de contenu IA', 'Médiathèque', 'Espaces de travail et membres d’équipe', 'Serveur MCP et API REST dans tous les forfaits', 'Utilisez votre propre IA : Claude ou ChatGPT via MCP, ou votre propre clé OpenAI', 'Fichiers d’agent pour Claude, ChatGPT, Cursor et les agents de code'],
     orbitLabel: (count: number, names: string) => `${count} réseaux sont connectables aujourd’hui : ${names}. Instagram, les Pages d’entreprise LinkedIn, TikTok et d’autres réseaux sont en attente d’approbation.`,
-    h1: 'Le planificateur social conçu pour les ',
-    h1Mark: 'agents IA.',
+    h1: "Planifiez vos posts. ",
+    h1Mark: "Publiez à temps.",
     lead: (count: number) => `Claude, ChatGPT ou vos propres scripts rédigent les publications via MCP. Vous les validez sur un seul calendrier. Elles partent à l’heure sur ${count} réseaux.`,
     trialNote: (price: number) => `Sans carte bancaire. Puis à partir de $${price}/mois.`,
     mcpLink: 'Découvrir comment fonctionne MCP',
@@ -192,8 +202,8 @@ const dict: Dict = {
     modeLabel: 'Comment voulez-vous publier ?',
     modeAi: 'Avec des agents IA',
     modeClassic: 'Planification classique',
-    classicH1: 'Le planificateur social conçu pour les ',
-    classicH1Mark: 'équipes occupées.',
+    classicH1: "Planifiez vos posts. ",
+    classicH1Mark: "Publiez à temps.",
     classicLead: (count: number) => `Planifiez chaque publication sur un seul calendrier, faites-la valider par votre équipe ou votre client, et elle part à l’heure sur ${count} réseaux.`,
     classicCardDraftSub: 'En attente de votre validation',
     classicSteps: ['Vous planifiez.', 'Vous ou votre client validez.', 'PostDelegate publie.'],
