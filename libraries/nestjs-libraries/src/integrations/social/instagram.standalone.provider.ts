@@ -278,64 +278,96 @@ export class InstagramStandaloneProvider
     return instagramProvider.accountStats(id, accessToken, 'graph.instagram.com');
   }
 
+  // A finite total_value is the card number when the daily series is missing
+  // or is only zeros. A real series is kept. One failed request does not drop
+  // totals already read from the other. Same two requests as production.
+  private insightCard(metric: any): AnalyticsData | null {
+    const labels: Record<string, string> = {
+      follower_count: 'Follower Count',
+      reach: 'Reach',
+      likes: 'Likes',
+      views: 'Views',
+      comments: 'Comments',
+      shares: 'Shares',
+      saves: 'Saves',
+      replies: 'Replies',
+    };
+    const label =
+      metric && typeof metric.name === 'string' ? labels[metric.name] : undefined;
+    if (!label) return null;
+    const rawTotal = metric.total_value?.value;
+    const total =
+      typeof rawTotal === 'number' && Number.isFinite(rawTotal) && rawTotal >= 0
+        ? rawTotal
+        : undefined;
+    const series = Array.isArray(metric.values)
+      ? metric.values.filter(
+          (point: any) =>
+            typeof point?.value === 'number' &&
+            Number.isFinite(point.value) &&
+            point.value >= 0
+        )
+      : [];
+    const seriesSum = series.reduce(
+      (sum: number, point: any) => sum + point.value,
+      0
+    );
+    const today = dayjs().format('YYYY-MM-DD');
+    if (total !== undefined && (series.length === 0 || (seriesSum === 0 && total > 0))) {
+      return {
+        label,
+        percentageChange: 5,
+        data: [{ total: String(total), date: today }],
+      };
+    }
+    if (series.length === 0) return null;
+    return {
+      label,
+      percentageChange: 5,
+      data: series.map((point: any) => ({
+        total: String(point.value),
+        date: dayjs(point.end_time).format('YYYY-MM-DD'),
+      })),
+    };
+  }
+
   async analytics(
     id: string,
     accessToken: string,
     date: number
   ): Promise<AnalyticsData[]> {
-    // Instagram Login interaction totals must not depend on availability of
-    // follower insights. Current followers still come from accountStats().
-    const labels: Record<string, string> = {
-      reach: 'Reach',
-      views: 'Views',
-      likes: 'Likes',
-      comments: 'Comments',
-      shares: 'Shares',
-      saves: 'Saves',
-      total_interactions: 'Total Interactions',
-      replies: 'Replies',
-    };
     const [token] = accessToken.split('___');
     const until = dayjs().startOf('day').unix();
     const since = dayjs().subtract(date, 'day').unix();
-    try {
-      const response = await fetch(
-        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${id}/insights?metric=${Object.keys(labels).join(',')}&period=day&metric_type=total_value&since=${since}&until=${until}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(15_000),
+    const root = `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${id}/insights`;
+    const urls = [
+      `${root}?metric=follower_count,reach&access_token=${token}&period=day&since=${since}&until=${until}`,
+      `${root}?metric_type=total_value&metric=likes,views,comments,shares,saves,replies&access_token=${token}&period=day&since=${since}&until=${until}`,
+    ];
+    const analytics: AnalyticsData[] = [];
+    let failed = false;
+    for (const url of urls) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          failed = true;
+          continue;
         }
-      );
-      if (!response.ok) throw new AnalyticsUnavailable();
-      const body = await response.json();
-      if (body?.error || !Array.isArray(body?.data)) {
-        throw new AnalyticsUnavailable();
+        const body = await response.json();
+        if (body?.error || !Array.isArray(body?.data)) {
+          failed = true;
+          continue;
+        }
+        for (const metric of body.data) {
+          const card = this.insightCard(metric);
+          if (card) analytics.push(card);
+        }
+      } catch {
+        failed = true;
       }
-
-      const analytics: AnalyticsData[] = [];
-      for (const metric of body.data) {
-        if (!metric || typeof metric.name !== 'string') {
-          throw new AnalyticsUnavailable();
-        }
-        if (!Object.prototype.hasOwnProperty.call(labels, metric.name)) continue;
-        const value = metric.total_value?.value;
-        // Unavailable individual metrics are omitted, never turned into zero.
-        if (value === undefined || value === null) continue;
-        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-          throw new AnalyticsUnavailable();
-        }
-        analytics.push({
-          label: labels[metric.name],
-          // Zero suppresses the legacy trend badge; no prior-period comparison
-          // is returned by this request.
-          percentageChange: 0,
-          data: [{ total: String(value), date: dayjs().format('YYYY-MM-DD') }],
-        });
-      }
-      return analytics;
-    } catch {
-      throw new AnalyticsUnavailable();
     }
+    if (analytics.length === 0 && failed) throw new AnalyticsUnavailable();
+    return analytics;
   }
 
   async postAnalytics(

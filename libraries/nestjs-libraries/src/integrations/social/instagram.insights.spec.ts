@@ -19,66 +19,105 @@ describe('Instagram Login account insights', () => {
     global.fetch = originalFetch;
   });
 
-  it('requests documented day totals independently of follower insight availability', async () => {
-    request.mockResolvedValue(
-      result({
-        data: [
-          { name: 'reach', total_value: { value: 12 } },
-          { name: 'views', total_value: { value: 30 } },
-          { name: 'total_interactions', total_value: { value: 4 } },
-        ],
-      })
+  it('keeps the two production requests and shows a finite total_value', async () => {
+    request
+      .mockResolvedValueOnce(
+        result({
+          data: [
+            { name: 'reach', period: 'day', total_value: { value: 12 } },
+            { name: 'follower_count', period: 'day', values: [] },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        result({
+          data: [
+            { name: 'views', total_value: { value: 30 } },
+            { name: 'likes', total_value: { value: 0 } },
+            { name: 'saves', total_value: {} },
+          ],
+        })
+      );
+    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN___extra', 7);
+    expect(request).toHaveBeenCalledTimes(2);
+    const first = new URL(request.mock.calls[0][0]);
+    const second = new URL(request.mock.calls[1][0]);
+    expect(first.hostname).toBe('graph.instagram.com');
+    expect(second.hostname).toBe('graph.instagram.com');
+    expect(first.pathname).toContain('/v25.0/');
+    expect(first.searchParams.get('metric')).toBe('follower_count,reach');
+    expect(first.searchParams.get('metric_type')).toBeNull();
+    expect(first.searchParams.get('period')).toBe('day');
+    expect(second.searchParams.get('metric_type')).toBe('total_value');
+    expect(second.searchParams.get('metric')).toBe(
+      'likes,views,comments,shares,saves,replies'
     );
-    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7);
-    expect(request).toHaveBeenCalledTimes(1);
-    const url = new URL(request.mock.calls[0][0]);
-    expect(url.hostname).toBe('graph.instagram.com');
-    expect(url.searchParams.has('access_token')).toBe(false);
-    expect(request.mock.calls[0][1]).toMatchObject({
-      headers: { Authorization: 'Bearer SYNTHETIC_TOKEN' },
-    });
-    expect(url.searchParams.get('period')).toBe('day');
-    expect(url.searchParams.get('metric_type')).toBe('total_value');
-    expect(url.searchParams.get('metric')?.split(',')).toEqual([
-      'reach',
-      'views',
-      'likes',
-      'comments',
-      'shares',
-      'saves',
-      'total_interactions',
-      'replies',
-    ]);
-    expect(Number(url.searchParams.get('until'))).toBeGreaterThan(
-      Number(url.searchParams.get('since'))
+    expect(Number(first.searchParams.get('until'))).toBeGreaterThan(
+      Number(first.searchParams.get('since'))
     );
     expect(data.map((x) => [x.label, x.data[0].total])).toEqual([
       ['Reach', '12'],
       ['Views', '30'],
-      ['Total Interactions', '4'],
+      ['Likes', '0'],
     ]);
-    expect(data.every((x) => x.percentageChange === 0)).toBe(true);
+    expect(JSON.stringify(data)).not.toContain('SYNTHETIC_TOKEN');
+    expect(JSON.stringify(data)).not.toContain('synthetic-id');
   });
 
-  it('keeps actual zero and partial results without inventing missing metrics', async () => {
-    request.mockResolvedValue(
-      result({
-        data: [
-          { name: 'likes', total_value: { value: 0 } },
-          { name: 'saves', total_value: {} },
-          { name: 'unknown', total_value: { value: 100 } },
-        ],
-      })
-    );
-    expect(
-      await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 30)
-    ).toEqual([
+  it('uses a finite total when the daily series is only zeros', async () => {
+    request
+      .mockResolvedValueOnce(
+        result({
+          data: [
+            {
+              name: 'reach',
+              values: [
+                { value: 0, end_time: '2026-11-08T00:00:00Z' },
+                { value: 0, end_time: '2026-11-09T00:00:00Z' },
+              ],
+              total_value: { value: 12 },
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(result({ data: [] }));
+    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7);
+    expect(data).toEqual([
       {
-        label: 'Likes',
-        percentageChange: 0,
-        data: [{ total: '0', date: expect.any(String) }],
+        label: 'Reach',
+        percentageChange: 5,
+        data: [{ total: '12', date: expect.any(String) }],
       },
     ]);
+  });
+
+  it('keeps a real daily series and a returned total from the other request', async () => {
+    request
+      .mockResolvedValueOnce(
+        result({
+          data: [
+            {
+              name: 'follower_count',
+              values: [{ value: 2, end_time: '2026-11-08T00:00:00Z' }],
+            },
+            {
+              name: 'reach',
+              values: [
+                { value: 2, end_time: '2026-11-08T00:00:00Z' },
+                { value: 3, end_time: '2026-11-09T00:00:00Z' },
+              ],
+              total_value: { value: 9 },
+            },
+          ],
+        })
+      )
+      .mockRejectedValueOnce(new Error('SYNTHETIC_SECRET'));
+    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7);
+    expect(data.map((x) => [x.label, x.data.map((point) => point.total)])).toEqual([
+      ['Follower Count', ['2']],
+      ['Reach', ['2', '3']],
+    ]);
+    expect(JSON.stringify(data)).not.toContain('SYNTHETIC_SECRET');
   });
 
   it('reserves an empty list for a successful empty dataset', async () => {
@@ -100,21 +139,33 @@ describe('Instagram Login account insights', () => {
     [false, { data: [] }],
     [true, {}],
     [true, { data: {} }],
-    [true, { data: [{ name: 'likes', total_value: { value: 'bad' } }] }],
-    [true, { data: [null] }],
-    [true, { data: [{ name: 'likes', total_value: { value: -1 } }] }],
   ])(
-    'curates HTTP/Graph/schema failure without exposing the response (%s)',
+    'curates a failed insights read without exposing the response (%s)',
     async (ok, body) => {
       request.mockResolvedValue(result(body, ok));
       await expect(
         provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7)
       ).rejects.toThrow(
-        'Analytics are temporarily unavailable. Try again later.'
+        /^Analytics are temporarily unavailable\. Try again later\.$/
       );
-      expect(request).toHaveBeenCalledTimes(1);
+      expect(request).toHaveBeenCalledTimes(2);
     }
   );
+
+  it('omits a non-numeric total instead of showing it or failing the other total', async () => {
+    request
+      .mockResolvedValueOnce(
+        result({
+          data: [{ name: 'likes', total_value: { value: 'bad' } }, null],
+        })
+      )
+      .mockResolvedValueOnce(
+        result({ data: [{ name: 'views', total_value: { value: 12 } }] })
+      );
+    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7);
+    expect(data.map((x) => [x.label, x.data[0].total])).toEqual([['Views', '12']]);
+    expect(JSON.stringify(data)).not.toContain('bad');
+  });
 
   it.each(['network', 'json'])(
     'curates %s failures without carrying a URL, token or body',
@@ -133,6 +184,7 @@ describe('Instagram Login account insights', () => {
       ).rejects.toThrow(
         /^Analytics are temporarily unavailable\. Try again later\.$/
       );
+      expect(request).toHaveBeenCalledTimes(2);
     }
   );
 

@@ -229,9 +229,13 @@ export const RenderAnalytics: FC<{
 
   const totals = useMemo(() => {
     return items?.map((p: AnalyticsDataItem) => {
-      const value =
-        (p?.data.reduce((acc: number, curr: { total: number }) => acc + curr.total, 0) || 0) /
-        (p.average ? p.data.length : 1);
+      // Totals arrive as numbers or numeric strings. String addition would
+      // hide a real total, so each point is read as a number first.
+      const sum = (p?.data || []).reduce((acc: number, curr: { total: number | string }) => {
+        const numeric = typeof curr?.total === 'number' ? curr.total : Number(curr?.total);
+        return acc + (Number.isFinite(numeric) ? numeric : 0);
+      }, 0);
+      const value = p.average ? sum / (p.data.length || 1) : sum;
       if (p.average) {
         return value.toFixed(2) + '%';
       }

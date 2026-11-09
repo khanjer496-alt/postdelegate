@@ -83,6 +83,35 @@ it.each(['http', 'network', 'malformed', 'json'])(
   }
 );
 
+it('shows a finite insights total on the card and keeps a real zero', async () => {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => [
+      { label: 'Reach', data: [{ total: 12, date: '2026-11-09' }] },
+      { label: 'Likes', data: [{ total: 0, date: '2026-11-09' }] },
+      {
+        label: 'Views',
+        data: [
+          { total: '4', date: '2026-11-08' },
+          { total: '8', date: '2026-11-09' },
+        ],
+      },
+    ],
+  });
+  await render();
+  const card = (label: string) =>
+    [...container.querySelectorAll('.group')].find((node) =>
+      node.textContent?.includes(label)
+    )?.textContent;
+  expect(card('Reach')).toContain('12');
+  expect(card('Likes')).toContain('0');
+  expect(card('Likes')).not.toContain('12');
+  expect(card('Views')).toContain('12');
+  expect(card('Views')).not.toContain('48');
+  expect(container.textContent).not.toContain('SYNTHETIC_TOKEN');
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
 it('renders successful partial metric data', async () => {
   mockFetch.mockResolvedValue({
     ok: true,
