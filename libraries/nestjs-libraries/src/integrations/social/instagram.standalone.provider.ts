@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   PostDetails,
   PostResponse,
@@ -8,6 +9,7 @@ import {
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import dayjs from 'dayjs';
 import {
+  AnalyticsUnavailable,
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -276,13 +278,64 @@ export class InstagramStandaloneProvider
     return instagramProvider.accountStats(id, accessToken, 'graph.instagram.com');
   }
 
-  async analytics(id: string, accessToken: string, date: number) {
-    return instagramProvider.analytics(
-      id,
-      accessToken,
-      date,
-      'graph.instagram.com'
-    );
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    // Instagram Login interaction totals must not depend on availability of
+    // follower insights. Current followers still come from accountStats().
+    const labels: Record<string, string> = {
+      reach: 'Reach',
+      views: 'Views',
+      likes: 'Likes',
+      comments: 'Comments',
+      shares: 'Shares',
+      saves: 'Saves',
+      total_interactions: 'Total Interactions',
+      replies: 'Replies',
+    };
+    const [token] = accessToken.split('___');
+    const until = dayjs().startOf('day').unix();
+    const since = dayjs().subtract(date, 'day').unix();
+    try {
+      const response = await fetch(
+        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${id}/insights?metric=${Object.keys(labels).join(',')}&period=day&metric_type=total_value&since=${since}&until=${until}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(15_000),
+        }
+      );
+      if (!response.ok) throw new AnalyticsUnavailable();
+      const body = await response.json();
+      if (body?.error || !Array.isArray(body?.data)) {
+        throw new AnalyticsUnavailable();
+      }
+
+      const analytics: AnalyticsData[] = [];
+      for (const metric of body.data) {
+        if (!metric || typeof metric.name !== 'string') {
+          throw new AnalyticsUnavailable();
+        }
+        if (!Object.prototype.hasOwnProperty.call(labels, metric.name)) continue;
+        const value = metric.total_value?.value;
+        // Unavailable individual metrics are omitted, never turned into zero.
+        if (value === undefined || value === null) continue;
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+          throw new AnalyticsUnavailable();
+        }
+        analytics.push({
+          label: labels[metric.name],
+          // Zero suppresses the legacy trend badge; no prior-period comparison
+          // is returned by this request.
+          percentageChange: 0,
+          data: [{ total: String(value), date: dayjs().format('YYYY-MM-DD') }],
+        });
+      }
+      return analytics;
+    } catch {
+      throw new AnalyticsUnavailable();
+    }
   }
 
   async postAnalytics(

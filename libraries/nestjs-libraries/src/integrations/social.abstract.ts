@@ -223,6 +223,14 @@ export class NotEnoughScopes {
   ) {}
 }
 
+// An explicit read failure, distinct from a successful empty analytics dataset.
+// Never attach the upstream response, request URL, token or exception cause.
+export class AnalyticsUnavailable extends Error {
+  constructor() {
+    super('Analytics are temporarily unavailable. Try again later.');
+  }
+}
+
 function safeStringify(obj: any) {
   const seen = new WeakSet();
 

@@ -179,14 +179,19 @@ export const RenderAnalytics: FC<{
 
   const load = useCallback(async () => {
     setLoading(true);
-    const load = (
-      await fetch(`/analytics/${integration.id}?date=${date}`)
-    ).json();
-    setLoading(false);
-    return load;
+    try {
+      const response = await fetch(`/analytics/${integration.id}?date=${date}`);
+      if (!response.ok) throw new Error('Analytics unavailable');
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error('Analytics unavailable');
+      return data;
+    } finally {
+      setLoading(false);
+    }
   }, [integration, date]);
 
-  const { data } = useSWR(`/analytics-${integration?.id}-${date}`, load, {
+  const { data, error } = useSWR(`/analytics-${integration?.id}-${date}`, load, {
+    shouldRetryOnError: false,
     refreshInterval: 0,
     refreshWhenHidden: false,
     revalidateOnFocus: false,
@@ -238,6 +243,17 @@ export const RenderAnalytics: FC<{
     return (
       <div className="flex items-center justify-center py-[48px]">
         <LoadingComponent />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="py-[24px] text-newTableText">
+        {t(
+          'analytics_temporarily_unavailable',
+          'Analytics are temporarily unavailable. Try again later.'
+        )}
       </div>
     );
   }
