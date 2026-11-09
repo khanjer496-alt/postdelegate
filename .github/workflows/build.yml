@@ -1,9 +1,11 @@
 ---
 name: Build
 
-# Pull-request check only. Nothing is published from this workflow: production
+# Check pull requests and the merged main result. Nothing is published: production
 # images are built by hand from deploy/postdelegate/Dockerfile.release.
 on:
+  push:
+    branches: [main]
   pull_request:
     paths-ignore:
       # deploy/** is NOT ignored: the Caddy config that fronts production lives
@@ -20,7 +22,7 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
