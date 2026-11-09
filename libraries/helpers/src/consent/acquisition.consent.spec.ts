@@ -9,6 +9,7 @@ afterEach(() => {
   delete (global as any).document;
   delete (global as any).navigator;
   delete (global as any).location;
+  delete (global as any).window;
 });
 const browser = (cookie: string, signals = {}) => {
   Object.defineProperty(global, 'document', {
@@ -49,3 +50,13 @@ it.each([{ globalPrivacyControl: true }, { doNotTrack: '1' }])(
     expect(acquisitionQuery()).toBe('');
   }
 );
+
+it('honors window-only DNT for copied touch URLs even with referral consent', () => {
+  browser('pd_consent=v1|ref:1|analytics:1');
+  Object.defineProperty(global, 'window', {
+    configurable: true,
+    value: { doNotTrack: '1' },
+  });
+  expect(permittedAcquisition('signed.token')).toBeUndefined();
+  expect(acquisitionQuery()).toBe('');
+});

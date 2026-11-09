@@ -15,6 +15,7 @@ import { usePulseVisitor } from './utm.saver';
 afterEach(() => {
   delete (global as any).navigator;
   delete (global as any).localStorage;
+  delete (global as any).window;
 });
 it.each([{ globalPrivacyControl: true }, { doNotTrack: '1' }])(
   'suppresses both copied and saved visitor IDs and removes the saved ID under %p',
@@ -35,4 +36,19 @@ it.each([{ globalPrivacyControl: true }, { doNotTrack: '1' }])(
 it('preserves existing visitor behavior without an opt-out signal', () => {
   Object.defineProperty(global, 'navigator', { configurable: true, value: {} });
   expect(usePulseVisitor()).toBe('b'.repeat(32));
+});
+
+it('clears saved ID and suppresses both saved and copied fallbacks for window-only DNT', () => {
+  Object.defineProperty(global, 'navigator', { configurable: true, value: {} });
+  Object.defineProperty(global, 'window', {
+    configurable: true,
+    value: { doNotTrack: '1' },
+  });
+  const removeItem = jest.fn();
+  Object.defineProperty(global, 'localStorage', {
+    configurable: true,
+    value: { removeItem },
+  });
+  expect(usePulseVisitor()).toBe('');
+  expect(removeItem).toHaveBeenCalledWith('pulse_vid');
 });

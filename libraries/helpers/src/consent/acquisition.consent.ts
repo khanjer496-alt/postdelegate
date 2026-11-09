@@ -1,10 +1,12 @@
 import { hasConsent } from './consent.cookie';
 
 export const privacySignalOptOut = () =>
-  typeof navigator !== 'undefined' &&
-  ((navigator as Navigator & { globalPrivacyControl?: boolean })
-    .globalPrivacyControl === true ||
-    navigator.doNotTrack === '1');
+  (typeof navigator !== 'undefined' &&
+    ((navigator as Navigator & { globalPrivacyControl?: boolean })
+      .globalPrivacyControl === true ||
+      navigator.doNotTrack === '1')) ||
+  (typeof window !== 'undefined' &&
+    (window as Window & { doNotTrack?: string }).doNotTrack === '1');
 
 // Recheck at submission time, including OAuth continuations and copied URLs.
 export const permittedAcquisition = (token: string | null | undefined) =>
