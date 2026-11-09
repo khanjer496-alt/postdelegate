@@ -106,3 +106,17 @@ it('does not initialize telemetry on callback/auth pages and discards any existi
     delete (globalThis as any).window;
   }
 });
+
+it('redacts legacy MCP path keys from URLs, paths and log messages without removing the resource name', () => {
+  const init = options();
+  for (const value of [
+    'https://app.postdelegate.test/api/mcp/EXAMPLE-path-key',
+    '/api/mcp/EXAMPLE-path-key?code=EXAMPLE-secret',
+    'POST /api/mcp/EXAMPLE-path-key',
+    'https://app.postdelegate.test/api/sse/EXAMPLE-path-key',
+  ]) {
+    const result = init.beforeSendLog({ message: value });
+    expect(JSON.stringify(result)).not.toContain('EXAMPLE-path-key');
+    expect(JSON.stringify(result)).toMatch(/mcp|sse/);
+  }
+});

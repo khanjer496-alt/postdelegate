@@ -1,6 +1,7 @@
 const mockServers: any[] = [];
+const mockRequestIds: unknown[] = [];
 jest.mock('@mastra/mcp', () => {
-  const { getAuth } = jest.requireActual(
+  const { getAuth, getRequestId } = jest.requireActual(
     '@gitroom/nestjs-libraries/chat/async.storage'
   );
   return {
@@ -23,6 +24,7 @@ jest.mock('@mastra/mcp', () => {
         };
       }
       async startHTTP({ res }: any) {
+        mockRequestIds.push(getRequestId());
         res.status(200).json({ handledBy: 'mcp', org: getAuth()?.id });
       }
     },
@@ -178,6 +180,22 @@ describe('startMcp', () => {
   });
 
   describe('/mcp API key auth', () => {
+    it('keeps legacy clients working with deprecation metadata and non-secret correlation IDs', async () => {
+      const first = await mcpPost('/mcp/key-123');
+      expect(first.status).toBe(200);
+      expect(first.headers.get('deprecation')).toBe('true');
+      expect(first.headers.get('link')).toContain('rel="deprecation"');
+      const firstId = mockRequestIds[mockRequestIds.length - 1];
+      const second = await mcpPost('/mcp', { Authorization: 'Bearer key-123' });
+      expect(second.status).toBe(200);
+      const secondId = mockRequestIds[mockRequestIds.length - 1];
+      expect(typeof firstId).toBe('string');
+      expect(typeof secondId).toBe('string');
+      expect(firstId).not.toBe('key-123');
+      expect(secondId).not.toBe('key-123');
+      expect(firstId).not.toBe(secondId);
+    });
+
     it.each([
       ['a bare key', 'key-123'],
       ['a Bearer key', 'Bearer key-123'],

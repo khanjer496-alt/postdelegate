@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nestjs';
+import { scrubTelemetry } from '@gitroom/helpers/utils/redact.url';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { capitalize } from 'lodash';
 
@@ -93,8 +94,11 @@ export const initializeSentry = (appName: string, allowLogs = false) => {
         { op: 'middleware.express' },
       ],
       enableLogs: true,
-      beforeSend: dropSecretRequestBody,
-      beforeSendTransaction: dropSecretRequestBody,
+      beforeSend: (event) => scrubTelemetry(dropSecretRequestBody(event)),
+      beforeSendTransaction: (event) => scrubTelemetry(dropSecretRequestBody(event)),
+      beforeSendSpan: (span) => scrubTelemetry(span),
+      beforeSendLog: (log) => scrubTelemetry(log),
+      beforeBreadcrumb: (breadcrumb) => scrubTelemetry(breadcrumb),
 
       // Profiling
       profileSessionSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.4,

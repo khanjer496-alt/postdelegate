@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
@@ -568,7 +569,7 @@ export const startMcp = async (app: INestApplication) => {
 
     endListenStream(req, res);
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token!, auth, relay: relay || undefined, source }, async () => {
+    await runWithContext({ requestId: randomUUID(), auth, relay: relay || undefined, source }, async () => {
       await (relay ? selfHostedServer! : mcpServer).startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -633,7 +634,7 @@ export const startMcp = async (app: INestApplication) => {
     endListenStream(req, res);
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: token, auth: req.auth, source: resolved.source }, async () => {
+    await runWithContext({ requestId: randomUUID(), auth: req.auth, source: resolved.source }, async () => {
       await server.startHTTP({
         url,
         httpPath: url.pathname,
@@ -648,6 +649,8 @@ export const startMcp = async (app: INestApplication) => {
 
   app.use('/mcp/:id', async (req: Request, res: Response) => {
     if (mcpCors(req, res)) return;
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '<https://postdelegate.com/docs/mcp/clients>; rel="deprecation"');
 
     // @ts-ignore
     req.auth = await organizationService.getOrgByApiKey(req.params.id);
@@ -673,7 +676,7 @@ export const startMcp = async (app: INestApplication) => {
     fixAcceptHeader(req);
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)' },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)' },
       async () => {
         await server.startHTTP({
           url,
@@ -690,6 +693,8 @@ export const startMcp = async (app: INestApplication) => {
 
   app.use(['/sse/:id', '/message/:id'], async (req: Request, res: Response) => {
     if (mcpCors(req, res)) return;
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '<https://postdelegate.com/docs/mcp/clients>; rel="deprecation"');
 
     // @ts-ignore
     req.auth = await organizationService.getOrgByApiKey(req.params.id);
@@ -710,7 +715,7 @@ export const startMcp = async (app: INestApplication) => {
 
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)' },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)' },
       async () => {
         await new MCPServer(serverConfig).startSSE({
           url,
