@@ -51,17 +51,43 @@ credentials into POST does not introduce a request-body telemetry leak there.
 
 The source Sentry client enables tracing and sampled Replay only when a DSN is
 configured. Before this change its beforeSend filter did not scrub query strings.
-Production DSN presence and event retention have not been established here.
-Public requests to both app.postdelegate.com/auth/login and the Pulse tracker
-returned HTTP 403; no bypass was attempted. CEO has been asked for booleans and
-aggregate parameter-name counts only, never DSN values or event payloads.
+CEO reported a read-only production check on 9 November: zero SENTRY-named
+variables in runtime.env and the running container, and zero PULSE-named variables
+in both. This is collaborator-reported metadata, not an independent production
+check by this author. It supports runtime configuration absence, not a guarantee
+that no historic event was sent: NEXT_PUBLIC_SENTRY_DSN can be embedded at build
+time. App layouts pass that public env value into SentryComponent; Next's static
+env handling inlines NEXT_PUBLIC_ values. Confirm the deployed build's effective
+DSN presence with boolean-only inspection before declaring browser Sentry inactive.
+Do not print a DSN, script payload or real URL to establish that boolean.
 
-Pulse's local source at Projects/site-analytics/src/tracker.js sends pathname,
-not the page query, as `p`. It sends a full first referrer in the request payload,
-but index.ts reduces that to a hostname via referrerHost before persistence;
-outbound links also omit queries/fragments. This describes the inspected source,
-not proof of the deployed version or historic retained events. No Pulse source,
-Cloudflare config or data was changed by this PR.
+Source injection audit:
+- site/src/layouts/Base.astro adds Pulse's /js/script.js tag with data-site
+  postdelegate to the marketing site. The release Dockerfile copies/builds
+  apps/frontend and libraries, not the marketing site.
+- No Pulse script injection was found in the inspected app frontend, shared
+  React/helpers, or checked-in Caddy configuration. The app's pulse_vid handling
+  carries attribution to checkout; it is not a tracker loader.
+- Projects/site-analytics/injector/index.ts and its wrangler.jsonc only target
+  fishbasket.co/www.fishbasket.co, not app.postdelegate.com.
+- This settles the inspected source paths, not deployed edge rules, tag-manager
+  configuration, generated build artifacts or past releases. Absence of a
+  PULSE-named environment variable alone is not tracker absence; the marketing
+  tag is hardcoded. Previous public fetches returned HTTP 403; no bypass attempted.
+
+Pulse's inspected Projects/site-analytics/src/tracker.js sends pathname, not the
+page query, as p. Without data-hash, fragments are omitted too. It sends the full
+first document.referrer in the request body, while src/index.ts reduces that to a
+hostname via referrerHost before persistence; outbound links also omit queries
+and fragments. Raw ingestion/proxy logs are outside that persistence guarantee.
+Legacy MCP keys embedded in a pathname would still need protection if Pulse is
+injected there. No Pulse source, configuration or data was changed by this PR.
+
+CEO relayed Bug Fixer's aggregate checks: zero password= matches in the examined
+nginx, Caddy and app stdout logs. Counts for /integrations/social/*?code= were
+still pending. Password-name counts do not cover the base64 credential object in
+code=, all possible telemetry/log sinks, earlier retention or browser history.
+No current evidence justifies a blanket browser-history-only exposure conclusion.
 
 If production Sentry was enabled during affected connects, assume matching error,
 trace, log or replay records may retain the old URL. Check only aggregate counts
