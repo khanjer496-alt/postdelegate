@@ -25,7 +25,17 @@ export default async function AuthLayout({
           <div className="w-full max-w-[440px] mx-auto justify-center gap-[20px] h-full flex flex-col text-white">
             <LogoTextComponent />
             <main className="flex">{children}</main>
-            <CookieSettingsButton className="self-start text-[13px] text-[#9299AA] hover:text-white underline underline-offset-2" />
+            <div className="flex gap-[16px] text-[13px] text-[#9299AA]">
+              <CookieSettingsButton className="hover:text-white underline underline-offset-2" />
+              <a
+                href="/source"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white underline underline-offset-2"
+              >
+                {t('source_code', 'Source code')}
+              </a>
+            </div>
           </div>
         </div>
         <div className="auth-brand-panel text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center rounded-[16px] ring-1 ring-[#262B37]">
@@ -34,14 +44,6 @@ export default async function AuthLayout({
             <br />
             with <span className="text-[#C8FF4D]">PostDelegate</span>
           </div>
-          <a
-            href="/source"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-[20px] text-[14px] text-[#9299AA] hover:text-white"
-          >
-            {t('source_code', 'Source code')}
-          </a>
         </div>
       </div>
     </MantineWrapper>
