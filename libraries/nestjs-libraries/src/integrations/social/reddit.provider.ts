@@ -192,7 +192,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   async authenticate(
     params: { code: string; codeVerifier: string },
     clientInformation?: ClientInformation
-  ) {
+  ): Promise<AuthTokenDetails | string> {
     const {
       access_token: accessToken,
       refresh_token: refreshToken,

@@ -24,7 +24,7 @@ const appValidation = `/^[A-Za-z0-9_-]{8,100}$/`;
 export class RedditOwnKeyProvider extends RedditProvider {
   override identifier = 'reddit-own-key';
   override name = 'Reddit\n(Own app)';
-  override toolTip =
+  toolTip =
     'Posts through your own Reddit app, for your personal, non-commercial use under Reddit’s Data API terms. Create a "web app" at reddit.com/prefs/apps and paste its keys.';
 
   // Field values arrive at the backend by POST, never in a url
