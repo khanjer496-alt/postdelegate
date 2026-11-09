@@ -50,7 +50,9 @@ LinkedIn Pages uses its own CMA-only application. This incorporates the existing
 [PR #181](https://github.com/khanjer496-alt/postdelegate/pull/181) member-identity
 fix: r_basicprofile reads /v2/me for the stable app-scoped member id; connect and
 refresh do not call the OpenID /userinfo endpoint. The optional analytics trim is
-added here. The two drafts overlap and must be reconciled before either merges. Reconcile the organization's scopes against
+added here. PR #184 absorbs #181 including its provider regression tests and
+approval notes; close #181 as superseded rather than merging it separately.
+See docs/providers/linkedin-pages-approval.md. Reconcile the organization's scopes against
 the actual approved product before enabling Pages in production. Personal LinkedIn
 and the approved Google clients are unchanged.
 
@@ -59,9 +61,9 @@ and the approved Google clients are unchanged.
 1. The CEO chooses a dedicated reviewer email and ids such as `pd-review-meta`
    and `pd-review-meta-user`. Use separate workspaces per platform if reviews
    overlap. A reviewer is an ordinary workspace admin, never a superadmin.
-2. Generate a strong password in OpenBot Vault, store as a login for
-   `https://app.postdelegate.com`, and supply it only through a protected Vault
-   file via `REVIEWER_PASSWORD_FILE`. Never put it in a shell argument, source,
+2. The user arranges a strong password in OpenBot Vault, stored as a login for
+   `https://app.postdelegate.com`. Supply it only through a protected Vault
+   file outside the repository via `REVIEWER_PASSWORD_FILE`. Never put it in a shell argument, source,
    console log, report, recording or GitHub. No credentials are seeded by build
    or deployment. The script does not generate or persist plaintext passwords.
 3. On a local disposable database first, export `DATABASE_URL`,
@@ -69,7 +71,12 @@ and the approved Google clients are unchanged.
    path. Run `node deploy/postdelegate/review/seed-reviewer.cjs` for the plan,
    then `node deploy/postdelegate/review/seed-reviewer.cjs --apply` after choosing
    that database. The script uses Prisma and bcrypt with the normal cost 12.
-4. Production use is a later CEO decision. It creates four rows atomically:
+4. CEO approved production reviewer seeding on 9 November 2026, conditional on
+   PR #184 passing review and Release Engineer deploying it first. Release
+   Engineer then runs this runbook using credentials supplied through the user
+   and OpenBot Vault only. Never store credentials in the repository. This
+   approval does not waive the disposable-database test or release gates above.
+   The seed creates four rows atomically:
    user, workspace, membership, manual lifetime plan capped at ten channels.
    It refuses existing ids/emails, including soft-deleted ones; never upserts,
    adopts an owner workspace, edits billing, or reads customer posts/channels.
