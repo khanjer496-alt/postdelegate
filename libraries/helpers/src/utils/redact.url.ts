@@ -64,4 +64,5 @@ export const scrubTelemetry = <T>(value: T): T => {
 // These are application handoff pages, not marketing destinations. Third-party
 // page trackers must not load here, including when analytics consent is present.
 export const isSensitiveTelemetryPath = (pathname: string | null) =>
-  /^\/(?:integrations\/social(?:\/|$)|auth(?:\/|$))/.test(pathname || '');
+  /^\/(?:integrations\/social(?:\/|$)|auth(?:\/|$))/i.test(pathname || '') ||
+  /\/(?:mcp|sse|message)\/[^/]+/i.test(pathname || '');
