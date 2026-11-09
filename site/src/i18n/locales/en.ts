@@ -185,7 +185,7 @@ const en = {
     orbitCore: 'Your calendar',
     cardScheduled: 'Scheduled', cardScheduledSub: 'YouTube · Tue 09:00',
     cardDraft: 'Draft ready to review', cardDraftSub: 'From your own AI, via MCP',
-    legendLive: 'Connect today', legendSoon: 'Waiting on approval',
+    legendLive: 'Connect today', legendSoon: 'Coming soon',
     stepsTitle: 'How it works',
     steps: ['Your AI drafts it.', 'You approve it.', 'PostDelegate posts it.'],
     // the hero switch: classic scheduling, for people who plan and write posts themselves
