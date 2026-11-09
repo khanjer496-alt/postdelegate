@@ -138,7 +138,7 @@ const services = new Map<unknown, unknown>([
       getSelfHostedByAccessToken: async (token: string) => token === 'psh_valid' ? { id: 'relay-fixture' } : null,
     },
   ],
-  [McpRelayService, { tools: () => ({ relayMarker: { execute: mockRelayExecute }, deletePostTool: { execute: mockRelayExecute } }) }],
+  [McpRelayService, { tools: () => ({ relayMarker: { execute: mockRelayExecute }, integrationList: { execute: mockRelayExecute }, deletePostTool: { execute: mockRelayExecute } }) }],
 ]);
 
 const env = { ...process.env };
@@ -549,13 +549,15 @@ describe('canonical /mcp OAuth relay compatibility', () => {
     expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
     expect(mockHttpServers[mockHttpServers.length - 1].config.tools.relayMarker).toBeDefined();
   });
-  it('executes a validated relay tool without dropping its legacy API-key-equivalent scopes', async () => {
+  it.each(['integrationList', 'deletePostTool'])('allows a validated psh_ token to execute %s on /mcp', async tool => {
+    mockRelayExecute.mockClear();
     const response = await fetch(base + '/mcp', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer psh_valid' },
-      body: JSON.stringify({ tool: 'relayMarker' }),
+      body: JSON.stringify({ tool }),
     });
     expect(response.status).toBe(200);
     expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
+    expect(mockRelayExecute).toHaveBeenCalledTimes(1);
   });
   it('denies a write on the relay-enabled canonical route for a read-scoped cloud token', async () => {
     mockRelayExecute.mockClear();
