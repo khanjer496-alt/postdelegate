@@ -238,6 +238,8 @@ export const ContinueIntegration: FC<{
         .json()
         .catch(() => ({}));
       if (pending?.needsConfirmation) {
+        // Keep only the in-memory payload needed by the confirmation POST.
+        clearExtensionCode(modifiedParams.state);
         setState({
           status: 'confirm',
           workspaceName: String(pending.workspaceName || ''),

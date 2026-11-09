@@ -213,3 +213,23 @@ removed; apps/backend/tsconfig.spec.json remains the backend-only Jest config.
 The #182 MCP scope enforcement is preserved alongside non-secret correlation
 IDs and self-hosted OAuth compatibility. Validated relay connections retain
 the existing API-key-equivalent scopes; revoked/disabled relays remain rejected.
+
+
+### Final relay-scope / error-message delta
+
+The confirmation early-return explicitly clears the sessionStorage key while
+retaining its in-memory confirmation payload. Cancel and both connect rejection
+handlers use clearConnectHandoff, which clears both ref and storage; the first
+request already consumes storage before any network call.
+
+Failed custom-provider start GETs use the existing errorMessage helper so a
+curated server message is shown instead of storage advice. Missing URLs on an
+otherwise successful response keep the generic connection-start warning.
+Moltbook body exclusion and message-only/type-safe backend error logging remain.
+
+Read-only authorization tests cover (a) a read-scoped cloud OAuth token on the
+relay-enabled canonical HTTP route and (b) the actual relay server's wrapped
+write tool under a read-only relay execution context, proving no forwarding.
+Legacy psh_ authorizations currently expose API-key-equivalent grants, not a
+separate persisted read-only relay grant model; these tests do not invent such
+a token format or change issuer policy. Main #182 scope guards/context remain.

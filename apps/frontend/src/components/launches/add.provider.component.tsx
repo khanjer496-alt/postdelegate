@@ -20,6 +20,7 @@ import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
 import { handoffConnectCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
 const resolver = classValidatorResolver(ApiKeyDto);
 
 export const useAddProvider = (update?: () => void, invite?: boolean) => {
@@ -225,7 +226,11 @@ export const CustomVariables: FC<{
       if (response.status === 402) {
         return;
       }
-      const { url = '' } = response.ok ? await response.json().catch(() => ({})) : {};
+      if (!response.ok) {
+        showStorageError(await errorMessage(response, 'Could not start this connection. Please try again.'), 'warning');
+        return;
+      }
+      const { url = '' } = await response.json().catch(() => ({}));
       if (typeof url !== 'string' || !url.trim()) {
         showStorageError('Could not start this connection. Please try again.', 'warning');
         return;

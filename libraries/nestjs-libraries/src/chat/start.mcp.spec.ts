@@ -138,7 +138,7 @@ const services = new Map<unknown, unknown>([
       getSelfHostedByAccessToken: async (token: string) => token === 'psh_valid' ? { id: 'relay-fixture' } : null,
     },
   ],
-  [McpRelayService, { tools: () => ({ relayMarker: { execute: mockRelayExecute } }) }],
+  [McpRelayService, { tools: () => ({ relayMarker: { execute: mockRelayExecute }, deletePostTool: { execute: mockRelayExecute } }) }],
 ]);
 
 const env = { ...process.env };
@@ -572,7 +572,7 @@ describe('canonical /mcp OAuth relay compatibility', () => {
     const relayTools = mockHttpServers[mockHttpServers.length - 1].config.tools;
     mockRelayExecute.mockClear();
     await expect(runWithContext({ requestId: 'test-read-only', relay: { id: 'relay-fixture' } as any, scopes: ['mcp:read'] },
-      () => relayTools.relayMarker.execute())).rejects.toThrow('mcp:write required');
+      () => relayTools.deletePostTool.execute())).rejects.toThrow('mcp:write required');
     expect(mockRelayExecute).not.toHaveBeenCalled();
   });
   it('rejects a revoked relay token without starting the MCP server', async () => {
