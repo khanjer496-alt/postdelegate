@@ -29,7 +29,7 @@ export const setSentryUserContext = (params: {
 // Requests to these paths post a secret (saving an AI key posts the
 // workspace's raw OpenAI key), so their body is never attached to an error or
 // a trace
-const secretBodyPaths = ['/ai-credentials', '/integrations/social-connect', '/integrations/extension-refresh', '/integrations/moltbook'];
+const secretBodyPaths = ['/auth', '/ai-credentials', '/integrations/social-connect', '/integrations/extension-refresh', '/integrations/moltbook'];
 
 export const dropSecretRequestBody = <T extends Sentry.Event>(event: T): T => {
   const path = (event.request?.url || '').split(/[?#]/)[0] + '/';

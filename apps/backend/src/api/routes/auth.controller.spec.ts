@@ -1,6 +1,7 @@
 jest.mock('@gitroom/backend/services/auth/auth.service', () => ({ AuthService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/services/email.service', () => ({ EmailService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/integrations/social/farcaster.provider', () => ({ FarcasterProvider: class {} }));
+jest.mock('@gitroom/backend/services/auth/providers/farcaster.provider', () => ({ FarcasterProvider: class {} }));
 jest.mock('@sentry/nestjs', () => ({ metrics: { count: jest.fn() } }));
 
 import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
@@ -27,6 +28,8 @@ describe('AuthController rate limits', () => {
     ['resendActivation', 5, HOUR],
     ['oauthExists', 30, 10 * MINUTE],
     ['oauthLink', 60, MINUTE],
+    ['farcasterLoginStart', 30, HOUR],
+    ['farcasterLoginStatus', 1000, HOUR],
   ])('%s is limited per client address', (name, limit, ttl) => {
     const found = limitOf(name);
     expect(found.guards).toContain(ThrottlerRealIpGuard);
@@ -106,7 +109,8 @@ describe('AuthController referral cookie', () => {
         '1.1.1.1',
         'agent',
         false,
-        'friend.1790000000000'
+        'friend.1790000000000',
+        ...(name === 'register' ? [undefined] : [])
       );
     }
   );

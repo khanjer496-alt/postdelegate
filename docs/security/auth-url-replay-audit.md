@@ -34,32 +34,23 @@ First-use interception is still a concern while the signed payload travels in a
 URL. The wallet frontend also has separate state-flow concerns; no live login or
 full auth-controller acceptance was checked by this provider-level test.
 
-## Farcaster: replay remains possible at the provider boundary
+## Farcaster: legacy finding and bound-proof follow-up
 
-apps/backend/src/services/auth/providers/farcaster.provider.ts decodes signer_uuid,
-asks Neynar whether it is approved, then returns that same identifier. getUser
-looks up the same signer again. There is no nonce consumption, code lifetime or
-binding of that code to a particular browser-state nonce in these methods.
+Before this follow-up, the auth provider decoded signer_uuid and accepted it
+repeatedly while Neynar reported approved. The #190 characterization and independent
+security review rated that existing behavior High if enabled. Production key
+absence was reported by CEO for one snapshot, not a permanent security guard.
 
-The characterization test submits the same synthetic approved signer code twice:
-both getToken calls return the same token and both getUser calls return the same
-identity. It makes no real Neynar request. AuthService.checkExists separately
-checks a browser state-cookie match, but that is not single-use binding of the
-signer code; an attacker who obtains a code can initiate a fresh state flow.
-Mobile redirect_uri and NOT_SECURED paths have different state rules. A full
-production account replay was not attempted, and deployed app configuration and
-affected-user counts are unverified.
+This follow-up rejects raw UUIDs, requires an auth-only default-off flag, creates
+signers bound to a private browser nonce, and issues/consumes opaque expiring
+proofs and purpose-separated registration continuation. The old characterization
+is now a rejection regression. Public state alone cannot redeem a proof, and an
+arbitrary existing signer cannot mint one. Both client history cleanup and
+nonce-only auth navigation are included; history cleanup alone is not replay
+protection or historical erasure.
 
-Treat the approved signer UUID/code as a reusable credential, not an expiring
-challenge. History removal alone cannot fix replay. A separate auth change should
-issue short-lived, browser-bound, single-use login proofs after approved signer
-validation, consume them atomically on redemption, preserve new-user registration
-continuations and cover concurrent redemption/revocation. That behavior change is
-not implemented or claimed by this assessment. CEO/Security Reviewer must decide
-its release priority or provider containment; this PR does not disable a provider.
-
-## Verification scope
-
-Auth characterization and MeWe/MCP/auth-form regressions run offline using example
-credentials only. No production records, keys, real signed messages, log payloads,
-provider settings, live accounts, rotations, merges or deployments were accessed.
+Protocol, limits and mandatory staging checks are in
+[the proof runbook](../../deploy/postdelegate/review/farcaster-login-proof.md).
+No production setting, live account, credential rotation or real Neynar call was
+performed for this implementation. Source tests/build plus real-Redis consumption
+proof and fresh security review are required; live enablement remains separate.

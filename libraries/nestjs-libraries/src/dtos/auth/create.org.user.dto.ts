@@ -39,6 +39,11 @@ export class CreateOrgUserDto {
   @MaxLength(128)
   company: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  providerState?: string;
+
   datafast_visitor_id: string;
 
   // the ?ref= code of the sign-up page, sent when the visitor did not allow

@@ -37,14 +37,13 @@ it('rejects a wallet signed challenge after its first successful exchange', asyn
   await expect(wallet.getToken(code)).resolves.toBe('');
 });
 
-it('documents that the same approved Farcaster signer code is accepted repeatedly', async () => {
+it('rejects the legacy approved signer UUID login code even when configured', async () => {
+  const old = process.env.FARCASTER_LOGIN_ENABLED;
+  process.env.FARCASTER_LOGIN_ENABLED='true';
   const farcaster = new FarcasterProvider();
   mockLookup.mockResolvedValue({ status: 'approved', fid: 123 });
   const code = Buffer.from(JSON.stringify({ signer_uuid: 'EXAMPLE-signer-uuid' })).toString('base64');
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const token = await farcaster.getToken(code);
-    expect(token).toBe('EXAMPLE-signer-uuid');
-    await expect(farcaster.getUser(token)).resolves.toEqual({ id: 'farcaster_123', email: 'farcaster_123' });
-  }
-  expect(mockLookup).toHaveBeenCalledTimes(4);
+  await expect(farcaster.getToken(code)).rejects.toThrow();
+  expect(mockLookup).not.toHaveBeenCalled();
+  if (old === undefined) delete process.env.FARCASTER_LOGIN_ENABLED; else process.env.FARCASTER_LOGIN_ENABLED=old;
 });
