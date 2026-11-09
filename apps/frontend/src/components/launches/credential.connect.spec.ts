@@ -1,25 +1,8 @@
 /** @jest-environment node */
 import React from 'react';
-// These form tests do not render canvas; the optional native canvas addon is
-// deliberately excluded so the test also works with a pure-JS dependency install.
-jest.mock('canvas', () => null);
-const { JSDOM } = require('jsdom');
-const dom = new JSDOM('<!doctype html><html><body></body></html>', {
-  url: 'https://app.postdelegate.test',
-});
-Object.defineProperties(globalThis, {
-  window: { configurable: true, value: dom.window },
-  document: { configurable: true, value: dom.window.document },
-  navigator: { configurable: true, value: dom.window.navigator },
-  sessionStorage: { configurable: true, value: dom.window.sessionStorage },
-  HTMLElement: { configurable: true, value: dom.window.HTMLElement },
-});
-const {
-  render,
-  fireEvent,
-  waitFor,
-  cleanup,
-} = require('@testing-library/react');
+import '../../../../../test/dom';
+import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
+Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: window.sessionStorage });
 import { Buffer } from 'buffer';
 
 const mockFetch = jest.fn();
@@ -325,7 +308,7 @@ it('does not load marketing trackers on the callback even with analytics consent
   delete process.env.NEXT_PUBLIC_FACEBOOK_PIXEL;
 });
 
-afterAll(() => dom.window.close());
+
 
 it('sends stored credentials only in the POST body and consumes the handoff after a response', async () => {
   const encoded = Buffer.from(JSON.stringify({ password: fixture })).toString(

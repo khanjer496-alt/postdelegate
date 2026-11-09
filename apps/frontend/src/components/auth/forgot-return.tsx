@@ -4,7 +4,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import Link from 'next/link';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -16,6 +16,8 @@ type Inputs = {
 };
 export function ForgotReturn({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const t = useT();
   const [state, setState] = useState(false);
   const resolver = useMemo(() => {
@@ -76,7 +78,7 @@ export function ForgotReturn({ token }: { token: string }) {
   };
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form method="post" action="/auth/forgot" onSubmit={form.handleSubmit(onSubmit)}>
         <div>
           <h1 className="text-3xl font-bold text-start mb-4 cursor-pointer">
             {t('forgot_password_1', 'Forgot Password')}
@@ -102,7 +104,7 @@ export function ForgotReturn({ token }: { token: string }) {
             </div>
             <div className="text-center mt-6">
               <div className="w-full flex">
-                <Button type="submit" className="flex-1" loading={loading}>
+                <Button type="submit" disabled={!hydrated || loading} className="flex-1" loading={loading}>
                   {t('change_password', 'Change Password')}
                 </Button>
               </div>
