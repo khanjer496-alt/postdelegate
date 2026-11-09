@@ -16,8 +16,10 @@ write leaves the modal open with a warning; there is no URL fallback.
 The callback captures its original parameters for the POST, then uses
 history.replaceState to remove code and related OAuth credential parameters
 before fetching. It preserves the existing Next history state, state nonce and
-onboarding flag. A network failure retains the handoff for retry; a backend
-response consumes it as before. Real OAuth codes still reach the POST body.
+onboarding flag. The callback consumes tab storage before its first request, including network
+failures. Pending confirmation keeps the payload only in component memory;
+cancel/final response/error clears it, and abandoning the component leaves no
+stored handoff. A failed flow must restart the connection. Real OAuth codes still reach the POST body.
 
 This protects new connects. Replacing the current history entry cannot erase
 older browser-history entries, synced history, server requests or old telemetry.
@@ -44,7 +46,8 @@ rendering application children. This does not unload scripts that already ran
 on an earlier SPA page or control an edge-injected tracker.
 
 Backend Sentry's existing secret-body filter also covers
-`/integrations/social-connect` and `/integrations/extension-refresh`, so moving
+`/integrations/social-connect`, `/integrations/extension-refresh` and
+`/integrations/moltbook` (including status polling with its API key), so moving
 credentials into POST does not introduce a request-body telemetry leak there.
 
 ## Production exposure assessment (no values)
@@ -194,3 +197,15 @@ Primary references: [Caddy log_skip](https://caddyserver.com/docs/caddyfile/dire
 No Caddy/app logging configuration on a server was changed here. The MCP handler
 file overlaps #182: preserve its authorization/scope checks when integrating both
 PRs, along with the deprecation headers and this PR's non-secret request ids.
+
+
+## Final review cleanup
+
+Custom provider URL failures are checked before a storage-specific warning.
+Public connect authentication failures log only err.message, not the AxiosError
+object containing request configuration/Authorization. Regression cases cover
+network failure, cancel, abandoned and accepted confirmation, malformed provider
+start responses, Moltbook secret bodies and Axios header exclusion.
+#183 is merged first; this branch is rebased onto main with main's shared
+jest.config.ts tsconfig.spec.json and isolatedModules preserved. The unused
+alternate tsconfig.test.json introduced by this branch was removed.

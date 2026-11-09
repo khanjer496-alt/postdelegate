@@ -81,6 +81,8 @@ export const ContinueIntegration: FC<{
   const [state, setState] = useState<ConnectState>({ status: 'loading' });
   // the OAuth code can be exchanged only once, even if the effect runs twice
   const started = useRef(false);
+  // Keep a pending confirmation only in this mounted component, never tab storage.
+  const handoffCode = useRef<string | undefined>(undefined);
 
   // Redirects to the return address, or to the calendar when logged in,
   // otherwise shows the result on this page. A shared link's channel went to
@@ -165,6 +167,11 @@ export const ContinueIntegration: FC<{
     return searchParams;
   }, []);
 
+  const clearConnectHandoff = useCallback(() => {
+    handoffCode.current = undefined;
+    clearExtensionCode(modifiedParams.state);
+  }, [modifiedParams.state]);
+
   const Provider = useMemo(() => {
     return (
       continueProviderList[provider as keyof typeof continueProviderList] ||
@@ -187,7 +194,11 @@ export const ContinueIntegration: FC<{
 
   const connect = useCallback(async (confirmed = false) => {
     const timezone = String(newDayjs().utcOffset());
-    const extensionCode = readExtensionCode(modifiedParams.state);
+    const extensionCode = handoffCode.current || readExtensionCode(modifiedParams.state);
+    handoffCode.current = extensionCode;
+    // Consume before the network call: failure, cancellation or an abandoned
+    // confirmation must not leave credentials in sessionStorage.
+    clearExtensionCode(modifiedParams.state);
     const body = JSON.stringify({
       ...modifiedParams,
       ...(extensionCode ? { code: extensionCode } : {}),
@@ -241,8 +252,8 @@ export const ContinueIntegration: FC<{
       }
     }
 
-    // the backend answered: the cookies were used (or refused), drop them
-    clearExtensionCode(modifiedParams.state);
+    // A final response no longer needs the in-memory confirmation payload.
+    clearConnectHandoff();
 
     if (data.status === HttpStatusCode.PreconditionFailed) {
       const { returnURL } = await data.json().catch(() => ({}));
@@ -347,10 +358,11 @@ export const ContinueIntegration: FC<{
       'success',
       confirmed
     );
-  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName]);
+  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName, clearConnectHandoff, fetch]);
 
   useEffect(() => {
     if (!stripConnectCodeFromHistory()) {
+      clearConnectHandoff();
       setState({ status: 'error', message: 'Could not secure this connection URL. Close this tab and start a new connection.' });
       return;
     }
@@ -359,6 +371,7 @@ export const ContinueIntegration: FC<{
     }
     started.current = true;
     connect().catch(() => {
+      clearConnectHandoff();
       setState({ status: 'error' });
     });
   }, []);
@@ -411,6 +424,7 @@ export const ContinueIntegration: FC<{
           step.sharedLink
         );
       } catch (e) {
+        clearConnectHandoff();
         setState({
           status: 'picking',
           step,
@@ -418,19 +432,21 @@ export const ContinueIntegration: FC<{
         });
       }
     },
-    [state, fetch, logged, modifiedParams, provider, navigateOrShow, t]
+    [state, fetch, logged, modifiedParams, provider, navigateOrShow, t, clearConnectHandoff]
   );
 
   const confirmLink = useCallback(() => {
     setState({ status: 'loading' });
     connect(true).catch(() => {
+      clearConnectHandoff();
       setState({ status: 'error' });
     });
-  }, [connect]);
+  }, [connect, clearConnectHandoff]);
 
   // nothing was exchanged; the link is dropped so the code the platform sent
   // can never be completed later
   const cancelLink = useCallback(async () => {
+    clearConnectHandoff();
     await fetch(`/integrations/social-connect/${provider}/cancel`, {
       method: 'POST',
       body: JSON.stringify({ state: modifiedParams.state }),
@@ -442,7 +458,7 @@ export const ContinueIntegration: FC<{
         'The connection was cancelled and nothing was added. You can close this window.'
       ),
     });
-  }, [fetch, provider, modifiedParams, t]);
+  }, [fetch, provider, modifiedParams, t, clearConnectHandoff]);
 
   // A shared link names the workspace before anything is connected
   if (state.status === 'confirm') {

@@ -114,6 +114,17 @@ describe('NoAuthIntegrationsController state keys', () => {
     ).rejects.toBeDefined();
   });
 
+  it('logs only the provider error message, without Axios request credentials', async () => {
+    const secret = 'EXAMPLE-bearer-do-not-use';
+    const { controller } = make({ ...authenticated, authenticate: jest.fn(async () => { throw Object.assign(new Error('Provider request failed'), { config: { headers: { Authorization: `Bearer ${secret}` } } }); }) });
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await expect(controller.connectSocialMedia('demo', { state: 's1', code: 'c', timezone: 0 } as any)).rejects.toThrow('Authentication failed');
+      expect(log).toHaveBeenCalledWith('Authentication failed for demo:', 'Provider request failed');
+      expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+    } finally { log.mockRestore(); }
+  });
+
   it('keeps it for the page picking step of a two step provider, then spends it', async () => {
     const { controller, integrationService } = make({
       ...authenticated,

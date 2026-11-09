@@ -26,7 +26,7 @@ export const readExtensionCode = (state?: string) => {
   }
 };
 
-// only once the backend answered, a reload after a network error can retry
+// Consume when the callback reads it; pending confirmation stays in memory only.
 export const clearExtensionCode = (state?: string) => {
   if (!state || typeof window === 'undefined') {
     return;
