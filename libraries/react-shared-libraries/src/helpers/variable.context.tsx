@@ -22,6 +22,8 @@ interface VariableContextInterface {
   facebookPixel: string;
   telegramBotName: string;
   neynarClientId: string;
+  farcasterLoginEnabled?: boolean;
+  walletLoginEnabled?: boolean;
   appleClientId: string;
   isSecured: boolean;
   disableImageCompression: boolean;
@@ -65,6 +67,8 @@ const VariableContext = createContext({
   telegramBotName: '',
   facebookPixel: '',
   neynarClientId: '',
+  farcasterLoginEnabled: false,
+  walletLoginEnabled: false,
   appleClientId: '',
   disableImageCompression: false,
   disableXAnalytics: false,
