@@ -91,21 +91,29 @@ it('scrubs replay custom navigation/network events and explicitly disables reque
   ).not.toContain('EXAMPLE-secret');
 });
 
-it('does not initialize telemetry on callback/auth pages and discards any existing replay buffer', () => {
-  const replay = { stop: jest.fn(async () => {}) };
-  (Sentry.getReplay as jest.Mock).mockReturnValue(replay);
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: { location: { pathname: '/integrations/social/nostr' } },
-  });
-  try {
-    initializeSentryClient('test', 'https://public@example.test/1');
-    expect(Sentry.init).not.toHaveBeenCalled();
-    expect(replay.stop).toHaveBeenCalledWith({ flush: false });
-  } finally {
-    delete (globalThis as any).window;
+it.each([
+  '/integrations/social/nostr',
+  '/api/mcp/EXAMPLE-path-key',
+  '/mcp/EXAMPLE-path-key',
+  '/api/sse/EXAMPLE-path-key',
+])(
+  'does not initialize telemetry on sensitive %s and discards any existing replay buffer',
+  (pathname) => {
+    const replay = { stop: jest.fn(async () => {}) };
+    (Sentry.getReplay as jest.Mock).mockReturnValue(replay);
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { location: { pathname } },
+    });
+    try {
+      initializeSentryClient('test', 'https://public@example.test/1');
+      expect(Sentry.init).not.toHaveBeenCalled();
+      expect(replay.stop).toHaveBeenCalledWith({ flush: false });
+    } finally {
+      delete (globalThis as any).window;
+    }
   }
-});
+);
 
 it('redacts legacy MCP path keys from URLs, paths and log messages without removing the resource name', () => {
   const init = options();
