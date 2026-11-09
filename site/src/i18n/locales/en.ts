@@ -24,7 +24,7 @@ const en = {
   numberLocale: 'en-US',
   launch: {
     available: (count: number) => `${count} networks available today`,
-    examples: 'Including YouTube, Bluesky, WordPress and LinkedIn personal profiles. Publish to connected channels.',
+    examples: 'Including YouTube, Bluesky, Slack and LinkedIn personal profiles. Publish to connected channels.',
     pending: 'Coming soon · awaiting platform approval',
     unavailable: 'Not available',
     modes: 'Use AI through MCP, or schedule posts yourself.',

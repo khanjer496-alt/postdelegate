@@ -4,6 +4,9 @@ import { SITE } from '../data/site';
 // Changes that are live in the app, newest first. Dates are the release day in Dubai time (UTC+4).
 // Add an entry only once the release that contains it is live on app.postdelegate.com.
 const releases: { date: string; items: { title: string; text: string; href?: string }[] }[] = [
+  { date: '2026-11-10', items: [
+    { title: 'Slack is live', text: 'Add PostDelegate to a Slack workspace and schedule text and image messages to the channel you pick. Posts appear from the PostDelegate app.', href: '/docs/channels/slack' },
+  ] },
   { date: '2026-11-06', items: [
     { title: 'Google Business Profile is live', text: 'Sign in with Google, pick a business location and schedule updates, events and offers with an optional image and button.', href: '/docs/channels/google-business' },
   ] },
@@ -38,7 +41,7 @@ const releases: { date: string; items: { title: string; text: string; href?: str
 ];
 const fmt = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 ---
-<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Google Business Profile, Mastodon, Studio templates, ownership transfer, bulk video and more." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
+<Doc title="Changelog — what's new in PostDelegate" description="What changed in PostDelegate, newest first: Slack, Google Business Profile, Mastodon, Studio templates, ownership transfer, bulk video and more." h1="Changelog." eyebrow="What's new" lead="Changes that are live in the app, newest first, dated in Dubai time. Network approvals are tracked on the roadmap.">
   <a slot="actions" href="/roadmap" class="button button-outline">See the roadmap</a>
   {releases.map((release) => (
     <section class="release">
