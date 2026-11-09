@@ -64,15 +64,15 @@ it('authenticates without OIDC and keeps the temporary identity namespaced', asy
   );
   expect(calls[1].url).toContain('/v2/me?');
 });
-it('refreshes using the Pages app and CMA identity endpoint', async () => {
+it('refreshes with the Pages app without looking up or replacing identity', async () => {
   const result = await new LinkedinPageProvider().refreshToken('old-refresh');
   expect(result).toMatchObject({
-    id: 'member-1',
+    id: '', name: '', picture: '', username: '',
     accessToken: 'access',
     refreshToken: 'refresh',
   });
   expect(calls[0].init.body.get('client_id')).toBe('page-id');
-  expect(calls[1].url).toContain('/v2/me?');
+  expect(calls).toHaveLength(1);
 });
 it('rejects missing grants before fetching the member', async () => {
   global.fetch = jest.fn(async () => ({
@@ -155,4 +155,18 @@ it('keeps declined optional analytics consent from blocking publishing', async (
   expect(result.scopeWarnings).toEqual([
     'Connected for publishing. Optional permission r_organization_social was not granted; features that need it are unavailable.',
   ]);
+});
+
+it.each([429, 503, 401])('preserves refreshed tokens when member lookup would return %s', async (status) => {
+  const requests: string[] = [];
+  global.fetch = jest.fn(async (url: string) => {
+    requests.push(url);
+    return url.includes('/accessToken')
+      ? { ok: true, json: async () => ({ access_token: 'new-access', refresh_token: 'rotated-refresh', expires_in: 3600 }) }
+      : { ok: false, status, json: async () => ({ message: 'profile unavailable' }) };
+  }) as any;
+  await expect(new LinkedinPageProvider().refreshToken('old-refresh')).resolves.toEqual({
+    id: '', name: '', picture: '', username: '', accessToken: 'new-access', refreshToken: 'rotated-refresh', expiresIn: 3600,
+  });
+  expect(requests).toEqual(['https://www.linkedin.com/oauth/v2/accessToken']);
 });
