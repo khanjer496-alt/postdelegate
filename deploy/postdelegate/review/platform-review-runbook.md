@@ -25,14 +25,24 @@ must finish it in TikTok. Basic-only user-info calls omit username. Creator info
 for Direct Post still supplies the creator identity in the composer. Pinterest's
 five scopes are kept for the implemented API security requirements; see oauth-scope-map.md.
 
-Enable extras only after platform approval by listing the exact scopes in
+Do not enable any `*_OPTIONAL_SCOPES` in production until granted optional
+permissions are persisted and enforced per connected channel. The current gates
+read deployment-requested scopes, not the scopes each user actually granted.
+A user can decline an optional scope at a fresh consent: publishing connects and
+warns, but the optional feature may still appear enabled and fail at runtime,
+including a reply failing after the main post publishes. Reconnecting alone does
+not resolve this limitation. Platform approval alone is also insufficient.
+
+On an isolated test deployment only, enable approved extras for investigation by
+listing the exact scopes in
 `FACEBOOK_OPTIONAL_SCOPES`, `INSTAGRAM_OPTIONAL_SCOPES`,
 `INSTAGRAM_STANDALONE_OPTIONAL_SCOPES`, `THREADS_OPTIONAL_SCOPES`,
 `TIKTOK_OPTIONAL_SCOPES`, or `LINKEDIN_PAGE_OPTIONAL_SCOPES`.
 Unknown names are ignored. Required permissions cannot be disabled this way.
 Optional analytics and automation are disabled by default; enabling their scope
 configuration does not establish that an existing token has those permissions.
-Reconnect with a new consent before testing an enabled optional feature. Missing
+On that test deployment, reconnect with new consent and confirm the actual grant
+before exercising an optional feature. Missing
 optional consent returns a publishing-success warning; missing minimum consent
 still rejects the connect. Older broad grants are not revoked by changing env.
 
@@ -184,7 +194,8 @@ Business Portfolio Page discovery remains a live gate: connect the exact Meta
 reviewer Page, verify it appears in the Page picker, and test publishing before
 recording/submission. Keep FACEBOOK_OPTIONAL_SCOPES=business_management (and the
 corresponding INSTAGRAM_OPTIONAL_SCOPES value for Facebook login) available for
-an approved configuration change if discovery needs it. No live proof is claimed.
+an approved isolated-test configuration change if discovery needs it; the
+production prohibition above still applies. No live proof is claimed.
 Threads optional grant introspection/warnings remain unproven; keep its extras off.
 The earlier LinkedIn companies-on-auth finding refers to a superseded snapshot:
 this branch uses the existing /v2/me member identity path at authentication.
