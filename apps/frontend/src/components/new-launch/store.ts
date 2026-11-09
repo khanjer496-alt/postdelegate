@@ -710,8 +710,8 @@ export const useLaunchStore = create<StoreState>()((set) => ({
       const canAddComments = comments !== false && selection.every(p => p.integration.commentsAvailable !== false);
       const entries = state.internal.find(p => p.integration.id === state.current)?.integrationValue || state.global;
       return {
-        // Availability controls creation, never whether saved content is shown.
-        comments: canAddComments ? comments : entries.length > 1,
+        // Optional availability preserves saved replies only on reply-capable providers.
+        comments: comments === false ? false : canAddComments ? comments : entries.length > 1,
         canAddComments,
       };
     }),

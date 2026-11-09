@@ -223,3 +223,28 @@ launch defaults and separate rollout checks above still apply. No live proof is 
 Threads optional grant introspection/warnings remain unproven; keep its extras off.
 The earlier LinkedIn companies-on-auth finding refers to a superseded snapshot:
 this branch uses the existing /v2/me member identity path at authentication.
+
+
+### Composer compatibility edge cases for staging
+
+Native provider support is separate from optional permission availability. A
+provider that never supports replies (for example YouTube or TikTok) keeps its
+single-entry channel display even when global content has multiple entries. A
+reply-capable provider with optional permissions off keeps every saved entry
+visible and editable after customization; the inherited preview behind the
+customize overlay still shows only the first entry. Global editing keeps all
+entries. These display rules never delete or rewrite stored IDs/content/media/delays.
+
+Include negative API checks using an entry from a sibling channel in the same
+composer group, another workspace, a soft-deleted reply, and a new ID appended to
+a saved sequence. Each must reject before scheduling/publishing; Prisma-mocked
+repository tests do not substitute for these real-schema staging checks.
+
+A channel reconnected under minimum-only consent may lose optional reply grants.
+Saved-sequence validation intentionally preserves the saved composition; it is
+not permission introspection. The main post can publish before the provider
+rejects its saved reply (for example Meta #200). Treat this as a partial publish,
+inspect the per-entry failure and do not retry the main post blindly. Preserve
+remaining content and resolve the grant/review issue with the operator before
+retrying a failed reply. Test this case separately from a still-broad-grant channel,
+where existing scheduled replies and saved automations must continue to succeed.

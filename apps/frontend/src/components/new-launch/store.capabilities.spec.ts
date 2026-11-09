@@ -12,14 +12,14 @@ beforeEach(() => useLaunchStore.setState({
 }));
 it('preserves every saved entry, media, ID and delay when replies become unavailable', () => {
   const before = structuredClone(useLaunchStore.getState().internal);
-  useLaunchStore.getState().setComments(false);
+  useLaunchStore.getState().setComments(true);
   expect(useLaunchStore.getState().comments).toBe(true);
   expect((useLaunchStore.getState() as any).canAddComments).toBe(false);
   expect(useLaunchStore.getState().internal).toEqual(before);
 });
 it('does not offer new replies on a single-entry unavailable channel', () => {
   useLaunchStore.setState({ internal: [{ integration: { id: 'channel-1' }, integrationValue: [entries[0]] }] as any });
-  useLaunchStore.getState().setComments(false);
+  useLaunchStore.getState().setComments(true);
   expect(useLaunchStore.getState().comments).toBe(false);
   expect((useLaunchStore.getState() as any).canAddComments).toBe(false);
 });
@@ -35,4 +35,13 @@ it('restores ordinary reply creation for an available channel', () => {
   useLaunchStore.getState().setComments('no-media');
   expect(useLaunchStore.getState().comments).toBe('no-media');
   expect((useLaunchStore.getState() as any).canAddComments).toBe(true);
+});
+
+it.each([true, false])('does not reinterpret a provider with no native replies as a thread when flag availability is %s', commentsAvailable => {
+  useLaunchStore.setState({ selectedIntegrations: [{ integration: { id: 'channel-1', commentsAvailable }, settings: {} }] as any });
+  const before = structuredClone(useLaunchStore.getState().internal);
+  useLaunchStore.getState().setComments(false);
+  expect(useLaunchStore.getState().comments).toBe(false);
+  expect(useLaunchStore.getState().canAddComments).toBe(false);
+  expect(useLaunchStore.getState().internal).toEqual(before);
 });

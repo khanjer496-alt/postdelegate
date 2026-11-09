@@ -250,8 +250,8 @@ export const EditorWrapper: FC<{
   // phones show one toolbar, for the post that is being edited
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  // without comments only the first post is shown
-  const showAllEntries = comments || items.length > 1;
+  // The store preserves saved replies while respecting native provider support.
+  const showAllEntries = !!comments;
   const last = showAllEntries ? items.length - 1 : 0;
   const active = canEdit ? Math.min(activeIndex ?? last, last) : -1;
 
@@ -531,7 +531,7 @@ export const EditorWrapper: FC<{
             index === 0 && 'rounded-t-[12px]',
             (index === items.length - 1 || !showAllEntries) && 'rounded-b-[12px]',
             !canEdit && !isCreateSet && 'blur-s',
-            !showAllEntries && index > 0 && 'hidden'
+            (!canEdit || !showAllEntries) && index > 0 && 'hidden'
           )}
         >
           <div className="flex gap-[5px] mobile:gap-[16px] flex-1 w-full min-w-0">
