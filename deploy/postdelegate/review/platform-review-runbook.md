@@ -53,8 +53,9 @@ ignored and required permissions cannot be disabled with these settings.
 
 LinkedIn Pages uses its own CMA-only application. This incorporates the existing
 [PR #181](https://github.com/khanjer496-alt/postdelegate/pull/181) member-identity
-fix: r_basicprofile reads /v2/me for the stable app-scoped member id; connect and
-refresh do not call the OpenID /userinfo endpoint. The optional analytics trim is
+fix: r_basicprofile reads /v2/me for the stable app-scoped member id at connect.
+Refresh uses only the OAuth token endpoint and preserves stored Page identity;
+neither flow calls the OpenID /userinfo endpoint. The optional analytics trim is
 added here. PR #184 absorbs #181 including its provider regression tests and
 approval notes; close #181 as superseded rather than merging it separately.
 See docs/providers/linkedin-pages-approval.md. Reconcile the organization's scopes against

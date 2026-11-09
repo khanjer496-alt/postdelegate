@@ -169,16 +169,17 @@ export class LinkedinPageProvider
       })
     ).json();
 
-    const { name, id, picture } = await this.memberInformation(accessToken);
+    // Refresh persistence updates authorization only. Keep the stored Page
+    // identity; an unrelated profile API failure must not discard rotated tokens.
 
     return {
-      id,
+      id: '',
       accessToken,
       refreshToken,
       expiresIn: expires_in,
-      name,
-      picture,
-      username: id,
+      name: '',
+      picture: '',
+      username: '',
     };
   }
 

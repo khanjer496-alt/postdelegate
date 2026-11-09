@@ -1,6 +1,6 @@
 # LinkedIn Pages approval gate
 
-The Pages provider targets a dedicated Community Management API (CMA) app. Verify the actual approved product and grants; this document is not proof that the app holds `r_basicprofile`, `rw_organization_admin`, `w_organization_social` and `r_organization_social`. OpenID Connect is a separate product: this provider uses `/v2/me` for member identity on authorization and refresh, rather than requesting `openid/profile` and `/v2/userinfo`. Personal LinkedIn is unchanged.
+The Pages provider targets a dedicated Community Management API (CMA) app. Verify the actual approved product and grants; this document is not proof that the app holds `r_basicprofile`, `rw_organization_admin`, `w_organization_social` and `r_organization_social`. OpenID Connect is a separate product: this provider uses `/v2/me` for member identity on authorization only, rather than requesting `openid/profile` and `/v2/userinfo`. Personal LinkedIn is unchanged.
 
 References retained from superseded PR #181 (live app entitlement is still unverified): [CMA permission list](https://learn.microsoft.com/en-us/linkedin/marketing/increasing-access?view=li-lms-2026-02), [Profile API](https://learn.microsoft.com/en-us/linkedin/shared/integrations/people/profile-api).
 
@@ -14,10 +14,10 @@ This is preparation, not proof of app approval. Before making `linkedin-page` vi
 
 ## Reconciled into PR #184
 
-PR #184 absorbs #181's /v2/me identity lookup on authorization/refresh,
+PR #184 absorbs #181's /v2/me identity lookup on authorization,
 complete-pair credential validation, failure handling, profile picture mapping,
-and nine provider regression tests. Its tenth test verifies partial optional
-consent. Close #181 as superseded; do not merge both drafts.
+and nine provider regression scenarios. Additional cases verify partial optional
+consent and profile-independent token refresh. Close #181 as superseded; do not merge both drafts.
 
 The publishing minimum in #184 is r_basicprofile, rw_organization_admin and
 w_organization_social. r_organization_social is optional for analytics, not a
@@ -27,3 +27,14 @@ may request r_organization_social for analytics only after reconnect/grant and
 live analytics verification. Consent defaults are not grants; no per-channel
 capability migration is included in the accepted launch scope.
 Keep linkedin-page hidden except for explicitly allowlisted test workspaces.
+
+
+## Token refresh must not depend on profile lookup
+
+refreshToken returns the new authorization fields without calling /v2/me.
+persistRefreshedAuthorization writes accessToken/refreshToken/expiresIn only;
+stored Page identity is retained, while reconnect obtains the selected Page
+identity separately. Empty refresh identity fields are intentional internal
+placeholders. Unit cases cover hypothetical member endpoint 429/503/401 after
+successful token issuance and assert that only the OAuth token endpoint is called.
+The r_basicprofile entitlement gate for fresh connections remains unchanged.
