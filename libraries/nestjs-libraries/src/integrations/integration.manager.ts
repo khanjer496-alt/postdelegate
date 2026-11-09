@@ -228,9 +228,9 @@ export class IntegrationManager {
     );
   }
 
-  getAllPlugs() {
+  getAllPlugs(includeExisting = false) {
     return socialIntegrationList
-      .filter(p => p.plugsAvailable)
+      .filter(p => includeExisting || p.plugsAvailable)
       .map((p) => {
         return {
           name: p.name,

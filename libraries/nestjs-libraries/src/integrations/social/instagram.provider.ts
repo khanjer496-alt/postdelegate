@@ -1229,10 +1229,7 @@ export class InstagramProvider
     integration: Integration,
     type = 'graph.facebook.com'
   ): Promise<PostResponse[]> {
-    if (type !== 'graph.instagram.com' && !this.plugsAvailable) {
-      throw new BadBody(this.identifier, '{}', '{}', 'Comment and reply automation needs an approved optional permission. Reconnect after it is enabled.');
-    }
-
+    // Existing scheduled replies use their token grants, not consent defaults.
     const [accessToken, userToken] = token.split('___');
     const [commentPost] = postDetails;
 

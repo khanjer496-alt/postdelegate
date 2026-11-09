@@ -4,7 +4,7 @@ import { InstagramStandaloneProvider } from './instagram.standalone.provider';
 import { ThreadsProvider } from './threads.provider';
 import { LinkedinPageProvider } from './linkedin.page.provider';
 import { TiktokProvider } from './tiktok.provider';
-import { NotEnoughScopes } from '../social.abstract';
+import { SocialAbstract, NotEnoughScopes } from '../social.abstract';
 
 const cases = [
   [
@@ -104,13 +104,18 @@ describe('review scope policy', () => {
     new InstagramStandaloneProvider(),
     new ThreadsProvider(),
   ])(
-    'rejects optional comment automation before a network call for %p',
+    'allows an existing scheduled reply to reach the provider with defaults off for %p',
     async (p) => {
-      await expect(
-        p.comment('review', 'post', undefined, 'test', [] as any, {} as any)
-      ).rejects.toMatchObject({
-        message: expect.stringContaining('permission'),
-      });
+      const error = new Error('provider permission response');
+      const transport = jest.spyOn(SocialAbstract.prototype, 'fetch').mockRejectedValue(error);
+      try {
+        await expect(p.comment('review', 'post', undefined, 'test', [
+          { message: 'Scheduled reply', media: [], settings: {} },
+        ] as any, {} as any)).rejects.toBe(error);
+        expect(transport).toHaveBeenCalled();
+      } finally {
+        transport.mockRestore();
+      }
     }
   );
   it('connects the Pages-only LinkedIn app without requesting a separate OpenID product', async () => {
@@ -147,6 +152,27 @@ describe('review scope policy', () => {
     } finally {
       transport.mockRestore();
     }
+  });
+  it.each(['spam_risk_too_many_posts', 'invalid creator info'])('connects TikTok when creator info fails: %s', async (message) => {
+    const p = new TiktokProvider();
+    const creator = jest.spyOn(p, 'creatorInfo').mockRejectedValue(new Error(message));
+    const transport = jest.spyOn(global, 'fetch').mockResolvedValue({
+      json: async () => ({
+        access_token: 'test', refresh_token: 'refresh', scope: p.scopes.join(','),
+        data: { user: { open_id: 'review', display_name: 'Reviewer', avatar_url: '' } },
+      }),
+    } as any);
+    try {
+      await expect(p.authenticate({ code: 'code', codeVerifier: 'state' })).resolves.toMatchObject({ id: 'review', username: '' });
+    } finally { creator.mockRestore(); transport.mockRestore(); }
+  });
+  it('resolves a missing TikTok handle after publication, without blocking a completed post on creator errors', async () => {
+    const p = new TiktokProvider();
+    jest.spyOn(p, 'fetch').mockResolvedValue({ text: async () => JSON.stringify({ data: { status: 'PUBLISH_COMPLETE', publicaly_available_post_id: ['123'] } }) } as any);
+    const creator = jest.spyOn(p, 'creatorInfo').mockResolvedValue({ creatorUsername: 'later_handle' } as any);
+    await expect(p.checkPostStatus('test', { publishId: 'v_pub_review' }, { profile: '' } as any)).resolves.toMatchObject({ status: 'completed', releaseURL: 'https://www.tiktok.com/@later_handle/video/123' });
+    creator.mockRejectedValue(new Error('still unavailable'));
+    await expect(p.checkPostStatus('test', { publishId: 'v_pub_review' }, { profile: '' } as any)).resolves.toMatchObject({ status: 'completed', releaseURL: 'https://www.tiktok.com' });
   });
   it('connects TikTok using only basic profile fields, then refreshes the same grant', async () => {
     const p = new TiktokProvider();
