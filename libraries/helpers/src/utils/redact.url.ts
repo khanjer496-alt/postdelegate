@@ -9,8 +9,15 @@ export const scrubTelemetry = <T>(value: T): T => {
         try {
           const parsed = new URL(text, 'https://redacted.invalid');
           return /^https?:\/\//i.test(text)
-            ? parsed.origin + parsed.pathname
-            : parsed.pathname;
+            ? parsed.origin +
+                parsed.pathname.replace(
+                  /(\/(?:mcp|sse|message)\/)[^/]+/gi,
+                  '$1[Filtered]'
+                )
+            : parsed.pathname.replace(
+                /(\/(?:mcp|sse|message)\/)[^/]+/gi,
+                '$1[Filtered]'
+              );
         } catch {
           return '[Filtered URL]';
         }
@@ -18,7 +25,11 @@ export const scrubTelemetry = <T>(value: T): T => {
       if (/^(https?:\/\/|\/)/i.test(item)) return cleanUrl(item);
       return item
         .replace(/https?:\/\/[^\s<>"']+/gi, cleanUrl)
-        .replace(/\/[a-z0-9_./%-]+\?[^\s<>"']+/gi, cleanUrl);
+        .replace(/\/[a-z0-9_./%-]+\?[^\s<>"']+/gi, cleanUrl)
+        .replace(
+          /(?:\/[a-z0-9._%-]+)*\/(?:mcp|sse|message)\/[^\s/?#<>"']+/gi,
+          cleanUrl
+        );
     }
     if (!item || typeof item !== 'object') return item;
     if (seen.has(item)) return '[Circular]';

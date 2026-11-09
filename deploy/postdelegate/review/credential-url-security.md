@@ -92,3 +92,74 @@ Sources: [Sentry breadcrumb hooks](https://docs.sentry.io/platforms/javascript/g
 installed @sentry/replay types (custom recording events and stop({flush:false})),
 and the checked-in Pulse tracker/ingestion source. No real credential values were
 used in tests or printed during the exposure check.
+
+## MCP setup and legacy migration
+
+New generated setup uses the OAuth-capable `/api/mcp` resource in production
+(the configured API base plus `/mcp`, including its protected-resource discovery).
+The existing OAuth issuer/discovery and `/mcp-oauth-dynamic` route still work.
+Clients with custom-header support can use the same resource with
+`Authorization: Bearer <API key>`. Claude/ChatGPT remote connectors and NanoClaw
+are directed to OAuth; no unsupported header flag or key-in-URL workaround is
+invented. The API-key fallback picker lists only clients with header configs.
+No new configuration contains `/mcp/<key>`.
+
+The legacy `/mcp/:id` endpoint remains a compatibility path for already configured
+clients, with the same Deprecation/Link headers as draft #182. Legacy SSE/message
+paths receive those headers too. There is no trustworthy registration marker for
+an installed legacy client, so this PR does not invent account-age restrictions:
+it stops all new UI setup from advertising that transport and preserves existing
+client behavior until the endpoint is removed. The endpoint is still technically
+reachable by any valid key; this is not a new-client allowlist.
+
+**Proposed removal: 7 February 2027**, 90 days from 9 November 2026, subject to CEO
+approval and a communicated migration window. If rollout/notice starts later,
+allow a full 90 days from that notice. Do not enforce removal or advertise an
+approved Sunset date until that decision. No automatic removal job is scheduled.
+
+App correlation IDs are now random per request, not API keys/OAuth tokens.
+Frontend/Next and backend Sentry scrub private MCP/SSE/message path segments in
+URLs, trace attributes and log messages; backend error/trace bodies are filtered.
+This protects the telemetry transport, not arbitrary raw stdout/debug loggers.
+Authentication, forwarded request URIs, MCP sessions and tool access are unchanged.
+
+### Release Engineer: logging checklist (not applied by this PR)
+
+1. Inspect the effective production and staging Caddy access/runtime logging and
+   downstream exports without printing real URLs, keys or Authorization values.
+   The checked-in Caddyfile has no access `log` directive; that is not proof that
+   live logs or exports are disabled. Do not enable logging just to apply a filter.
+2. If access logging is enabled, the simplest safe choice is to skip legacy
+   credential-path requests, on Caddy 2.8+ inside each relevant site block:
+
+   ```caddyfile
+   @legacyCredentials path /api/mcp/* /mcp/* /api/sse/* /sse/* /api/message/* /message/*
+   log_skip @legacyCredentials
+   ```
+
+   Validate with the installed Caddy version before reload. This changes logging
+   only. Do not rewrite the forwarded URI: legacy authentication needs its path.
+3. If counts must be retained instead, log a fixed route template and method/status
+   with a non-secret correlation id. Delete the raw `request>uri` logging field
+   and any duplicate original/upstream URI fields before persistence. Query-only
+   filters do not redact a credential in the path. Keep `log_credentials` disabled;
+   remove Authorization, Proxy-Authorization, Cookie, Set-Cookie and Referer from
+   every access/runtime/export sink. Caddy's normal sensitive-header masking does
+   not establish URI or Referer privacy.
+4. In app/MCP/SDK HTTP loggers and log collectors, mask `/mcp/<key>` (and old
+   `/sse/<key>` / `/message/<key>`) in `url`, `originalUrl`, request targets and free
+   text; never dump the raw request, headers, bodies, auth context or configured
+   transport URL. Keep verbose HTTP/SDK debug logging off in production. Preserve
+   only route labels, status and the new random request id. Sentry hooks do not
+   sanitize a line already written to Docker stdout or another collector.
+5. Apply the same policy to Cloudflare exports, reverse-proxy errors and log
+   shipping/retention. Verify using synthetic markers and boolean/count-only
+   checks across Caddy, app stdout and telemetry. Do not display matching records.
+   Existing records need a separate scoped retention/purge decision; this PR
+   neither inspects nor deletes them.
+
+Primary references: [Caddy log_skip](https://caddyserver.com/docs/caddyfile/directives/log_skip),
+[Caddy logging filters and sensitive headers](https://caddyserver.com/docs/caddyfile/directives/log).
+No Caddy/app logging configuration on a server was changed here. The MCP handler
+file overlaps #182: preserve its authorization/scope checks when integrating both
+PRs, along with the deprecation headers and this PR's non-secret request ids.
