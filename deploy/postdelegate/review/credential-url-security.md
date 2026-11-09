@@ -98,6 +98,9 @@ used in tests or printed during the exposure check.
 New generated setup uses the OAuth-capable `/api/mcp` resource in production
 (the configured API base plus `/mcp`, including its protected-resource discovery).
 The existing OAuth issuer/discovery and `/mcp-oauth-dynamic` route still work.
+The canonical resource routes self-hosted OAuth connections through the existing
+relay server when that feature is enabled; revoked tokens and disabled relays
+remain rejected. Cloud workspace auth and subscription checks are preserved.
 Clients with custom-header support can use the same resource with
 `Authorization: Bearer <API key>`. Claude/ChatGPT remote connectors and NanoClaw
 are directed to OAuth; no unsupported header flag or key-in-URL workaround is
@@ -115,7 +118,9 @@ reachable by any valid key; this is not a new-client allowlist.
 **Proposed removal: 7 February 2027**, 90 days from 9 November 2026, subject to CEO
 approval and a communicated migration window. If rollout/notice starts later,
 allow a full 90 days from that notice. Do not enforce removal or advertise an
-approved Sunset date until that decision. No automatic removal job is scheduled.
+approved Sunset date until that decision. No automatic removal job is scheduled. Removing the legacy path does not revoke
+an API key: rotate any exposed workspace keys separately with an approved client
+migration plan.
 
 App correlation IDs are now random per request, not API keys/OAuth tokens.
 Frontend/Next and backend Sentry scrub private MCP/SSE/message path segments in
