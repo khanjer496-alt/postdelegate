@@ -63,7 +63,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           telegramBotName={process.env.TELEGRAM_BOT_NAME!}
           neynarClientId={process.env.NEYNAR_CLIENT_ID!}
           farcasterLoginEnabled={process.env.FARCASTER_LOGIN_ENABLED === 'true'}
-          walletLoginEnabled={process.env.WALLET_LOGIN_ENABLED === 'true'}
+          walletLoginEnabled={process.env.AUTH_WALLET_LOGIN_ENABLED === 'true'}
           appleClientId={process.env.APPLE_CLIENT_ID!}
           isSecured={!process.env.NOT_SECURED}
           isChatBase={false}

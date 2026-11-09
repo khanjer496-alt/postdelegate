@@ -9,7 +9,7 @@ export class AuthProviderManager {
   getProvider(provider: string): AuthProviderAbstract {
     // Authentication is a separate opt-in from social channel credentials.
     const enableFlags: Partial<Record<string, string>> = {
-      WALLET: 'WALLET_LOGIN_ENABLED',
+      WALLET: 'AUTH_WALLET_LOGIN_ENABLED',
       FARCASTER: 'FARCASTER_LOGIN_ENABLED',
     };
     const enableFlag = enableFlags[provider];

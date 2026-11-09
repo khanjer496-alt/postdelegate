@@ -590,6 +590,7 @@ describe('disabled crypto login entry points', () => {
   const originalEnv = process.env;
   beforeEach(() => {
     process.env = { ...originalEnv, NOT_SECURED: 'true', NEYNAR_SECRET_KEY: 'example-channel-key' };
+    delete process.env.AUTH_WALLET_LOGIN_ENABLED;
     delete process.env.WALLET_LOGIN_ENABLED;
     delete process.env.FARCASTER_LOGIN_ENABLED;
   });
@@ -607,4 +608,16 @@ describe('disabled crypto login entry points', () => {
     expect(resolve).not.toHaveBeenCalled();
     expect(createOrgAndUser).not.toHaveBeenCalled();
   });
+  it('keeps normal LOCAL password login available with crypto login flags absent', async () => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+    const { AuthProviderManager } = jest.requireActual('./providers/providers.manager');
+    const resolve = jest.fn();
+    const manager = new AuthProviderManager({ get: resolve } as any);
+    const { users, emails, lockout } = setup(localUser({ password: Tokens.hashPassword('example-password') }));
+    const service = new AuthService(users as any, {} as any, emails as any, manager, {} as any, lockout as any);
+    const body = Object.assign(new LoginUserDto(), { provider: 'LOCAL', email: 'a@example.com', password: 'example-password' });
+    await expect(service.routeAuth('LOCAL' as any, body, '127.0.0.1', 'unit-test')).resolves.toMatchObject({ addedOrg: false, jwt: expect.any(String) });
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
 });
