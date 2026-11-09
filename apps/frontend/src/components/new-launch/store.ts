@@ -711,7 +711,7 @@ export const useLaunchStore = create<StoreState>()((set) => ({
       const entries = state.internal.find(p => p.integration.id === state.current)?.integrationValue || state.global;
       return {
         // Optional availability preserves saved replies only on reply-capable providers.
-        comments: comments === false ? false : canAddComments ? comments : entries.length > 1,
+        comments: comments !== false && (canAddComments || entries.length > 1) ? comments : false,
         canAddComments,
       };
     }),

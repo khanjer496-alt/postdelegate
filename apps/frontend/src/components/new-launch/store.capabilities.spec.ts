@@ -45,3 +45,10 @@ it.each([true, false])('does not reinterpret a provider with no native replies a
   expect(useLaunchStore.getState().canAddComments).toBe(false);
   expect(useLaunchStore.getState().internal).toEqual(before);
 });
+
+it('preserves a reply-capable provider no-media restriction when optional reply availability is off', () => {
+  useLaunchStore.getState().setComments('no-media');
+  expect(useLaunchStore.getState().comments).toBe('no-media');
+  expect(useLaunchStore.getState().canAddComments).toBe(false);
+  expect(useLaunchStore.getState().internal[0].integrationValue).toEqual(entries);
+});
