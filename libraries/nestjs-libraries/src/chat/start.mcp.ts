@@ -602,11 +602,16 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const resolved = await resolveAuthWithSource(token);
+    // The canonical resource offers the same self-hosted OAuth choice as the
+    // older /mcp-oauth resources. Relay credentials never become cloud auth.
+    const relay = token.startsWith('psh_') ? await resolveSelfHosted(token) : undefined;
+    const resolved = token.startsWith('psh_')
+      ? { auth: undefined, source: undefined }
+      : await resolveAuthWithSource(token);
     // @ts-ignore
     req.auth = resolved.auth;
     // @ts-ignore
-    if (!req.auth) {
+    if (!req.auth && !(relay && selfHostedServer)) {
       // RFC 6750: a wrong, rotated or revoked key or token
       res.setHeader(
         'WWW-Authenticate',
@@ -634,8 +639,8 @@ export const startMcp = async (app: INestApplication) => {
     endListenStream(req, res);
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: randomUUID(), auth: req.auth, source: resolved.source }, async () => {
-      await server.startHTTP({
+    await runWithContext({ requestId: randomUUID(), auth: req.auth, relay: relay || undefined, source: resolved.source }, async () => {
+      await (relay ? selfHostedServer! : server).startHTTP({
         url,
         httpPath: url.pathname,
         options: {
