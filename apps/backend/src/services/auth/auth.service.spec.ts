@@ -584,3 +584,27 @@ describe('AuthService invites and provider accounts', () => {
     );
   });
 });
+
+
+describe('disabled crypto login entry points', () => {
+  const originalEnv = process.env;
+  beforeEach(() => {
+    process.env = { ...originalEnv, NOT_SECURED: 'true', NEYNAR_SECRET_KEY: 'example-channel-key' };
+    delete process.env.WALLET_LOGIN_ENABLED;
+    delete process.env.FARCASTER_LOGIN_ENABLED;
+  });
+  afterAll(() => { process.env = originalEnv; });
+  it.each(['WALLET', 'FARCASTER'])('refuses %s challenge, exchange and direct registration before provider or database activity', async provider => {
+    const { AuthProviderManager } = jest.requireActual('./providers/providers.manager');
+    const resolve = jest.fn();
+    const createOrgAndUser = jest.fn();
+    const manager = new AuthProviderManager({ get: resolve } as any);
+    const service = new AuthService({} as any, { createOrgAndUser } as any, {} as any, manager, {} as any, {} as any);
+    expect(() => service.oauthLink(provider, { publicKey: 'example' })).toThrow('sign-in method is disabled');
+    await expect(service.checkExists(provider, 'example-token')).rejects.toThrow('sign-in method is disabled');
+    const body = Object.assign(new CreateOrgUserDto(), { provider, providerToken: 'example-token' });
+    await expect(service.routeAuth(provider as any, body, '127.0.0.1', 'unit-test')).rejects.toThrow('sign-in method is disabled');
+    expect(resolve).not.toHaveBeenCalled();
+    expect(createOrgAndUser).not.toHaveBeenCalled();
+  });
+});

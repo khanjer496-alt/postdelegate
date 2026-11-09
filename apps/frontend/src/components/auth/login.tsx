@@ -30,6 +30,7 @@ export function Login() {
   const {
     isGeneral,
     neynarClientId,
+    farcasterLoginEnabled,
     appleClientId,
     genericOauth,
   } = useVariables();
@@ -112,7 +113,7 @@ export function Login() {
               <div className="gap-[8px] flex">
                 <GoogleProvider />
                 {!!appleClientId && <AppleProvider />}
-                {!!neynarClientId && <FarcasterProvider />}
+                {farcasterLoginEnabled && !!neynarClientId && <FarcasterProvider />}
               </div>
             )}
             <div className="h-[20px] mb-[24px] mt-[24px] relative">

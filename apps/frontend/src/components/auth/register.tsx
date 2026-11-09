@@ -130,6 +130,7 @@ export function RegisterAfter({
     isGeneral,
     genericOauth,
     neynarClientId,
+    farcasterLoginEnabled,
     appleClientId,
     billingEnabled,
   } = useVariables();
@@ -230,7 +231,7 @@ export function RegisterAfter({
                     <GoogleProvider />
                   )}
                   {!!appleClientId && <AppleProvider />}
-                  {!!neynarClientId && <FarcasterProvider />}
+                  {farcasterLoginEnabled && !!neynarClientId && <FarcasterProvider />}
                 </div>
               ))}
             {!isAfterProvider && (
