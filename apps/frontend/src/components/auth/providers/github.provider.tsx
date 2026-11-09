@@ -1,3 +1,4 @@
+import { acquisitionQuery } from '@gitroom/helpers/consent/acquisition.consent';
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
