@@ -1,7 +1,7 @@
 // Network families in the PostDelegate channel directory.
 // `available` marks networks that can be connected in the app today. WAITING_KEYS are the
 // networks that are not live yet but are on their way (waiting on platform approval or verification).
-// Every other network here (X, Reddit, Farcaster) is not offered on
+// Every other network here (X, Farcaster) is not offered on
 // PostDelegate and is listed only for the free tools' character limits.
 // Caption limits are tool estimates; providers validate the actual post.
 // unit: codepoints | utf16 | utf8_bytes | graphemes | codepoints_emoji_bytes | weighted (X)
@@ -27,7 +27,6 @@ export const NETWORKS: Network[] = [
   { key: 'pinterest', name: 'Pinterest', color: '#e60023', abbr: 'Pi', limit: 500, unit: 'codepoints', scheduler: 'pinterest-scheduler' },
   { key: 'mastodon', name: 'Mastodon', color: '#6364ff', abbr: 'Ma', limit: 500, unit: 'codepoints', urlCost: 23, noMentionDomain: true, scheduler: 'mastodon-scheduler', available: true, blurb: 'Posts and threads on mastodon.social, with images or a video.' },
   { key: 'google_business', name: 'Google Business Profile', color: '#4285f4', abbr: 'Gb', limit: 1500, unit: 'codepoints', scheduler: 'google-business-scheduler', identifier: 'gmb', available: true, blurb: 'Updates, events and offers for a business location, with an optional image.' },
-  { key: 'reddit', name: 'Reddit', color: '#ff4500', abbr: 'Re', limit: 40000, unit: 'codepoints' },
   { key: 'telegram', name: 'Telegram', color: '#26a5e4', abbr: 'Tg', limit: 4096, unit: 'codepoints', scheduler: 'telegram-scheduler', available: true, blurb: 'Text, photos, videos and files to a channel or group.' },
   { key: 'discord', name: 'Discord', color: '#5865f2', abbr: 'Dc', limit: 1980, unit: 'codepoints', note: 'Discord allows 2,000; PostDelegate keeps a small margin.', scheduler: 'discord-scheduler', available: true, blurb: 'Markdown messages, images and videos to the channel you pick.' },
   { key: 'slack', name: 'Slack', color: '#8c3a90', abbr: 'Sl', limit: 4000, unit: 'codepoints', scheduler: 'slack-scheduler', available: true, blurb: 'Text and image messages to the channel you pick.' },
@@ -43,6 +42,8 @@ export const NETWORKS: Network[] = [
   { key: 'wordpress', name: 'WordPress', color: '#21759b', abbr: 'Wp', limit: 100000, unit: 'codepoints', scheduler: 'wordpress-scheduler', available: true, blurb: 'Posts or pages with categories, tags and a featured image.' },
   { key: 'hashnode', name: 'Hashnode', color: '#2962ff', abbr: 'Hn', limit: 10000, unit: 'codepoints', scheduler: 'hashnode-scheduler', available: true, blurb: 'Markdown articles to one of your publications.' },
   { key: 'listmonk', name: 'Listmonk (email)', color: '#0055d4', abbr: 'Lm', limit: 100000, unit: 'codepoints', scheduler: 'listmonk-scheduler', available: true, blurb: 'Email campaigns through your own Listmonk.' },
+  { key: 'moltbook', name: 'Moltbook', color: '#e56b4b', abbr: 'Mo', limit: 300, unit: 'codepoints', available: true, blurb: 'Text posts through your Moltbook agent.' },
+  { key: 'whop', name: 'Whop', color: '#ff6243', abbr: 'Wh', limit: 50000, unit: 'codepoints', available: true, blurb: 'Posts to a forum in your Whop community.' },
 ];
 export const NETWORK_COUNT = NETWORKS.length;
 export const AVAILABLE_NETWORKS = NETWORKS.filter((network) => network.available);

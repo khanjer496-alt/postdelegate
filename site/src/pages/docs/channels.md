@@ -18,6 +18,8 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | [Lemmy](/docs/channels/lemmy) | Instance address, username and password | Posts to communities |
 | [Listmonk](/docs/channels/listmonk) | Your Listmonk address, username and password | Email campaigns |
 | [Medium](/docs/channels/medium) | Integration token | Stories in Markdown |
+| [Moltbook](/docs/channels/moltbook) | Moltbook agent connection | Text posts |
+| [Whop](/docs/channels/whop) | Whop sign-in | Forum posts |
 | [Nostr](/docs/channels/nostr) | Hex private key | Notes |
 | [WordPress](/docs/channels/wordpress) | Site address, username and application password | Posts and pages |
 | [Kick](/docs/channels/kick) | Kick sign-in | Chat messages |

@@ -185,7 +185,7 @@ const en = {
     orbitCore: 'Your calendar',
     cardScheduled: 'Scheduled', cardScheduledSub: 'YouTube · Tue 09:00',
     cardDraft: 'Draft ready to review', cardDraftSub: 'From your own AI, via MCP',
-    legendLive: 'Connect today', legendSoon: 'Waiting on approval',
+    legendLive: 'Connect today', legendSoon: 'Coming soon',
     stepsTitle: 'How it works',
     steps: ['Your AI drafts it.', 'You approve it.', 'PostDelegate posts it.'],
     // the hero switch: classic scheduling, for people who plan and write posts themselves
@@ -277,7 +277,7 @@ const en = {
     description: (count: number) => `The ${count} networks you can connect to PostDelegate today, from YouTube and Bluesky to WordPress and Slack, and the ones waiting on platform approval.`,
     eyebrow: 'Platform coverage',
     h1: (count: number) => `Supported social networks: ${count} live today.`,
-    lead: 'Connect any live network from Add Channel. The others open once each platform approves PostDelegate.',
+    lead: "Connect an available network from Add Channel. Coming-soon networks await platform approval. X is not available.",
     ask: 'Ask about a channel',
     note: 'Networks marked available can be connected from Add Channel in your workspace. Account types and permissions still affect what each connection can do. See the <a href="/docs/channels">channel guides</a> for details.',
     connectIt: 'Connect it in your workspace',

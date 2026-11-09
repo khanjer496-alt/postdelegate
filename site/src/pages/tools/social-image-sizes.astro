@@ -6,7 +6,7 @@ import { SITE, CTA_LABEL } from '../../data/site';
 import AppShot from '../../components/AppShot.astro';
 import { CHECKED, IMAGE_SIZES as sections } from '../../data/image-sizes';
 const byKey = new Map(NETWORKS.map((n) => [n.key, n]));
-const rows = sections.map((s) => ({ ...s, network: byKey.get(s.key)! }));
+const rows = sections.filter((s) => byKey.has(s.key)).map((s) => ({ ...s, network: byKey.get(s.key)! }));
 const faq = [
   { q: 'What size should a YouTube thumbnail be?', a: 'YouTube asks for a 16:9 image and recommends 3840×2160, with a width of at least 640. JPG and PNG work. When you upload from a phone the file must be 2 MB or less, so a 1280×720 JPEG is a safe choice that still looks sharp.' },
   { q: 'What is the best image size for link previews?', a: 'Use a 1.91:1 image of 1200×630. Meta asks for at least 1200×630 for link shares, and LinkedIn recommends 1200×627, which is close enough that one image works for both.' },

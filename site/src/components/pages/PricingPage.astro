@@ -55,7 +55,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <section class="section"><div class="container"><Pricing heading={false} lang={lang} /></div></section>
   <section class="plan-compare" id="compare-plans"><div class="container">
     <h2>{p.compareTitle}</h2>
-    <div class="compare-scroll">
+    <div class="compare-scroll" role="region" aria-label={p.compareTitle} tabindex="0">
       <table>
         <thead><tr><th scope="col"><span class="sr-only">{p.feature}</span></th>{PLANS.map((plan) => <th scope="col">{plan.name}</th>)}</tr></thead>
         <tbody>{rows.map(([label, value]) => <tr><th scope="row">{label}</th>{PLANS.map((plan) => { const v = value(plan); return <td>{v === true ? <span class="cell-yes"><span aria-hidden="true">✓</span><span class="sr-only">{p.yes}</span></span> : v === false ? <span class="cell-no"><span aria-hidden="true">–</span><span class="sr-only">{p.no}</span></span> : v}</td>; })}</tr>)}</tbody>

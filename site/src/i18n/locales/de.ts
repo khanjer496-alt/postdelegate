@@ -306,7 +306,7 @@ const dict: Dict = {
     description: (count: number) => `Die ${count} Netzwerke, die Sie heute mit PostDelegate verbinden können, von YouTube und Bluesky bis WordPress und Slack, und die, die auf die Genehmigung der Plattformen warten.`,
     eyebrow: 'Plattformabdeckung',
     h1: (count: number) => `Unterstützte soziale Netzwerke: ${count} heute live.`,
-    lead: 'Verbinden Sie jedes Live-Netzwerk über „Kanal hinzufügen“. Die übrigen werden freigeschaltet, sobald die jeweilige Plattform PostDelegate genehmigt.',
+    lead: "Verbinde ein verfügbares Netzwerk über Kanal hinzufügen. Kommende Netzwerke warten auf die Plattformfreigabe. X ist nicht verfügbar.",
     ask: 'Nach einem Kanal fragen',
     note: 'Als verfügbar markierte Netzwerke verbinden Sie in Ihrem Arbeitsbereich über „Kanal hinzufügen“. Kontotypen und Berechtigungen bestimmen weiterhin, was jede Verbindung kann. Details in den <a href="/docs/channels">Kanalanleitungen</a>.',
     connectIt: 'In Ihrem Arbeitsbereich verbinden',
