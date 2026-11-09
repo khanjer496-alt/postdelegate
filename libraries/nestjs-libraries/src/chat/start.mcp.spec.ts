@@ -1,7 +1,10 @@
 const mockServers: any[] = [];
 const mockRequestIds: unknown[] = [];
+const mockRelays: unknown[] = [];
+const mockHttpServers: any[] = [];
+let mockRelayEnabled = false;
 jest.mock('@mastra/mcp', () => {
-  const { getAuth, getRequestId } = jest.requireActual(
+  const { getAuth, getRequestId, getRelay } = jest.requireActual(
     '@gitroom/nestjs-libraries/chat/async.storage'
   );
   return {
@@ -25,6 +28,8 @@ jest.mock('@mastra/mcp', () => {
       }
       async startHTTP({ req, res }: any) {
         mockRequestIds.push(getRequestId());
+        mockRelays.push(getRelay());
+        mockHttpServers.push(this);
         if (req.body?.tool) {
           try { await this.config.tools[req.body.tool].execute(); }
           catch (error) { res.status(403).json({ error: String(error) }); return; }
@@ -46,7 +51,7 @@ jest.mock(
 );
 jest.mock('@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service', () => ({
   OAuthService: class {},
-  selfHostedRelayEnabled: () => false,
+  selfHostedRelayEnabled: () => mockRelayEnabled,
 }));
 jest.mock('@gitroom/nestjs-libraries/chat/mcp.relay.service', () => ({
   McpRelayService: class {},
@@ -129,10 +134,10 @@ const services = new Map<unknown, unknown>([
         token === 'pos_valid'
           ? { organization: { id: 'org-oauth' }, oauthApp: { name: 'Smithery' }, scope: 'mcp:read mcp:write' }
           : token === 'pos_readonly' ? { organization: { id: 'org-read' }, scope: 'mcp:read' } : null,
-      getSelfHostedByAccessToken: async () => null,
+      getSelfHostedByAccessToken: async (token: string) => token === 'psh_valid' ? { id: 'relay-fixture' } : null,
     },
   ],
-  [McpRelayService, {}],
+  [McpRelayService, { tools: () => ({ relayMarker: {} }) }],
 ]);
 
 const env = { ...process.env };
@@ -521,5 +526,35 @@ describe('startMcp', () => {
       expect(response.headers.get('content-type')).toContain('text/plain');
       expect(await response.text()).toBe('challenge-token');
     });
+  });
+});
+
+
+describe('canonical /mcp OAuth relay compatibility', () => {
+  beforeAll(async () => { mockRelayEnabled = true; await boot(); });
+  afterAll(async () => { await shutdown(); mockRelayEnabled = false; process.env = env; });
+  it.each(['/mcp', '/mcp-oauth-dynamic'])('routes a valid self-hosted OAuth connection on %s through the relay server', async path => {
+    const response = await mcpPost(path, { Authorization: 'Bearer psh_valid' });
+    expect(response.status).toBe(200);
+    expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
+    expect(mockHttpServers[mockHttpServers.length - 1].config.tools.relayMarker).toBeDefined();
+  });
+  it('rejects a revoked relay token without starting the MCP server', async () => {
+    const calls = mockHttpServers.length;
+    const response = await mcpPost('/mcp', { Authorization: 'Bearer psh_revoked' });
+    expect(response.status).toBe(401);
+    expect(mockHttpServers).toHaveLength(calls);
+  });
+});
+
+
+describe('canonical /mcp relay-disabled boundary', () => {
+  beforeAll(async () => { mockRelayEnabled = false; await boot(); });
+  afterAll(async () => { await shutdown(); process.env = env; });
+  it('does not enable a self-hosted connection when the relay feature is off', async () => {
+    const calls = mockHttpServers.length;
+    const response = await mcpPost('/mcp', { Authorization: 'Bearer psh_valid' });
+    expect(response.status).toBe(401);
+    expect(mockHttpServers).toHaveLength(calls);
   });
 });
