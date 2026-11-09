@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import {
   Body,
   Controller,
@@ -48,7 +50,8 @@ const HOUR = 60 * MINUTE;
 export class AuthController {
   constructor(
     private _authService: AuthService,
-    private _emailService: EmailService
+    private _emailService: EmailService,
+    private _measurement?: MeasurementService
   ) {}
 
   // The invite in the cookie: its workspace opens, or the app says why it
@@ -117,6 +120,13 @@ export class AuthController {
     @ClientIp() ip: string,
     @UserAgent() userAgent: string
   ) {
+    const identity = req?.headers?.['x-measurement-event'];
+    await this._measurement?.signupAttempt(
+      body.acquisition,
+      typeof identity === 'string' && /^[a-f0-9-]{36}$/.test(identity)
+        ? identity
+        : randomUUID()
+    );
     try {
       const getOrgFromCookie = this._authService.getOrgFromCookie(
         req?.cookies?.org
@@ -260,6 +270,7 @@ export class AuthController {
       expires: new Date(Date.now() + 1000 * 60 * 10),
     });
 
+    await this._measurement?.rememberHandoff(state, query?.acquisition);
     return this._authService.oauthLink(provider, { ...query, state });
   }
 
@@ -378,7 +389,10 @@ export class AuthController {
     );
 
     if (token) {
-      return response.json({ token });
+      return response.json({
+        token,
+        acquisition: await this._measurement?.handoff(state),
+      });
     }
 
     this.clearInviteCookie(req, response);

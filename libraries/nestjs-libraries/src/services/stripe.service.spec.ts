@@ -915,6 +915,7 @@ describe('StripeService cardless trial', () => {
         status: 'trialing',
         trialEndsAt: new Date(1793664000 * 1000),
         currentPeriodEnd: null,
+        measurementSubscriptionId: 'sub_1',
       }
     );
   });
@@ -1726,7 +1727,7 @@ describe('extra channels', () => {
         null,
         undefined,
         undefined,
-        { status: 'active', trialEndsAt: null, currentPeriodEnd: null }
+        { status: 'active', trialEndsAt: null, currentPeriodEnd: null, measurementSubscriptionId: 'sub_1' }
       );
     });
 
@@ -1782,6 +1783,7 @@ describe('extra channels', () => {
           // the trial it once had, as Stripe keeps it
           trialEndsAt: new Date(1800000000 * 1000),
           currentPeriodEnd: null,
+        measurementSubscriptionId: 'sub_1',
         }
       );
     });
@@ -2100,7 +2102,7 @@ describe('extra channels', () => {
         null,
         undefined,
         undefined,
-        { status: 'active', trialEndsAt: null, currentPeriodEnd: null }
+        { status: 'active', trialEndsAt: null, currentPeriodEnd: null, measurementSubscriptionId: 'sub_1' }
       );
     });
 

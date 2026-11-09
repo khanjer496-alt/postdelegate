@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { HttpException, Injectable } from '@nestjs/common';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
@@ -18,19 +19,22 @@ import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autop
 export class OrganizationService {
   constructor(
     private _organizationRepository: OrganizationRepository,
-    private _notificationsService: NotificationService
+    private _notificationsService: NotificationService,
+    private _measurement?: MeasurementService
   ) {}
   async createOrgAndUser(
     body: Omit<CreateOrgUserDto, 'providerToken'> & { providerId?: string },
     ip: string,
     userAgent: string
   ) {
-    return this._organizationRepository.createOrgAndUser(
+    const created = await this._organizationRepository.createOrgAndUser(
       body,
       this._notificationsService.hasEmailProvider(),
       ip,
       userAgent
     );
+    await this._measurement?.registration(created.id, body.acquisition, !!created.users[0]?.user.activated);
+    return created;
   }
 
   async getCount() {

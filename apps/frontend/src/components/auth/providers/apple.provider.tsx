@@ -10,7 +10,15 @@ export const AppleProvider = () => {
   const toaster = useToaster();
   const gotoLogin = useCallback(async () => {
     try {
-      const response = await fetch('/auth/oauth/APPLE');
+      const response = await fetch(
+        '/auth/oauth/APPLE' +
+          (new URLSearchParams(location.search).get('pd_touch')
+            ? '?acquisition=' +
+              encodeURIComponent(
+                new URLSearchParams(location.search).get('pd_touch')!
+              )
+            : '')
+      );
       // an error body is not a sign-in link
       if (!response.ok) {
         throw new Error(

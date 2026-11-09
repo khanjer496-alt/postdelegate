@@ -36,6 +36,7 @@ export function Register() {
   const [provider] = useState(getQuery?.get('provider')?.toUpperCase());
   const [code, setCode] = useState(getQuery?.get('code') || '');
   const [state] = useState(getQuery?.get('state') || '');
+  const [acquisition, setAcquisition] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -57,6 +58,9 @@ export function Register() {
     const body = await response.json().catch(() => ({}));
     if (response.ok && body?.token) {
       setCode(body.token);
+      setAcquisition(
+        typeof body.acquisition === 'string' ? body.acquisition : ''
+      );
       setShow(true);
       return;
     }
@@ -106,7 +110,11 @@ export function Register() {
     return <LoadingComponent />;
   }
   return (
-    <RegisterAfter token={code} provider={provider?.toUpperCase() || 'LOCAL'} />
+    <RegisterAfter
+      token={code}
+      provider={provider?.toUpperCase() || 'LOCAL'}
+      acquisition={acquisition}
+    />
   );
 }
 function getHelpfulReasonForRegistrationFailure(httpCode: number) {
@@ -121,7 +129,9 @@ function getHelpfulReasonForRegistrationFailure(httpCode: number) {
 export function RegisterAfter({
   token,
   provider,
+  acquisition,
 }: {
+  acquisition?: string;
   token: string;
   provider: string;
 }) {
@@ -162,9 +172,12 @@ export function RegisterAfter({
     try {
       const response = await fetchData('/auth/register', {
         method: 'POST',
+        headers: { 'x-measurement-event': crypto.randomUUID() },
         body: JSON.stringify({
           ...data,
           datafast_visitor_id,
+          acquisition:
+            acquisition || searchParams?.get('pd_touch') || undefined,
           ...(ref ? { ref } : {}),
         }),
       });
@@ -200,7 +213,12 @@ export function RegisterAfter({
   };
   return (
     <FormProvider {...form}>
-      <form method="post" action="/auth" className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
+      <form
+        method="post"
+        action="/auth"
+        className="flex-1 flex"
+        onSubmit={form.handleSubmit(onSubmit)}
+      >
         <div className="flex flex-col flex-1">
           <div>
             <h1 className="text-[40px] font-[500] -tracking-[0.8px] text-start cursor-pointer">

@@ -11,6 +11,8 @@ import { Organization, Prisma } from '@prisma/client';
 // the row as it comes: its own status (Stripe's trialing, active, past_due,
 // paused...), when its trial ends and when the period being paid ends
 export type SubscriptionProviderState = {
+  trialStartsAt?: Date;
+  measurementSubscriptionId?: string;
   status: string;
   trialEndsAt: Date | null;
   currentPeriodEnd: Date | null;

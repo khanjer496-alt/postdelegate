@@ -11,7 +11,15 @@ export const OauthProvider = () => {
   const t = useT();
   const gotoLogin = useCallback(async () => {
     try {
-      const response = await fetch('/auth/oauth/GENERIC');
+      const response = await fetch(
+        '/auth/oauth/GENERIC' +
+          (new URLSearchParams(location.search).get('pd_touch')
+            ? '?acquisition=' +
+              encodeURIComponent(
+                new URLSearchParams(location.search).get('pd_touch')!
+              )
+            : '')
+      );
       if (!response.ok) {
         throw new Error(
           `Login link request failed with status ${response.status}`

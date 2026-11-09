@@ -100,7 +100,7 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
       // derived from Pulse's pulse_vid cookie; without it, it is that day's cookie-free id.
       // Without Pulse (blocked, or no visitor id to give) the links stay as they
       // are.
-      type Pulse = { visitorId?: () => Promise<string> };
+      type Pulse = { visitorId?: () => Promise<string>; acquisitionTouch?: () => Promise<string> };
       const VISITOR = /^[0-9a-f]{32}$/;
       const app = new URL(SITE.app).origin;
     
@@ -123,6 +123,24 @@ const safeJson = (value: object) => JSON.stringify(value).replace(/</g, '\\u003c
           .catch(() => {});
       };
     
+      // A signed touch carries first-session source dimensions without browser storage.
+      // Retry briefly because the first pageview beacon may still be arriving.
+      const carryTouch = (attempt = 0) => {
+        const tracker = pulse();
+        if (!tracker?.acquisitionTouch) return;
+        tracker.acquisitionTouch().then(token => {
+          if (!token) { if (attempt < 3) setTimeout(() => carryTouch(attempt + 1), 300); return; }
+          document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach(link => {
+            const url = new URL(link.href, location.href);
+            if (url.origin === app && (url.pathname === '/' || url.pathname.startsWith('/auth'))) {
+              url.searchParams.set('pd_touch', token);
+              link.href = url.href;
+            }
+          });
+        }).catch(() => {});
+      };
+      if (document.readyState === 'complete') carryTouch();
+      else addEventListener('load', () => carryTouch(), { once: true });
       // the tracker is a deferred script, it is there once the page has loaded
       if (typeof pulse()?.visitorId === 'function' || document.readyState === 'complete') carry();
       else addEventListener('load', carry, { once: true });

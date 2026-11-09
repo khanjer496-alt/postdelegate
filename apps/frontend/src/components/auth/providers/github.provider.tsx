@@ -8,7 +8,15 @@ export const GithubProvider = () => {
   const toaster = useToaster();
   const gotoLogin = useCallback(async () => {
     try {
-      const response = await fetch('/auth/oauth/GITHUB');
+      const response = await fetch(
+        '/auth/oauth/GITHUB' +
+          (new URLSearchParams(location.search).get('pd_touch')
+            ? '?acquisition=' +
+              encodeURIComponent(
+                new URLSearchParams(location.search).get('pd_touch')!
+              )
+            : '')
+      );
       // an error body is not a sign-in link
       if (!response.ok) {
         throw new Error(
