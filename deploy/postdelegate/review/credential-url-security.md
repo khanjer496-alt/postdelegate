@@ -33,7 +33,7 @@ request bodies and raw query/fragment attributes are filtered. Input masking alo
 never established URL privacy. Replay request-body capture is explicitly disabled.
 
 Replay DOM metadata cannot be edited by the custom-event hook. Initial Sentry
-client initialization is skipped on auth/connect routes; entering one with an
+client initialization is skipped on auth/connect and legacy credential-path routes; entering one with an
 existing client stops Replay with `flush: false`, discarding the pending buffer.
 Normal later routes can initialize the client. An already-stopped Replay is not
 forcibly restarted or resampled during that existing SPA session.
