@@ -1,11 +1,16 @@
 'use client';
+import {
+  readAuthCode,
+  clearAuthCode,
+  stripAuthCodeFromHistory,
+} from './auth.code';
 
 import { FormProvider, SubmitHandler, useForm } from 'react-hook-form';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import Link from 'next/link';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { GithubProvider } from '@gitroom/frontend/components/auth/providers/github.provider';
@@ -38,52 +43,66 @@ export function Register() {
   const [state] = useState(getQuery?.get('state') || '');
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
+  const [handoff] = useState(getQuery?.get('handoff') === 'true');
+  const started = useRef(false);
   useEffect(() => {
-    if (provider && code) {
-      load();
+    if (started.current) return;
+    started.current = true;
+    const captured = readAuthCode(provider, state) || code;
+    clearAuthCode(provider, state);
+    if (!stripAuthCodeFromHistory()) {
+      setError('Could not secure this sign-in URL. Start again.');
+      return;
     }
+    if (handoff && !captured) {
+      setError('This sign-in expired. Start again from the sign-in page.');
+      return;
+    }
+    if (provider && captured)
+      void load(captured).catch(() =>
+        setError('Could not complete sign-in. Start again.')
+      );
   }, []);
-  const load = useCallback(async () => {
-    const response = await fetch(
-      `/auth/oauth/${provider?.toUpperCase() || 'LOCAL'}/exists`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          code,
-          state,
-        }),
+  const load = useCallback(
+    async (capturedCode: string) => {
+      const response = await fetch(
+        `/auth/oauth/${provider?.toUpperCase() || 'LOCAL'}/exists`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            code: capturedCode,
+            state,
+          }),
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (response.ok && body?.token) {
+        setCode(body.token);
+        setShow(true);
+        return;
       }
-    );
-    const body = await response.json().catch(() => ({}));
-    if (response.ok && body?.token) {
-      setCode(body.token);
-      setShow(true);
-      return;
-    }
-    // a signed in account reloads the page from the response headers
-    if (response.ok && body?.login) {
-      return;
-    }
-    // only a 400 carries a message meant for people
-    const message =
-      response.status !== 400
-        ? undefined
-        : Array.isArray(body?.message)
-        ? body.message[0]
-        : body?.message;
-    setError(
-      typeof message === 'string' && message
-        ? message
-        : t(
-            'oauth_sign_in_failed',
-            'We could not sign you in with this provider. Try again, or sign in with your email.'
-          )
-    );
-  }, [provider, code, state, t]);
-  // a provider without a code is not a sign-in callback, e.g. an old link
-  if (!code || !provider) {
-    return <RegisterAfter token="" provider="LOCAL" />;
-  }
+      // a signed in account reloads the page from the response headers
+      if (response.ok && body?.login) {
+        return;
+      }
+      // only a 400 carries a message meant for people
+      const message =
+        response.status !== 400
+          ? undefined
+          : Array.isArray(body?.message)
+          ? body.message[0]
+          : body?.message;
+      setError(
+        typeof message === 'string' && message
+          ? message
+          : t(
+              'oauth_sign_in_failed',
+              'We could not sign you in with this provider. Try again, or sign in with your email.'
+            )
+      );
+    },
+    [provider, code, state, t]
+  );
   if (error) {
     return (
       <div className="flex flex-col gap-[16px]">
@@ -102,11 +121,17 @@ export function Register() {
       </div>
     );
   }
+  if (handoff && !show) return <LoadingComponent />;
+  if (!code || !provider) return <RegisterAfter token="" provider="LOCAL" />;
   if (!show) {
     return <LoadingComponent />;
   }
   return (
-    <RegisterAfter token={code} provider={provider?.toUpperCase() || 'LOCAL'} />
+    <RegisterAfter
+      token={code}
+      provider={provider?.toUpperCase() || 'LOCAL'}
+      state={state}
+    />
   );
 }
 function getHelpfulReasonForRegistrationFailure(httpCode: number) {
@@ -121,9 +146,11 @@ function getHelpfulReasonForRegistrationFailure(httpCode: number) {
 export function RegisterAfter({
   token,
   provider,
+  state,
 }: {
   token: string;
   provider: string;
+  state?: string;
 }) {
   const t = useT();
   const {
@@ -164,6 +191,7 @@ export function RegisterAfter({
         method: 'POST',
         body: JSON.stringify({
           ...data,
+          ...(state ? { providerState: state } : {}),
           datafast_visitor_id,
           ...(ref ? { ref } : {}),
         }),
@@ -200,7 +228,12 @@ export function RegisterAfter({
   };
   return (
     <FormProvider {...form}>
-      <form method="post" action="/auth" className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
+      <form
+        method="post"
+        action="/auth"
+        className="flex-1 flex"
+        onSubmit={form.handleSubmit(onSubmit)}
+      >
         <div className="flex flex-col flex-1">
           <div>
             <h1 className="text-[40px] font-[500] -tracking-[0.8px] text-start cursor-pointer">
@@ -271,6 +304,17 @@ export function RegisterAfter({
                       {t('signup_password_rules', 'Use 3–64 characters.')}
                     </p>
                   </>
+                )}
+                {isAfterProvider && form.formState.errors.email?.message && (
+                  <div
+                    role="alert"
+                    className="mb-[12px] text-[14px] text-red-400"
+                  >
+                    <p>{String(form.formState.errors.email.message)}</p>
+                    <Link href="/auth/login" className="underline">
+                      {t('restart_sign_in', 'Start sign-in again')}
+                    </Link>
+                  </div>
                 )}
                 <Input
                   id="signup-company"

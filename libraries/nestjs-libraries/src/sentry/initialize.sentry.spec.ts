@@ -19,6 +19,9 @@ const KEY = 'sk-proj-xxxxxxxxxxxxxxxxxxxxa9F2';
 describe('Sentry request body scrubbing', () => {
   it.each([
     'https://app.example.com/api/ai-credentials',
+    'https://app.example.com/api/auth/farcaster/login/start',
+    'https://app.example.com/api/auth/oauth/FARCASTER/exists',
+    'https://app.example.com/auth/register',
     'https://app.example.com/api/ai-credentials/',
     'https://app.example.com/ai-credentials?x=1',
     'https://app.example.com/ai-credentials#x',

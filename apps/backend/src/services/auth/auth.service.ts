@@ -1,3 +1,4 @@
+import { AuthProviderContext } from './providers.interface';
 import { HttpException, Injectable } from '@nestjs/common';
 import { Provider, User } from '@prisma/client';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -62,7 +63,8 @@ export class AuthService {
     ip: string,
     userAgent: string,
     addToOrg?: boolean | InviteCookie,
-    affiliateCookie?: string
+    affiliateCookie?: string,
+    providerContext?: AuthProviderContext
   ) {
     // without referral consent there is no pd_ref cookie, the sign-up form
     // then sends the ?ref= code of the link it was opened from, this visit only
@@ -143,7 +145,8 @@ export class AuthService {
       ip,
       userAgent,
       affiliateCookie,
-      referralCode
+      referralCode,
+      providerContext
     );
 
     const addedOrg = await this.acceptInvite(user.id, addToOrg);
@@ -151,7 +154,10 @@ export class AuthService {
   }
 
   // The invite in the cookie, accepted by whoever signs up or signs in
-  private async acceptInvite(userId: string, addToOrg?: boolean | InviteCookie) {
+  private async acceptInvite(
+    userId: string,
+    addToOrg?: boolean | InviteCookie
+  ) {
     if (!addToOrg || typeof addToOrg === 'boolean') {
       return false as const;
     }
@@ -220,12 +226,21 @@ export class AuthService {
     ip: string,
     userAgent: string,
     affiliateCookie?: string,
-    referralCode?: string
+    referralCode?: string,
+    providerContext?: AuthProviderContext
   ) {
     const providerInstance = this._providerManager.getProvider(provider);
-    const providerUser = await providerInstance.getUser(body.providerToken);
+    if (
+      providerInstance.requiresBrowserContext &&
+      !providerContext?.browserNonce
+    )
+      throw new Error('Invalid state');
+    const providerUser = await providerInstance.getUser(
+      body.providerToken,
+      providerContext ? { ...providerContext, purpose: 'register' } : undefined
+    );
 
-    if (!providerUser) {
+    if (!providerUser || !providerUser.id) {
       throw new Error('Invalid provider token');
     }
 
@@ -331,7 +346,9 @@ export class AuthService {
     if (!user) {
       // an account that signs in with Google (or another provider) has no
       // password, it is told how to sign in instead
-      const providerUser = await this._userService.getProviderUserByEmail(email);
+      const providerUser = await this._userService.getProviderUserByEmail(
+        email
+      );
       if (providerUser) {
         const name =
           providerNames[providerUser.providerName] || 'your sign-in provider';
@@ -454,11 +471,20 @@ export class AuthService {
     redirectUri?: string,
     state?: string,
     stateCookie?: string,
-    addToOrg?: boolean | InviteCookie
+    addToOrg?: boolean | InviteCookie,
+    providerContext?: AuthProviderContext
   ) {
+    const providerInstance = this._providerManager.getProvider(provider);
     // the mobile app passes redirect_uri and keeps no cookies, the web flow
     // never passes it, so the state nonce is only enforced for the web flow
-    if (
+    if (providerInstance.requiresBrowserContext) {
+      if (
+        !providerContext?.browserNonce ||
+        !state ||
+        providerContext.state !== state
+      )
+        throw new Error('Invalid state');
+    } else if (
       !process.env.NOT_SECURED &&
       !redirectUri &&
       (!state || state !== stateCookie)
@@ -466,10 +492,12 @@ export class AuthService {
       throw new Error('Invalid state');
     }
 
-    const providerInstance = this._providerManager.getProvider(provider);
-    const token = await providerInstance.getToken(code, redirectUri);
-    const user = await providerInstance.getUser(token);
-    if (!user) {
+    const context: AuthProviderContext | undefined = providerContext
+      ? { ...providerContext, state, purpose: 'login' }
+      : undefined;
+    const token = await providerInstance.getToken(code, redirectUri, context);
+    const user = await providerInstance.getUser(token, context);
+    if (!user || !user.id) {
       throw new Error('Invalid user');
     }
     const checkExists = await this._userService.getUserByProvider(
@@ -487,7 +515,7 @@ export class AuthService {
     // a new provider account, unless the email already signs in with a password
     await this.assertNoPasswordAccount(user.email);
 
-    return { token };
+    return { token: user.registrationToken || token };
   }
 
   // The session token: who it is, which password it was issued for (so

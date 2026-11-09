@@ -1,7 +1,20 @@
+import { randomBytes } from 'crypto';
 import {
+  FarcasterProvider as FarcasterAuthProvider,
+  FARCASTER_AUTH_COOKIE_TTL,
+} from '@gitroom/backend/services/auth/providers/farcaster.provider';
+import {
+  providerNonceCookie,
+  providerNonceCookieOptions,
+  providerRequestContext,
+} from '@gitroom/backend/services/auth/provider.binding';
+import { ProviderProofStatusDto } from '@gitroom/nestjs-libraries/dtos/auth/provider-proof.dto';
+import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Post,
   Query,
@@ -100,6 +113,12 @@ export class AuthController {
     });
   }
 
+  private clearProviderNonce(req: Request, response: Response, state?: string) {
+    if (!providerRequestContext(req?.cookies, state)) return;
+    const { maxAge, ...options } = providerNonceCookieOptions(0);
+    response.clearCookie(providerNonceCookie(state!), options);
+  }
+
   @Get('/can-register')
   async canRegister() {
     return {
@@ -110,6 +129,7 @@ export class AuthController {
   @UseGuards(ThrottlerRealIpGuard)
   @Throttle({ default: { limit: 10, ttl: HOUR } })
   @Post('/register')
+  @Header('Cache-Control', 'no-store')
   async register(
     @Req() req: Request,
     @Body() body: CreateOrgUserDto,
@@ -128,9 +148,11 @@ export class AuthController {
         ip,
         userAgent,
         getOrgFromCookie,
-        req?.cookies?.[AFFILIATE_COOKIE_NAME]
+        req?.cookies?.[AFFILIATE_COOKIE_NAME],
+        providerRequestContext(req?.cookies, body.providerState)
       );
 
+      this.clearProviderNonce(req, response, body.providerState);
       this.clearInviteCookie(req, response);
 
       const activationRequired =
@@ -307,6 +329,59 @@ export class AuthController {
     };
   }
 
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 30, ttl: HOUR } })
+  @Post('/farcaster/login/start')
+  @Header('Cache-Control', 'no-store')
+  async farcasterLoginStart(
+    @Req() req: Request,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    if (!req.headers['content-type']?.includes('application/json'))
+      throw new BadRequestException('Invalid request');
+    try {
+      const nonce = randomBytes(32).toString('hex');
+      const flow = await new FarcasterAuthProvider().startLogin(nonce);
+      response.cookie(
+        providerNonceCookie(flow.state),
+        nonce,
+        providerNonceCookieOptions(FARCASTER_AUTH_COOKIE_TTL)
+      );
+      return flow;
+    } catch {
+      throw new BadRequestException(
+        'Could not start Farcaster sign-in. Start again.'
+      );
+    }
+  }
+
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 1000, ttl: HOUR } })
+  @Post('/farcaster/login/status')
+  @Header('Cache-Control', 'no-store')
+  async farcasterLoginStatus(
+    @Req() req: Request,
+    @Body() body: ProviderProofStatusDto
+  ) {
+    if (!req.headers['content-type']?.includes('application/json'))
+      throw new BadRequestException('Invalid request');
+    const context = providerRequestContext(req?.cookies, body.state);
+    if (!context)
+      throw new BadRequestException(
+        'This sign-in expired or belongs to another browser. Start again.'
+      );
+    try {
+      return await new FarcasterAuthProvider().loginStatus(
+        context.state!,
+        context.browserNonce!
+      );
+    } catch {
+      throw new BadRequestException(
+        'This sign-in expired or belongs to another browser. Start again.'
+      );
+    }
+  }
+
   // public and creates a signer at Neynar per call, so cap it per client
   @UseGuards(ThrottlerRealIpGuard)
   @Throttle({ default: { limit: 30, ttl: 3600000 } })
@@ -355,6 +430,7 @@ export class AuthController {
   @UseGuards(ThrottlerRealIpGuard)
   @Throttle({ default: { limit: 30, ttl: 10 * MINUTE } })
   @Post('/oauth/:provider/exists')
+  @Header('Cache-Control', 'no-store')
   async oauthExists(
     @Req() req: Request,
     @Body('code') code: string,
@@ -374,13 +450,15 @@ export class AuthController {
       redirect_uri,
       state,
       req?.cookies?.oauth_state,
-      this._authService.getOrgFromCookie(req?.cookies?.org)
+      this._authService.getOrgFromCookie(req?.cookies?.org),
+      providerRequestContext(req?.cookies, state)
     );
 
     if (token) {
       return response.json({ token });
     }
 
+    this.clearProviderNonce(req, response, state);
     this.clearInviteCookie(req, response);
     this.applyInvite(response, addedOrg || false);
 
