@@ -104,15 +104,18 @@ describe('review scope policy', () => {
     new InstagramStandaloneProvider(),
     new ThreadsProvider(),
   ])(
-    'allows an existing scheduled reply to reach the provider with defaults off for %p',
+    'publishes an existing scheduled reply with its broad-grant token while defaults are off for %p',
     async (p) => {
-      const error = new Error('provider permission response');
-      const transport = jest.spyOn(SocialAbstract.prototype, 'fetch').mockRejectedValue(error);
+      const transport = jest.spyOn(SocialAbstract.prototype, 'fetch').mockResolvedValue({
+        json: async () => ({ id: 'network-reply', status: 'FINISHED', permalink: 'https://network.test/reply', permalink_url: 'https://network.test/reply' }),
+      } as any);
       try {
-        await expect(p.comment('review', 'post', undefined, 'test', [
-          { message: 'Scheduled reply', media: [], settings: {} },
-        ] as any, {} as any)).rejects.toBe(error);
-        expect(transport).toHaveBeenCalled();
+        const result = await p.comment('review', 'main-post', undefined, 'EXAMPLE-broad-grant-token', [
+          { id: 'saved-reply', message: 'Scheduled reply', media: [], settings: {} },
+        ] as any, {} as any);
+        expect(p.plugsAvailable).toBe(false);
+        expect(result).toEqual([{ id: 'saved-reply', postId: 'network-reply', releaseURL: 'https://network.test/reply', status: 'success' }]);
+        expect(JSON.stringify(transport.mock.calls)).toContain('EXAMPLE-broad-grant-token');
       } finally {
         transport.mockRestore();
       }
