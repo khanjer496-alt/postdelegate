@@ -23,6 +23,7 @@ import { DribbbleProvider } from '@gitroom/nestjs-libraries/integrations/social/
 import { MoltbookProvider } from '@gitroom/nestjs-libraries/integrations/social/moltbook.provider';
 import { FarcasterProvider } from '@gitroom/nestjs-libraries/integrations/social/farcaster.provider';
 import { RedditProvider } from '@gitroom/nestjs-libraries/integrations/social/reddit.provider';
+import { RedditOwnKeyProvider } from '@gitroom/nestjs-libraries/integrations/social/reddit.own.key.provider';
 import { NostrProvider } from '@gitroom/nestjs-libraries/integrations/social/nostr.provider';
 import { TumblrProvider } from '@gitroom/nestjs-libraries/integrations/social/tumblr.provider';
 import { MediumProvider } from '@gitroom/nestjs-libraries/integrations/social/medium.provider';
@@ -323,6 +324,14 @@ describe('isPublicReleaseURL, per provider that opted in', () => {
     });
   }
 
+  it('is inherited by the Reddit provider that runs on the customer app', () => {
+    expect(
+      new RedditOwnKeyProvider().isPublicReleaseURL!(
+        'https://www.reddit.com/r/selfhosted/comments/1abcdef/my_post/'
+      )
+    ).toBe(true);
+  });
+
   it('is inherited by the X provider that runs on the customer keys', () => {
     expect(
       new XOwnKeyProvider().isPublicReleaseURL!(
@@ -348,9 +357,13 @@ describe('providers that must stay private', () => {
 // opts out, which is the safe side, but it should be a decision someone wrote
 // down. This fails until the new provider is listed in one table or the other.
 describe('every provider is ruled on', () => {
-  // x-own-key is the same X provider on the customer's own keys and inherits
-  // its opt-in, which the suite above checks directly
-  const optedIdentifiers = [...opted.map((o) => o.name), 'x-own-key'];
+  // x-own-key and reddit-own-key are the same X and Reddit providers on the
+  // customer's own app and inherit their opt-in, checked directly above
+  const optedIdentifiers = [
+    ...opted.map((o) => o.name),
+    'x-own-key',
+    'reddit-own-key',
+  ];
   const privateIdentifiers = privateProviders.map(([name]) => name);
 
   it('lists each connectable provider as opted in or kept private', () => {
