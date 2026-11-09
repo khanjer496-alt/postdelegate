@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PendingCheckResponse,
   PostDetails,
   PostResponse,
@@ -58,9 +59,12 @@ type RedditPendingData = {
 // Reddit's API rules ask every client for a unique, descriptive User-Agent
 // naming the platform, app id, version and the developer's Reddit username.
 // REDDIT_USER_AGENT replaces the whole string (e.g. another Reddit username).
-const redditUserAgent = () =>
+export const redditUserAgent = () =>
   process.env.REDDIT_USER_AGENT ||
   'web:com.postdelegate.app:v1.0.0 (by /u/ConsciousYam1737)';
+
+export const basicAuthHeader = (clientId: string, clientSecret: string) =>
+  `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
 
 export class RedditProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 1; // Reddit has strict rate limits (1 request per second)
@@ -112,20 +116,40 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     return true;
   }
 
+  // Where Reddit sends the user back after authorizing; it must match the
+  // redirect uri registered on the Reddit app exactly.
+  protected redirectUri() {
+    return `${process.env.FRONTEND_URL}/integrations/social/${this.identifier}`;
+  }
+
+  // HTTP basic auth of the Reddit app the channel was authorized with. The
+  // shared app comes from the environment; reddit-own-key reads the
+  // customer's own app from the stored refresh token.
+  protected basicAuth(_storedRefreshToken = '') {
+    return basicAuthHeader(
+      process.env.REDDIT_CLIENT_ID || '',
+      process.env.REDDIT_CLIENT_SECRET || ''
+    );
+  }
+
+  // The refresh token Reddit issued, without anything a subclass stores
+  // alongside it.
+  protected bareRefreshToken(storedRefreshToken: string) {
+    return storedRefreshToken;
+  }
+
   async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
     const { access_token: accessToken, expires_in: expiresIn } = await (
       await this.fetch('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${Buffer.from(
-            `${process.env.REDDIT_CLIENT_ID}:${process.env.REDDIT_CLIENT_SECRET}`
-          ).toString('base64')}`,
+          Authorization: this.basicAuth(refreshToken),
           'User-Agent': redditUserAgent(),
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: refreshToken,
+          refresh_token: this.bareRefreshToken(refreshToken),
         }),
       })
     ).json();
@@ -153,10 +177,10 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   async generateAuthUrl() {
     const state = makeSecureId(6);
     const codeVerifier = makeSecureId(30);
-    const url = `https://www.reddit.com/api/v1/authorize?client_id=${
-      process.env.REDDIT_CLIENT_ID
-    }&response_type=code&state=${state}&redirect_uri=${encodeURIComponent(
-      `${process.env.FRONTEND_URL}/integrations/social/reddit`
+    const url = `https://www.reddit.com/api/v1/authorize?client_id=${encodeURIComponent(
+      process.env.REDDIT_CLIENT_ID || ''
+    )}&response_type=code&state=${state}&redirect_uri=${encodeURIComponent(
+      this.redirectUri()
     )}&duration=permanent&scope=${encodeURIComponent(this.scopes.join(' '))}`;
     return {
       url,
@@ -165,7 +189,10 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: { code: string; codeVerifier: string }) {
+  async authenticate(
+    params: { code: string; codeVerifier: string },
+    clientInformation?: ClientInformation
+  ) {
     const {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -176,15 +203,18 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${Buffer.from(
-            `${process.env.REDDIT_CLIENT_ID}:${process.env.REDDIT_CLIENT_SECRET}`
-          ).toString('base64')}`,
+          Authorization: clientInformation?.client_id
+            ? basicAuthHeader(
+                clientInformation.client_id,
+                clientInformation.client_secret
+              )
+            : this.basicAuth(),
           'User-Agent': redditUserAgent(),
         },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
           code: params.code,
-          redirect_uri: `${process.env.FRONTEND_URL}/integrations/social/reddit`,
+          redirect_uri: this.redirectUri(),
         }),
       })
     ).json();
@@ -704,7 +734,12 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   ): Promise<ProviderAuthorizationRevocation> {
     const tokens = [
       ...(credentials.refreshToken
-        ? [{ token: credentials.refreshToken, hint: 'refresh_token' }]
+        ? [
+            {
+              token: this.bareRefreshToken(credentials.refreshToken),
+              hint: 'refresh_token',
+            },
+          ]
         : []),
       ...(credentials.accessToken
         ? [{ token: credentials.accessToken, hint: 'access_token' }]
@@ -723,9 +758,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
-              Authorization: `Basic ${Buffer.from(
-                `${process.env.REDDIT_CLIENT_ID}:${process.env.REDDIT_CLIENT_SECRET}`
-              ).toString('base64')}`,
+              Authorization: this.basicAuth(credentials.refreshToken || ''),
               'User-Agent': redditUserAgent(),
             },
             body: new URLSearchParams({ token, token_type_hint: hint }),
