@@ -683,3 +683,28 @@ describe('PostsRepository state and date of a thread', () => {
     expect(update).not.toHaveProperty('releaseURL');
   });
 });
+
+
+describe('saved sequence permission compatibility boundary', () => {
+  it('accepts only stored IDs in the same organization/channel/root group', async () => {
+    const { repo, post } = makeRepo();
+    post.findFirst.mockResolvedValue({ group: 'saved-group' });
+    (post as any).count = jest.fn().mockResolvedValue(3);
+    await expect((repo as any).isExistingPostSequence('org-A', 'int-1', ['p-1', 'p-2', 'p-3'])).resolves.toBe(true);
+    expect(post.findFirst).toHaveBeenCalledWith({ where: { id: 'p-1', organizationId: 'org-A', integrationId: 'int-1', parentPostId: null, deletedAt: null }, select: { group: true } });
+    expect((post as any).count).toHaveBeenCalledWith({ where: { organizationId: 'org-A', integrationId: 'int-1', group: 'saved-group', deletedAt: null, id: { in: ['p-1', 'p-2', 'p-3'] } } });
+  });
+  it('rejects a missing/foreign root and duplicate IDs without accepting a new sequence', async () => {
+    const { repo, post } = makeRepo();
+    (post as any).count = jest.fn();
+    await expect((repo as any).isExistingPostSequence('org-B', 'int-1', ['p-1', 'p-2'])).resolves.toBe(false);
+    await expect((repo as any).isExistingPostSequence('org-A', 'int-1', ['p-1', 'p-1'])).resolves.toBe(false);
+    expect((post as any).count).not.toHaveBeenCalled();
+  });
+  it('rejects newly added or deleted entries absent from the stored sequence', async () => {
+    const { repo, post } = makeRepo();
+    post.findFirst.mockResolvedValue({ group: 'saved-group' });
+    (post as any).count = jest.fn().mockResolvedValue(1);
+    await expect((repo as any).isExistingPostSequence('org-A', 'int-1', ['p-1', 'new-entry'])).resolves.toBe(false);
+  });
+});

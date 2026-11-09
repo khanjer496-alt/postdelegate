@@ -22,6 +22,8 @@ consent. Close #181 as superseded; do not merge both drafts.
 The publishing minimum in #184 is r_basicprofile, rw_organization_admin and
 w_organization_social. r_organization_social is optional for analytics, not a
 publishing requirement. Compare live grants against this required minimum.
-Do not enable LINKEDIN_PAGE_OPTIONAL_SCOPES in production until granted optional
-permissions are persisted/enforced per channel; consent defaults are not grants.
+Keep LINKEDIN_PAGE_OPTIONAL_SCOPES unset at launch. After approval, the operator
+may request r_organization_social for analytics only after reconnect/grant and
+live analytics verification. Consent defaults are not grants; no per-channel
+capability migration is included in the accepted launch scope.
 Keep linkedin-page hidden except for explicitly allowlisted test workspaces.

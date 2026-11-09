@@ -25,26 +25,31 @@ must finish it in TikTok. Basic-only user-info calls omit username. Creator info
 for Direct Post still supplies the creator identity in the composer. Pinterest's
 five scopes are kept for the implemented API security requirements; see oauth-scope-map.md.
 
-Do not enable any `*_OPTIONAL_SCOPES` in production until granted optional
-permissions are persisted and enforced per connected channel. The current gates
-read deployment-requested scopes, not the scopes each user actually granted.
-A user can decline an optional scope at a fresh consent: publishing connects and
-warns, but the optional feature may still appear enabled and fail at runtime,
-including a reply failing after the main post publishes. Reconnecting alone does
-not resolve this limitation. Platform approval alone is also insufficient.
+Launch defaults keep optional analytics/reply scopes unset. CEO accepted default-off
+analytics UI and collection for launch, with no per-channel capability migration,
+on 9 November 2026 (decision eaec1b5a-f21a-458b-9c66-473a2b562fe8).
+This acceptance is conditional on the compatibility and staging checks below;
+it does not authorize enabling optional permissions or exposing hidden providers.
 
-On an isolated test deployment only, enable approved extras for investigation by
-listing the exact scopes in
-`FACEBOOK_OPTIONAL_SCOPES`, `INSTAGRAM_OPTIONAL_SCOPES`,
-`INSTAGRAM_STANDALONE_OPTIONAL_SCOPES`, `THREADS_OPTIONAL_SCOPES`,
-`TIKTOK_OPTIONAL_SCOPES`, or `LINKEDIN_PAGE_OPTIONAL_SCOPES`.
-Unknown names are ignored. Required permissions cannot be disabled this way.
-Optional analytics and automation are disabled by default; enabling their scope
-configuration does not establish that an existing token has those permissions.
-On that test deployment, reconnect with new consent and confirm the actual grant
-before exercising an optional feature. Missing
-optional consent returns a publishing-success warning; missing minimum consent
-still rejects the connect. Older broad grants are not revoked by changing env.
+After the corresponding provider is approved, an authorized operator can restore
+analytics by setting its allowlisted env value and restarting the application:
+
+| Provider | Analytics env value after approval |
+| --- | --- |
+| Facebook | FACEBOOK_OPTIONAL_SCOPES=read_insights |
+| Instagram via Facebook | INSTAGRAM_OPTIONAL_SCOPES=instagram_manage_insights |
+| Instagram standalone | INSTAGRAM_STANDALONE_OPTIONAL_SCOPES=instagram_business_manage_insights |
+| Threads | THREADS_OPTIONAL_SCOPES=threads_manage_insights |
+| TikTok | TIKTOK_OPTIONAL_SCOPES=user.info.stats,video.list |
+| LinkedIn Pages | LINKEDIN_PAGE_OPTIONAL_SCOPES=r_organization_social |
+| Pinterest | No optional-scope flag; required read scopes are unchanged. Keep the provider hidden until approval. |
+
+Env flags are request/UI defaults, not proof of a token's grants. Reconnect and
+verify actual granted permissions and live analytics before enabling the feature
+for a channel; declined optional consent still produces a warning but is not
+persisted/enforced per channel. Platform approval alone is not user consent.
+Keep optional reply/automation scope settings off at launch. Unknown names are
+ignored and required permissions cannot be disabled with these settings.
 
 LinkedIn Pages uses its own CMA-only application. This incorporates the existing
 [PR #181](https://github.com/khanjer496-alt/postdelegate/pull/181) member-identity
@@ -182,15 +187,26 @@ separate console checks. No live end-to-end test has been run from this branch.
 
 ## Compatibility and exact-reviewer gates (9 November follow-up)
 
-Optional scope env settings are consent/UI defaults, not evidence of grants on a
-stored channel. Existing scheduled replies and saved plug executions continue to
-call the platform using their existing tokens. New multi-entry compositions are
-still rejected before publishing when optional replies are disabled. Analytics
-UI and collection remain disabled by these defaults, including for older broad
-grant channels. Do not roll these defaults into a customer deployment until the
-release owner has explicitly accepted that analytics/composer behavior or a
-per-channel capability migration is implemented. Editing an existing composition
-also uses the disabled comment UI; validate that case before any customer rollout.
+CEO accepts default-off analytics UI/collection for launch with NO per-channel
+capability migration. Conditions, all required for release:
+
+1. Existing connected channels with broader grants keep publishing; existing
+   scheduled main posts/replies and saved automations continue executing using
+   their existing tokens. Prove this in regression tests AND on staging.
+2. Editing an existing composition must not fail because optional features are
+   unavailable, hide entries or silently drop content/media/delays. Show a clear
+   unavailable-feature notice. Existing entries remain editable; new reply
+   creation stays off. Validation admits only IDs verified against the same
+   stored organization/channel/root group; a supplied ID is not sufficient.
+3. Document the per-provider analytics env values above for an approved later
+   rollout. Keep publishing minimums and existing hidden-provider settings.
+
+The editor/store and validation regressions are source proof only. Staging must
+open a saved three-entry composition with optional flags unset, edit/save/reopen
+it, verify all IDs/content/media/delays and visible notice, and run an existing
+scheduled sequence plus saved automation with an approved test token. Record the
+exact deployed commit, workspace and outcomes without secrets. No staging pass
+or live publish is inferred from a unit test or from this acceptance decision.
 
 TikTok OAuth tolerates creator-info limits or temporary errors, returning an empty
 handle. Public post links resolve the handle lazily; if it is still unavailable,
@@ -202,7 +218,7 @@ reviewer Page, verify it appears in the Page picker, and test publishing before
 recording/submission. Keep FACEBOOK_OPTIONAL_SCOPES=business_management (and the
 corresponding INSTAGRAM_OPTIONAL_SCOPES value for Facebook login) available for
 an approved isolated-test configuration change if discovery needs it; the
-production prohibition above still applies. No live proof is claimed.
+launch defaults and separate rollout checks above still apply. No live proof is claimed.
 Threads optional grant introspection/warnings remain unproven; keep its extras off.
 The earlier LinkedIn companies-on-auth finding refers to a superseded snapshot:
 this branch uses the existing /v2/me member identity path at authentication.

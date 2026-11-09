@@ -2096,3 +2096,32 @@ describe('PostsService optional comments permission', () => {
     expect(result.errors).toMatch(/optional permission/);
   });
 });
+
+
+describe('saved composition optional-reply compatibility', () => {
+  const payload = () => ({ integration: { id: 'channel-1' }, value: [
+    { id: 'saved-root', content: 'Edited post', image: [] },
+    { id: 'saved-reply', content: 'Edited reply', image: [{ path: 'https://example.test/reply.jpg' }] },
+  ], settings: {} });
+  const make = (saved: boolean) => {
+    const repo = { isExistingPostSequence: jest.fn(async () => saved) };
+    const service = new PostsService(repo as any,
+      { getSocialIntegration: () => ({ plugsAvailable: false, checkValidity: async () => true, maxLength: () => 2200, editor: 'normal' }) } as any,
+      { getIntegrationById: async () => ({ id: 'channel-1', name: 'Review', providerIdentifier: 'instagram', additionalSettings: '[]' }) } as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    return { service, repo };
+  };
+  it('allows existing saved entries to be edited/rescheduled without dropping content', async () => {
+    const { service, repo } = make(true);
+    const post = payload(); const before = structuredClone(post);
+    const [result] = await service.validatePosts('org-1', [post], 'schedule');
+    expect(result.errors).toBe(true);
+    expect(repo.isExistingPostSequence).toHaveBeenCalledWith('org-1', 'channel-1', ['saved-root', 'saved-reply']);
+    expect(post).toEqual(before);
+  });
+  it('still rejects a forged/new sequence when optional replies are unavailable', async () => {
+    const { service } = make(false);
+    const [result] = await service.validatePosts('org-1', [payload()], 'schedule');
+    expect(result.errors).toMatch(/optional permission/);
+  });
+});

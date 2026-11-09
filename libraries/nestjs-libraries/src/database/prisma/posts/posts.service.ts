@@ -1273,6 +1273,7 @@ export class PostsService {
       date?: string;
       integration: { id: string };
       value: Array<{
+        id?: string;
         content?: string;
         image?: Array<{ path: string; thumbnail?: string }>;
       }>;
@@ -1365,7 +1366,12 @@ export class PostsService {
         }
 
         if (provider.plugsAvailable === false && (post.value || []).length > 1) {
-          errors = 'Comment and reply automation needs an approved optional permission. Publish one entry or reconnect after it is enabled.';
+          const ids = post.value.map(entry => entry.id);
+          const savedSequence = ids.every((id): id is string => typeof id === 'string' && !!id) &&
+            await this._postRepository.isExistingPostSequence(orgId, integration.id, ids as string[]);
+          if (!savedSequence) {
+            errors = 'Comment and reply automation needs an approved optional permission. Existing saved entries can be edited; new replies are unavailable.';
+          }
         }
 
         const maximumCharacters = provider.maxLength(

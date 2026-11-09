@@ -43,6 +43,7 @@ interface StoreState {
   tab: 0 | 1;
   current: string;
   comments: boolean | 'no-media';
+  canAddComments: boolean;
   // true while any upload or AI generation in `locks` still runs
   locked: boolean;
   locks: string[];
@@ -158,6 +159,7 @@ const initialState = {
   loaded: true,
   dummy: false,
   comments: true,
+  canAddComments: true,
   exitBlockers: 0,
   date: newDayjs(),
   repeater: undefined as number | undefined,
@@ -701,9 +703,18 @@ export const useLaunchStore = create<StoreState>()((set) => ({
       },
     })),
   setComments: (comments: boolean | 'no-media') =>
-    set((state) => ({
-      comments,
-    })),
+    set((state) => {
+      const selection = state.current === 'global'
+        ? state.selectedIntegrations
+        : state.selectedIntegrations.filter(p => p.integration.id === state.current);
+      const canAddComments = comments !== false && selection.every(p => p.integration.commentsAvailable !== false);
+      const entries = state.internal.find(p => p.integration.id === state.current)?.integrationValue || state.global;
+      return {
+        // Availability controls creation, never whether saved content is shown.
+        comments: canAddComments ? comments : entries.length > 1,
+        canAddComments,
+      };
+    }),
   setGlobalDelay: (index: number, minutes: number) =>
     set((state) => ({
       global: state.global.map((item, i) =>
