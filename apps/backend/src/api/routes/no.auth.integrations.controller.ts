@@ -368,7 +368,7 @@ export class NoAuthIntegrationsController {
           });
         }
 
-        console.log(`Authentication failed for ${integration}:`, err);
+        console.log(`Authentication failed for ${integration}:`, err?.message);
         return res({
           error: 'Authentication failed',
           accessToken: '',

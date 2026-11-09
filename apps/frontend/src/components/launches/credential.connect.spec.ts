@@ -54,7 +54,7 @@ jest.mock('@gitroom/react/form/input', () => ({
   },
 }));
 jest.mock('@gitroom/react/form/button', () => ({
-  Button: ({ children, ...props }: any) =>
+  Button: ({ children, secondary, ...props }: any) =>
     require('react').createElement('button', props, children),
 }));
 jest.mock('@hookform/resolvers/class-validator', () => ({
@@ -400,4 +400,43 @@ it('fails closed for extension cookies instead of using the old query fallback',
     blocked.mockRestore();
     delete (globalThis as any).chrome;
   }
+});
+
+
+it.each(['missing', 'failed'])('does not misdiagnose a %s custom-provider URL as blocked storage', async (kind) => {
+  mockFetch.mockResolvedValue({ status: kind === 'failed' ? 500 : 200, ok: kind !== 'failed', json: async () => ({}) });
+  const view = render(React.createElement(CustomVariables, { identifier: 'nostr', variables, gotoUrl: navigate }));
+  fireEvent.change(view.getByLabelText('Credential'), { target: { value: fixture } });
+  fireEvent.submit(view.container.querySelector('form')!);
+  await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(mockToast.show.mock.calls.flat().join(' ')).not.toMatch(/session storage/i);
+  expect(navigate).not.toHaveBeenCalled();
+});
+
+it.each(['initial', 'confirmed'])('clears the handoff when the %s connect request fails on the network', async (stage) => {
+  sessionStorage.setItem('extension-code:review-state', fixture);
+  mockFetch.mockImplementation(async () => {
+    if (stage === 'confirmed' && mockFetch.mock.calls.length === 1) return { status: 200, ok: true, clone() { return this; }, json: async () => ({ needsConfirmation: true }) };
+    throw new Error('offline');
+  });
+  const view = render(React.createElement(ContinueIntegration, { provider: 'wordpress', logged: false, searchParams: { state: 'review-state' } }));
+  if (stage === 'confirmed') fireEvent.click(await view.findByRole('button', { name: 'Connect' }));
+  await waitFor(() => expect(mockFetch.mock.calls.length).toBe(stage === 'confirmed' ? 2 : 1));
+  await waitFor(() => expect(sessionStorage.getItem('extension-code:review-state')).toBe(null));
+});
+
+it.each(['cancel', 'abandon', 'confirm'])('consumes the handoff while a shared connection waits for %s', async (action) => {
+  sessionStorage.setItem('extension-code:review-state', fixture);
+  mockFetch.mockImplementation(async (_url, options) => {
+    if (mockFetch.mock.calls.length === 1) return { status: 200, ok: true, clone() { return this; }, json: async () => ({ needsConfirmation: true }) };
+    if (action === 'confirm') expect(JSON.parse(options.body).code).toBe(fixture);
+    return { status: 401, ok: false, json: async () => ({}) };
+  });
+  const view = render(React.createElement(ContinueIntegration, { provider: 'wordpress', logged: false, searchParams: { state: 'review-state' } }));
+  await view.findByRole('button', { name: 'Connect' });
+  if (action === 'cancel') fireEvent.click(view.getByRole('button', { name: 'Cancel' }));
+  if (action === 'confirm') { fireEvent.click(view.getByRole('button', { name: 'Connect' })); await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2)); }
+  if (action === 'abandon') view.unmount();
+  await waitFor(() => expect(sessionStorage.getItem('extension-code:review-state')).toBe(null));
 });
