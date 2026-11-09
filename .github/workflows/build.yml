@@ -1,11 +1,9 @@
 ---
 name: Build
 
-# Check pull requests and the merged main result. Nothing is published: production
+# Pull-request check only. Nothing is published from this workflow: production
 # images are built by hand from deploy/postdelegate/Dockerfile.release.
 on:
-  push:
-    branches: [main]
   pull_request:
     paths-ignore:
       # deploy/** is NOT ignored: the Caddy config that fronts production lives
