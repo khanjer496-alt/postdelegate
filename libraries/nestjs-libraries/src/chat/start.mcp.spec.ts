@@ -2,6 +2,7 @@ const mockServers: any[] = [];
 const mockRequestIds: unknown[] = [];
 const mockRelays: unknown[] = [];
 const mockHttpServers: any[] = [];
+const mockRelayExecute = jest.fn(async () => 'relayed');
 let mockRelayEnabled = false;
 jest.mock('@mastra/mcp', () => {
   const { getAuth, getRequestId, getRelay } = jest.requireActual(
@@ -137,7 +138,7 @@ const services = new Map<unknown, unknown>([
       getSelfHostedByAccessToken: async (token: string) => token === 'psh_valid' ? { id: 'relay-fixture' } : null,
     },
   ],
-  [McpRelayService, { tools: () => ({ relayMarker: { execute: jest.fn(async () => 'relayed') } }) }],
+  [McpRelayService, { tools: () => ({ relayMarker: { execute: mockRelayExecute } }) }],
 ]);
 
 const env = { ...process.env };
@@ -555,6 +556,24 @@ describe('canonical /mcp OAuth relay compatibility', () => {
     });
     expect(response.status).toBe(200);
     expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
+  });
+  it('denies a write on the relay-enabled canonical route for a read-scoped cloud token', async () => {
+    mockRelayExecute.mockClear();
+    const response = await fetch(base + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer pos_readonly' },
+      body: JSON.stringify({ tool: 'deletePostTool' }),
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain('insufficient_scope');
+    expect(mockRelayExecute).not.toHaveBeenCalled();
+  });
+  it('denies relay tool forwarding under a read-only execution context', async () => {
+    await mcpPost('/mcp', { Authorization: 'Bearer psh_valid' });
+    const relayTools = mockHttpServers[mockHttpServers.length - 1].config.tools;
+    mockRelayExecute.mockClear();
+    await expect(runWithContext({ requestId: 'test-read-only', relay: { id: 'relay-fixture' } as any, scopes: ['mcp:read'] },
+      () => relayTools.relayMarker.execute())).rejects.toThrow('mcp:write required');
+    expect(mockRelayExecute).not.toHaveBeenCalled();
   });
   it('rejects a revoked relay token without starting the MCP server', async () => {
     const calls = mockHttpServers.length;

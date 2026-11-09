@@ -102,7 +102,7 @@ jest.mock('@gitroom/frontend/app/(app)/auth/return.url.component', () => ({
 }));
 jest.mock(
   '@gitroom/frontend/components/launches/import/import.posts.modal',
-  () => ({ errorMessage: async () => '' })
+  () => ({ errorMessage: async (response: any, fallback: string) => { const body = await response.json().catch(() => ({})); return typeof body.message === 'string' && body.message ? body.message : fallback; } })
 );
 
 import {
@@ -439,4 +439,16 @@ it.each(['cancel', 'abandon', 'confirm'])('consumes the handoff while a shared c
   if (action === 'confirm') { fireEvent.click(view.getByRole('button', { name: 'Connect' })); await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2)); }
   if (action === 'abandon') view.unmount();
   await waitFor(() => expect(sessionStorage.getItem('extension-code:review-state')).toBe(null));
+});
+
+it('shows the provider-start API error rather than a session-storage warning', async () => {
+  mockFetch.mockResolvedValue({ status: 400, ok: false, json: async () => ({ message: 'This channel is not available in this workspace.' }) });
+  const view = render(React.createElement(CustomVariables, { identifier: 'nostr', variables, gotoUrl: navigate }));
+  fireEvent.change(view.getByLabelText('Credential'), { target: { value: fixture } });
+  fireEvent.submit(view.container.querySelector('form')!);
+  await waitFor(() => expect(mockToast.show).toHaveBeenCalled());
+  expect(mockToast.show.mock.calls.flat().join(' ')).toContain('This channel is not available in this workspace.');
+  expect(mockToast.show.mock.calls.flat().join(' ')).not.toMatch(/session storage/i);
+  expect(navigate).not.toHaveBeenCalled();
+  expect(sessionStorage.length).toBe(0);
 });
