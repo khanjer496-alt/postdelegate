@@ -125,6 +125,16 @@ describe('NoAuthIntegrationsController state keys', () => {
     } finally { log.mockRestore(); }
   });
 
+  it('never logs an untyped provider failure object', async () => {
+    const { controller } = make({ ...authenticated, authenticate: jest.fn(async () => { throw { config: { headers: { Authorization: 'EXAMPLE-non-error-secret' } } }; }) });
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await expect(controller.connectSocialMedia('demo', { state: 's1', code: 'c', timezone: 0 } as any)).rejects.toThrow('Authentication failed');
+      expect(log).toHaveBeenCalledWith('Authentication failed for demo:', 'Unknown provider error');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('EXAMPLE-non-error-secret');
+    } finally { log.mockRestore(); }
+  });
+
   it('keeps it for the page picking step of a two step provider, then spends it', async () => {
     const { controller, integrationService } = make({
       ...authenticated,

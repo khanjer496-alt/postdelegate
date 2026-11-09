@@ -368,7 +368,7 @@ export class NoAuthIntegrationsController {
           });
         }
 
-        console.log(`Authentication failed for ${integration}:`, err?.message);
+        console.log(`Authentication failed for ${integration}:`, err instanceof Error ? err.message : 'Unknown provider error');
         return res({
           error: 'Authentication failed',
           accessToken: '',
