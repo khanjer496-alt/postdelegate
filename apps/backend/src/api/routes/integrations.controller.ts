@@ -11,6 +11,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ClientInformation } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -344,6 +345,108 @@ export class IntegrationsController {
       migrateTo || integration
     );
 
+    // own-app providers start through the POST below, with the app's keys
+    if (integrationProvider.ownAppCredentials) {
+      return { err: true };
+    }
+
+    return this.startConnect(integrationProvider, {
+      externalUrl,
+      redirectUrl,
+      onboarding,
+      invite,
+      refresh,
+      org,
+      user,
+      res,
+    });
+  }
+
+  // "Bring your own app" providers (reddit-own-key): the connect form POSTs
+  // the app's client id and secret here, so they never travel in a url, and
+  // the OAuth flow then runs against the customer's own app.
+  @Post('/social/:integration/own-app')
+  @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
+  async getOwnAppIntegrationUrl(
+    @Param('integration') integration: string,
+    @Query('refresh') refresh: string,
+    @Query('redirectUrl') redirectUrl: string,
+    @Query('onboarding') onboarding: string,
+    @Body() body: Record<string, unknown>,
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    if (
+      !this._integrationManager
+        .getAllowedSocialsIntegrations()
+        .includes(integration)
+    ) {
+      throw new Error('Integration not allowed');
+    }
+
+    await this._integrationService.checkProviderAvailable(
+      org.id,
+      integration,
+      refresh
+    );
+
+    const integrationProvider =
+      this._integrationManager.getSocialIntegration(integration);
+
+    if (!integrationProvider.ownAppCredentials) {
+      return { err: true };
+    }
+
+    const fields = Object.fromEntries(
+      Object.entries(body || {}).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value : '',
+      ])
+    );
+    const ownApp = integrationProvider.ownAppCredentials(fields);
+    if (typeof ownApp === 'string') {
+      return { err: true, message: ownApp };
+    }
+
+    return this.startConnect(integrationProvider, {
+      redirectUrl,
+      onboarding,
+      refresh,
+      org,
+      user,
+      res,
+      ownApp,
+    });
+  }
+
+  private async startConnect(
+    integrationProvider: ReturnType<
+      IntegrationManager['getSocialIntegration']
+    >,
+    {
+      externalUrl,
+      redirectUrl,
+      onboarding,
+      invite,
+      refresh,
+      org,
+      user,
+      res,
+      ownApp,
+    }: {
+      externalUrl?: string;
+      redirectUrl?: string;
+      onboarding?: string;
+      invite?: string;
+      refresh?: string;
+      org: Organization;
+      user: User;
+      res: Response;
+      ownApp?: ClientInformation;
+    }
+  ) {
+
     if (integrationProvider.externalUrl && !externalUrl) {
       throw new Error('Missing external url');
     }
@@ -351,10 +454,10 @@ export class IntegrationsController {
     try {
       const getExternalUrl = integrationProvider.externalUrl
         ? {
-            ...(await integrationProvider.externalUrl(externalUrl)),
-            instanceUrl: externalUrl,
+            ...(await integrationProvider.externalUrl(externalUrl!)),
+            instanceUrl: externalUrl!,
           }
-        : undefined;
+        : ownApp;
 
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl(getExternalUrl);

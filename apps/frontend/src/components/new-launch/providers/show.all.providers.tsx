@@ -67,6 +67,10 @@ export const Providers = [
     component: RedditProvider,
   },
   {
+    identifier: 'reddit-own-key',
+    component: RedditProvider,
+  },
+  {
     identifier: 'medium',
     component: MediumProvider,
   },

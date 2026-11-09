@@ -98,6 +98,11 @@ export class EnterpriseController {
         load.provider
       );
 
+      // own-app providers need the customer's app keys from the connect form
+      if (integrationProvider.ownAppCredentials) {
+        throw new Error('Integration not allowed');
+      }
+
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl();
 
