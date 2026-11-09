@@ -8,6 +8,7 @@ import {
   OAuthService,
   selfHostedRelayEnabled,
 } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
+import { scopeMcpTools } from './mcp.scopes';
 import { runWithContext } from './async.storage';
 import { createOAuthMiddleware } from './oauth-middleware';
 import {
@@ -96,6 +97,7 @@ export const startMcp = async (app: INestApplication) => {
       if (!authorization) return { auth: null, source: undefined };
       return {
         auth: authorization.organization,
+        scopes: authorization.scope?.split(/\s+/) || [],
         source: authorization.oauthApp?.name
           ? `${authorization.oauthApp.name} (MCP)`
           : 'MCP client',
@@ -104,6 +106,7 @@ export const startMcp = async (app: INestApplication) => {
     return {
       auth: await organizationService.getOrgByApiKey(token),
       source: 'MCP (API key)',
+      scopes: ['mcp:read', 'mcp:write'],
     };
   };
 
@@ -117,16 +120,16 @@ export const startMcp = async (app: INestApplication) => {
   const mastra = await mastraService.mastra();
   const agent = mastra.getAgent('postdelegate');
   const agentTools = await agent.listTools();
-  const tools = {
+  const tools = scopeMcpTools({
     ...agentTools,
     // tools that only make sense inside an MCP host (ui:// widgets)
     ...(await loadToolsService.loadTools(true)),
-  };
+  });
   // the API key server (/mcp, /mcp/:id, /sse/:id) also offers the agent itself
-  const apiKeyTools = {
+  const apiKeyTools = scopeMcpTools({
     ...tools,
     [ASK_AGENT_TOOL_NAME]: askAgentTool(agent),
-  };
+  });
 
   // The Claude connector directory does not accept AI media generation tools,
   // so the directory-facing endpoint hides them. Direct connections
@@ -226,7 +229,7 @@ export const startMcp = async (app: INestApplication) => {
   let selfHostedServer: MCPServer | undefined;
   let claudeSelfHostedServer: MCPServer | undefined;
   if (selfHostedRelayEnabled()) {
-    const selfHostedTools = mcpRelayService.tools(agentTools);
+    const selfHostedTools = scopeMcpTools(mcpRelayService.tools(agentTools));
     selfHostedServer = new MCPServer({
       name: 'PostDelegate MCP',
       version: '1.0.0',
@@ -315,7 +318,8 @@ export const startMcp = async (app: INestApplication) => {
           if (!org) {
             return { valid: false, error: 'invalid_token', errorDescription: 'Invalid API Key or OAuth token' };
           }
-          return { valid: true, subject: token };
+          const resolved = token.startsWith('psh_') ? undefined : await resolveAuthWithSource(token);
+          return { valid: true, subject: token, scopes: resolved?.scopes ?? ['mcp:read', 'mcp:write'] };
         },
       },
       mcpPath,
@@ -568,7 +572,7 @@ export const startMcp = async (app: INestApplication) => {
 
     endListenStream(req, res);
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token!, auth, relay: relay || undefined, source }, async () => {
+    await runWithContext({ requestId: token!, auth, relay: relay || undefined, source, scopes: result.tokenValidation?.scopes || [] }, async () => {
       await (relay ? selfHostedServer! : mcpServer).startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -633,7 +637,7 @@ export const startMcp = async (app: INestApplication) => {
     endListenStream(req, res);
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: token, auth: req.auth, source: resolved.source }, async () => {
+    await runWithContext({ requestId: token, auth: req.auth, source: resolved.source, scopes: resolved.scopes }, async () => {
       await server.startHTTP({
         url,
         httpPath: url.pathname,
@@ -648,6 +652,8 @@ export const startMcp = async (app: INestApplication) => {
 
   app.use('/mcp/:id', async (req: Request, res: Response) => {
     if (mcpCors(req, res)) return;
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '<https://postdelegate.com/docs/mcp/clients>; rel="deprecation"');
 
     // @ts-ignore
     req.auth = await organizationService.getOrgByApiKey(req.params.id);
@@ -673,7 +679,7 @@ export const startMcp = async (app: INestApplication) => {
     fixAcceptHeader(req);
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)' },
+      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await server.startHTTP({
           url,
@@ -690,6 +696,8 @@ export const startMcp = async (app: INestApplication) => {
 
   app.use(['/sse/:id', '/message/:id'], async (req: Request, res: Response) => {
     if (mcpCors(req, res)) return;
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '<https://postdelegate.com/docs/mcp/clients>; rel="deprecation"');
 
     // @ts-ignore
     req.auth = await organizationService.getOrgByApiKey(req.params.id);
@@ -710,7 +718,7 @@ export const startMcp = async (app: INestApplication) => {
 
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)' },
+      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await new MCPServer(serverConfig).startSSE({
           url,

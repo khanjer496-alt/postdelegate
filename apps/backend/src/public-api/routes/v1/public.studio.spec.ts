@@ -1,3 +1,11 @@
+jest.mock('@gitroom/backend/services/auth/auth.service', () => ({ AuthService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/services/stripe.service', () => ({ StripeService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/upload/upload.module', () => ({ UploadModule: class {} }));
+jest.mock('@gitroom/backend/services/auth/permissions/permissions.service', () => ({ PermissionsService: class {} }));
+jest.mock('@gitroom/backend/services/auth/permissions/permissions.guard', () => ({ PoliciesGuard: class {} }));
+jest.mock('@gitroom/nestjs-libraries/openai/openai.service', () => ({ OpenaiService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/openai/extract.content.service', () => ({ ExtractContentService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/services/codes.service', () => ({ CodesService: class {} }));
 // the controller imports every provider and service of the public API, only
 // the Studio routes are under test
 jest.mock(
@@ -76,6 +84,7 @@ jest.mock('@gitroom/nestjs-libraries/sentry/initialize.sentry', () => ({
 jest.mock('@sentry/nestjs', () => ({ metrics: { count: jest.fn() } }));
 
 import 'reflect-metadata';
+import { PublicApiModule } from '../../public.api.module';
 import { HttpException, ValidationPipe } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common/enums/request-method.enum';
@@ -276,5 +285,28 @@ describe('Public API Studio routes', () => {
       expect(next).toHaveBeenCalled();
       expect(req.org.id).toBe('org-1');
     });
+  });
+});
+
+describe('Every public v1 business route requires authentication', () => {
+  it('mounts auth middleware on the entire business controller', () => {
+    const forRoutes = jest.fn();
+    const apply = jest.fn(() => ({ forRoutes }));
+    new PublicApiModule().configure({ apply } as any);
+    expect(apply).toHaveBeenCalledWith(PublicAuthMiddleware);
+    expect(forRoutes).toHaveBeenCalledWith(PublicIntegrationsController);
+  });
+  const methods = Object.getOwnPropertyNames(PublicIntegrationsController.prototype)
+    .filter(name => Reflect.hasMetadata(METHOD_METADATA, PublicIntegrationsController.prototype[name]));
+  it.each(methods)('%s rejects an anonymous request before its handler', async name => {
+    const handler = PublicIntegrationsController.prototype[name];
+    const req: any = { headers: {}, method: RequestMethod[Reflect.getMetadata(METHOD_METADATA, handler)],
+      path: '/public/v1/' + Reflect.getMetadata(PATH_METADATA, handler) };
+    const res: any = { status: jest.fn(() => res), json: jest.fn(() => res) };
+    const next = jest.fn();
+    await new PublicAuthMiddleware({} as any, {} as any).use(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(req.org).toBeUndefined();
   });
 });

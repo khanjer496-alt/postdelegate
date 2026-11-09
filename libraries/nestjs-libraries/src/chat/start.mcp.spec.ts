@@ -22,7 +22,11 @@ jest.mock('@mastra/mcp', () => {
           ),
         };
       }
-      async startHTTP({ res }: any) {
+      async startHTTP({ req, res }: any) {
+        if (req.body?.tool) {
+          try { await this.config.tools[req.body.tool].execute(); }
+          catch (error) { res.status(403).json({ error: String(error) }); return; }
+        }
         res.status(200).json({ handledBy: 'mcp', org: getAuth()?.id });
       }
     },
@@ -61,6 +65,7 @@ jest.mock('@gitroom/nestjs-libraries/chat/ui/clipping.widget', () => ({
 }));
 
 import express from 'express';
+import { runWithContext } from './async.storage';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startMcp } from '@gitroom/nestjs-libraries/chat/start.mcp';
@@ -74,6 +79,7 @@ const agent = {
   name: 'postdelegate',
   getDescription: () => 'Agent that helps schedule and list social media posts',
   listTools: async () => ({
+    deletePostTool: { id: 'deletePostTool', description: 'Delete a post', mcp: { annotations: { title: 'Delete Post', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true } }, execute: jest.fn(async () => 'deleted') },
     generateImageTool: {
       id: 'generateImageTool',
       description: 'Generate an image',
@@ -119,8 +125,8 @@ const services = new Map<unknown, unknown>([
     {
       getOrgByOAuthToken: async (token: string) =>
         token === 'pos_valid'
-          ? { organization: { id: 'org-oauth' }, oauthApp: { name: 'Smithery' } }
-          : null,
+          ? { organization: { id: 'org-oauth' }, oauthApp: { name: 'Smithery' }, scope: 'mcp:read mcp:write' }
+          : token === 'pos_readonly' ? { organization: { id: 'org-read' }, scope: 'mcp:read' } : null,
       getSelfHostedByAccessToken: async () => null,
     },
   ],
@@ -141,6 +147,7 @@ const boot = async (extraEnv: Record<string, string> = {}) => {
     ...extraEnv,
   };
   const app = express();
+  app.use(express.json());
   await startMcp({
     get: (token: unknown) => services.get(token),
     use: (...args: any[]) => (app.use as any)(...args),
@@ -171,6 +178,15 @@ const expectMcpCors = (response: Response) => {
 };
 
 describe('startMcp', () => {
+  it.each(['/mcp', '/mcp-oauth', '/mcp-oauth-claude', '/mcp-oauth-dynamic', '/mcp-oauth-chatgpt'])(
+    '%s refuses a write by a read-only OAuth client', async path => {
+      const response = await fetch(base + path, { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer pos_readonly' },
+        body: JSON.stringify({ tool: 'deletePostTool' }),
+      });
+      expect(response.status).toBe(403);
+    });
+
   beforeAll(() => boot());
   afterAll(async () => {
     await shutdown();
@@ -369,7 +385,7 @@ describe('startMcp', () => {
       const names = card.tools.map((tool: { name: string }) => tool.name);
 
       // the Claude list: no agent, no AI media generation, no clipping
-      expect(names).toEqual(['integrationList']);
+      expect(names).toEqual(['deletePostTool', 'integrationList']);
       for (const tool of card.tools) {
         expect(tool.title).toEqual(expect.any(String));
         expect(tool.annotations).toMatchObject({
@@ -428,7 +444,8 @@ describe('startMcp', () => {
       const requestContext = new Map<string, string>();
 
       await expect(
-        tool.execute({ message: 'Schedule a post' }, { requestContext })
+        runWithContext({ requestId: 'test', auth: {}, scopes: ['mcp:read', 'mcp:write'] },
+          () => tool.execute({ message: 'Schedule a post' }, { requestContext }))
       ).resolves.toEqual({ text: 'Scheduled' });
       expect(agent.generate).toHaveBeenCalledWith('Schedule a post', {
         requestContext,

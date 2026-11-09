@@ -1,5 +1,5 @@
 const mockStripe = {
-  prices: { list: jest.fn(), create: jest.fn() },
+  prices: { list: jest.fn(), create: jest.fn(), retrieve: jest.fn() },
   products: { list: jest.fn(), create: jest.fn() },
   subscriptions: {
     list: jest.fn(),
@@ -28,6 +28,8 @@ jest.mock('stripe', () => ({
   __esModule: true,
   default: jest.fn(() => mockStripe),
 }));
+jest.mock('@sentry/nestjs', () => ({ captureMessage: jest.fn() }));
+import * as Sentry from '@sentry/nestjs';
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service',
   () => ({ SubscriptionService: class {} })
@@ -61,6 +63,11 @@ import {
   StripeService,
   trialEndsSoonDetails,
 } from '@gitroom/nestjs-libraries/services/stripe.service';
+
+beforeEach(() => {
+  jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
+});
+afterEach(() => jest.restoreAllMocks());
 
 describe('resolveTierPrice', () => {
   beforeEach(() => {
@@ -207,7 +214,7 @@ describe('StripeService failed payments', () => {
   });
 
   it('drops the paid tier when the subscription ended with customer.subscription.deleted', async () => {
-    await service.processWebhook({
+    await service.dispatchWebhook({
       ...event('canceled'),
       type: 'customer.subscription.deleted',
     });
@@ -225,7 +232,7 @@ describe('StripeService failed payments', () => {
         ...latest,
         status: 'active',
       });
-      await service.processWebhook(late);
+      await service.dispatchWebhook(late);
     }
 
     expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
@@ -238,7 +245,7 @@ describe('StripeService failed payments', () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockStripe.subscriptions.retrieve.mockRejectedValue(new Error('down'));
 
-    expect(await service.processWebhook(event('unpaid'))).toEqual({
+    expect(await service.dispatchWebhook(event('unpaid'))).toEqual({
       retry: true,
     });
     expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
@@ -250,7 +257,7 @@ describe('StripeService failed payments', () => {
   it.each(['unpaid', 'paused'])(
     'drops the paid tier when a subscription becomes %s',
     async (status) => {
-      await service.processWebhook(event(status));
+      await service.dispatchWebhook(event(status));
 
       expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
         'cus_1',
@@ -263,7 +270,7 @@ describe('StripeService failed payments', () => {
   );
 
   it('keeps the tier while Stripe retries a past_due renewal', async () => {
-    await service.processWebhook(event('past_due'));
+    await service.dispatchWebhook(event('past_due'));
 
     expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
     expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalled();
@@ -277,7 +284,7 @@ describe('StripeService failed payments', () => {
       ],
     });
 
-    await service.processWebhook(event('unpaid'));
+    await service.dispatchWebhook(event('unpaid'));
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalled();
   });
@@ -299,7 +306,7 @@ describe('StripeService failed payments', () => {
       ],
     });
 
-    await service.processWebhook(event('unpaid'));
+    await service.dispatchWebhook(event('unpaid'));
 
     expect(subscriptionService.deleteSubscription).not.toHaveBeenCalled();
     expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalledWith(
@@ -330,7 +337,7 @@ describe('StripeService failed payments', () => {
       ],
     });
 
-    await service.processWebhook(event('unpaid'));
+    await service.dispatchWebhook(event('unpaid'));
 
     const call = subscriptionService.createOrUpdateSubscription.mock.calls[0];
     expect(call[1]).toBe(false);
@@ -349,7 +356,7 @@ describe('StripeService failed payments', () => {
       ],
     });
 
-    await service.processWebhook(event('unpaid'));
+    await service.dispatchWebhook(event('unpaid'));
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
       'cus_1',
@@ -364,11 +371,11 @@ describe('StripeService failed payments', () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockStripe.subscriptions.list.mockRejectedValue(new Error('down'));
 
-    await expect(service.processWebhook(event('paused'))).resolves.toEqual({
+    await expect(service.dispatchWebhook(event('paused'))).resolves.toEqual({
       retry: true,
     });
     await expect(
-      service.processWebhook({
+      service.dispatchWebhook({
         ...event('canceled'),
         type: 'customer.subscription.deleted',
       })
@@ -491,11 +498,13 @@ describe('StripeService affiliate events', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockStripe.invoices.retrieve.mockImplementation(async id => ({ ...invoiceEvent().data.object, id, status: 'paid' }));
   });
 
   it('records the commission of a paid invoice without needing gitroom metadata', async () => {
-    await service.processWebhook(invoiceEvent());
+    await service.dispatchWebhook(invoiceEvent());
 
     expect(affiliateService.recordInvoicePayment).toHaveBeenCalledWith({
       invoiceId: 'in_1',
@@ -509,7 +518,7 @@ describe('StripeService affiliate events', () => {
   });
 
   it('reads the customer from an expanded object and falls back to the creation date', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       invoiceEvent({
         customer: { id: 'cus_9' },
         status_transitions: { paid_at: null },
@@ -526,11 +535,11 @@ describe('StripeService affiliate events', () => {
     );
   });
 
-  it('does not fail the webhook when the commission cannot be recorded', async () => {
+  it('keeps the event retryable when the commission cannot be recorded', async () => {
     affiliateService.recordInvoicePayment.mockRejectedValue(new Error('db'));
 
-    await expect(service.processWebhook(invoiceEvent())).resolves.toEqual({
-      ok: true,
+    await expect(service.dispatchWebhook(invoiceEvent())).resolves.toEqual({
+      retry: true,
     });
     expect(console.error).toHaveBeenCalledWith(
       'affiliate_commission_failed',
@@ -539,12 +548,25 @@ describe('StripeService affiliate events', () => {
     );
   });
 
+  it('creates the invoice commission before an out-of-order refund', async () => {
+    const sequence: string[] = [];
+    affiliateService.recordInvoicePayment.mockImplementation(async () => { sequence.push('create'); });
+    affiliateService.reverseCommission.mockImplementation(async () => { sequence.push('reverse'); });
+    await service.chargeRefunded({ data: { object: { invoice: 'in_1', amount: 2900, amount_refunded: 2900 } } } as any);
+    expect(sequence).toEqual(['create', 'reverse']);
+  });
+  it('keeps a reversal retryable when commission creation fails', async () => {
+    affiliateService.recordInvoicePayment.mockRejectedValue(new Error('db'));
+    await expect(service.chargeRefunded({ data: { object: { invoice: 'in_1', amount: 2900, amount_refunded: 2900 } } } as any)).resolves.toEqual({ retry: true });
+    expect(affiliateService.reverseCommission).not.toHaveBeenCalled();
+  });
+
   it('reverses the commission on charge.refunded although the charge has no service metadata', async () => {
     mockStripe.invoicePayments.list.mockResolvedValue({
       data: [{ invoice: 'in_1' }],
     });
 
-    await service.processWebhook({
+    await service.dispatchWebhook({
       type: 'charge.refunded',
       data: {
         object: {
@@ -569,7 +591,7 @@ describe('StripeService affiliate events', () => {
   });
 
   it('uses the invoice that older API versions put on the charge', async () => {
-    await service.processWebhook({
+    await service.dispatchWebhook({
       type: 'charge.refunded',
       data: {
         object: {
@@ -593,7 +615,7 @@ describe('StripeService affiliate events', () => {
     mockStripe.invoicePayments.list.mockResolvedValue({ data: [] });
 
     await expect(
-      service.processWebhook({
+      service.dispatchWebhook({
         type: 'charge.refunded',
         data: {
           object: {
@@ -618,7 +640,7 @@ describe('StripeService affiliate events', () => {
       data: [{ invoice: { id: 'in_1' } }],
     });
 
-    await service.processWebhook({
+    await service.dispatchWebhook({
       type: 'charge.dispute.created',
       data: { object: { id: 'dp_1', charge: 'ch_1', amount: 2900 } },
     } as any);
@@ -631,11 +653,11 @@ describe('StripeService affiliate events', () => {
     });
   });
 
-  it('does not fail the webhook when a refund cannot be processed', async () => {
+  it('keeps failed refund processing retryable', async () => {
     mockStripe.invoicePayments.list.mockRejectedValue(new Error('stripe'));
 
     await expect(
-      service.processWebhook({
+      service.dispatchWebhook({
         type: 'charge.refunded',
         data: {
           object: {
@@ -646,15 +668,15 @@ describe('StripeService affiliate events', () => {
           },
         },
       } as any)
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({ retry: true });
   });
 
   it('still ignores other events that carry no gitroom metadata', async () => {
-    await service.processWebhook({
+    await service.dispatchWebhook({
       type: 'customer.subscription.updated',
       data: { object: { id: 'sub_1', metadata: {} } },
     } as any);
-    await service.processWebhook({
+    await service.dispatchWebhook({
       type: 'charge.succeeded',
       data: { object: { id: 'ch_1', metadata: {} } },
     } as any);
@@ -864,7 +886,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('records a trial that has no card', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.created', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -913,7 +935,7 @@ describe('StripeService cardless trial', () => {
       userId: 'user_1',
       ...cookies,
     };
-    await service.processWebhook(event);
+    await service.dispatchWebhook(event);
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(trackService.track).toHaveBeenCalledTimes(sent ? 1 : 0);
@@ -932,7 +954,7 @@ describe('StripeService cardless trial', () => {
     });
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.created', {
         status: 'trialing',
       })
@@ -948,7 +970,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('still rejects a card trial that has no card', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.created', {
         status: 'trialing',
       })
@@ -960,7 +982,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('reminds the workspace to add a card before the trial ends', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -976,7 +998,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('emails the reminder only to the workspace admins', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -997,7 +1019,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('adds what a card keeps and the plan prices to the reminder email only', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -1013,7 +1035,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('drops the list price from the reminder when a discount applies', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -1048,7 +1070,7 @@ describe('StripeService cardless trial', () => {
     });
 
     it('is added to a monthly trial when it is about to convert', async () => {
-      await service.processWebhook(
+      await service.dispatchWebhook(
         subscriptionEvent('customer.subscription.trial_will_end', {
           status: 'trialing',
           trial_end: 1793664000,
@@ -1077,13 +1099,13 @@ describe('StripeService cardless trial', () => {
         discounts: ['di_1'],
       });
 
-      await service.processWebhook(event);
+      await service.dispatchWebhook(event);
 
       expect(mockStripe.subscriptions.update).not.toHaveBeenCalled();
     });
 
     it('is not added to a yearly trial', async () => {
-      await service.processWebhook(
+      await service.dispatchWebhook(
         subscriptionEvent('customer.subscription.trial_will_end', {
           status: 'trialing',
           trial_end: 1793664000,
@@ -1097,7 +1119,7 @@ describe('StripeService cardless trial', () => {
     });
 
     it('is not stacked on a trial that already has a discount', async () => {
-      await service.processWebhook(
+      await service.dispatchWebhook(
         subscriptionEvent('customer.subscription.trial_will_end', {
           status: 'trialing',
           trial_end: 1793664000,
@@ -1116,7 +1138,7 @@ describe('StripeService cardless trial', () => {
         new Error('restricted')
       );
 
-      await service.processWebhook(
+      await service.dispatchWebhook(
         subscriptionEvent('customer.subscription.trial_will_end', {
           status: 'trialing',
           trial_end: 1793664000,
@@ -1232,7 +1254,7 @@ describe('StripeService cardless trial', () => {
       invoice_settings: { default_payment_method: 'pm_1' },
     });
 
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -1254,7 +1276,7 @@ describe('StripeService cardless trial', () => {
       invoice_settings: { default_payment_method: 'pm_1' },
     });
 
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -1267,7 +1289,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('does not remind a trial that is set to cancel', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.trial_will_end', {
         status: 'trialing',
         trial_end: 1793664000,
@@ -1287,7 +1309,7 @@ describe('StripeService cardless trial', () => {
     );
 
     expect(
-      await service.processWebhook(
+      await service.dispatchWebhook(
         subscriptionEvent('customer.subscription.trial_will_end', {
           status: 'trialing',
           trial_end: 1793664000,
@@ -1298,7 +1320,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('moves the workspace to FREE and tells it when the trial ended without a card', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.deleted', {
         status: 'canceled',
         trial_end: 1793664000,
@@ -1319,7 +1341,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('does not send the trial ended notice for a subscription canceled before the trial ended', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.deleted', {
         status: 'canceled',
         trial_end: 1793664000,
@@ -1334,7 +1356,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('does not send the trial ended notice when a converted subscription is canceled later', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.deleted', {
         status: 'canceled',
         trial_end: 1793664000,
@@ -1349,7 +1371,7 @@ describe('StripeService cardless trial', () => {
   });
 
   it('does not run the card check on a paid subscription', async () => {
-    await service.processWebhook(
+    await service.dispatchWebhook(
       subscriptionEvent('customer.subscription.updated', { status: 'active' })
     );
 
@@ -1403,6 +1425,7 @@ describe('isTrialing', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
     organizationService.getOrgById.mockResolvedValue({
       id: 'org_1',
       paymentId: 'cus_1',
@@ -1581,6 +1604,7 @@ describe('extra channels', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     organizationService.getOrgById.mockResolvedValue({
@@ -1681,7 +1705,7 @@ describe('extra channels', () => {
       mockStripe.subscriptions.retrieve.mockResolvedValue(
         stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
       );
-      await service.processWebhook(
+      await service.dispatchWebhook(
         updated(
           stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
         )
@@ -1711,7 +1735,7 @@ describe('extra channels', () => {
       mockStripe.subscriptions.retrieve.mockResolvedValue(
         stripeSubscription({ items: { data: [planItem(), extraItem(5)] } })
       );
-      await service.processWebhook(
+      await service.dispatchWebhook(
         updated(
           stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
         )
@@ -1737,7 +1761,7 @@ describe('extra channels', () => {
           items: { data: [planItem('year'), extraItem(2, 'year')] },
         })
       );
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       expect(
         subscriptionService.createOrUpdateSubscription
@@ -1773,7 +1797,7 @@ describe('extra channels', () => {
           },
         })
       );
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       const call = subscriptionService.createOrUpdateSubscription.mock.calls[0];
       expect(call[1]).toBe(true);
@@ -1791,7 +1815,7 @@ describe('extra channels', () => {
           },
         })
       );
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       expect(
         subscriptionService.createOrUpdateSubscription.mock.calls[0][1]
@@ -1813,7 +1837,7 @@ describe('extra channels', () => {
             },
           })
         );
-        await service.processWebhook(updated(stripeSubscription()));
+        await service.dispatchWebhook(updated(stripeSubscription()));
 
         const call =
           subscriptionService.createOrUpdateSubscription.mock.calls[0];
@@ -1833,7 +1857,7 @@ describe('extra channels', () => {
         stripeSubscription({ status: 'paused' })
       );
       mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       expect(
         subscriptionService.createOrUpdateSubscription
@@ -1848,17 +1872,17 @@ describe('extra channels', () => {
       mockStripe.subscriptions.retrieve.mockResolvedValue(
         stripeSubscription({ status: 'active' })
       );
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       expect(subscriptionService.createOrUpdateSubscription).toHaveBeenCalled();
     });
 
     it('never stores an incomplete subscription', async () => {
       mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
-      await service.processWebhook(
+      await service.dispatchWebhook(
         updated(stripeSubscription({ status: 'incomplete' }))
       );
-      await service.processWebhook({
+      await service.dispatchWebhook({
         type: 'customer.subscription.created',
         data: { object: stripeSubscription({ status: 'incomplete' }) },
       } as any);
@@ -1877,7 +1901,7 @@ describe('extra channels', () => {
         );
         mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
         expect(
-          await service.processWebhook(updated(stripeSubscription()))
+          await service.dispatchWebhook(updated(stripeSubscription()))
         ).toEqual({ ok: true });
 
         expect(
@@ -1892,7 +1916,7 @@ describe('extra channels', () => {
         stripeSubscription({ status: 'unpaid' })
       );
       mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       expect(
         subscriptionService.createOrUpdateSubscription
@@ -1916,8 +1940,8 @@ describe('extra channels', () => {
         });
       mockStripe.subscriptions.retrieve.mockResolvedValue(standard('canceled'));
       mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
-      await service.processWebhook(updated(standard('active')));
-      await service.processWebhook({
+      await service.dispatchWebhook(updated(standard('active')));
+      await service.dispatchWebhook({
         type: 'customer.subscription.created',
         data: { object: standard('active') },
       } as any);
@@ -1933,7 +1957,7 @@ describe('extra channels', () => {
         retry: true,
       });
       expect(
-        await service.processWebhook(updated(stripeSubscription()))
+        await service.dispatchWebhook(updated(stripeSubscription()))
       ).toEqual({ retry: true });
 
       subscriptionService.deleteSubscription.mockResolvedValue({
@@ -1942,7 +1966,7 @@ describe('extra channels', () => {
       });
       mockStripe.subscriptions.list.mockResolvedValue({ data: [] });
       expect(
-        await service.processWebhook({
+        await service.dispatchWebhook({
           type: 'customer.subscription.deleted',
           data: { object: stripeSubscription({ status: 'canceled' }) },
         } as any)
@@ -1952,7 +1976,7 @@ describe('extra channels', () => {
     it('keeps the event count when the subscription cannot be read, never failing the webhook', async () => {
       jest.spyOn(console, 'error').mockImplementation(() => undefined);
       mockStripe.subscriptions.retrieve.mockRejectedValue(new Error('down'));
-      await service.processWebhook(
+      await service.dispatchWebhook(
         updated(
           stripeSubscription({ items: { data: [planItem(), extraItem(25)] } })
         )
@@ -1964,7 +1988,7 @@ describe('extra channels', () => {
     });
 
     it('keeps 100 for an Ultimate subscription without the item', async () => {
-      await service.processWebhook(updated(stripeSubscription()));
+      await service.dispatchWebhook(updated(stripeSubscription()));
 
       expect(
         subscriptionService.createOrUpdateSubscription.mock.calls[0][4]
@@ -1972,7 +1996,7 @@ describe('extra channels', () => {
     });
 
     it('ignores an extra channel item left on a tier without extra channels', async () => {
-      await service.processWebhook(
+      await service.dispatchWebhook(
         updated(
           stripeSubscription({
             metadata: {
@@ -3160,6 +3184,7 @@ describe('admin growth stats', () => {
 
     beforeEach(() => {
       jest.resetAllMocks();
+    jest.spyOn(StripeService.prototype, 'validatedPlan').mockImplementation(async sub => ({ ...sub.metadata, extraChannels: extraChannelsOf(sub) }) as any);
       (service as any)._growthSubscriptions = null;
       process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
     });
@@ -3303,6 +3328,26 @@ describe('StripeService failed renewal', () => {
     expect(message).toContain('2026');
   });
 
+  it('dispatches a generated renewal invoice with nested subscription metadata', async () => {
+    await expect(
+      service.dispatchWebhook(event({
+        metadata: {},
+        parent: {
+          type: 'subscription_details',
+          subscription_details: {
+            subscription: 'sub_1',
+            metadata: { service: 'gitroom' },
+          },
+        },
+      }))
+    ).resolves.toEqual({ ok: true });
+
+    expect(notificationService.inAppNotification).toHaveBeenCalledWith(
+      'org-1', expect.stringMatching(/payment/i), expect.stringMatching(/try again/i)
+    );
+    expect(notificationService.sendEmailsToOrgAdmins).toHaveBeenCalledTimes(1);
+  });
+
   it('says the plan will be cancelled when there is no further attempt', async () => {
     mockStripe.invoices.retrieve.mockResolvedValue(
       invoice({ next_payment_attempt: null })
@@ -3350,5 +3395,96 @@ describe('StripeService failed renewal', () => {
       'utf8'
     );
     expect(source).toContain("case 'invoice.payment_failed':");
+  });
+});
+
+describe('Stripe webhook security boundaries', () => {
+  const service = new StripeService({} as any, {} as any, {} as any, {} as any);
+  const subscription = () => ({ metadata: { billing: 'STANDARD', period: 'MONTHLY', uniqueId: 'u1' },
+    items: { data: [{ quantity: 1, price: { id: 'price_starter' } }] } }) as any;
+  const price = { id: 'price_starter', product: 'prod_starter', unit_amount: 1900, currency: 'usd', recurring: { interval: 'month' } };
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockStripe.prices.list.mockReset().mockImplementation(async params => ({ data: params.lookup_keys?.[0] === 'postdelegate_starter_month' ? [price] : [] }));
+    mockStripe.prices.retrieve.mockReset().mockResolvedValue(price);
+    mockStripe.products.list.mockResolvedValue({ data: [] });
+    (Sentry.captureMessage as jest.Mock).mockClear();
+  });
+  it('accepts catalog-backed metadata', async () => {
+    await expect(service.validatedPlan(subscription())).resolves.toMatchObject({ billing: 'STANDARD' });
+  });
+  it.each(['FREE', 'UNKNOWN', '__proto__'])('rejects invalid tier %s', async billing => {
+    const sub = subscription(); sub.metadata.billing = billing;
+    await expect(service.validatedPlan(sub)).rejects.toThrow();
+  });
+  it('rejects forged higher tier or period and unregistered prices', async () => {
+    for (const change of [{ billing: 'PRO' }, { period: 'YEARLY' }, { period: 'invalid' }]) {
+      const sub = subscription(); Object.assign(sub.metadata, change);
+      await expect(service.validatedPlan(sub)).rejects.toThrow();
+    }
+    mockStripe.prices.list.mockResolvedValue({ data: [] });
+    await expect(service.validatedPlan(subscription())).rejects.toThrow();
+  });
+  it('rejects forged add-on entitlements', async () => {
+    const sub = subscription(); sub.items.data.push({ quantity: 100, price: { id: 'forged', lookup_key: 'postdelegate_extra_channel_month' } });
+    await expect(service.validatedPlan(sub)).rejects.toThrow();
+  });
+  it('accepts an inactive historical price of the registered plan product', async () => {
+    const sub = subscription(); sub.items.data[0].price.id = 'price_old';
+    mockStripe.prices.retrieve.mockResolvedValue({ ...price, id: 'price_old', active: false, unit_amount: 1500 });
+    await expect(service.validatedPlan(sub)).resolves.toMatchObject({ billing: 'STANDARD', period: 'MONTHLY' });
+  });
+  it('recognizes an archived named legacy product after its lookup key is removed', async () => {
+    mockStripe.prices.list.mockResolvedValue({ data: [] });
+    mockStripe.products.list.mockResolvedValue({ data: [{ id: 'prod_starter', name: 'STANDARD', active: false }] });
+    mockStripe.prices.retrieve.mockResolvedValue({ ...price, active: false, unit_amount: 1500 });
+    await expect(service.validatedPlan(subscription())).resolves.toMatchObject({ billing: 'STANDARD' });
+  });
+  it('counts historical add-ons without lookup keys even when the add-on is first', async () => {
+    const base = { ...price, id: 'price_old_ultimate', product: 'prod_ultimate', active: false, unit_amount: 6900 };
+    const extra = { ...price, id: 'price_old_extra', product: 'prod_extra', active: false, unit_amount: 80, lookup_key: null };
+    mockStripe.prices.list.mockImplementation(async params => ({ data: params.lookup_keys[0].includes('extra_channel') ? [extra] : [base] }));
+    mockStripe.prices.retrieve.mockImplementation(async id => id === extra.id ? extra : base);
+    const sub = { ...subscription(), id: 'sub_old', customer: 'cus_1', status: 'active', metadata: { billing: 'ULTIMATE', period: 'MONTHLY', uniqueId: 'u1' },
+      items: { data: [{ quantity: 7, price: extra }, { quantity: 1, price: base }] } } as any;
+    const write = jest.fn();
+    const svc = new StripeService({ createOrUpdateSubscription: write } as any, {} as any, {} as any, {} as any);
+    jest.spyOn(svc, 'checkValidCard').mockResolvedValue(true);
+    jest.spyOn(svc as any, 'liveSubscription').mockResolvedValue(sub);
+    await svc.updateSubscription({ data: { object: sub } } as any);
+    expect(write.mock.calls[0][4]).toBe(107);
+  });
+  it('does not claim or complete an event rejected by the service metadata filter', async () => {
+    const processPaymentEvent = jest.fn(async (_provider, _id, handler) => handler());
+    const svc = new StripeService({ processPaymentEvent } as any, {} as any, {} as any, {} as any);
+    await expect(svc.processWebhook({ id: 'evt_filtered', type: 'customer.subscription.updated', data: { object: { metadata: {} } } } as any)).resolves.toMatchObject({ ok: true });
+    expect(processPaymentEvent).not.toHaveBeenCalled();
+  });
+  it.each(['customer.subscription.updated', 'customer.subscription.deleted'])('acknowledges, logs and alerts a catalog mismatch on %s without writing entitlements', async type => {
+    const processPaymentEvent = jest.fn(async (_provider, _id, handler) => handler());
+    const write = jest.fn(); const remove = jest.fn();
+    const svc = new StripeService({ processPaymentEvent, createOrUpdateSubscription: write, deleteSubscription: remove } as any, {} as any, {} as any, {} as any);
+    const sub = { ...subscription(), id: 'sub_1', customer: 'cus_1', status: 'active', metadata: { service: 'gitroom', billing: 'ULTIMATE', period: 'MONTHLY', uniqueId: 'u1' } };
+    jest.spyOn(svc, 'checkValidCard').mockResolvedValue(true);
+    jest.spyOn(svc as any, 'liveSubscription').mockResolvedValue(sub);
+    jest.spyOn(svc, 'getLiveSubscriptions').mockResolvedValue([sub]);
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(svc.processWebhook({ id: 'evt_mismatch', type, data: { object: { ...sub, id: type.endsWith('deleted') ? 'sub_deleted' : sub.id } } } as any)).resolves.toMatchObject({ ok: true });
+    expect(logged).toHaveBeenCalledWith('stripe_catalog_mismatch', expect.objectContaining({ stripe_event_id: 'evt_mismatch' }));
+    expect(Sentry.captureMessage).toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled();
+  });
+  it('deduplicates an event through the persistent ledger boundary', async () => {
+    const done = new Set();
+    const processPaymentEvent = jest.fn(async (provider, id, handle) => {
+      if (done.has(id)) return { ok: true };
+      const result = await handle(); done.add(id); return result;
+    });
+    const svc = new StripeService({ processPaymentEvent } as any, {} as any, {} as any, {} as any);
+    const dispatch = jest.spyOn(svc, 'dispatchWebhook').mockResolvedValue({ ok: true });
+    const event = { id: 'evt_duplicate', type: 'invoice.payment_succeeded' } as any;
+    await svc.processWebhook(event); await svc.processWebhook(event);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(processPaymentEvent).toHaveBeenCalledTimes(2);
   });
 });

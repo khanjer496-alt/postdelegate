@@ -9,6 +9,7 @@ type Ctx = {
   relay?: SelfHostedInstance & { id: string };
   // the MCP client (OAuth app) or "API key" the tool calls come from
   source?: string;
+  scopes?: string[];
 };
 
 const als = new AsyncLocalStorage<Ctx>();

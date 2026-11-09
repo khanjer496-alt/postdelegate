@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   PrismaRepository,
@@ -36,6 +37,54 @@ export class SubscriptionRepository {
     private _usedCodes: PrismaRepository<'usedCodes'>,
     private _transaction: PrismaTransaction
   ) {}
+
+  // Claim in a short transaction: the handler must not reserve a pool
+  // connection while its normal repositories need that same pool.
+  async processPaymentEvent(provider: string, eventId: string, handle: () => Promise<any>) {
+    const token = randomUUID();
+    const query = <T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) =>
+      this._transaction.model.$transaction(fn, { timeout: 10_000 });
+    const claimed = await query(tx => tx.$queryRaw<Array<{ claimToken: string }>>`
+      INSERT INTO "PaymentWebhookEvent" ("provider", "eventId", "claimToken", "claimUntil")
+      VALUES (${provider}, ${eventId}, ${token}, NOW() + INTERVAL '15 minutes')
+      ON CONFLICT ("provider", "eventId") DO UPDATE
+      SET "claimToken" = EXCLUDED."claimToken", "claimUntil" = EXCLUDED."claimUntil"
+      WHERE "PaymentWebhookEvent"."processedAt" IS NULL AND "PaymentWebhookEvent"."claimUntil" < NOW()
+      RETURNING "claimToken"`);
+    if (!claimed.length) {
+      const rows = await query(tx => tx.$queryRaw<Array<{ processedAt: Date | null }>>`
+        SELECT "processedAt" FROM "PaymentWebhookEvent" WHERE "provider" = ${provider} AND "eventId" = ${eventId}`);
+      return rows[0]?.processedAt ? { ok: true } : { retry: true };
+    }
+    // Renew while alive; an interrupted worker becomes retryable after its lease.
+    let renewing = false;
+    const heartbeat = setInterval(async () => {
+      if (renewing) return;
+      renewing = true;
+      try {
+        await query(tx => tx.$executeRaw`UPDATE "PaymentWebhookEvent" SET "claimUntil" = NOW() + INTERVAL '15 minutes'
+          WHERE "provider" = ${provider} AND "eventId" = ${eventId} AND "claimToken" = ${token} AND "processedAt" IS NULL`);
+      } catch (err) { console.error('payment_webhook_lease_renew_failed', { provider, eventId }); }
+      finally { renewing = false; }
+    }, 60_000);
+    heartbeat.unref();
+    try {
+      const result = await handle();
+      if (result?.retry || result?.ok === false) {
+        await query(tx => tx.$executeRaw`DELETE FROM "PaymentWebhookEvent"
+          WHERE "provider" = ${provider} AND "eventId" = ${eventId} AND "claimToken" = ${token} AND "processedAt" IS NULL`);
+      } else {
+        const count = await query(tx => tx.$executeRaw`UPDATE "PaymentWebhookEvent" SET "processedAt" = NOW(), "claimUntil" = NULL
+          WHERE "provider" = ${provider} AND "eventId" = ${eventId} AND "claimToken" = ${token} AND "processedAt" IS NULL`);
+        if (!count) return { retry: true };
+      }
+      return result;
+    } catch (err) {
+      await query(tx => tx.$executeRaw`DELETE FROM "PaymentWebhookEvent"
+        WHERE "provider" = ${provider} AND "eventId" = ${eventId} AND "claimToken" = ${token} AND "processedAt" IS NULL`).catch(() => undefined);
+      throw err;
+    } finally { clearInterval(heartbeat); }
+  }
 
   getUserAccount(userId: string) {
     return this._user.model.user.findFirst({
