@@ -1,5 +1,7 @@
 'use client';
 
+import { permittedAcquisition } from '@gitroom/helpers/consent/acquisition.consent';
+
 import { FormProvider, SubmitHandler, useForm } from 'react-hook-form';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import Link from 'next/link';
@@ -176,8 +178,9 @@ export function RegisterAfter({
         body: JSON.stringify({
           ...data,
           datafast_visitor_id,
-          acquisition:
-            acquisition || searchParams?.get('pd_touch') || undefined,
+          acquisition: permittedAcquisition(
+            acquisition || searchParams?.get('pd_touch')
+          ),
           ...(ref ? { ref } : {}),
         }),
       });

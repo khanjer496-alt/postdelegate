@@ -1,5 +1,7 @@
 'use client';
 
+import { acquisitionQuery } from '@gitroom/helpers/consent/acquisition.consent';
+
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -10,15 +12,7 @@ export const GoogleProvider = () => {
   const toaster = useToaster();
   const gotoLogin = useCallback(async () => {
     try {
-      const response = await fetch(
-        '/auth/oauth/GOOGLE' +
-          (new URLSearchParams(location.search).get('pd_touch')
-            ? '?acquisition=' +
-              encodeURIComponent(
-                new URLSearchParams(location.search).get('pd_touch')!
-              )
-            : '')
-      );
+      const response = await fetch('/auth/oauth/GOOGLE' + acquisitionQuery());
       // an error body is not a sign-in link
       if (!response.ok) {
         throw new Error(

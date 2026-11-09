@@ -1,5 +1,7 @@
 'use client';
 
+import { acquisitionQuery } from '@gitroom/helpers/consent/acquisition.consent';
+
 import { useCallback } from 'react';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -11,15 +13,7 @@ export const OauthProvider = () => {
   const t = useT();
   const gotoLogin = useCallback(async () => {
     try {
-      const response = await fetch(
-        '/auth/oauth/GENERIC' +
-          (new URLSearchParams(location.search).get('pd_touch')
-            ? '?acquisition=' +
-              encodeURIComponent(
-                new URLSearchParams(location.search).get('pd_touch')!
-              )
-            : '')
-      );
+      const response = await fetch('/auth/oauth/GENERIC' + acquisitionQuery());
       if (!response.ok) {
         throw new Error(
           `Login link request failed with status ${response.status}`
