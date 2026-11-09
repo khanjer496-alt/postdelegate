@@ -134,6 +134,8 @@ export function RegisterAfter({
     billingEnabled,
   } = useVariables();
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const router = useRouter();
   const fireEvents = useFireEvents();
   const track = useTrack();
@@ -198,7 +200,7 @@ export function RegisterAfter({
   };
   return (
     <FormProvider {...form}>
-      <form className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
+      <form method="post" action="/auth" className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex flex-col flex-1">
           <div>
             <h1 className="text-[40px] font-[500] -tracking-[0.8px] text-start cursor-pointer">
@@ -324,6 +326,7 @@ export function RegisterAfter({
                 <div className="w-full flex">
                   <Button
                     type="submit"
+                    disabled={!hydrated || loading}
                     data-primary-cta=""
                     className="flex-1 rounded-[10px] !h-[52px]"
                     loading={loading}

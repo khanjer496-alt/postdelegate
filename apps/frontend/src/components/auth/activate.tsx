@@ -20,6 +20,8 @@ export function Activate() {
   const t = useT();
   const fetch = useFetch();
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const [status, setStatus] = useState<ResendStatus>('idle');
   const [cooldown, setCooldown] = useState(0);
   const form = useForm<ResendInputs>();
@@ -123,7 +125,7 @@ export function Activate() {
           </div>
         ) : (
           <FormProvider {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+            <form method="post" action="/auth/activate" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
               <Input
                 label={t('label_email', 'Email')}
                 translationKey="label_email"
@@ -135,7 +137,7 @@ export function Activate() {
                 type="submit"
                 className="rounded-[10px] !h-[52px]"
                 loading={loading}
-                disabled={cooldown > 0}
+                disabled={!hydrated || loading || cooldown > 0}
               >
                 {cooldown > 0
                   ? `${t('resend_available_in', 'You can resend in')} ${cooldown}s`
