@@ -285,7 +285,7 @@ const dict: Dict = {
     description: (count: number) => `Les ${count} réseaux connectables à PostDelegate aujourd’hui, de YouTube et Bluesky à WordPress et Slack, et ceux en attente d’approbation des plateformes.`,
     eyebrow: 'Couverture des plateformes',
     h1: (count: number) => `Réseaux sociaux pris en charge : ${count} disponibles aujourd’hui.`,
-    lead: 'Connectez n’importe quel réseau disponible depuis Ajouter un canal. Les autres s’ouvriront dès que chaque plateforme aura approuvé PostDelegate.',
+    lead: "Connectez un réseau disponible depuis Ajouter un canal. Les réseaux à venir attendent l’approbation des plateformes. X n’est pas disponible.",
     ask: 'Poser une question sur un canal',
     note: 'Les réseaux marqués disponibles se connectent depuis Ajouter un canal dans votre espace de travail. Le type de compte et les autorisations déterminent toujours ce que chaque connexion permet. Consultez les <a href="/docs/channels">guides des canaux</a> pour les détails.',
     connectIt: 'À connecter dans votre espace de travail',

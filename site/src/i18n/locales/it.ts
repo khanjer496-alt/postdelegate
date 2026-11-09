@@ -306,7 +306,7 @@ const dict: Dict = {
     description: (count: number) => `I ${count} social che puoi collegare oggi a PostDelegate, da YouTube e Bluesky a WordPress e Slack, e quelli in attesa dell’approvazione delle piattaforme.`,
     eyebrow: 'Copertura delle piattaforme',
     h1: (count: number) => `Social network supportati: ${count} attivi oggi.`,
-    lead: 'Collega qualsiasi social attivo da Aggiungi canale. Gli altri si aprono quando ciascuna piattaforma approva PostDelegate.',
+    lead: "Collega un social disponibile da Aggiungi canale. I social in arrivo attendono l’approvazione delle piattaforme. X non è disponibile.",
     ask: 'Chiedi informazioni su un canale',
     note: 'I social segnati come disponibili si collegano da Aggiungi canale nel tuo workspace. Il tipo di account e i permessi influiscono comunque su ciò che ogni collegamento può fare. Consulta le <a href="/docs/channels">guide ai canali</a> per i dettagli.',
     connectIt: 'Collegalo nel tuo workspace',

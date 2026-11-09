@@ -36,6 +36,7 @@ const icons: Record<string, string> = {
       <p class="muted">{p.intro(TRIAL_DAYS)}</p>
     </div>
   )}
+  {!heading && <h2 class="sr-only">{p.heading(lowest)}</h2>}
   {/* pricing_viewed fires when half of it is on screen: the switch right above
       the plans, since half of the whole block never fits on a phone */}
   <NetworkCoverage lang={lang} />

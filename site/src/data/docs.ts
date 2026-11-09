@@ -32,6 +32,8 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Lemmy', href: '/docs/channels/lemmy', description: 'Connect to a Lemmy instance with your login.' },
     { title: 'Listmonk', href: '/docs/channels/listmonk', description: 'Send email campaigns through your own Listmonk.' },
     { title: 'Medium', href: '/docs/channels/medium', description: 'Connect with a Medium integration token.' },
+    { title: 'Moltbook', href: '/docs/channels/moltbook', description: 'Connect your Moltbook agent and schedule text posts.' },
+    { title: 'Whop', href: '/docs/channels/whop', description: 'Sign in with Whop and choose a company forum.' },
     { title: 'Nostr', href: '/docs/channels/nostr', description: 'Connect with a hex private key.' },
     { title: 'WordPress', href: '/docs/channels/wordpress', description: 'Connect with an application password.' },
     { title: 'Kick', href: '/docs/channels/kick', description: 'Connect a Kick channel with Kick sign-in.' },
