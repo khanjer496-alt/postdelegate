@@ -65,3 +65,19 @@ describe('IntegrationManager hidden providers', () => {
     expect(preview).toContain('bluesky');
   });
 });
+
+
+describe('saved automation compatibility', () => {
+  it('keeps definitions for saved Threads automations while hiding new ones by default', () => {
+    const original = process.env.THREADS_OPTIONAL_SCOPES;
+    delete process.env.THREADS_OPTIONAL_SCOPES;
+    try {
+      const manager = new IntegrationManager();
+      expect(manager.getAllPlugs().some(p => p.identifier === 'threads')).toBe(false);
+      expect(manager.getAllPlugs(true).some(p => p.identifier === 'threads')).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env.THREADS_OPTIONAL_SCOPES;
+      else process.env.THREADS_OPTIONAL_SCOPES = original;
+    }
+  });
+});

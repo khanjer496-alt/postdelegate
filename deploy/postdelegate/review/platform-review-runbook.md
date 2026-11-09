@@ -161,3 +161,30 @@ separate console checks. No live end-to-end test has been run from this branch.
 - Reviewer seed: three create-only/identity-isolation tests and the no-DB dry run passed.
 - Full Jest suite and backend/frontend type checks are recorded in the PR once
   complete. These are source checks, not a production seed or a real provider post.
+
+
+## Compatibility and exact-reviewer gates (9 November follow-up)
+
+Optional scope env settings are consent/UI defaults, not evidence of grants on a
+stored channel. Existing scheduled replies and saved plug executions continue to
+call the platform using their existing tokens. New multi-entry compositions are
+still rejected before publishing when optional replies are disabled. Analytics
+UI and collection remain disabled by these defaults, including for older broad
+grant channels. Do not roll these defaults into a customer deployment until the
+release owner has explicitly accepted that analytics/composer behavior or a
+per-channel capability migration is implemented. Editing an existing composition
+also uses the disabled comment UI; validate that case before any customer rollout.
+
+TikTok OAuth tolerates creator-info limits or temporary errors, returning an empty
+handle. Public post links resolve the handle lazily; if it is still unavailable,
+the link safely opens TikTok without a malformed /@ path. Publishing itself still
+requires successful creator-info checks in the composer/provider.
+
+Business Portfolio Page discovery remains a live gate: connect the exact Meta
+reviewer Page, verify it appears in the Page picker, and test publishing before
+recording/submission. Keep FACEBOOK_OPTIONAL_SCOPES=business_management (and the
+corresponding INSTAGRAM_OPTIONAL_SCOPES value for Facebook login) available for
+an approved configuration change if discovery needs it. No live proof is claimed.
+Threads optional grant introspection/warnings remain unproven; keep its extras off.
+The earlier LinkedIn companies-on-auth finding refers to a superseded snapshot:
+this branch uses the existing /v2/me member identity path at authentication.

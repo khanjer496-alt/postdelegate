@@ -1054,10 +1054,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     postDetails: PostDetails<FacebookDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    if (!this.plugsAvailable) {
-      throw new BadBody(this.identifier, '{}', '{}', 'Comment and reply automation needs an approved optional permission. Reconnect after it is enabled.');
-    }
-
+    // Existing scheduled replies use their token grants, not consent defaults.
     const [commentPost] = postDetails;
     const replyToId = lastCommentId || postId;
 

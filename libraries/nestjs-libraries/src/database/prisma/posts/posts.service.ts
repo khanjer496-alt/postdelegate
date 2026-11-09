@@ -1114,7 +1114,8 @@ export class PostsService {
     providerName: string,
     integrationId: string
   ) {
-    const loadAllPlugs = this._integrationManager.getAllPlugs();
+    // Consent defaults hide new automations; saved automations retain their definitions.
+    const loadAllPlugs = this._integrationManager.getAllPlugs(true);
     const getPlugs = await this._integrationService.getPlugs(
       orgId,
       integrationId
