@@ -610,7 +610,7 @@ export const startMcp = async (app: INestApplication) => {
     // older /mcp-oauth resources. Relay credentials never become cloud auth.
     const relay = token.startsWith('psh_') ? await resolveSelfHosted(token) : undefined;
     const resolved = token.startsWith('psh_')
-      ? { auth: undefined, source: undefined }
+      ? { auth: undefined, source: undefined, scopes: relay ? ['mcp:read', 'mcp:write'] : [] }
       : await resolveAuthWithSource(token);
     // @ts-ignore
     req.auth = resolved.auth;

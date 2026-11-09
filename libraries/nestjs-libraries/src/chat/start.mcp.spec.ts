@@ -137,7 +137,7 @@ const services = new Map<unknown, unknown>([
       getSelfHostedByAccessToken: async (token: string) => token === 'psh_valid' ? { id: 'relay-fixture' } : null,
     },
   ],
-  [McpRelayService, { tools: () => ({ relayMarker: {} }) }],
+  [McpRelayService, { tools: () => ({ relayMarker: { execute: jest.fn(async () => 'relayed') } }) }],
 ]);
 
 const env = { ...process.env };
@@ -192,7 +192,16 @@ describe('startMcp', () => {
         body: JSON.stringify({ tool: 'deletePostTool' }),
       });
       expect(response.status).toBe(403);
+      expect((await response.json()).error).toContain('insufficient_scope');
     });
+
+  it.each(['pos_valid', 'key-123'])('keeps write execution available to a fully authorized %s connection', async token => {
+    const response = await fetch(base + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tool: 'deletePostTool' }),
+    });
+    expect(response.status).toBe(200);
+  });
 
   beforeAll(() => boot());
   afterAll(async () => {
@@ -538,6 +547,14 @@ describe('canonical /mcp OAuth relay compatibility', () => {
     expect(response.status).toBe(200);
     expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
     expect(mockHttpServers[mockHttpServers.length - 1].config.tools.relayMarker).toBeDefined();
+  });
+  it('executes a validated relay tool without dropping its legacy API-key-equivalent scopes', async () => {
+    const response = await fetch(base + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer psh_valid' },
+      body: JSON.stringify({ tool: 'relayMarker' }),
+    });
+    expect(response.status).toBe(200);
+    expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
   });
   it('rejects a revoked relay token without starting the MCP server', async () => {
     const calls = mockHttpServers.length;

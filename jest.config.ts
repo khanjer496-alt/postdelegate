@@ -3,7 +3,7 @@ export default {
   transform: {
     '^.+\\.[tj]sx?$': [
       'ts-jest',
-      { tsconfig: '<rootDir>/tsconfig.spec.json', diagnostics: false, isolatedModules: true },
+      { tsconfig: '<rootDir>/tsconfig.test.json', diagnostics: false },
     ],
   },
   // Frontend specs render the actual components, including their JSX.

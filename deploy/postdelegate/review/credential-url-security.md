@@ -206,6 +206,10 @@ Public connect authentication failures log only err.message, not the AxiosError
 object containing request configuration/Authorization. Regression cases cover
 network failure, cancel, abandoned and accepted confirmation, malformed provider
 start responses, Moltbook secret bodies and Axios header exclusion.
-#183 is merged first; this branch is rebased onto main with main's shared
-jest.config.ts tsconfig.spec.json and isolatedModules preserved. The unused
-alternate tsconfig.test.json introduced by this branch was removed.
+#183 is merged first; this branch is rebased onto main including #182.
+Per the release decision, root Jest uses the JSX-capable tsconfig.test.json and
+has no isolatedModules transform option. Root tsconfig.spec.json is unused and
+removed; apps/backend/tsconfig.spec.json remains the backend-only Jest config.
+The #182 MCP scope enforcement is preserved alongside non-secret correlation
+IDs and self-hosted OAuth compatibility. Validated relay connections retain
+the existing API-key-equivalent scopes; revoked/disabled relays remain rejected.
