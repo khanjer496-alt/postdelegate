@@ -11,6 +11,10 @@ import {
 export class MeasurementService {
   private logger = new Logger(MeasurementService.name);
   constructor(private repository: MeasurementRepository) {}
+  // Deployment-owned staging quarantine; never inferred from consent or identity.
+  private diagnosticOnly() {
+    return process.env.MEASUREMENT_INTERNAL_ONLY === 'true';
+  }
   private async safe(work: () => Promise<unknown>) {
     try {
       await work();
@@ -54,7 +58,7 @@ export class MeasurementService {
         content: touch?.content || 'unknown',
         entryPage: touch?.entryPage || 'unknown',
         device: touch?.device || 'unknown',
-        internalOrTest: touch?.internalOrTest || false,
+        internalOrTest: this.diagnosticOnly() || touch?.internalOrTest || false,
         matchedTouch: touch?.matchedTouch || false,
       });
     });
@@ -91,7 +95,8 @@ export class MeasurementService {
         content: touch?.content || 'unknown',
         entryPage: touch?.entry_page || 'unknown',
         device: touch?.device || 'unknown',
-        internalOrTest: touch?.internal_or_test || false,
+        internalOrTest:
+          this.diagnosticOnly() || touch?.internal_or_test || false,
         matchedTouch: !!touch,
       });
     });
@@ -111,7 +116,8 @@ export class MeasurementService {
         content: touch?.content || 'unknown',
         entryPage: touch?.entry_page || 'unknown',
         device: touch?.device || 'unknown',
-        internalOrTest: touch?.internal_or_test || false,
+        internalOrTest:
+          this.diagnosticOnly() || touch?.internal_or_test || false,
         matchedTouch: !!touch,
         touchHash: touch ? measurementHash(touch.nonce) : null,
       };
@@ -265,12 +271,21 @@ export class MeasurementService {
         status: 'unavailable',
         reason: 'Export exceeds 100000 rows; request a smaller date window',
       };
-    return aggregateMeasurement(
+    const report = aggregateMeasurement(
       rows,
       new Set(lifetime.map((row) => row.organizationId)),
       from,
       to,
       first?.receivedAt || null
     );
+    return {
+      ...report,
+      coverage: {
+        ...report.coverage,
+        diagnostic_only_current_configuration: this.diagnosticOnly(),
+        diagnostic_scope:
+          'current writes only; historical classifications are unchanged',
+      },
+    };
   }
 }

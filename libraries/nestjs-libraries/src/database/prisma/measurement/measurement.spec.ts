@@ -62,6 +62,7 @@ const row = (
 afterEach(() => {
   jest.restoreAllMocks();
   delete process.env.PULSE_HANDOFF_SECRET;
+  delete process.env.MEASUREMENT_INTERNAL_ONLY;
 });
 it('rejects tampered, expired, oversize and malformed handoffs, without trusting unsigned query labels', () => {
   expect(acquisitionFromToken(token(), secret, now)).toMatchObject({
@@ -158,22 +159,18 @@ it('uses Dubai dates, cohort maturity and null visitor metrics with unavailable 
 });
 it('only records a human future accepted schedule on a connected available channel and never fails the action when storage fails', async () => {
   const repository = {
-    post: jest
-      .fn()
-      .mockResolvedValue({
-        state: 'QUEUE',
-        approvalStatus: 'APPROVED',
-        publishDate: new Date(Date.now() + 86400000),
-        integrationId: 'channel',
-      }),
-    channel: jest
-      .fn()
-      .mockResolvedValue({
-        providerIdentifier: 'youtube',
-        disabled: false,
-        inBetweenSteps: false,
-        deletedAt: null,
-      }),
+    post: jest.fn().mockResolvedValue({
+      state: 'QUEUE',
+      approvalStatus: 'APPROVED',
+      publishDate: new Date(Date.now() + 86400000),
+      integrationId: 'channel',
+    }),
+    channel: jest.fn().mockResolvedValue({
+      providerIdentifier: 'youtube',
+      disabled: false,
+      inBetweenSteps: false,
+      deletedAt: null,
+    }),
     acquisition: jest.fn().mockResolvedValue(null),
     save: jest.fn().mockResolvedValue({ key: 'k' }),
   };
@@ -206,3 +203,51 @@ it('keeps an unverified registration out of confirmed registrations and trials',
     expect.objectContaining({ kind: 'acquisition', matchedTouch: false })
   );
 });
+
+it(
+  'quarantines identifier-free staging outcomes without inventing acquisition',
+  async () => {
+    process.env.MEASUREMENT_INTERNAL_ONLY = 'true';
+    const saved: MeasurementEvent[] = [];
+    const repository = {
+      acquisition: jest.fn().mockResolvedValue(null),
+      save: jest.fn(async (data) => {
+        saved.push(row(data.kind, { ...data, receivedAt: data.occurredAt }));
+      }),
+      rows: jest.fn(async () => saved),
+      lifetimeOrgs: jest.fn().mockResolvedValue([]),
+      firstEvent: jest.fn(async () => ({ receivedAt: saved[0].receivedAt })),
+    };
+    const service = new MeasurementService(repository as never);
+    await service.signupAttempt(undefined, 'test-request');
+    await service.registration('test-org', undefined, true);
+    await service.record('test-org', 'channel_connected', 'first');
+    await service.record('test-org', 'trial_started', 'test-sub');
+    await service.record('test-org', 'qualifying_schedule', 'first', {
+      humanApproval: true,
+      acceptedPublishAt: new Date(Date.now() + 86400000),
+    });
+    expect(saved.length).toBe(7);
+    expect(
+      saved.every(
+        (event) =>
+          event.internalOrTest &&
+          !event.matchedTouch &&
+          event.source === 'unknown'
+      )
+    ).toBe(true);
+    const report = await service.export(
+      new Date(Date.now() - 60000),
+      new Date(Date.now() + 60000)
+    );
+    expect(report).toMatchObject({
+      coverage: { diagnostic_only_current_configuration: true },
+      reconciliation: {
+        internal_excluded: 6,
+        unmatched: 6,
+        eligible_server_milestones: 0,
+        matched_permitted_acquisition_touch: 0,
+      },
+    });
+  }
+);
