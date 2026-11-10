@@ -17,6 +17,10 @@ app.postdelegate.com {
         Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
         # the app asks for none of these
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        # The app (login, dashboard, legal copies) is not a search landing
+        # page: postdelegate.com is. Keep every app response out of search
+        # indexes; links in it are still followed.
+        X-Robots-Tag "noindex"
     }
     # Only Cloudflare may reach the origin, so CF-Connecting-IP (used for
     # per-visitor rate limits, TRUST_CF_CONNECTING_IP) cannot be forged.

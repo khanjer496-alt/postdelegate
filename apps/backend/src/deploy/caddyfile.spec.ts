@@ -46,6 +46,13 @@ describe('the committed Caddyfile security headers', () => {
     }
   );
 
+  // Search engines index postdelegate.com, never the app or staging.
+  it.each(['app', 'staging'])('%s: tells search engines not to index it', (name) => {
+    const block = blocks.find((b) => b.startsWith(`${name}.`)) as string;
+    const robots = block.match(/X-Robots-Tag "([^"]+)"/)?.[1] ?? '';
+    expect(robots).toContain('noindex');
+  });
+
   // Cross-Origin-Opener-Policy is deliberately absent: the social connect
   // flows are popups that talk back through window.opener, and same-origin
   // COOP severs that.
