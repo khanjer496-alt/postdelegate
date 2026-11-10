@@ -3,7 +3,7 @@
   "slug": "postiz",
   "site": "https://postiz.com",
   "pricingUrl": "https://postiz.com/pricing",
-  "checked": "2026-11-02",
+  "checked": "2026-11-10",
   "kind": { "value": "Scheduler: hosted cloud or self-hosted open source", "src": "https://postiz.com/pricing" },
   "hosting": { "value": "Postiz Cloud, or self-host it on your own server", "src": "https://postiz.com/pricing" },
   "license": { "value": "AGPL-3.0 (open source)", "src": "https://github.com/gitroomhq/postiz-app" },
@@ -14,7 +14,9 @@
   "plans": { "value": "Standard $29 (5 channels), Team $39 (10), Pro $49 (30), Ultimate $99 (100)", "src": "https://postiz.com/pricing" },
   "cost": {
     "3": { "value": "$29", "note": "Standard, 5 channels", "src": "https://postiz.com/pricing" },
+    "5": { "value": "$29", "note": "Standard, 5 channels", "src": "https://postiz.com/pricing" },
     "10": { "value": "$39", "note": "Team, 10 channels", "src": "https://postiz.com/pricing" },
+    "20": { "value": "$49", "note": "Pro, 30 channels", "src": "https://postiz.com/pricing" },
     "30": { "value": "$49", "note": "Pro, 30 channels", "src": "https://postiz.com/pricing" }
   },
   "networks": { "value": "30 listed, including Instagram, Facebook, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Reddit, Bluesky and Mastodon", "src": "https://postiz.com/pricing" },
