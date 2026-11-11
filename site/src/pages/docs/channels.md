@@ -38,7 +38,7 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | --- | --- | --- |
 | [Reddit (Own app)](/docs/channels/reddit) | Create a Reddit "web app" in your own account, then paste its client ID and secret | Posts to subreddits, for personal, non-commercial use |
 
-Reddit is not in the list above and is not counted in the networks available on the [platform status](/platforms) page. PostDelegate's own Reddit connection is not open yet, so Reddit works only through an app you create yourself.
+Reddit is not in the list above and is not counted in the networks available on the [platform status](/platforms) page. PostDelegate does not offer its own Reddit connection yet, so Reddit works only through an app you create yourself.
 
 ## Waiting on approval
 
