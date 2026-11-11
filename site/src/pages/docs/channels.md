@@ -32,19 +32,29 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | [Mastodon](/docs/channels/mastodon) | Mastodon sign-in (mastodon.social) | Posts and threads, up to 4 images or 1 video |
 | [Google Business Profile](/docs/channels/google-business) | Google sign-in, then pick a business location | Updates, events and offers, with 1 optional image |
 
+## Bring your own app
+
+| Network | How you connect | What you publish |
+| --- | --- | --- |
+| [Reddit (Own app)](/docs/channels/reddit) | Create a Reddit "web app" in your own account, then paste its client ID and secret | Posts to subreddits, for personal, non-commercial use |
+
+Reddit is not in the list above and is not counted in the networks available on the [platform status](/platforms) page. PostDelegate's own Reddit connection is not open yet, so Reddit works only through an app you create yourself.
+
 ## Waiting on approval
 
-Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, and Pinterest are waiting on approval from each network. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the table above does not work today.
+Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, and Pinterest are waiting on approval from each network. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the tables above does not work today.
 
 ## How connections work
 
-There are three kinds of connection.
+There are four kinds of connection.
 
 **Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. LinkedIn personal profiles, YouTube, Kick, Twitch, Tumblr, Dribbble, Slack, Discord, Mastodon and Google Business Profile work this way. For Discord, approving also adds the PostDelegate bot to the server you choose.
 
 **Paste a credential.** You enter an app password, API key or site address into PostDelegate. Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr and WordPress work this way. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
 
 **Add a bot.** For Telegram you add @PostDelegateBot to your channel or group and send a short connect command there. No password or key is involved.
+
+**Use your own app.** For Reddit you create an app in your own Reddit account and paste its client ID and secret into PostDelegate, then approve the connection on Reddit. It is for personal, non-commercial use and is connected from the app only.
 
 Whichever kind it is, you start from **Add Channel** on the calendar page.
 
