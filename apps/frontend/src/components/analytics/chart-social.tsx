@@ -6,12 +6,14 @@ import { TotalList } from '@gitroom/frontend/components/analytics/stars.and.fork
 import { chunk } from 'lodash';
 import useCookie from 'react-use-cookie';
 
-function mergeDataPoints(data: TotalList[], numPoints: number): TotalList[] {
+// Totals can arrive as numeric strings (analytics contracts send strings), and
+// adding a string would join digits instead of summing them.
+export function mergeDataPoints(data: TotalList[], numPoints: number): TotalList[] {
   const res = chunk(data, Math.ceil(data.length / numPoints));
   return res.map((row) => {
     return {
       date: `${row[0].date} - ${row?.at(-1)?.date}`,
-      total: row.reduce((acc, curr) => acc + curr.total, 0),
+      total: row.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0),
     };
   });
 }
