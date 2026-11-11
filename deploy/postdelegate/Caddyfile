@@ -110,6 +110,16 @@ app.postdelegate.com {
         rewrite * /data-deletion.html
         file_server
     }
+    # Brand icons: same artwork as postdelegate.com (PR #199). Served from
+    # /legal-public/brand-icons, which is already bind-mounted, so the app
+    # image does not need a rebuild. Rollback: restore the sibling
+    # Caddyfile.before-brand-icons-* backup and caddy reload.
+    @brandIcons path /postdelegate.svg /favicon.ico /postdelegate-apple-touch-icon.png
+    handle @brandIcons {
+        header Cache-Control "public, max-age=86400"
+        root * /legal-public/brand-icons
+        file_server
+    }
     handle {
         reverse_proxy postiz:5000
     }
@@ -151,6 +161,57 @@ staging.postdelegate.com {
     handle @swagger {
         respond 404
     }
+    # Public legal pages and exact source for staging revision 55d1b26a.
+    handle /source {
+        header Cache-Control "no-store"
+        redir * /source/postdelegate-55d1b26a.tar.gz 302
+    }
+    handle /source/REVISION {
+        header Cache-Control "no-store"
+        respond "55d1b26a" 200
+    }
+    handle /source/postdelegate-55d1b26a.tar.gz {
+        header Cache-Control "no-store"
+        root * /source
+        uri strip_prefix /source
+        file_server
+    }
+    @privacy path /legal/privacy /legal/privacy/
+    handle @privacy {
+        root * /legal-public
+        rewrite * /privacy.html
+        file_server
+    }
+    @terms path /legal/terms /legal/terms/
+    handle @terms {
+        root * /legal-public
+        rewrite * /terms.html
+        file_server
+    }
+    @affiliateTerms path /legal/affiliate-terms /legal/affiliate-terms/
+    handle @affiliateTerms {
+        root * /legal-public
+        rewrite * /affiliate-terms.html
+        file_server
+    }
+    @dpa path /legal/dpa /legal/dpa/
+    handle @dpa {
+        root * /legal-public
+        rewrite * /dpa.html
+        file_server
+    }
+    @subprocessors path /legal/subprocessors /legal/subprocessors/
+    handle @subprocessors {
+        root * /legal-public
+        rewrite * /subprocessors.html
+        file_server
+    }
+    @deletion path /legal/data-deletion /legal/data-deletion/ /data-deletion /data-deletion/
+    handle @deletion {
+        root * /legal-public
+        rewrite * /data-deletion.html
+        file_server
+    }
     # Public API, MCP and the MCP OAuth endpoints: own auth, no basic auth.
     @machine path /api/public/* /api/mcp* /api/sse/* /api/message/* /api/.well-known/* /api/oauth/register /api/oauth/token /api/oauth/userinfo
     handle @machine {
@@ -168,6 +229,25 @@ staging.postdelegate.com {
     @mcpWellKnown path /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
     handle @mcpWellKnown {
         rewrite * /api{uri}
+        reverse_proxy postdelegate-staging-app-1:5000
+    }
+    @stripeWebhook path /api/stripe /api/stripe/
+    handle @stripeWebhook {
+        reverse_proxy postdelegate-staging-app-1:5000
+    }
+    # QA access: requests that arrive through Cloudflare with this one client
+    # address skip the basic-auth gate. The address is personal data, so it is
+    # NOT committed: Caddy takes it from QA_CLIENT_IP in /etc/postiz/caddy.env
+    # (the same env_file as the staging basic-auth login), and it is never
+    # written to deploy/ or the source offer. If QA_CLIENT_IP is unset the
+    # default below is a documentation-only address (RFC 5737) that no visitor
+    # has, so the gate stays closed. An empty value makes Caddy refuse to load
+    # the config (checked with `caddy adapt`), it never opens the gate.
+    @qaMac {
+        remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+        header CF-Connecting-IP {$QA_CLIENT_IP:192.0.2.1}
+    }
+    handle @qaMac {
         reverse_proxy postdelegate-staging-app-1:5000
     }
     handle {
