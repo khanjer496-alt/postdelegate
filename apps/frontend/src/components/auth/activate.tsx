@@ -131,6 +131,7 @@ export function Activate() {
                 translationKey="label_email"
                 {...form.register('email', { required: true })}
                 type="email"
+                autoComplete="email"
                 placeholder={t('email_address', 'Email Address')}
               />
               <Button

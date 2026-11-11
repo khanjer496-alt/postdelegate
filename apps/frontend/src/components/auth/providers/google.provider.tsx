@@ -8,6 +8,7 @@ export const GoogleProvider = () => {
   const fetch = useFetch();
   const t = useT();
   const toaster = useToaster();
+  const label = t('continue_with_google', 'Continue with Google');
   const gotoLogin = useCallback(async () => {
     try {
       const response = await fetch('/auth/oauth/GOOGLE');
@@ -29,7 +30,7 @@ export const GoogleProvider = () => {
     <button
       type="button"
       onClick={gotoLogin}
-      aria-label={t('continue_with_google', 'Continue with Google')}
+      aria-label={label}
       className={`cursor-pointer flex-1 min-w-0 bg-white min-h-[52px] px-[12px] py-[10px] rounded-[10px] flex justify-center items-center text-[#0E0E0E] gap-[10px]`}
     >
       <div className="shrink-0" aria-hidden="true">
@@ -57,8 +58,8 @@ export const GoogleProvider = () => {
           />
         </svg>
       </div>
-      <span className="whitespace-normal text-center leading-[20px]">
-        {t('continue_with_google', 'Continue with Google')}
+      <span className="min-w-0 whitespace-normal break-words text-center leading-[20px]">
+        {label}
       </span>
     </button>
   );
