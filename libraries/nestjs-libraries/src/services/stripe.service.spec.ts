@@ -751,6 +751,37 @@ describe('StripeService affiliate events', () => {
       await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ ok: true });
     });
 
+    it('cancels once when partial refunds add up to the full amount', async () => {
+      withSubscription();
+
+      // Stripe's charge snapshot carries the cumulative amount_refunded
+      await service.dispatchWebhook(refundEvent({ amount_refunded: 900 }));
+      expect(mockStripe.subscriptions.cancel).not.toHaveBeenCalled();
+
+      await service.dispatchWebhook(refundEvent({ amount_refunded: 1900 }));
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledTimes(1);
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith('sub_1', {
+        prorate: false,
+        invoice_now: false,
+      });
+    });
+
+    it('cancels on redelivery after a failed cancel and reverses the commission the same way', async () => {
+      withSubscription();
+      mockStripe.subscriptions.cancel
+        .mockRejectedValueOnce(new Error('stripe down'))
+        .mockResolvedValueOnce({});
+
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ retry: true });
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ ok: true });
+
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledTimes(2);
+      const reversal = { invoiceId: 'in_1', reversedCents: 1900, chargedCents: 1900 };
+      expect(affiliateService.reverseCommission).toHaveBeenCalledTimes(2);
+      expect(affiliateService.reverseCommission).toHaveBeenNthCalledWith(1, reversal);
+      expect(affiliateService.reverseCommission).toHaveBeenNthCalledWith(2, reversal);
+    });
+
     it('keeps the event retryable when the cancel fails', async () => {
       withSubscription();
       mockStripe.subscriptions.cancel.mockRejectedValue(new Error('stripe down'));
