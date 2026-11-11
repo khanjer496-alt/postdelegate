@@ -2,6 +2,7 @@ jest.mock('@gitroom/backend/services/auth/auth.service', () => ({ AuthService: c
 jest.mock('@gitroom/nestjs-libraries/services/email.service', () => ({ EmailService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/integrations/social/farcaster.provider', () => ({ FarcasterProvider: class {} }));
 jest.mock('@sentry/nestjs', () => ({ metrics: { count: jest.fn() } }));
+jest.mock('@gitroom/nestjs-libraries/database/prisma/users/users.service', () => ({ UsersService: class {} }));
 jest.mock('@gitroom/backend/services/auth/auth.middleware', () => ({ getSessionUser: jest.fn(async () => null) }));
 
 import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
