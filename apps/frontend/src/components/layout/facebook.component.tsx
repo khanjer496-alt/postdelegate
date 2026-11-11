@@ -2,11 +2,14 @@
 
 import Script from 'next/script';
 import { useConsent } from '@gitroom/helpers/consent/use.consent';
+import { usePathname } from 'next/navigation';
+import { isSensitiveTelemetryPath } from '@gitroom/helpers/utils/redact.url';
 
 // waits for the analytics choice in the cookie banner
 export const FacebookComponent = () => {
   const consent = useConsent();
-  if (!process.env.NEXT_PUBLIC_FACEBOOK_PIXEL || !consent?.analytics) {
+  const sensitive = isSensitiveTelemetryPath(usePathname());
+  if (sensitive || !process.env.NEXT_PUBLIC_FACEBOOK_PIXEL || !consent?.analytics) {
     return null;
   }
   return (

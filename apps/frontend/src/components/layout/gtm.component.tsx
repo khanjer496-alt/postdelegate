@@ -5,6 +5,8 @@ import { FC, useEffect } from 'react';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useConsent } from '@gitroom/helpers/consent/use.consent';
+import { usePathname } from 'next/navigation';
+import { isSensitiveTelemetryPath } from '@gitroom/helpers/utils/redact.url';
 import { hasConsent } from '@gitroom/helpers/consent/consent.cookie';
 
 export const TrialTracker: FC = () => {
@@ -42,7 +44,8 @@ export const GoogleTagManagerComponent: FC<{ gtmId?: string }> = ({
   gtmId,
 }) => {
   const consent = useConsent();
-  if (!gtmId || !consent?.analytics) {
+  const sensitive = isSensitiveTelemetryPath(usePathname());
+  if (sensitive || !gtmId || !consent?.analytics) {
     return null;
   }
   return (
