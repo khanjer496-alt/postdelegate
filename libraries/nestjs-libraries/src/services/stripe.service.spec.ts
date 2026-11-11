@@ -630,6 +630,140 @@ describe('StripeService affiliate events', () => {
     expect(affiliateService.reverseCommission).not.toHaveBeenCalled();
   });
 
+  describe('full refund cancels the subscription', () => {
+    const refundEvent = (over: Record<string, unknown> = {}) =>
+      ({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_1',
+            invoice: 'in_1',
+            amount: 1900,
+            amount_refunded: 1900,
+            ...over,
+          },
+        },
+      } as any);
+    const withSubscription = (sub: Record<string, unknown> = {}) => {
+      mockStripe.invoices.retrieve.mockImplementation(async (id: string) => ({
+        ...invoiceEvent().data.object,
+        id,
+        status: 'paid',
+        parent: { subscription_details: { subscription: 'sub_1' } },
+      }));
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_1',
+        status: 'active',
+        metadata: { service: 'gitroom' },
+        ...sub,
+      });
+      mockStripe.subscriptions.cancel.mockResolvedValue({});
+    };
+
+    it('cancels the subscription at once, without proration or a final invoice', async () => {
+      withSubscription();
+
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ ok: true });
+
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledTimes(1);
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith('sub_1', {
+        prorate: false,
+        invoice_now: false,
+      });
+      // the affiliate reversal still happens
+      expect(affiliateService.reverseCommission).toHaveBeenCalledWith({
+        invoiceId: 'in_1',
+        reversedCents: 1900,
+        chargedCents: 1900,
+      });
+    });
+
+    it('reads the subscription from the older invoice shape too', async () => {
+      withSubscription();
+      mockStripe.invoices.retrieve.mockImplementation(async (id: string) => ({
+        ...invoiceEvent().data.object,
+        id,
+        status: 'paid',
+        subscription: 'sub_1',
+      }));
+
+      await service.dispatchWebhook(refundEvent());
+
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith('sub_1', expect.anything());
+    });
+
+    it('does not cancel on a partial refund', async () => {
+      withSubscription();
+
+      await service.dispatchWebhook(refundEvent({ amount_refunded: 900 }));
+
+      expect(mockStripe.subscriptions.cancel).not.toHaveBeenCalled();
+      expect(affiliateService.reverseCommission).toHaveBeenCalledWith({
+        invoiceId: 'in_1',
+        reversedCents: 900,
+        chargedCents: 1900,
+      });
+    });
+
+    it('ignores a charge that belongs to no subscription', async () => {
+      // an invoice without a subscription, and a charge without any invoice
+      mockStripe.invoices.retrieve.mockImplementation(async (id: string) => ({
+        ...invoiceEvent().data.object,
+        id,
+        status: 'paid',
+      }));
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ ok: true });
+
+      mockStripe.invoicePayments.list.mockResolvedValue({ data: [] });
+      await expect(
+        service.dispatchWebhook(
+          refundEvent({ invoice: undefined, payment_intent: 'pi_1' })
+        )
+      ).resolves.toEqual({ ok: true });
+
+      expect(mockStripe.subscriptions.retrieve).not.toHaveBeenCalled();
+      expect(mockStripe.subscriptions.cancel).not.toHaveBeenCalled();
+    });
+
+    it('leaves subscriptions of other services on the Stripe account alone', async () => {
+      withSubscription({ metadata: { service: 'other' } });
+
+      await service.dispatchWebhook(refundEvent());
+
+      expect(mockStripe.subscriptions.cancel).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when the subscription already ended (replay)', async () => {
+      withSubscription({ status: 'canceled' });
+
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ ok: true });
+
+      expect(mockStripe.subscriptions.cancel).not.toHaveBeenCalled();
+    });
+
+    it('treats a cancel that loses a race with another cancel as done', async () => {
+      withSubscription();
+      mockStripe.subscriptions.retrieve
+        .mockResolvedValueOnce({ id: 'sub_1', status: 'active', metadata: { service: 'gitroom' } })
+        .mockResolvedValueOnce({ id: 'sub_1', status: 'canceled', metadata: { service: 'gitroom' } });
+      mockStripe.subscriptions.cancel.mockRejectedValue(new Error('No such subscription'));
+
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ ok: true });
+    });
+
+    it('keeps the event retryable when the cancel fails', async () => {
+      withSubscription();
+      mockStripe.subscriptions.cancel.mockRejectedValue(new Error('stripe down'));
+
+      await expect(service.dispatchWebhook(refundEvent())).resolves.toEqual({ retry: true });
+      expect(console.error).toHaveBeenCalledWith(
+        'subscription_refund_cancel_failed',
+        { stripe_charge_id: 'ch_1' },
+        expect.any(Error)
+      );
+    });
+  });
+
   it('reverses the disputed share on charge.dispute.created', async () => {
     mockStripe.charges.retrieve.mockResolvedValue({
       id: 'ch_1',
