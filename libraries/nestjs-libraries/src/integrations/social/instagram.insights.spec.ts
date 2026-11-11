@@ -85,10 +85,30 @@ describe('Instagram Login account insights', () => {
     expect(data).toEqual([
       {
         label: 'Reach',
-        percentageChange: 5,
+        percentageChange: 0,
         data: [{ total: '12', date: expect.any(String) }],
       },
     ]);
+  });
+
+  it('never claims a trend it did not measure on a total card or a series card', async () => {
+    request
+      .mockResolvedValueOnce(
+        result({
+          data: [
+            {
+              name: 'reach',
+              values: [{ value: 3, end_time: '2026-11-08T08:00:00+0000' }],
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        result({ data: [{ name: 'views', total_value: { value: 30 } }] })
+      );
+    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7);
+    expect(data.map((x) => x.label)).toEqual(['Reach', 'Views']);
+    data.forEach((card) => expect(card.percentageChange).toBe(0));
   });
 
   it('keeps a real daily series and a returned total from the other request', async () => {

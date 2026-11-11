@@ -279,6 +279,8 @@ export class InstagramStandaloneProvider
     return instagramProvider.accountStats(id, accessToken, 'graph.instagram.com');
   }
 
+  // percentageChange 0 hides the trend badge: nothing here measures a real
+  // comparison against an earlier period, so no trend is claimed.
   // A finite total_value is the card number when the daily series is missing
   // or is only zeros. A real series is kept. One failed request does not drop
   // totals already read from the other. Same two requests as production.
@@ -317,14 +319,14 @@ export class InstagramStandaloneProvider
     if (total !== undefined && (series.length === 0 || (seriesSum === 0 && total > 0))) {
       return {
         label,
-        percentageChange: 5,
+        percentageChange: 0,
         data: [{ total: String(total), date: today }],
       };
     }
     if (series.length === 0) return null;
     return {
       label,
-      percentageChange: 5,
+      percentageChange: 0,
       data: series.map((point: any) => ({
         total: String(point.value),
         date: dayjs(point.end_time).format('YYYY-MM-DD'),
