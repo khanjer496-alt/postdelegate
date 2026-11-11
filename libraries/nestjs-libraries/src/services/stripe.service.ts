@@ -2734,11 +2734,12 @@ export class StripeService extends PaymentProviderAbstract {
       );
       return { retry: true };
     }
-    // The Terms say a refund cancels the subscription in the same step. Only a
-    // full refund does; a partial one leaves the subscription running.
+    // The Terms say a refund cancels the subscription in the same step. Any
+    // refund does (a yearly plan's policy refund is one twelfth, a partial
+    // one), but only a refund of the subscription's current invoice.
     try {
       const charge = event.data.object;
-      if (charge.amount > 0 && charge.amount_refunded >= charge.amount) {
+      if (charge.amount_refunded > 0) {
         const invoiceId = await this.getInvoiceIdOfCharge(charge);
         if (invoiceId) {
           await this.cancelSubscriptionOfRefundedInvoice(invoiceId);
@@ -2755,7 +2756,7 @@ export class StripeService extends PaymentProviderAbstract {
     return { ok: true };
   }
 
-  // Cancels the subscription whose current invoice was fully refunded, without
+  // Cancels the subscription whose current invoice was refunded (in full or in part), without
   // proration or a final invoice. The customer.subscription.deleted event that
   // follows moves the workspace to the free limits. Safe to repeat: an ended
   // subscription is left alone. Invoices without a subscription, invoices that are
@@ -2780,9 +2781,8 @@ export class StripeService extends PaymentProviderAbstract {
       return;
     }
     // Only the refund of the payment for the CURRENT subscription cancels it.
-    // A full refund of an older renewal, a proration or extra-channel invoice
-    // or a duplicate charge must not cut a period the customer was not
-    // refunded for.
+    // A refund of an older renewal, a proration or extra-channel invoice or a
+    // duplicate charge must not cut a period the customer was not refunded for.
     const latest = subscription.latest_invoice;
     const latestInvoiceId = typeof latest === 'string' ? latest : latest?.id;
     if (latestInvoiceId !== invoiceId) {
