@@ -161,16 +161,16 @@ staging.postdelegate.com {
     handle @swagger {
         respond 404
     }
-    # Public legal pages and exact source for staging revision 55d1b26a.
+    # Public legal pages and the AGPL source offer for staging. Same mechanism
+    # as the app block: postdelegate-latest.tar.gz is the symlink a release
+    # updates, so no per-release name is ever written here (that is what made
+    # this copy drift before), and /source/REVISION names what it points at.
     handle /source {
         header Cache-Control "no-store"
-        redir * /source/postdelegate-55d1b26a.tar.gz 302
+        redir * /source/postdelegate-latest.tar.gz 302
     }
-    handle /source/REVISION {
-        header Cache-Control "no-store"
-        respond "55d1b26a" 200
-    }
-    handle /source/postdelegate-55d1b26a.tar.gz {
+    @sourceFiles path /source/*.tar.gz /source/REVISION
+    handle @sourceFiles {
         header Cache-Control "no-store"
         root * /source
         uri strip_prefix /source
