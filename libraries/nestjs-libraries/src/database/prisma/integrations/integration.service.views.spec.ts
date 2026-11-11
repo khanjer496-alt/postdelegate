@@ -155,6 +155,25 @@ describe('IntegrationService.checkAnalytics soft refresh (Analytics > Views)', (
     }
   });
 
+  it('returns a partial analytics read without caching it for an hour', async () => {
+    const { markPartialAnalytics } = require('@gitroom/nestjs-libraries/integrations/social.abstract');
+    const partial = markPartialAnalytics([
+      { label: 'Reach', percentageChange: 5, data: [{ total: '3', date: '2026-11-08' }] },
+    ]);
+    const { service } = makeService({ analytics: jest.fn().mockResolvedValue(partial) });
+    expect(await service.checkAnalytics(org, 'int-1', '7')).toBe(partial);
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('still caches a complete analytics read', async () => {
+    const complete = [
+      { label: 'Reach', percentageChange: 5, data: [{ total: '3', date: '2026-11-08' }] },
+    ];
+    const { service } = makeService({ analytics: jest.fn().mockResolvedValue(complete) });
+    await service.checkAnalytics(org, 'int-1', '7');
+    expect(redis.set).toHaveBeenCalledTimes(1);
+  });
+
   it('retries a token error once with a soft refresh, never in a loop', async () => {
     const analytics = jest
       .fn()

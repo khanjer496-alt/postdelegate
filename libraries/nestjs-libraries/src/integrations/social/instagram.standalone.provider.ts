@@ -10,6 +10,7 @@ import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id'
 import dayjs from 'dayjs';
 import {
   AnalyticsUnavailable,
+  markPartialAnalytics,
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -367,7 +368,7 @@ export class InstagramStandaloneProvider
       }
     }
     if (analytics.length === 0 && failed) throw new AnalyticsUnavailable();
-    return analytics;
+    return failed ? markPartialAnalytics(analytics) : analytics;
   }
 
   async postAnalytics(

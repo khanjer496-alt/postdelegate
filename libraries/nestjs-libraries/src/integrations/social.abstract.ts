@@ -231,6 +231,16 @@ export class AnalyticsUnavailable extends Error {
   }
 }
 
+// A read that returned some cards while another request failed. The caller may
+// show what it has but must not cache it as if it were complete.
+const partialAnalytics = new WeakSet<object>();
+export const markPartialAnalytics = <T extends object>(result: T): T => {
+  partialAnalytics.add(result);
+  return result;
+};
+export const isPartialAnalytics = (result: unknown): boolean =>
+  typeof result === 'object' && result !== null && partialAnalytics.has(result);
+
 function safeStringify(obj: any) {
   const seen = new WeakSet();
 

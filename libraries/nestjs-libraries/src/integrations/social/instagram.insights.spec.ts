@@ -167,6 +167,32 @@ describe('Instagram Login account insights', () => {
     expect(JSON.stringify(data)).not.toContain('bad');
   });
 
+  it('marks a result partial when one of the two requests fails', async () => {
+    const { isPartialAnalytics } = require('@gitroom/nestjs-libraries/integrations/social.abstract');
+    request
+      .mockResolvedValueOnce(
+        result({
+          data: [
+            {
+              name: 'reach',
+              values: [{ value: 3, end_time: '2026-11-08T08:00:00+0000' }],
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(result({ error: { message: 'SYNTHETIC_SECRET' } }, false));
+    const data = await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7);
+    expect(data.map((x) => x.label)).toEqual(['Reach']);
+    expect(isPartialAnalytics(data)).toBe(true);
+    expect(JSON.stringify(data)).not.toContain('SYNTHETIC_SECRET');
+  });
+
+  it('does not mark a complete result partial', async () => {
+    const { isPartialAnalytics } = require('@gitroom/nestjs-libraries/integrations/social.abstract');
+    request.mockResolvedValue(result({ data: [] }));
+    expect(isPartialAnalytics(await provider.analytics('synthetic-id', 'SYNTHETIC_TOKEN', 7))).toBe(false);
+  });
+
   it.each(['network', 'json'])(
     'curates %s failures without carrying a URL, token or body',
     async (failure) => {
