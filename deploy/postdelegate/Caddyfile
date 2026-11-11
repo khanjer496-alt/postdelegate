@@ -235,21 +235,6 @@ staging.postdelegate.com {
     handle @stripeWebhook {
         reverse_proxy postdelegate-staging-app-1:5000
     }
-    # QA access: requests that arrive through Cloudflare with this one client
-    # address skip the basic-auth gate. The address is personal data, so it is
-    # NOT committed: Caddy takes it from QA_CLIENT_IP in /etc/postiz/caddy.env
-    # (the same env_file as the staging basic-auth login), and it is never
-    # written to deploy/ or the source offer. If QA_CLIENT_IP is unset the
-    # default below is a documentation-only address (RFC 5737) that no visitor
-    # has, so the gate stays closed. An empty value makes Caddy refuse to load
-    # the config (checked with `caddy adapt`), it never opens the gate.
-    @qaMac {
-        remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
-        header CF-Connecting-IP {$QA_CLIENT_IP:192.0.2.1}
-    }
-    handle @qaMac {
-        reverse_proxy postdelegate-staging-app-1:5000
-    }
     handle {
         basic_auth {
             {$STAGING_BASIC_AUTH_USER} {$STAGING_BASIC_AUTH_HASH}
