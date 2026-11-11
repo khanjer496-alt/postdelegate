@@ -4,7 +4,7 @@ title: Reddit (your own app)
 description: Connect Reddit to PostDelegate through a Reddit app you create yourself, for personal, non-commercial use. What you need, the connect steps and what to expect.
 ---
 
-Reddit works differently from the other networks. PostDelegate does not offer its own Reddit connection yet. What you can do today is connect Reddit through **a Reddit app that you create yourself**. It appears in **Add Channel** as **Reddit (Own app)**.
+Reddit works differently from the other networks. PostDelegate doesn't offer a shared Reddit connection. Connect Reddit through **a Reddit app that you create yourself**. It appears in **Add Channel** as **Reddit (Own app)**.
 
 Reddit is not counted in the networks listed as available on the [platform status](/platforms) page: those are the networks connected through PostDelegate's own apps.
 

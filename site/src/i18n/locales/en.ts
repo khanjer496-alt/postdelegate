@@ -298,7 +298,7 @@ const en = {
     waitingTitle: (count: number) => `Coming soon (awaiting platform approval): ${count}`,
     waitingText: 'None of these can be connected yet. Each one opens once its platform approves PostDelegate and the connection is switched on. We don’t give dates.',
     ownAppTitle: 'Reddit: bring your own app',
-    ownAppText: (count: number) => `Reddit is not one of the ${count} networks above, and PostDelegate does not offer its own Reddit connection yet. Instead, Add Channel offers “Reddit (Own app)”: you create a Reddit “web app” in your own Reddit account and paste its client ID and secret. It is meant for your personal, non-commercial use (check Reddit’s Data API terms), and it is connected in the app, not through the public API.`,
+    ownAppText: (count: number) => `Reddit is not one of the ${count} networks above, and PostDelegate doesn’t offer a shared Reddit connection. Instead, Add Channel offers “Reddit (Own app)”: you create a Reddit “web app” in your own Reddit account and paste its client ID and secret. It is meant for your personal, non-commercial use (check Reddit’s Data API terms), and it is connected in the app, not through the public API.`,
     ownAppCard: 'Connect it with your own Reddit app',
     ownAppLabel: 'Your own app',
     xTitle: 'X: not available',

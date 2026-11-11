@@ -317,7 +317,7 @@ const dict: Dict = {
     waitingTitle: (count: number) => `Aguardando aprovação (${count})`,
     waitingText: 'Nenhuma destas redes pode ser conectada ainda. Cada uma é liberada quando a plataforma aprovar o PostDelegate e a conexão for ativada. Não divulgamos datas.',
     ownAppTitle: 'Reddit: traga o seu próprio app',
-    ownAppText: (count: number) => `O Reddit não é uma das ${count} redes acima, e o PostDelegate ainda não oferece uma conexão própria com o Reddit. Em vez disso, Adicionar canal oferece “Reddit (Own app)”: você cria um “web app” do Reddit na sua própria conta do Reddit e cola o ID do cliente e o segredo. Ele é pensado para o seu uso pessoal e não comercial (consulte os termos da API de dados do Reddit) e é conectado no app, não pela API pública.`,
+    ownAppText: (count: number) => `O Reddit não é uma das ${count} redes acima, e o PostDelegate não oferece uma conexão compartilhada com o Reddit. Em vez disso, Adicionar canal oferece “Reddit (Own app)”: você cria um “web app” do Reddit na sua própria conta do Reddit e cola o ID do cliente e o segredo. Ele é pensado para o seu uso pessoal e não comercial (consulte os termos da API de dados do Reddit) e é conectado no app, não pela API pública.`,
     ownAppCard: 'Conecte-o com o seu próprio app do Reddit',
     ownAppLabel: 'Seu próprio app',
     xTitle: 'X: não disponível',

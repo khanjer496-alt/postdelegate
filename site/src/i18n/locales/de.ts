@@ -317,7 +317,7 @@ const dict: Dict = {
     waitingTitle: (count: number) => `Warten auf Genehmigung (${count})`,
     waitingText: 'Noch lässt sich keines dieser Netzwerke verbinden. Jedes wird freigeschaltet, sobald die jeweilige Plattform PostDelegate genehmigt und die Verbindung aktiviert ist. Termine nennen wir nicht.',
     ownAppTitle: 'Reddit: mit Ihrer eigenen App',
-    ownAppText: (count: number) => `Reddit gehört nicht zu den ${count} Netzwerken oben, und PostDelegate bietet noch keine eigene Reddit-Anbindung an. Stattdessen bietet „Kanal hinzufügen“ die Option „Reddit (Own app)“: Sie legen in Ihrem eigenen Reddit-Konto eine Reddit-„Web-App“ an und fügen deren Client-ID und Secret ein. Die Verbindung ist für Ihre persönliche, nicht kommerzielle Nutzung gedacht (beachten Sie die Data-API-Bedingungen von Reddit) und wird in der App eingerichtet, nicht über die öffentliche API.`,
+    ownAppText: (count: number) => `Reddit gehört nicht zu den ${count} Netzwerken oben, und PostDelegate bietet keine gemeinsame Reddit-Anbindung an. Stattdessen bietet „Kanal hinzufügen“ die Option „Reddit (Own app)“: Sie legen in Ihrem eigenen Reddit-Konto eine Reddit-„Web-App“ an und fügen deren Client-ID und Secret ein. Die Verbindung ist für Ihre persönliche, nicht kommerzielle Nutzung gedacht (beachten Sie die Data-API-Bedingungen von Reddit) und wird in der App eingerichtet, nicht über die öffentliche API.`,
     ownAppCard: 'Mit Ihrer eigenen Reddit-App verbinden',
     ownAppLabel: 'Eigene App',
     xTitle: 'X: nicht verfügbar',
