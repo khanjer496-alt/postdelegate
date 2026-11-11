@@ -16,7 +16,17 @@ import { LIVE_SCHEDULERS } from '../../data/schedulers';
 type QA = { q: string; a: string };
 type Card = { title: string; text: string };
 // Per live network: the fields of its scheduler page that are translated.
-export type SchedulerStrings = { action: string; description: string; h1: string; intro: string; plan: string[]; limits: string[] };
+export type SchedulerStrings = {
+  action: string; description: string; h1: string; intro: string; plan: string[]; limits: string[];
+  /** Optional <title> override for search intent the default "{name} scheduler" title misses. */
+  title?: string;
+  /** Optional how-to for doing it in the network itself, shown before the product sections. */
+  nativeHowTo?: { title: string; intro: string; sections: { heading: string; steps: string[] }[]; sources: { label: string; href: string }[]; sourcesLabel: string };
+  /** Optional "when PostDelegate fits better" section shown after the native how-to. */
+  fitTitle?: string; fitPoints?: string[];
+  /** Optional page-specific questions for this language; plain text answers. */
+  localFaq?: QA[];
+};
 type Site = typeof SITE;
 
 const en = {
@@ -24,7 +34,7 @@ const en = {
   numberLocale: 'en-US',
   launch: {
     available: (count: number) => `${count} networks available today`,
-    examples: 'Including YouTube, Bluesky, WordPress and LinkedIn personal profiles. Publish to connected channels.',
+    examples: 'Including YouTube, Bluesky, Slack and LinkedIn personal profiles. Publish to connected channels.',
     pending: 'Coming soon · awaiting platform approval',
     unavailable: 'Not available',
     modes: 'Use AI through MCP, or schedule posts yourself.',

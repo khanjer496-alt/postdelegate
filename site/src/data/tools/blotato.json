@@ -3,7 +3,7 @@
   "slug": "blotato",
   "site": "https://www.blotato.com",
   "pricingUrl": "https://www.blotato.com/pricing",
-  "checked": "2026-11-02",
+  "checked": "2026-11-10",
   "kind": { "value": "AI content tool with cross-posting, a social media API and an MCP server", "src": "https://www.blotato.com/pricing" },
   "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://www.blotato.com/pricing" },
   "pricingModel": { "value": "Flat monthly plans by connected accounts, each with a monthly allowance of AI credits", "src": "https://www.blotato.com/pricing" },
@@ -13,7 +13,9 @@
   "plans": { "value": "Starter $29 (20 accounts, 1,250 AI credits), Creator $97 (40 accounts, 5,000 credits), Agency $499 (28,000 credits)", "src": "https://www.blotato.com/pricing" },
   "cost": {
     "3": { "value": "$29", "note": "Starter, 20 accounts", "src": "https://www.blotato.com/pricing" },
+    "5": { "value": "$29", "note": "Starter, 20 accounts", "src": "https://www.blotato.com/pricing" },
     "10": { "value": "$29", "note": "Starter, 20 accounts", "src": "https://www.blotato.com/pricing" },
+    "20": { "value": "$29", "note": "Starter, 20 accounts", "src": "https://www.blotato.com/pricing" },
     "30": { "value": "$97", "note": "Creator, 40 accounts", "src": "https://www.blotato.com/pricing" }
   },
   "networks": { "value": "9: X, LinkedIn, Facebook, Instagram, TikTok, YouTube, Threads, Bluesky and Pinterest", "src": "https://www.blotato.com/mcp" },

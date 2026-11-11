@@ -266,7 +266,8 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`login:${body.state}`);
     }
 
-    const details = integrationProvider.externalUrl
+    const details =
+      integrationProvider.externalUrl || integrationProvider.ownAppCredentials
       ? await ioRedis.get(`external:${body.state}`)
       : undefined;
 
