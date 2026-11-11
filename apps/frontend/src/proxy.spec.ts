@@ -70,3 +70,30 @@ describe('proxy (signed out)', () => {
     expect(cookies).toContain('invite_error=wrong_email');
   });
 });
+
+describe('proxy (a session cookie is already present)', () => {
+  const withCookie = (url: string) => run(url, 'auth=stale-or-other-account');
+
+  it.each([
+    ['activation', 'https://app.test/auth/activate/one-time-code'],
+    ['activation with a trailing slash', 'https://app.test/auth/activate/one-time-code/'],
+    ['password reset', 'https://app.test/auth/forgot/one-time-token'],
+  ])('lets the emailed %s link open instead of redirecting to the app', async (_name, url) => {
+    expect(await withCookie(url)).toBeNull();
+  });
+
+  it.each([
+    'https://app.test/auth/login',
+    'https://app.test/auth',
+    'https://app.test/auth/activate',
+    'https://app.test/auth/forgot',
+    'https://app.test/auth/activate/code/extra',
+  ])('still sends a signed-in visitor away from %s', async (url) => {
+    const location = new URL((await withCookie(url))!);
+    expect(location.pathname).toBe('/');
+  });
+
+  it('is unchanged for the same link without a cookie', async () => {
+    expect(await run('https://app.test/auth/activate/one-time-code')).toBeNull();
+  });
+});
