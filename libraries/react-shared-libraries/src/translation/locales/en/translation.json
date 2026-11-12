@@ -2354,5 +2354,13 @@
   "pinterest_unnamed_board": "Board {{id}}",
   "gmb_call_hint": "The Call button dials the phone number on your Business Profile.",
   "gmb_offer_title": "Offer Title",
-  "gmb_offer_title_placeholder": "20% off this week"
+  "gmb_offer_title_placeholder": "20% off this week",
+  "nav_group_plan": "Plan",
+  "nav_group_create": "Create",
+  "nav_group_measure": "Measure",
+  "nav_group_workspace": "Workspace",
+  "plan_word": "plan",
+  "expand_menu": "Expand menu",
+  "collapse_menu": "Collapse menu",
+  "switch_to_classic_layout": "Switch to classic layout"
 }
