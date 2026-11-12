@@ -15,9 +15,11 @@ export const NavItemV2: FC<{
   collapsed?: boolean;
   onClick?: () => void;
   badge?: number;
-}> = ({ label, title, icon, path, collapsed, onClick, badge }) => {
+  // a neutral count, e.g. connected channels
+  count?: number;
+}> = ({ label, title, icon, path, collapsed, onClick, badge, count }) => {
   const currentPath = usePathname();
-  const isActive = currentPath.indexOf(path) === 0;
+  const isActive = path.startsWith('/') && currentPath.indexOf(path) === 0;
 
   const className = clsx(
     'group relative flex items-center w-full h-[36px] rounded-[9px] text-[13.5px] font-[500] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
@@ -54,10 +56,20 @@ export const NavItemV2: FC<{
       >
         {label}
       </span>
+      {!badge && !!count && (
+        <span
+          className={clsx(
+            'min-w-[20px] h-[18px] px-[6px] rounded-[6px] bg-pdSurface2 text-textItemBlur text-[11px] leading-[18px] font-[600] text-center',
+            collapsed && 'hidden mobile:block'
+          )}
+        >
+          {count}
+        </span>
+      )}
       {!!badge && (
         <span
           className={clsx(
-            'min-w-[20px] h-[18px] px-[6px] rounded-[6px] bg-btnCta text-btnCtaText text-[11px] leading-[18px] font-[700] text-center',
+            'min-w-[20px] h-[18px] px-[6px] rounded-[6px] bg-[#ffb5472a] text-[#ffb547] text-[11px] leading-[18px] font-[700] text-center',
             collapsed && 'hidden mobile:block'
           )}
         >
@@ -73,6 +85,14 @@ export const NavItemV2: FC<{
       <button type="button" onClick={onClick} title={title || label} className={className}>
         {inner}
       </button>
+    );
+  }
+
+  if (path.startsWith('mailto:')) {
+    return (
+      <a href={path} title={collapsed ? label : title} className={className}>
+        {inner}
+      </a>
     );
   }
 

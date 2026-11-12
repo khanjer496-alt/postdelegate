@@ -10,6 +10,7 @@ import React, {
   ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -43,8 +44,9 @@ import { CopilotKit } from '@copilotkit/react-core';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Impersonate } from '@gitroom/frontend/components/layout/impersonate';
 import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announcement.banner';
-import { Title } from '@gitroom/frontend/components/layout/title';
+import { TitleV2 } from './title.v2';
 import { SidebarV2 } from '@gitroom/frontend/components/new-layout/v2/sidebar.v2';
+import { UI_V2_BODY_CLASS } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
 import { LanguageComponent } from '@gitroom/frontend/components/layout/language.component';
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
 import { OrganizationSelector } from '@gitroom/frontend/components/layout/organization.selector';
@@ -53,7 +55,6 @@ import { StreakComponent } from '@gitroom/frontend/components/layout/streak.comp
 import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-condition.component';
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
-import { TrialCountdown } from '@gitroom/frontend/components/billing/trial.banner';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 import { setSentryUser } from '@gitroom/react/sentry/initialize.sentry.client';
 import { setUserTimezone } from '@gitroom/frontend/components/layout/set.timezone';
@@ -125,6 +126,11 @@ const TopBarMore: FC<{ children: ReactNode }> = ({ children }) => {
 };
 
 export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
+  // the v2 colors (colors.scss) and the v2 composer layout hang off this class
+  useLayoutEffect(() => {
+    document.body.classList.add(UI_V2_BODY_CLASS);
+    return () => document.body.classList.remove(UI_V2_BODY_CLASS);
+  }, []);
   const fetch = useFetch();
   const t = useT();
 
@@ -299,15 +305,14 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                             />
                           </svg>
                         </button>
-                        <div className="text-[17px] mobile:text-[18px] font-[700] tracking-[-0.01em] flex min-w-0 w-[220px] tablet:w-auto tablet:flex-1">
-                          <Title />
+                        <div className="text-[17px] mobile:text-[18px] font-[700] tracking-[-0.01em] flex min-w-0 w-[300px] tablet:w-auto tablet:flex-1">
+                          <TitleV2 />
                         </div>
                         {/* wide centered search on desktop, the same quick menu button */}
                         <div className="flex-1 flex justify-center tablet:flex-none [&>button]:w-[420px] [&>button]:max-w-full tablet:[&>button]:w-auto [&>button]:h-[36px] [&>button]:my-0 [&>button]:border [&>button]:border-newBorder [&>button]:bg-newBgColorInner [&>button>kbd]:ms-auto">
                           <CommandPalette />
                         </div>
                         <div className="flex gap-[14px] mobile:gap-[4px] items-center text-textItemBlur">
-                          <TrialCountdown />
                           <TopBarMore>
                             <StreakComponent />
                             <div className="w-[1px] h-[20px] bg-blockSeparator mobile:hidden" />
