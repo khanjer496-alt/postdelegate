@@ -1,0 +1,253 @@
+// v2 layout styles. Everything here is scoped to body.pd-v2, the class the
+// v2 shell adds, so the classic layout is unchanged when the flag is off.
+
+body.pd-v2 {
+  // ---- calendar cards (calendar.tsx CalendarItem, data-pd-* hooks) ----
+  [data-pd-card] {
+    --pd-card: #7357ff;
+    --pd-card-bg: rgba(115, 87, 255, 0.13);
+    --pd-card-ink: rgb(var(--new-textColor));
+    box-shadow: none !important;
+    border-radius: 7px !important;
+    position: relative;
+  }
+  [data-pd-card][data-pd-status='review'] {
+    --pd-card: #ffb547;
+    --pd-card-bg: rgba(255, 181, 71, 0.12);
+  }
+  [data-pd-card][data-pd-status='published'] {
+    --pd-card: #3ddc97;
+    --pd-card-bg: rgba(61, 220, 151, 0.11);
+  }
+  [data-pd-card][data-pd-status='failed'] {
+    --pd-card: #ff5a5f;
+    --pd-card-bg: rgba(255, 90, 95, 0.12);
+  }
+  [data-pd-card][data-pd-status='draft'] {
+    --pd-card: var(--pd-line-2);
+    --pd-card-bg: transparent;
+  }
+
+  // the action strip floats over the card's corner, only on hover or focus
+  [data-pd-strip] {
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 3px;
+    z-index: 18;
+    width: auto !important;
+    max-height: 26px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    padding: 0 3px !important;
+    gap: 1px !important;
+    border-radius: 7px !important;
+    background: var(--pd-surface-2) !important;
+    border: 1px solid var(--pd-line-2);
+    color: rgb(var(--new-textColor));
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
+    > div:first-child {
+      display: none;
+    }
+  }
+  [data-pd-card]:hover [data-pd-strip],
+  [data-pd-card]:focus-within [data-pd-strip] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  [data-pd-body] {
+    border-radius: 7px !important;
+    background: var(--pd-card-bg) !important;
+    border: 1px solid transparent;
+    border-inline-start: 3px solid var(--pd-card);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  [data-pd-week-cell] [data-pd-body] > div:last-child {
+    -webkit-line-clamp: 2;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  [data-pd-card][data-pd-status='draft'] [data-pd-body] {
+    border: 1px dashed var(--pd-line-2);
+    border-inline-start: 3px dashed var(--pd-line-2);
+  }
+  [data-pd-card]:hover [data-pd-body] {
+    filter: brightness(1.12);
+  }
+  [data-pd-card][data-pd-status='published'] [data-pd-body],
+  [data-pd-card][data-pd-status='failed'] [data-pd-body] {
+    filter: none !important;
+  }
+
+  // ---- calendar cells ----
+  [data-pd-cell] {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent;
+    position: relative;
+    z-index: 1;
+  }
+  [data-pd-cell] > div:last-child > div > div > div[class*='group-hover:bg-btnPrimary'] {
+    background: transparent;
+  }
+  // week: the click-to-add area sits under the cards instead of below
+  // them, so an hour with one post stays one row tall
+  [data-pd-week-cell] [data-pd-cell] > div:first-child {
+    min-height: 64px !important;
+    position: relative;
+    > div:first-child {
+      position: relative;
+      z-index: 1;
+    }
+    > div:nth-child(2) {
+      position: absolute;
+      inset: 0;
+      padding: 0;
+      > div {
+        min-height: 100% !important;
+        height: 100%;
+      }
+    }
+  }
+  .repeated-strip {
+    background: transparent;
+  }
+  [data-pd-week-cell]:has([data-pd-past]),
+  [data-pd-month-cell]:has([data-pd-past]) {
+    background: color-mix(in srgb, var(--pd-surface) 45%, transparent);
+  }
+  [data-pd-month-cell][data-pd-outside] {
+    opacity: 0.45;
+  }
+  // month: day number to the top-left like a wall calendar
+  [data-pd-month-cell] [data-pd-cell] > div:first-child {
+    justify-content: flex-start;
+    padding: 8px 8px 2px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  [data-pd-month-cell] [data-pd-cell] > div:first-child > div {
+    border-radius: 999px;
+    min-width: 26px;
+    height: 26px;
+  }
+  [data-pd-month-cell] [data-pd-cell] > div:first-child > div[class*='bg-newTableTextFocused'] {
+    background: #c8ff4d !important;
+    color: #0a0a0b !important;
+  }
+  [data-pd-month-cell] [data-pd-cell] > div:first-child {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+  }
+  [data-pd-month-cell] [data-pd-cell] > div:nth-child(2) {
+    min-height: 0 !important;
+    position: static;
+    > div:first-child {
+      position: relative;
+      z-index: 1;
+      padding-bottom: 6px;
+    }
+    > div:nth-child(2) {
+      position: absolute;
+      inset: 0;
+      padding: 0;
+      > div {
+        min-height: 100% !important;
+        height: 100%;
+      }
+    }
+  }
+}
+
+// ---- light mode: softer card tints ----
+body.pd-v2.light {
+  [data-pd-card] {
+    --pd-card-bg: rgba(115, 87, 255, 0.09);
+  }
+  [data-pd-strip] {
+    box-shadow: 0 6px 18px rgba(17, 20, 28, 0.12);
+  }
+}
+
+// ---- composer (manage.modal.tsx data-pd-composer hooks) ----
+// full page instead of a floating card, desktop only; phones keep theirs
+@media (min-width: 1026px) {
+  body.pd-v2 {
+    div:has(> [data-pd-composer]) {
+      width: 100% !important;
+      max-width: none !important;
+    }
+    [data-pd-composer] {
+      padding: 0 !important;
+      height: 100vh;
+      > div {
+        border-radius: 0 !important;
+        background: var(--new-bgColor);
+      }
+    }
+    [data-pd-composer-head] {
+      height: 56px !important;
+      border-radius: 0 !important;
+      font-size: 15px !important;
+      font-weight: 700 !important;
+      background: transparent !important;
+      border-bottom: 1px solid var(--pd-line);
+    }
+    [data-pd-composer-head='editor'] {
+      display: none !important;
+    }
+    [data-pd-composer-head='preview'] button {
+      display: none;
+    }
+    [data-pd-composer-preview] {
+      width: 420px !important;
+      background: var(--pd-panel);
+    }
+    [data-pd-composer] #social-content {
+      padding-inline: 28px !important;
+      padding-top: 18px !important;
+    }
+    [data-pd-composer-bar] {
+      height: 68px !important;
+      padding-block: 12px !important;
+      background: var(--pd-panel);
+      border-color: var(--pd-line) !important;
+      button {
+        border-radius: 10px;
+      }
+    }
+  }
+}
+
+// composer accents: the classic pink becomes the brand violet
+body.pd-v2 [data-pd-composer] {
+  #wrapper-settings .bg-btnPrimary {
+    background: var(--pd-surface-2);
+    border: 1px solid var(--pd-line-2);
+    > div,
+    svg {
+      color: rgb(var(--new-textColor)) !important;
+    }
+  }
+  .bg-\[\#D82D7E\],
+  .bg-\[\#FC69FF\] {
+    background-color: #7357ff !important;
+  }
+  .text-\[\#FC69FF\] {
+    color: #b39aff !important;
+  }
+  .border-\[\#FC69FF\] {
+    border-color: #7357ff !important;
+  }
+}
+// the assistant bubble sits above the composer's action bar
+@media (min-width: 1026px) {
+  body.pd-v2 [data-pd-composer] .copilotKitPopup {
+    bottom: 84px !important;
+  }
+}
