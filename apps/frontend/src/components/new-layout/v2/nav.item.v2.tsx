@@ -1,0 +1,91 @@
+'use client';
+
+import { FC, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import clsx from 'clsx';
+import Link from 'next/link';
+
+// One row of the v2 sidebar: icon + label, a count on the right, an accent
+// bar on the active row. Same links and click handlers as the classic menu.
+export const NavItemV2: FC<{
+  label: string;
+  title?: string;
+  icon: ReactNode;
+  path: string;
+  collapsed?: boolean;
+  onClick?: () => void;
+  badge?: number;
+}> = ({ label, title, icon, path, collapsed, onClick, badge }) => {
+  const currentPath = usePathname();
+  const isActive = currentPath.indexOf(path) === 0;
+
+  const className = clsx(
+    'group relative flex items-center w-full h-[36px] rounded-[9px] text-[13.5px] font-[500] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+    collapsed
+      ? 'justify-center px-0 mobile:justify-start mobile:gap-[10px] mobile:px-[10px]'
+      : 'gap-[10px] px-[10px]',
+    isActive
+      ? 'bg-pdNavActive text-pdNavActiveText'
+      : 'text-textItemBlur hover:bg-boxHover hover:text-newTextColor'
+  );
+
+  const inner = (
+    <>
+      {isActive && (
+        <span
+          aria-hidden="true"
+          className="absolute start-0 top-[8px] bottom-[8px] w-[3px] rounded-full bg-pdNavAccent"
+        />
+      )}
+      <span
+        aria-hidden="true"
+        className={clsx(
+          'relative flex items-center justify-center w-[20px] h-[20px] shrink-0 [&_svg]:max-w-[18px] [&_svg]:max-h-[18px]',
+          isActive && 'text-pdNavAccent'
+        )}
+      >
+        {icon}
+        {collapsed && !!badge && (
+          <span className="absolute -top-[5px] -end-[7px] w-[8px] h-[8px] rounded-full bg-btnCta mobile:hidden" />
+        )}
+      </span>
+      <span
+        className={clsx('flex-1 min-w-0 truncate text-start', collapsed && 'hidden mobile:block')}
+      >
+        {label}
+      </span>
+      {!!badge && (
+        <span
+          className={clsx(
+            'min-w-[20px] h-[18px] px-[6px] rounded-[6px] bg-btnCta text-btnCtaText text-[11px] leading-[18px] font-[700] text-center',
+            collapsed && 'hidden mobile:block'
+          )}
+        >
+          {badge > 99 ? '99+' : badge}
+          <span className="sr-only"> ({badge})</span>
+        </span>
+      )}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} title={title || label} className={className}>
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      prefetch={true}
+      href={path}
+      title={collapsed ? label : title}
+      aria-current={isActive ? 'page' : undefined}
+      {...(path.indexOf('http') === 0 && { target: '_blank' })}
+      className={className}
+    >
+      {inner}
+    </Link>
+  );
+};
