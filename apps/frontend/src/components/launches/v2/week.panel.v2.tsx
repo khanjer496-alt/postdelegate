@@ -13,7 +13,8 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { useOpenSlotCount } from './views.v2';
-import { ChannelAvatarV2, Pill, PdStatus, statusPill } from './ui.v2';
+import { ChannelAvatarV2, NetworkBadge, Pill, PdStatus, statusPill } from './ui.v2';
+import { Icon } from '@gitroom/frontend/components/new-layout/v2/icons.v2';
 
 type Tab = 'next' | 'approval' | 'drafts';
 
@@ -46,8 +47,13 @@ export const WeekPanelV2: FC<{
       review: sorted.filter((p) => status(p) === 'review'),
       published: sorted.filter((p) => status(p) === 'published'),
       drafts: sorted.filter((p) => status(p) === 'draft'),
+      // what is coming and what needs a hand: upcoming scheduled or in-review
+      // posts, plus the ones that failed
       upNext: sorted.filter(
-        (p) => status(p) === 'scheduled' && fromUtc(p.publishDate).isAfter(now)
+        (p) =>
+          status(p) === 'failed' ||
+          ((status(p) === 'scheduled' || status(p) === 'review') &&
+            fromUtc(p.publishDate).isAfter(now))
       ),
       approval: sorted.filter((p) => p.approvalStatus === 'IN_REVIEW'),
     };
@@ -103,22 +109,22 @@ export const WeekPanelV2: FC<{
         <div className="grid grid-cols-3 gap-[8px]">
           {(
             [
-              [byStatus.scheduled.length, t('scheduled', 'Scheduled'), 'text-[#b39aff]'],
+              [byStatus.scheduled.length, t('scheduled', 'Scheduled'), 'text-newTextColor'],
               [byStatus.review.length, t('in_review', 'In review'), 'text-[#ffb547]'],
               [byStatus.published.length, t('published', 'Published'), 'text-[#3ddc97]'],
             ] as const
           ).map(([count, label, color]) => (
-            <div key={label} className="rounded-[10px] bg-pdSurface border border-pdLine px-[10px] py-[9px]">
-              <div className={clsx('text-[20px] font-[800] leading-none', color)}>{count}</div>
-              <div className="text-[11px] text-textItemBlur mt-[5px] whitespace-nowrap">{label}</div>
+            <div key={label} className="rounded-[10px] bg-pdSurface border border-pdLine px-[10px] py-[8px]">
+              <div className={clsx('text-[18px] font-[700] leading-[22px] tracking-[-0.01em]', color)}>{count}</div>
+              <div className="text-[11px] text-pdInk3 mt-[2px] whitespace-nowrap">{label}</div>
             </div>
           ))}
         </div>
       </div>
-      <div className="px-[16px] flex gap-[4px] border-b border-pdLine">
+      <div className="px-[16px] flex border-b border-pdLine">
         {(
           [
-            ['next', t('up_next', 'Up next'), byStatus.upNext.length],
+            ['next', t('up_next', 'Up next'), 0],
             [
               'approval',
               t('needs_approval', 'Needs approval'),
@@ -133,16 +139,16 @@ export const WeekPanelV2: FC<{
             aria-pressed={tab === key}
             onClick={() => setTab(key)}
             className={clsx(
-              'h-[36px] px-[6px] -mb-px border-b-2 text-[12px] font-[600] whitespace-nowrap flex items-center gap-[5px]',
-              tab === key ? 'border-[#7357ff] text-newTextColor' : 'border-transparent text-textItemBlur hover:text-newTextColor'
+              'h-[36px] px-[2px] me-[10px] -mb-px border-b-2 text-[12.5px] font-[600] whitespace-nowrap flex items-center gap-[4px]',
+              tab === key ? 'border-[#7357ff] text-newTextColor' : 'border-transparent text-pdInk3 hover:text-newTextColor'
             )}
           >
             {label}
             {count > 0 && (
               <span
                 className={clsx(
-                  'text-[10.5px] px-[5px] rounded-full',
-                  key === 'approval' ? 'bg-[#ffb5472a] text-[#ffb547]' : 'bg-pdSurface2 text-textItemBlur'
+                  'text-[12px] font-[600]',
+                  key === 'approval' ? 'text-[#ffb547]' : 'text-pdInk3'
                 )}
               >
                 {count}
@@ -165,51 +171,65 @@ export const WeekPanelV2: FC<{
           const integration = integrationOf(post);
           const at = fromUtc(post.publishDate);
           const text = stripHtmlValidation('normal', post.content || '', false, true).trim();
+          const status = pdStatus(post.state, post.approvalStatus) as PdStatus;
+          const today = at.isSame(newDayjs(), 'day');
+          const day = today ? t('today', 'Today') : at.format('ddd');
+          const clock = at.format(isUSCitizen() ? 'h:mm A' : 'HH:mm');
+          const statusText =
+            status === 'review'
+              ? t('in_review', 'In review')
+              : status === 'failed'
+              ? t('failed', 'Failed')
+              : status === 'draft'
+              ? t('draft', 'Draft')
+              : status === 'published'
+              ? t('published', 'Published')
+              : t('scheduled', 'Scheduled');
           return (
-            <div
-              key={post.id}
-              className={clsx(
-                'rounded-[10px] bg-pdSurface border border-pdLine p-[10px]',
-                tab === 'approval' && 'border-s-[3px] border-s-[#ffb547]'
-              )}
-            >
-              <button type="button" onClick={editPost(post, false)} className="w-full text-start flex gap-[10px]">
-                <ChannelAvatarV2
-                  picture={integration.picture}
-                  identifier={integration.providerIdentifier || integration.identifier || ''}
-                  name={integration.name || ''}
-                  size={28}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex justify-between gap-[6px] text-[11.5px] text-textItemBlur">
-                    <span className="truncate">{integration.customer?.name || integration.name}</span>
-                    <span className="whitespace-nowrap tabular-nums">
-                      {at.format(isUSCitizen() ? 'ddd h:mm A' : 'ddd HH:mm')}
-                    </span>
+            <div key={post.id} className="rounded-[12px] bg-pdSurface border border-pdLine p-[12px]">
+              <button type="button" onClick={editPost(post, false)} className="w-full text-start block">
+                <span className="flex items-center gap-[8px] text-[11.5px] text-textItemBlur">
+                  <span title={integration.name || ''} className="inline-flex">
+                    <NetworkBadge
+                      identifier={integration.providerIdentifier || integration.identifier || ''}
+                      size={16}
+                    />
                   </span>
-                  {tab !== 'drafts' && (
-                    <span className="float-end ms-[6px] mt-[3px]">
-                      <Pill className={statusPill[pdStatus(post.state, post.approvalStatus) as PdStatus]}>
-                        {pdStatus(post.state, post.approvalStatus) === 'review'
-                          ? t('in_review', 'In review')
-                          : t('scheduled', 'Scheduled')}
-                      </Pill>
-                    </span>
-                  )}
-                  <span className="block text-[12.5px] leading-[1.4] mt-[2px] line-clamp-2">
-                    {text || t('pd_no_content', 'No content')}
+                  <span className="whitespace-nowrap tabular-nums font-[500]">
+                    {day} · {clock}
+                  </span>
+                  <span className="sr-only">{integration.name}</span>
+                  <span className="ms-auto">
+                    <Pill className={statusPill[status]}>{statusText}</Pill>
                   </span>
                 </span>
+                <span className="block text-[13px] font-[500] leading-[1.4] mt-[8px] line-clamp-2 text-newTextColor">
+                  {text || t('pd_no_content', 'No content')}
+                </span>
               </button>
-              {tab === 'approval' && (
-                <div className="flex gap-[6px] mt-[8px]">
+              {status === 'failed' && (
+                <div className="mt-[6px] text-[11.5px] leading-[1.45] text-[#ff5a5f]">
+                  {post.error || t('post_publish_error', 'An error occurred while publishing this post')}
+                  {integration.refreshNeeded && (
+                    <>
+                      {' · '}
+                      <button type="button" onClick={refreshChannel(integration)} className="underline">
+                        {t('reconnect', 'Reconnect')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {post.approvalStatus === 'IN_REVIEW' && (
+                <div className="flex gap-[6px] mt-[10px]">
                   <button
                     type="button"
                     onClick={async () => {
                       if (await approve(post)) reloadCalendarView();
                     }}
-                    className="flex-1 h-[28px] rounded-[7px] bg-[#c8ff4d] text-[#0a0a0b] text-[12px] font-[700]"
+                    className="inline-flex items-center gap-[6px] h-[28px] px-[12px] rounded-[8px] bg-[#3ddc971f] border border-[#3ddc9740] text-[#3ddc97] text-[12px] font-[600] hover:bg-[#3ddc972e]"
                   >
+                    <Icon name="check" size={14} />
                     {t('approve', 'Approve')}
                   </button>
                   <button
@@ -217,7 +237,7 @@ export const WeekPanelV2: FC<{
                     onClick={async () => {
                       if (await requestChanges(post)) reloadCalendarView();
                     }}
-                    className="flex-1 h-[28px] rounded-[7px] bg-pdSurface2 border border-pdLine2 text-[12px] font-[600]"
+                    className="h-[28px] px-[12px] rounded-[8px] bg-pdSurface2 border border-pdLine2 text-[12px] font-[600] hover:text-newTextColor"
                   >
                     {t('approval_request_changes', 'Request changes')}
                   </button>
@@ -231,7 +251,9 @@ export const WeekPanelV2: FC<{
             {t('open_review_inbox', 'Open the review inbox')} ({reviewCount?.count})
           </Link>
         )}
-        {failing.map((integration) => (
+        {failing
+          .filter((integration) => !rows.some((p: any) => p.integration?.id === integration.id && pdStatus(p.state, p.approvalStatus) === 'failed'))
+          .map((integration) => (
           <div key={integration.id} className="rounded-[10px] border border-[#ff5a5f55] bg-[#ff5a5f12] p-[10px] flex items-center gap-[10px]">
             <ChannelAvatarV2 picture={integration.picture} identifier={integration.identifier} name={integration.name} size={28} />
             <span className="flex-1 min-w-0 text-[12px]">
@@ -249,7 +271,8 @@ export const WeekPanelV2: FC<{
         ))}
       </div>
       <div className="m-[12px] mt-0 rounded-[12px] border border-pdLine bg-gradient-to-br from-[#7357ff1f] to-transparent p-[12px]">
-        <div className="text-[12.5px] font-[700]">
+        <div className="text-[12.5px] font-[700] flex items-center gap-[8px]">
+          <Icon name="sparkles" size={14} className="text-pdBrand2 shrink-0" />
           {display !== 'list' && openSlots > 0
             ? display === 'week'
               ? t('open_slots_this_week', '{{count}} open slots this week', { count: openSlots })

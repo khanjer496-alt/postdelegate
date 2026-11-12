@@ -86,7 +86,8 @@ export const WeekViewV2: FC = () => {
     // open on the working day, like a paper planner
     const hour = newDayjs().hour();
     const top = (hour >= 8 && hour < 18 ? 8 : Math.max(0, Math.min(hour - 2, 16))) * HOUR;
-    scroller.current?.scrollTo({ top });
+    // a little above the hour so its label isn't under the sticky day row
+    scroller.current?.scrollTo({ top: Math.max(0, top - 12) });
   }, [startDate]);
 
   return (
@@ -124,7 +125,7 @@ export const WeekViewV2: FC = () => {
           {hours.map((hour) => (
             <Fragment key={hour}>
               <div
-                className="relative border-b border-pdLine/0 text-end pe-[8px] text-[11px] text-pdInk3"
+                className="relative text-end pe-[8px] text-[11px] text-pdInk3"
                 style={{ minHeight: HOUR }}
               >
                 <span className="relative -top-[7px]">{hour === 0 ? '' : hourLabel(hour)}</span>
@@ -143,7 +144,7 @@ export const WeekViewV2: FC = () => {
                     data-pd-week-cell=""
                     className={clsx(
                       'relative border-b border-s border-pdLine flex',
-                      day.isSame(now, 'day') && 'bg-[#7357ff0a]'
+                      day.isSame(now, 'day') && 'bg-[#7357ff10]'
                     )}
                     style={{ minHeight: HOUR }}
                   >

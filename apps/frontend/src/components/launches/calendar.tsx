@@ -1554,6 +1554,12 @@ const CalendarItem: FC<{
                 {time}
               </div>
             )}
+            {/* the v2 layout shows the time on month chips (hidden otherwise) */}
+            {compact && (
+              <div data-pd-month-time="" className="hidden">
+                {time}
+              </div>
+            )}
           </div>
         </div>
         <div
