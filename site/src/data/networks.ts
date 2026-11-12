@@ -47,6 +47,13 @@ export const NETWORKS: Network[] = [
 ];
 export const NETWORK_COUNT = NETWORKS.length;
 export const AVAILABLE_NETWORKS = NETWORKS.filter((network) => network.available);
+// Networks that can be connected only through the customer's own developer app, which Add Channel
+// lists as "Reddit (Own app)". They are deliberately NOT in NETWORKS or AVAILABLE_NETWORKS: every
+// "N networks live" claim counts the networks connected through PostDelegate's own apps.
+// limit is unused here (no counter or scheduler page is built from this list).
+export const OWN_APP_NETWORKS: Network[] = [
+  { key: 'reddit', name: 'Reddit (your own app)', color: '#ff4500', abbr: 'Re', limit: 0, unit: 'codepoints', blurb: 'Posts to subreddits through a Reddit app you create yourself, for personal, non-commercial use.' },
+];
 // Live networks with the ones people ask about most first, for logo stacks.
 const FEATURED_KEYS = ['youtube', 'bluesky', 'discord', 'telegram', 'wordpress', 'slack'];
 export const FEATURED_LIVE_NETWORKS = [

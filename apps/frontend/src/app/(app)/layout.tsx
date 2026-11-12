@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ? new URL(process.env.FRONTEND_URL).hostname
     : 'app.postdelegate.com';
   return (
-    <html>
+    <html lang={language} dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/postdelegate.svg" type="image/svg+xml" />

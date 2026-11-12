@@ -11,7 +11,9 @@ export interface Fact { value: string; src: string | string[]; note?: string }
 // Per-unit prices that drop at volume: [up to this many units, price per unit per month], in order.
 export interface TieredFact extends Fact { tiers: Record<string, [number, number][]> }
 export const COST_POINTS = ['3', '10', '30'] as const;
-export type CostPoint = (typeof COST_POINTS)[number];
+// Extra account counts a page can add to its cost table (CompareTool's costPoints prop).
+export const EXTRA_COST_POINTS = ['5', '20'] as const;
+export type CostPoint = (typeof COST_POINTS)[number] | (typeof EXTRA_COST_POINTS)[number];
 export interface Tool {
   name: string; slug: string; site: string; pricingUrl: string; checked: string;
   kind?: Fact; hosting?: Fact; license?: Fact; pricingModel?: Fact; freeOption?: Fact; trial?: Fact;

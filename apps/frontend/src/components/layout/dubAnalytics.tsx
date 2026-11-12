@@ -4,12 +4,15 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { Analytics as DubAnalyticsIn } from '@dub/analytics/react';
 import { getCookie } from 'react-use-cookie';
 import { useConsent } from '@gitroom/helpers/consent/use.consent';
+import { usePathname } from 'next/navigation';
+import { isSensitiveTelemetryPath } from '@gitroom/helpers/utils/redact.url';
 
 // waits for the analytics choice in the cookie banner
 export const DubAnalytics = () => {
   const { dub } = useVariables();
   const consent = useConsent();
-  if (!dub || !consent?.analytics) return null;
+  const sensitive = isSensitiveTelemetryPath(usePathname());
+  if (sensitive || !dub || !consent?.analytics) return null;
   return (
     <DubAnalyticsIn
       domainsConfig={{

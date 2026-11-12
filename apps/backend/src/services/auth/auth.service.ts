@@ -398,7 +398,7 @@ export class AuthService {
   async activate(
     code: string,
     tracking: string
-  ): Promise<{ jwt: string } | { failed: ActivationFailure }> {
+  ): Promise<{ jwt: string; userId: string } | { failed: ActivationFailure }> {
     let token: { id: string; email: string };
     try {
       token = AuthChecker.verifyTypedJWT(code, 'activation');
@@ -424,7 +424,7 @@ export class AuthService {
     await this._userService.activateUser(user.id);
     this._track('register', user.email, tracking).catch((err) => {});
     await NewsletterService.register(user.email);
-    return { jwt: await this.jwt(user) };
+    return { jwt: await this.jwt(user), userId: user.id };
   }
 
   async resendActivationEmail(email: string) {

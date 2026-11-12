@@ -3,7 +3,12 @@ jest.mock('@gitroom/nestjs-libraries/database/prisma/organizations/organization.
 jest.mock('@gitroom/nestjs-libraries/chat/mastra.service', () => ({ MastraService: class {} }));
 jest.mock('@gitroom/nestjs-libraries/sentry/initialize.sentry', () => ({ setSentryUserContext: jest.fn() }));
 
+import { ForbiddenException, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { AuthMiddleware, getSessionUser } from './auth.middleware';
+import {
+  HttpExceptionFilter,
+  HttpForbiddenException,
+} from '@gitroom/nestjs-libraries/services/exception.filter';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
 const user = {
@@ -38,9 +43,9 @@ const run = async (
   };
   try {
     await middleware.use(request, {} as any, next);
-    return { allowed: next.mock.calls.length === 1, request };
+    return { allowed: next.mock.calls.length === 1, request, error: undefined as any };
   } catch (err) {
-    return { allowed: false, request };
+    return { allowed: false, request, error: err as any };
   }
 };
 
@@ -248,5 +253,117 @@ describe('getSessionUser', () => {
     ).toBeNull();
     const failing = { getUserById: jest.fn(async () => { throw new Error('db'); }) } as any;
     expect(await getSessionUser(failing, session())).toBeNull();
+  });
+});
+
+// What the browser is told. Only HttpForbiddenException makes the exception
+// filter answer 401 and clear the auth cookie, which also signs the user out
+// of every tab. That is for a session that is truly not valid, nothing else.
+describe('AuthMiddleware: what signs the browser out', () => {
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'unit-test-secret';
+    process.env.FRONTEND_URL = 'https://app.example.com';
+  });
+  let logged: jest.SpyInstance;
+  beforeEach(() => {
+    logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => logged.mockRestore());
+
+  // the real filter, against a fake response, so "clears the cookie" is observed
+  const answer = (error: unknown) => {
+    const response: any = {
+      cookie: jest.fn(),
+      header: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    };
+    if (error instanceof HttpForbiddenException) {
+      new HttpExceptionFilter().catch(error, {
+        switchToHttp: () => ({ getResponse: () => response }),
+      } as any);
+    }
+    return response;
+  };
+
+  it('signs out, clearing the cookie, for a token that is not a valid session', async () => {
+    const { middleware } = setup();
+    const { error } = await run(middleware, { cookies: { auth: 'not-a-token' } });
+    expect(error).toBeInstanceOf(HttpForbiddenException);
+    const response = answer(error);
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(response.cookie).toHaveBeenCalledWith('auth', '', expect.objectContaining({ maxAge: -1 }));
+    expect(response.header).toHaveBeenCalledWith('logout', 'true');
+  });
+
+  it('signs out for a user who no longer exists and for a user without an active workspace', async () => {
+    const gone = await run(setup(null).middleware, { cookies: { auth: session() } });
+    expect(gone.error).toBeInstanceOf(HttpForbiddenException);
+
+    const { middleware } = setup();
+    (middleware as any)._organizationService.getOrgsByUserId.mockResolvedValue([
+      { ...org, users: [{ disabled: true }] },
+    ]);
+    const none = await run(middleware, { cookies: { auth: session() } });
+    expect(none.error).toBeInstanceOf(HttpForbiddenException);
+  });
+
+  it('answers a cross-site write with a plain 403 that keeps the cookie', async () => {
+    const { middleware } = setup();
+    for (const headers of [{ origin: 'https://evil.example.org' }, {}]) {
+      const { error, allowed } = await run(middleware, {
+        method: 'POST',
+        cookies: { auth: session() },
+        headers,
+      });
+      expect(allowed).toBe(false);
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(error).not.toBeInstanceOf(HttpForbiddenException);
+      expect(error.getStatus()).toBe(403);
+      const response = answer(error);
+      expect(response.cookie).not.toHaveBeenCalled();
+      expect(response.header).not.toHaveBeenCalled();
+    }
+  });
+
+  it('answers a request with no credentials with a plain 401 that clears nothing', async () => {
+    const { middleware } = setup();
+    const { error } = await run(middleware, { method: 'POST', headers: { origin: 'https://evil.example.org' } });
+    expect(error).toBeInstanceOf(UnauthorizedException);
+    expect(error).not.toBeInstanceOf(HttpForbiddenException);
+    expect(error.getStatus()).toBe(401);
+    expect(answer(error).cookie).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['looking up the user', (m: any) => m._userService.getUserById.mockRejectedValue(new Error('SYNTHETIC db down'))],
+    ['listing the workspaces', (m: any) => m._organizationService.getOrgsByUserId.mockRejectedValue(new Error('SYNTHETIC db down'))],
+    ['creating the api key', (m: any) => m._organizationService.updateApiKey.mockRejectedValue(new Error('SYNTHETIC db down'))],
+  ])('answers 503 and keeps the cookie when the database fails %s', async (_step, fail) => {
+    const { middleware } = setup();
+    // an organization without an api key reaches updateApiKey
+    (middleware as any)._organizationService.getOrgsByUserId.mockResolvedValue([{ ...org, apiKey: '' }]);
+    fail(middleware as any);
+    const { error, allowed } = await run(middleware, { cookies: { auth: session() } });
+    expect(allowed).toBe(false);
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expect(error).not.toBeInstanceOf(HttpForbiddenException);
+    expect(error.getStatus()).toBe(503);
+    const response = answer(error);
+    expect(response.cookie).not.toHaveBeenCalled();
+    expect(response.header).not.toHaveBeenCalled();
+    // the outage is logged without the upstream message
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('SYNTHETIC');
+  });
+
+  it('still lets a live session through after a database failure on an earlier request', async () => {
+    const { middleware } = setup();
+    (middleware as any)._userService.getUserById
+      .mockRejectedValueOnce(new Error('SYNTHETIC db down'))
+      .mockResolvedValue({ ...user });
+    const first = await run(middleware, { cookies: { auth: session() } });
+    expect(first.error).toBeInstanceOf(ServiceUnavailableException);
+    const second = await run(middleware, { cookies: { auth: session() } });
+    expect(second.allowed).toBe(true);
   });
 });

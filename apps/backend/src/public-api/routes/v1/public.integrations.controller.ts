@@ -437,6 +437,16 @@ export class PublicIntegrationsController {
       );
     }
 
+    // the customer's own app keys are pasted in the app's connect form
+    if (integrationProvider.ownAppCredentials) {
+      throw new HttpException(
+        {
+          msg: 'This integration uses your own app keys and is connected from the app, not the public API',
+        },
+        400
+      );
+    }
+
     try {
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl();

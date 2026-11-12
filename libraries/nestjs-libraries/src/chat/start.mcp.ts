@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
@@ -572,7 +573,7 @@ export const startMcp = async (app: INestApplication) => {
 
     endListenStream(req, res);
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token!, auth, relay: relay || undefined, source, scopes: result.tokenValidation?.scopes || [] }, async () => {
+    await runWithContext({ requestId: randomUUID(), auth, relay: relay || undefined, source, scopes: result.tokenValidation?.scopes || [] }, async () => {
       await (relay ? selfHostedServer! : mcpServer).startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -605,11 +606,16 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const resolved = await resolveAuthWithSource(token);
+    // The canonical resource offers the same self-hosted OAuth choice as the
+    // older /mcp-oauth resources. Relay credentials never become cloud auth.
+    const relay = token.startsWith('psh_') ? await resolveSelfHosted(token) : undefined;
+    const resolved = token.startsWith('psh_')
+      ? { auth: undefined, source: undefined, scopes: relay ? ['mcp:read', 'mcp:write'] : [] }
+      : await resolveAuthWithSource(token);
     // @ts-ignore
     req.auth = resolved.auth;
     // @ts-ignore
-    if (!req.auth) {
+    if (!req.auth && !(relay && selfHostedServer)) {
       // RFC 6750: a wrong, rotated or revoked key or token
       res.setHeader(
         'WWW-Authenticate',
@@ -637,8 +643,8 @@ export const startMcp = async (app: INestApplication) => {
     endListenStream(req, res);
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: token, auth: req.auth, source: resolved.source, scopes: resolved.scopes }, async () => {
-      await server.startHTTP({
+    await runWithContext({ requestId: randomUUID(), auth: req.auth, relay: relay || undefined, source: resolved.source, scopes: resolved.scopes }, async () => {
+      await (relay ? selfHostedServer! : server).startHTTP({
         url,
         httpPath: url.pathname,
         options: {
@@ -679,7 +685,7 @@ export const startMcp = async (app: INestApplication) => {
     fixAcceptHeader(req);
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await server.startHTTP({
           url,
@@ -718,7 +724,7 @@ export const startMcp = async (app: INestApplication) => {
 
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await new MCPServer(serverConfig).startSSE({
           url,

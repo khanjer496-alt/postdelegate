@@ -11,7 +11,7 @@ Use Node.js 22 and pnpm. From this directory:
     node scripts/serve.mjs 4321
     node scripts/check-urls.mjs
 
-The build packages the website source at /website-source.tar.gz. It includes source, assets, dependency lockfile and license; excludes installed dependencies, build outputs and local configuration. Application source is separately offered at https://app.postdelegate.com/source.
+Application source is offered on GitHub at https://github.com/khanjer496-alt/postdelegate-app (AGPL-3.0). The marketing site itself is not packaged for download.
 
 ## Deployment
 
@@ -29,4 +29,4 @@ The page structure, typography, monochrome shell, pill controls, colourful featu
 
 Current product facts refer to the live PostDelegate deployment. Paid plans and the 7-day trial are live; further social connections, AI and agent workflows open in stages. Do not replace these disclosures with unverified launch claims.
 
-The application is based on Postiz under AGPL-3.0; applicable website source is supplied under AGPL-3.0. Plus Jakarta Sans is redistributed with its SIL Open Font License in public/fonts/OFL.txt. Network glyphs are generated from Simple Icons (CC0); names/logos identify their respective services and imply no endorsement.
+The application is based on Postiz under AGPL-3.0; see https://github.com/khanjer496-alt/postdelegate-app. The marketing site is not distributed under AGPL-3.0. Plus Jakarta Sans is redistributed with its SIL Open Font License in public/fonts/OFL.txt. Network glyphs are generated from Simple Icons (CC0); names/logos identify their respective services and imply no endorsement.

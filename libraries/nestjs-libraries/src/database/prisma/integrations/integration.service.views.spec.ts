@@ -134,6 +134,46 @@ describe('IntegrationService.checkAnalytics soft refresh (Analytics > Views)', (
     expect(analytics).toHaveBeenCalledWith('open-id', 'fresh', 7);
   });
 
+  it('surfaces a curated Instagram Insights failure as 502, without caching or reconnecting', async () => {
+    const { InstagramStandaloneProvider } = require('@gitroom/nestjs-libraries/integrations/social/instagram.standalone.provider');
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: { code: 100, message: 'SYNTHETIC_SECRET unsupported metric' } }),
+    });
+    const provider = new InstagramStandaloneProvider();
+    const { service, refreshIntegrationService } = makeService(provider, channel({ providerIdentifier: 'instagram-standalone' }));
+    const disconnect = jest.spyOn(service, 'disconnectChannel');
+    try {
+      await expect(service.checkAnalytics(org, 'int-1', '7'))
+        .rejects.toMatchObject({ status: 502, message: 'Analytics are temporarily unavailable. Try again later.' });
+      expect(redis.set).not.toHaveBeenCalled();
+      expect(refreshIntegrationService.refresh).not.toHaveBeenCalled();
+      expect(disconnect).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('returns a partial analytics read without caching it for an hour', async () => {
+    const { markPartialAnalytics } = require('@gitroom/nestjs-libraries/integrations/social.abstract');
+    const partial = markPartialAnalytics([
+      { label: 'Reach', percentageChange: 5, data: [{ total: '3', date: '2026-11-08' }] },
+    ]);
+    const { service } = makeService({ analytics: jest.fn().mockResolvedValue(partial) });
+    expect(await service.checkAnalytics(org, 'int-1', '7')).toBe(partial);
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('still caches a complete analytics read', async () => {
+    const complete = [
+      { label: 'Reach', percentageChange: 5, data: [{ total: '3', date: '2026-11-08' }] },
+    ];
+    const { service } = makeService({ analytics: jest.fn().mockResolvedValue(complete) });
+    await service.checkAnalytics(org, 'int-1', '7');
+    expect(redis.set).toHaveBeenCalledTimes(1);
+  });
+
   it('retries a token error once with a soft refresh, never in a loop', async () => {
     const analytics = jest
       .fn()

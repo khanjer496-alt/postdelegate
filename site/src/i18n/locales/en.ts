@@ -16,7 +16,17 @@ import { LIVE_SCHEDULERS } from '../../data/schedulers';
 type QA = { q: string; a: string };
 type Card = { title: string; text: string };
 // Per live network: the fields of its scheduler page that are translated.
-export type SchedulerStrings = { action: string; description: string; h1: string; intro: string; plan: string[]; limits: string[] };
+export type SchedulerStrings = {
+  action: string; description: string; h1: string; intro: string; plan: string[]; limits: string[];
+  /** Optional <title> override for search intent the default "{name} scheduler" title misses. */
+  title?: string;
+  /** Optional how-to for doing it in the network itself, shown before the product sections. */
+  nativeHowTo?: { title: string; intro: string; sections: { heading: string; steps: string[] }[]; sources: { label: string; href: string }[]; sourcesLabel: string };
+  /** Optional "when PostDelegate fits better" section shown after the native how-to. */
+  fitTitle?: string; fitPoints?: string[];
+  /** Optional page-specific questions for this language; plain text answers. */
+  localFaq?: QA[];
+};
 type Site = typeof SITE;
 
 const en = {
@@ -24,7 +34,7 @@ const en = {
   numberLocale: 'en-US',
   launch: {
     available: (count: number) => `${count} networks available today`,
-    examples: 'Including YouTube, Bluesky, WordPress and LinkedIn personal profiles. Publish to connected channels.',
+    examples: 'Including YouTube, Bluesky, Slack and LinkedIn personal profiles. Publish to connected channels.',
     pending: 'Coming soon · awaiting platform approval',
     unavailable: 'Not available',
     modes: 'Use AI through MCP, or schedule posts yourself.',
@@ -287,6 +297,10 @@ const en = {
     liveTitle: (count: number) => `Live today (${count})`,
     waitingTitle: (count: number) => `Coming soon (awaiting platform approval): ${count}`,
     waitingText: 'None of these can be connected yet. Each one opens once its platform approves PostDelegate and the connection is switched on. We don’t give dates.',
+    ownAppTitle: 'Reddit: bring your own app',
+    ownAppText: (count: number) => `Reddit is not one of the ${count} networks above, and PostDelegate doesn’t offer a shared Reddit connection. Instead, Add Channel offers “Reddit (Own app)”: you create a Reddit “web app” in your own Reddit account and paste its client ID and secret. It is meant for your personal, non-commercial use (check Reddit’s Data API terms), and it is connected in the app, not through the public API.`,
+    ownAppCard: 'Connect it with your own Reddit app',
+    ownAppLabel: 'Your own app',
     xTitle: 'X: not available',
     xText: 'PostDelegate does not post to X, and you cannot connect an X account.',
     googleNote: 'A Google login creates access to PostDelegate; it does not connect a YouTube channel or Google Business Profile. Each publishing destination has its own connection flow.',

@@ -10,7 +10,7 @@ const t = strings(lang);
 const f = t.footer;
 // Live networks only; everything still pending approval sits behind one line to /platforms.
 const schedulers = [
-  ...menuNetworks(['youtube', 'bluesky', 'wordpress', 'medium', 'devto', 'discord', 'telegram'])
+  ...menuNetworks(['youtube', 'bluesky', 'wordpress', 'medium', 'devto', 'slack', 'discord', 'telegram'])
     .filter((network) => network.available)
     .map((network) => [network.name, `/${network.scheduler}`] as const),
   [f.moreNetworks, '/platforms'] as const,

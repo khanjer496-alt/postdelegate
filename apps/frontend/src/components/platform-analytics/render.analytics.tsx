@@ -179,14 +179,19 @@ export const RenderAnalytics: FC<{
 
   const load = useCallback(async () => {
     setLoading(true);
-    const load = (
-      await fetch(`/analytics/${integration.id}?date=${date}`)
-    ).json();
-    setLoading(false);
-    return load;
+    try {
+      const response = await fetch(`/analytics/${integration.id}?date=${date}`);
+      if (!response.ok) throw new Error('Analytics unavailable');
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error('Analytics unavailable');
+      return data;
+    } finally {
+      setLoading(false);
+    }
   }, [integration, date]);
 
-  const { data } = useSWR(`/analytics-${integration?.id}-${date}`, load, {
+  const { data, error } = useSWR(`/analytics-${integration?.id}-${date}`, load, {
+    shouldRetryOnError: false,
     refreshInterval: 0,
     refreshWhenHidden: false,
     revalidateOnFocus: false,
@@ -224,9 +229,13 @@ export const RenderAnalytics: FC<{
 
   const totals = useMemo(() => {
     return items?.map((p: AnalyticsDataItem) => {
-      const value =
-        (p?.data.reduce((acc: number, curr: { total: number }) => acc + curr.total, 0) || 0) /
-        (p.average ? p.data.length : 1);
+      // Totals arrive as numbers or numeric strings. String addition would
+      // hide a real total, so each point is read as a number first.
+      const sum = (p?.data || []).reduce((acc: number, curr: { total: number | string }) => {
+        const numeric = typeof curr?.total === 'number' ? curr.total : Number(curr?.total);
+        return acc + (Number.isFinite(numeric) ? numeric : 0);
+      }, 0);
+      const value = p.average ? sum / (p.data.length || 1) : sum;
       if (p.average) {
         return value.toFixed(2) + '%';
       }
@@ -238,6 +247,17 @@ export const RenderAnalytics: FC<{
     return (
       <div className="flex items-center justify-center py-[48px]">
         <LoadingComponent />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="py-[24px] text-newTableText">
+        {t(
+          'analytics_temporarily_unavailable',
+          'Analytics are temporarily unavailable. Try again later.'
+        )}
       </div>
     );
   }

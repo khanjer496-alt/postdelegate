@@ -295,6 +295,10 @@ const dict: Dict = {
     liveTitle: (count: number) => `Disponibles aujourd’hui (${count})`,
     waitingTitle: (count: number) => `En attente d’approbation (${count})`,
     waitingText: 'Aucun de ces réseaux ne peut encore être connecté. Chacun s’ouvrira dès que sa plateforme aura approuvé PostDelegate et que la connexion sera activée. Nous ne donnons pas de dates.',
+    ownAppTitle: 'Reddit : avec votre propre application',
+    ownAppText: (count: number) => `Reddit ne fait pas partie des ${count} réseaux ci-dessus, et PostDelegate ne propose pas de connexion Reddit partagée. À la place, Ajouter un canal propose « Reddit (Own app) » : vous créez une « web app » Reddit dans votre propre compte Reddit et collez son identifiant client et son secret. Elle est pensée pour votre usage personnel et non commercial (consultez les conditions de l’API de données de Reddit) et se connecte depuis l’application, pas via l’API publique.`,
+    ownAppCard: 'Connectez-le avec votre propre application Reddit',
+    ownAppLabel: 'Votre propre application',
     xTitle: 'X : non disponible',
     xText: 'PostDelegate ne publie pas sur X, et vous ne pouvez pas connecter de compte X.',
     googleNote: 'Une connexion avec Google donne accès à PostDelegate ; elle ne connecte ni une chaîne YouTube ni une fiche Google Business Profile. Chaque destination de publication a son propre processus de connexion.',
@@ -620,9 +624,53 @@ const dict: Dict = {
     },
     'slack-scheduler': {
       action: 'Programmer vos messages',
-      description: `Programmez des messages Slack avec texte et images dans le canal de votre choix, réponses en fil comprises. Ajoutez PostDelegate. Essai gratuit de ${TRIAL_DAYS} jours.`,
-      h1: 'Programmez vos messages Slack dans n’importe quel canal.',
-      intro: 'Ajoutez PostDelegate à un espace de travail Slack, puis envoyez des messages programmés avec texte et images dans le canal de votre choix.',
+      title: 'Programmer un message Slack : la méthode (ordinateur, mobile, récurrent)',
+      description: 'Programmer un message Slack : sur ordinateur via la flèche à côté de l’icône d’envoi, sur mobile par appui long. PostDelegate le planifie avec vos autres canaux.',
+      h1: 'Programmer un message Slack : la méthode.',
+      intro: 'Dans Slack, vous programmez un message sur ordinateur avec l’icône flèche à côté de l’icône d’envoi, et sur mobile en appuyant longuement sur l’icône d’envoi. Les messages récurrents passent par un workflow. Avec PostDelegate, vous planifiez Slack avec vos autres canaux dans un seul calendrier.',
+      nativeHowTo: {
+        title: 'Programmer un message dans Slack',
+        intro: 'Pour un message ponctuel, aucun outil supplémentaire n’est nécessaire. Voici la marche à suivre d’après l’aide de Slack :',
+        sections: [
+          { heading: 'Sur ordinateur', steps: [
+            'Ouvrez le canal, le message direct ou le fil de destination.',
+            'Rédigez votre message et ajoutez si besoin des fichiers, des emojis, des mentions ou une mise en forme.',
+            'Cliquez sur l’icône flèche à côté de l’icône d’avion en papier, puis choisissez la date et l’heure.',
+          ] },
+          { heading: 'Sur mobile', steps: [
+            'Ouvrez le canal, le message direct ou le fil.',
+            'Appuyez sur le champ de saisie et rédigez votre message.',
+            'Appuyez longuement sur l’icône d’avion en papier, puis choisissez quand l’envoyer.',
+          ] },
+          { heading: 'Retrouver et modifier un message programmé', steps: [
+            'Cliquez sur « Brouillons et envoyés » en haut de la barre latérale (sur mobile, depuis l’onglet d’accueil).',
+            'Ouvrez l’onglet « Programmé ».',
+            'Survolez le message (sur mobile, appuyez longuement dessus) pour le modifier, le reprogrammer, l’envoyer tout de suite ou le supprimer.',
+          ] },
+          { heading: 'Messages récurrents avec un workflow', steps: [
+            'Sur ordinateur, cliquez sur « Agents et outils » dans la barre latérale, puis sur « Modèles » dans la partie Workflows.',
+            'Choisissez le modèle « Envoyer un message programmé ».',
+            'Définissez la date de début, l’heure et la fréquence, puis choisissez le canal et rédigez le message.',
+            'Terminez la configuration, donnez un nom au workflow et publiez-le.',
+          ] },
+        ],
+        sourcesLabel: 'Sources (aide Slack) :',
+        sources: [
+          { label: 'Envoyer et lire des messages', href: 'https://slack.com/intl/fr-fr/help/articles/1500012915082' },
+          { label: 'Planifier des messages récurrents dans un canal', href: 'https://slack.com/intl/fr-fr/help/articles/23814859584659' },
+        ],
+      },
+      fitTitle: 'Quand PostDelegate est plus adapté',
+      fitPoints: [
+        'Vous planifiez Slack avec d’autres canaux comme Discord, Telegram ou Mastodon et voulez tout voir dans un seul calendrier.',
+        'Une autre personne doit relire et approuver les messages avant leur envoi.',
+        'Claude, ChatGPT ou un autre assistant IA prépare des brouillons via MCP, que vous validez ensuite.',
+        'Le message doit partir d’une application plutôt que de votre compte Slack personnel.',
+      ],
+      localFaq: [
+        { q: 'Peut-on programmer des messages récurrents dans Slack ?', a: 'Oui, avec un workflow. Sur ordinateur, cliquez sur « Agents et outils », puis sur « Modèles » dans la partie Workflows, choisissez « Envoyer un message programmé », définissez l’heure de début et la fréquence, puis publiez le workflow. Un message programmé classique, lui, n’est envoyé qu’une fois.' },
+        { q: 'Où trouver les messages programmés dans Slack ?', a: 'En haut de la barre latérale, dans « Brouillons et envoyés », onglet « Programmé ». Vous pouvez y modifier, reprogrammer, envoyer tout de suite ou supprimer un message. Dans PostDelegate, les messages Slack programmés apparaissent dans le calendrier à côté de vos autres canaux.' },
+      ],
       plan: [
         'Ajoutez PostDelegate à un espace de travail depuis Ajouter un canal.',
         'Rédigez un message et choisissez le canal Slack de destination.',

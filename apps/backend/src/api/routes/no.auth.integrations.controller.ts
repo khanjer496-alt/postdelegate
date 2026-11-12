@@ -266,7 +266,8 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`login:${body.state}`);
     }
 
-    const details = integrationProvider.externalUrl
+    const details =
+      integrationProvider.externalUrl || integrationProvider.ownAppCredentials
       ? await ioRedis.get(`external:${body.state}`)
       : undefined;
 
@@ -368,7 +369,7 @@ export class NoAuthIntegrationsController {
           });
         }
 
-        console.log(`Authentication failed for ${integration}:`, err);
+        console.log(`Authentication failed for ${integration}:`, err instanceof Error ? err.message : 'Unknown provider error');
         return res({
           error: 'Authentication failed',
           accessToken: '',
