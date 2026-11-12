@@ -15,6 +15,20 @@ import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useChannelsV2 } from './use.channels.v2';
 import { ChannelAvatarV2, Pill, ghostButton } from './ui.v2';
+import { TimeTable } from '@gitroom/frontend/components/launches/time.table';
+import { Icon } from '@gitroom/frontend/components/new-layout/v2/icons.v2';
+
+const GROUP_COLORS = ['#8a5a2b', '#1f7a8c', '#5b3fd6', '#2d6a4f', '#9d4edd', '#b5651d'];
+const groupColor = (seed: string) =>
+  GROUP_COLORS[Array.from(seed).reduce((sum, c) => sum + c.charCodeAt(0), 0) % GROUP_COLORS.length];
+const initialsOf = (name: string) =>
+  name
+    .replace(/[()@#]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || '?';
 
 const networkName = (identifier: string) =>
   ({
@@ -96,6 +110,21 @@ export const ChannelsComponentV2: FC = () => {
       });
     },
     [integrations, fetch, modal, mutate]
+  );
+
+  // the same time-slot editor the channel menu opens
+  const editSlots = useCallback(
+    (integration: any) => () => {
+      modal.openModal({
+        withCloseButton: true,
+        closeOnEscape: false,
+        closeOnClickOutside: false,
+        askClose: true,
+        title: t('time_table_slots', 'Time Table Slots'),
+        children: <TimeTable integration={integration} mutate={mutate} />,
+      });
+    },
+    [modal, mutate, t]
   );
 
   const attention = (i: any) => i.refreshNeeded || i.inBetweenSteps;
@@ -196,8 +225,11 @@ export const ChannelsComponentV2: FC = () => {
           {groups.map((group) => (
             <section key={group.id || 'none'} className="mb-[24px]">
               <div className="flex items-center gap-[10px] mb-[10px]">
-                <span className="w-[22px] h-[22px] rounded-[6px] grid place-items-center text-[10px] font-[800] text-white bg-gradient-to-br from-[#7357ff] to-[#3b2bb8]">
-                  {(group.name || '?').slice(0, 2).toUpperCase()}
+                <span
+                  className="w-[22px] h-[22px] rounded-[6px] grid place-items-center text-[10px] font-[800] text-white"
+                  style={{ background: groupColor(group.name || '?') }}
+                >
+                  {initialsOf(group.name || '?')}
                 </span>
                 <h2 className="text-[14px] font-[700]">{group.name || t('no_customer', 'No customer')}</h2>
                 <span className="text-[12px] text-pdInk3">
@@ -270,7 +302,10 @@ export const ChannelsComponentV2: FC = () => {
                             onClick={refreshChannel(integration)}
                             className="flex-1 h-[32px] rounded-[9px] bg-[#ff5a5f26] text-[#ff5a5f] text-[12.5px] font-[700]"
                           >
-                            {t('reconnect', 'Reconnect')}
+                            <span className="inline-flex items-center gap-[6px]">
+                              <Icon name="refresh-cw" size={13} />
+                              {t('reconnect', 'Reconnect')}
+                            </span>
                           </button>
                         ) : (
                           <button
@@ -279,9 +314,18 @@ export const ChannelsComponentV2: FC = () => {
                             onClick={createPost(integration)}
                             className={clsx(ghostButton, 'flex-1 justify-center disabled:opacity-40')}
                           >
+                            <Icon name="square-pen" size={14} />
                             {t('create_post', 'Create post')}
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={editSlots(integration)}
+                          className={clsx(ghostButton, 'flex-1 justify-center')}
+                        >
+                          <Icon name="clock" size={14} />
+                          {t('pd_time_slots', 'Time slots')}
+                        </button>
                       </div>
                     </div>
                   );
