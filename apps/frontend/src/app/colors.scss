@@ -1,24 +1,18 @@
 :root {
   .dark {
-    /* PostDelegate layout v2 shell */
-    --pd-side: #0e0e10;
-    --pd-nav-active: rgba(115, 87, 255, 0.16);
-    --pd-nav-active-text: #ffffff;
-    --pd-nav-accent: #7357ff;
-    --pd-section: #6e6e74;
-    --new-back-drop: #030303;
-    --new-settings: #1b1b1e;
-    --new-border: #232327;
-    --new-bgColor: #0a0a0b;
-    --new-bgColorInner: #111113;
-    --new-sep: #3a3a40;
-    --new-bgLineColor: #1f1f23;
+    --new-back-drop: #030407;
+    --new-settings: #1a1e29;
+    --new-border: #262b37;
+    --new-bgColor: #080a0f;
+    --new-bgColorInner: #11141c;
+    --new-sep: #3b4150;
+    --new-bgLineColor: #222734;
     --new-textItemFocused: #e4deff;
-    --new-textItemBlur: #a3a3a8;
-    --new-boxFocused: #221c45;
+    --new-textItemBlur: #9299aa;
+    --new-boxFocused: #2c2563;
     --new-textColor: 247 247 242;
-    --new-blockSeparator: #232327;
-    --new-btn-simple: #1f1f23;
+    --new-blockSeparator: #232836;
+    --new-btn-simple: #232835;
     --new-btn-text: #f7f7f2;
     --new-btn-primary: #7357ff;
     --new-btn-cta: #c8ff4d;
@@ -26,19 +20,19 @@
     --new-btn-cta-text: #0b0f05;
     --new-btn-cta-edge: transparent;
     --new-orbit-dot: #c8ff4d;
-    --new-orbit-ring: #0a0a0b;
+    --new-orbit-ring: #080a0f;
     --new-focus-ring: #c8ff4d;
     --new-ai-btn: #7357ff;
-    --new-box-hover: #19191c;
-    --new-table-border: #2a2a2f;
+    --new-box-hover: #191d29;
+    --new-table-border: #2a2f3b;
     --new-input-border: #5c6475;
-    --new-table-header: #161618;
-    --new-table-text: #a3a3a8;
+    --new-table-header: #171b26;
+    --new-table-text: #9299aa;
     --new-table-text-focused: #c8ff4d;
-    --new-small-strips: #141416;
-    --new-big-strips: #0e0e10;
-    --new-col-color: #2a2a2f;
-    --new-menu-dots: #6e6e74;
+    --new-small-strips: #141822;
+    --new-big-strips: #0e1118;
+    --new-col-color: #2a2f3b;
+    --new-menu-dots: #6e7587;
     --new-menu-hover: #f7f7f2;
     --menu-shadow: 0 0 0 1px rgba(146, 153, 170, 0.08),
       0 12px 32px 0 rgba(3, 4, 7, 0.6);
@@ -59,12 +53,6 @@
     --youtube-svg-border: #A0A0A0;
   }
   .light {
-    /* PostDelegate layout v2 shell */
-    --pd-side: #fbfbf8;
-    --pd-nav-active: #ece8ff;
-    --pd-nav-active-text: #11141c;
-    --pd-nav-accent: #5b3fe6;
-    --pd-section: #8a8f9c;
     --new-back-drop: #11141c;
     --new-settings: #efefe8;
     --new-sep: #d3d4cb;
@@ -125,15 +113,15 @@
 
 :root {
   .dark {
-    --color-primary: #0a0a0b;
-    --color-secondary: #0d0d0f;
+    --color-primary: #080a0f;
+    --color-secondary: #0b0e15;
     --color-text: #f7f7f2;
-    --color-third: #0b0b0d;
+    --color-third: #0a0d14;
     --color-forth: #7357ff;
     --color-fifth: var(--new-bgLineColor);
     --color-sixth: var(--new-table-header);
     --color-seventh: #6545ed;
-    --color-gray: #a3a3a8;
+    --color-gray: #9299aa;
     --color-input: var(--new-table-header);
     --color-input-text: #64748b;
     --color-table-border: var(--new-table-border);
@@ -263,5 +251,61 @@
     --color-custom54: #afb8c1;
     --color-custom55: #d5d7e1;
     --color-modalCustom: transparent;
+  }
+}
+
+/* PostDelegate layout v2 (PD_UI_V2). The v2 shell adds .pd-v2 to <body>;
+   with the flag off these rules never match and the classic colors stay. */
+:root {
+  .dark.pd-v2 {
+    --pd-side: #0e0e10;
+    --pd-nav-active: rgba(115, 87, 255, 0.16);
+    --pd-nav-active-text: #ffffff;
+    --pd-nav-accent: #7357ff;
+    --pd-section: #6e6e74;
+    --pd-surface: #141416;
+    --pd-surface-2: #1b1b1e;
+    --pd-line: #232327;
+    --pd-line-2: #2e2e33;
+    --pd-ink-3: #6e6e74;
+    --pd-panel: #0c0c0e;
+    --new-back-drop: #030303;
+    --new-settings: #1b1b1e;
+    --new-border: #232327;
+    --new-bgColor: #0a0a0b;
+    --new-bgColorInner: #0a0a0b;
+    --new-sep: #3a3a40;
+    --new-bgLineColor: #232327;
+    --new-textItemBlur: #a3a3a8;
+    --new-boxFocused: #221c45;
+    --new-blockSeparator: #232327;
+    --new-btn-simple: #1b1b1e;
+    --new-box-hover: #19191c;
+    --new-table-border: #2a2a2f;
+    --new-table-header: #141416;
+    --new-table-text: #a3a3a8;
+    --new-small-strips: #141416;
+    --new-big-strips: #0e0e10;
+    --new-col-color: #18181b;
+    --new-menu-dots: #6e6e74;
+    --new-orbit-ring: #0a0a0b;
+    --color-primary: #0a0a0b;
+    --color-secondary: #0d0d0f;
+    --color-third: #0b0b0d;
+    --color-gray: #a3a3a8;
+  }
+  .light.pd-v2 {
+    --pd-side: #fbfbf8;
+    --pd-nav-active: #ece8ff;
+    --pd-nav-active-text: #11141c;
+    --pd-nav-accent: #5b3fe6;
+    --pd-section: #8a8f9c;
+    --pd-surface: #ffffff;
+    --pd-surface-2: #f3f3ee;
+    --pd-line: #e6e7e0;
+    --pd-line-2: #d9dad2;
+    --pd-ink-3: #8a8f9c;
+    --pd-panel: #fbfbf8;
+    --new-bgLineColor: #e6e7e0;
   }
 }

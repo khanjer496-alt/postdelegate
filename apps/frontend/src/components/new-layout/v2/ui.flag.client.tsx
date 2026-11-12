@@ -32,3 +32,10 @@ export const UiFlagQuerySync: FC = () => {
 
   return null;
 };
+
+// The v2 shell marks <body> with this class: the v2 colors hang off it and
+// shared components (the composer modal) can check it.
+export const UI_V2_BODY_CLASS = 'pd-v2';
+export const isUiV2Client = () =>
+  typeof document !== 'undefined' &&
+  document.body.classList.contains(UI_V2_BODY_CLASS);
