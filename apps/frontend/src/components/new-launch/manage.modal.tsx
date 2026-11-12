@@ -76,6 +76,8 @@ import {
   useMediaSettingsValues,
 } from '@gitroom/frontend/components/new-launch/media.settings.section';
 import { ChannelChecks } from '@gitroom/frontend/components/new-launch/channel.checks.component';
+import { isUiV2Client } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
+import { ChannelPickerV2 } from '@gitroom/frontend/components/new-launch/v2/channel.picker.v2';
 
 // the modifier key of the shortcuts, as the keyboard labels it
 // the validation pipe answers `message` as a list, other errors as a string
@@ -96,6 +98,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const fetch = useFetch();
   const ref = useRef(null);
   const existingData = useExistingData();
+  // the v2 layout puts the channels in their own column
+  const [uiV2] = useState(isUiV2Client);
   const [loading, setLoading] = useState(false);
   // set before the first await, so a second click can't start a second save
   // or delete while the dialogs of the first are still open
@@ -1212,6 +1216,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     <div
       className="w-full h-full flex-1 p-[40px] mobile:p-0 mobile:h-auto mobile:min-h-full flex relative"
       onKeyDown={onShortcut}
+      data-pd-composer=""
     >
       <div className="flex flex-1 min-w-0 bg-newBgColorInner rounded-[20px] mobile:rounded-none flex-col">
         <MobileTopBar
@@ -1229,14 +1234,59 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             }}
           />
         </MobileTopBar>
+        {uiV2 && (
+          <div
+            data-pd-composer-top=""
+            className="h-[56px] shrink-0 flex items-center gap-[10px] px-[16px] border-b border-pdLine mobile:hidden"
+          >
+            <button
+              type="button"
+              onClick={askClose}
+              className="flex items-center gap-[6px] text-[13px] font-[500] text-textItemBlur hover:text-newTextColor"
+            >
+              <span aria-hidden="true" className="rtl:-scale-x-100">
+                ←
+              </span>
+              {t('calendar', 'Calendar')}
+            </button>
+            <span className="text-pdInk3">/</span>
+            <span className="text-[16px] font-[700]">
+              {existingData?.integration
+                ? t('edit_post', 'Edit post')
+                : t('new_post', 'New post')}
+            </span>
+            <CreationMethodBadge
+              creationMethod={existingData?.posts?.[0]?.creationMethod}
+              size="sm"
+            />
+            <ApprovalStatusBadge status={existingApproval} />
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={askClose}
+              aria-label={t('close', 'Close')}
+              className="w-[32px] h-[32px] grid place-items-center rounded-[8px] border border-pdLine2 bg-pdSurface2 text-textItemBlur hover:text-newTextColor"
+            >
+              <CloseIcon className="text-current" />
+            </button>
+          </div>
+        )}
         <div className="flex-1 flex mobile:contents">
+          {uiV2 && (
+            <ChannelPickerV2
+              onSelectCustomer={!dummy ? changeCustomer : undefined}
+            />
+          )}
           <div
             className={clsx(
               'flex flex-col flex-1 min-w-0 border-e border-newBorder mobile:border-e-0',
               mobileTab === 'preview' && 'mobile:flex-none'
             )}
           >
-            <div className="bg-newBgColor h-[65px] rounded-s-[20px] !rounded-b-[0] mobile:hidden flex items-center gap-[12px] px-[20px] text-[20px] font-[600]">
+            <div
+              data-pd-composer-head="editor"
+              className="bg-newBgColor h-[65px] rounded-s-[20px] !rounded-b-[0] mobile:hidden flex items-center gap-[12px] px-[20px] text-[20px] font-[600]"
+            >
               {t('create_post_title', 'Create Post')}
               <CreationMethodBadge
                 creationMethod={existingData?.posts?.[0]?.creationMethod}
@@ -1259,7 +1309,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   <div
                     className={clsx(
                       'flex w-full',
-                      !existingData.integration && 'mobile:hidden'
+                      !existingData.integration &&
+                        (uiV2 ? 'hidden' : 'mobile:hidden')
                     )}
                   >
                     <div className="flex flex-1">
@@ -1418,12 +1469,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             </div>
           </div>
           <div
+            data-pd-composer-preview=""
             className={clsx(
               'w-[580px] tablet:w-[440px] mobile:!w-full flex flex-col mobile:flex-1',
               mobileTab === 'edit' && 'mobile:hidden'
             )}
           >
-            <div className="bg-newBgColor h-[65px] rounded-e-[20px] !rounded-b-[0] mobile:hidden flex items-center px-[20px] text-[20px] font-[600]">
+            <div
+              data-pd-composer-head="preview"
+              className="bg-newBgColor h-[65px] rounded-e-[20px] !rounded-b-[0] mobile:hidden flex items-center px-[20px] text-[20px] font-[600]"
+            >
               <div className="flex-1">{t('post_preview', 'Post Preview')}</div>
               <button
                 type="button"
@@ -1456,7 +1511,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             </div>
           </div>
         </div>
-        <div className="select-none h-[84px] py-[20px] border-t border-newBorder flex items-center mobile:hidden">
+        <div
+          data-pd-composer-bar=""
+          className="select-none h-[84px] py-[20px] border-t border-newBorder flex items-center mobile:hidden"
+        >
           <div className="flex-1 flex ps-[20px] gap-[8px]">
             {/* keep a single tags component mounted, the tags sheet has its own */}
             {!dummy && mobileSheet !== 'tags' && (
@@ -1570,7 +1628,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     )}
                   >
                     {selectedIntegrations.length === 0
-                      ? t('check_circles_above', 'Check the circles above')
+                      ? uiV2
+                        ? t('pick_channels_first', 'Pick channels first')
+                        : t('check_circles_above', 'Check the circles above')
                       : scheduleLabel}
                   </div>
                   {selectedIntegrations.length > 0 && (
