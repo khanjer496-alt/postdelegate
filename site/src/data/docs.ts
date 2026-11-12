@@ -45,6 +45,7 @@ export const DOC_SECTIONS: DocSection[] = [
     { title: 'Discord', href: '/docs/channels/discord', description: 'Add the PostDelegate bot to a Discord server.' },
     { title: 'Mastodon', href: '/docs/channels/mastodon', description: 'Connect a mastodon.social account with Mastodon sign-in.' },
     { title: 'Google Business Profile', href: '/docs/channels/google-business', description: 'Connect a business location with Google sign-in.' },
+    { title: 'Reddit (your own app)', href: '/docs/channels/reddit', description: 'Connect Reddit through a Reddit app you create yourself, for personal use.' },
     { title: 'Waiting on approval', href: '/docs/channels/coming-soon', description: 'Networks waiting on platform approval.' },
   ] },
   { title: 'REST API', items: [

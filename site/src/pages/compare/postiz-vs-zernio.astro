@@ -7,6 +7,9 @@ const faq = [
   { q: 'Can my customers connect their own accounts?', a: 'With Zernio, yes: you give each customer a profile, connect their accounts into it, and can use your own app on each network so the consent screen shows your brand. Postiz is built for your own team: client invite links let clients connect accounts into your Postiz workspace, and OAuth lets other Postiz users authorise your app, but each of them needs a Postiz account.' },
   { q: 'Which has an MCP server?', a: 'Both, hosted. Zernio’s server at mcp.zernio.com accepts a sign-in or an API key and exposes 20 core tools plus one tool per API endpoint. Postiz includes its MCP server, CLI and API on every Cloud plan.' },
   { q: 'Is there a free tier?', a: 'Zernio’s first 2 connected accounts are free with no card, including the full API. Postiz Cloud has no free plan; it starts at $29 a month after a 7-day trial, though the open-source code is free to self-host.' },
+  { q: 'Is there a free Zernio alternative?', a: 'Postiz has no free cloud plan, but its code is open source under AGPL-3.0, so you can self-host it with no license fee if you run the server and get each network’s developer app approved yourself. If you only need two accounts, Zernio’s own free tier may be the simpler free option: the first 2 connected accounts are free with the full API and no card.' },
+  { q: 'Can I self-host Zernio?', a: 'Not that we could find. Zernio’s pricing page and docs describe a hosted API only, billed per connected account, with enterprise contracts as the only custom option. What it publishes as open source is its OpenAPI spec and example projects built on the API, not the service itself. Postiz is the one of the two you can run on your own server.' },
+  { q: 'What are the API rate limits?', a: 'Zernio allows 60 requests a minute while a team has 0 to 2 connected accounts, 600 a minute from 3 to 2,000 accounts and 1,200 above that, plus a per-account cap of 25 posts an hour. Postiz Cloud limits only its create-post endpoint, to 100 requests an hour, and one request can schedule several posts.' },
   { q: 'Does Zernio charge extra for X?', a: 'Yes, on top of the account price. Zernio passes X’s own API charges through at cost with no markup, and analytics and inbox syncing for X accounts are opt-in so you control that spend. The totals on this page leave X costs out.' },
 ];
 const links = [
@@ -19,18 +22,20 @@ const links = [
   { href: '/pricing', label: 'PostDelegate pricing' },
   { href: '/api', label: 'PostDelegate REST API' },
   { href: '/mcp', label: 'PostDelegate MCP server' },
+  { href: '/docs/mcp/tools', label: 'PostDelegate MCP tools' },
   { href: '/discord-scheduler', label: 'Discord scheduler' },
   { href: '/telegram-scheduler', label: 'Telegram scheduler' },
   { href: '/guides/social-media-mcp-server', label: 'What a social media MCP server does' },
 ];
 ---
 <CompareTool
-  a="postiz" b="zernio" published="2026-11-02"
-  title="Postiz vs Zernio (2026): App vs API for AI Agents"
-  description="Postiz is a scheduling app and Zernio is a social media API. Compare pricing by channel or by account, MCP, webhooks, SDKs and who each one is really built for."
+  a="postiz" b="zernio" published="2026-11-02" updated="2026-11-10"
+  costPoints={['3', '5', '10', '20', '30']} omitRows={['ai', 'license']}
+  title="Postiz vs Zernio (2026): Pricing, API Limits and MCP Compared"
+  description="Postiz vs Zernio: $49 vs $108 a month at 30 accounts, Zernio's 2 free accounts, API rate limits, DM inbox coverage and MCP. Prices checked on each vendor's site."
   h1="Postiz vs Zernio: scheduler app or social media API?"
   shortAnswer="Pick Zernio if you are building posting, inboxes or ads into your own product and want each customer's accounts under your app, billed per account with two free. Pick Postiz if you want a ready-made calendar for your team, with an API and MCP for your own accounts. At 30 accounts, Postiz costs $49 a month and Zernio $108."
-  costIntro="Zernio bills every connected account on a sliding scale; Postiz sells channel bundles. Zernio is cheaper up to eight accounts and Postiz from nine. Zernio also passes X's API charges through on top, which these totals leave out."
+  costIntro="Zernio has no named plans: it bills every connected account on a sliding scale, with the first two free. Postiz sells four channel bundles: Standard $29 for 5, Team $39 for 10, Pro $49 for 30 and Ultimate $99 for 100. Zernio is cheaper up to eight accounts and Postiz from nine. Zernio also passes X's API charges through on top, which these totals leave out."
   fitIntro={`PostDelegate sits on the app side of this split: a hosted, open-source scheduler, with a REST API, webhooks and an MCP server on every plan for the accounts you connect yourself. It is not a multi-tenant API for your customers' accounts. Plans start at $${starter.monthly} after a ${TRIAL_DAYS}-day trial with no card, and Instagram, Facebook, Threads, TikTok, LinkedIn company Pages and Pinterest are still waiting on approval, and X is not available.`}
   faq={faq} links={links}
 >
@@ -42,6 +47,31 @@ const links = [
     <li><strong>Do you just want Claude or ChatGPT to post to your own accounts?</strong> Either works; both run a hosted MCP server.</li>
     <li><strong>Do you need DMs, ads or messaging from the same integration?</strong> Zernio covers them; Postiz is about publishing.</li>
   </ul>
+
+  <h2>Plans and pricing model</h2>
+  <p>Some comparisons list Zernio under named tiers. Its pricing page today says the opposite: “no plans, no seats”, and every feature on every account. You pay per connected social account each month on a graduated ladder, and each rate applies only to the accounts inside its band:</p>
+  <ul>
+    <li><strong>Accounts 1 to 2:</strong> free, no credit card.</li>
+    <li><strong>Accounts 3 to 10:</strong> $6 a month each.</li>
+    <li><strong>Accounts 11 to 100:</strong> $3 a month each.</li>
+    <li><strong>101 and up:</strong> $1 a month each.</li>
+  </ul>
+  <p>Zernio's own example bills match the table above: $48 for 10 accounts and $78 for 20. Sent messages past 10,000 a month, managed ads, phone numbers and X API calls are metered on top. Postiz charges a flat plan price by channel count, with unlimited posts and no usage meters. See <a href="https://zernio.com/pricing" target="_blank" rel="noopener">Zernio pricing</a> and <a href="https://postiz.com/pricing" target="_blank" rel="noopener">Postiz pricing</a>.</p>
+
+  <h2>Rate limits and inbox/DM support</h2>
+  <div class="zp-scroll">
+    <table class="zp-table">
+      <caption class="sr-only">API rate limits and inbox coverage of Postiz and Zernio</caption>
+      <thead><tr><th scope="col">Limit or feature</th><th scope="col">Postiz</th><th scope="col">Zernio</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">API rate limit</th><td>100 create-post requests an hour on Cloud (90 self-hosted by default); other endpoints are not capped this way. One request can schedule several posts. <a class="zp-src" href="https://docs.postiz.com/public-api/introduction" target="_blank" rel="noopener">source</a></td><td>60 requests a minute at 0 to 2 connected accounts, 600 at 3 to 2,000, and 1,200 above that, counted team-wide. Analytics endpoints use a per-second window (6, 10 or 20). <a class="zp-src" href="https://docs.zernio.com/guides/rate-limits" target="_blank" rel="noopener">source</a></td></tr>
+        <tr><th scope="row">Posting caps</th><td>No per-account hourly cap listed; plans include unlimited posts. <a class="zp-src" href="https://postiz.com/pricing" target="_blank" rel="noopener">source</a></td><td>25 posts an hour per account (extra posts are held, not rejected), plus daily caps such as Instagram 100, X 50 and Pinterest 25. <a class="zp-src" href="https://docs.zernio.com/guides/rate-limits" target="_blank" rel="noopener">source</a></td></tr>
+        <tr><th scope="row">DM inbox</th><td>No DM inbox listed on its pricing page. <a class="zp-src" href="https://postiz.com/pricing" target="_blank" rel="noopener">source</a></td><td>Read and send DMs on 9 platforms: Instagram, Facebook, X, WhatsApp, iMessage, Bluesky, Reddit, Telegram and Slack. First 10,000 sent messages a month free. <a class="zp-src" href="https://zernio.com/pricing" target="_blank" rel="noopener">source</a></td></tr>
+        <tr><th scope="row">Comments and reviews</th><td>“Post comments” is listed as a publishing feature; no comment inbox is listed. <a class="zp-src" href="https://postiz.com/pricing" target="_blank" rel="noopener">source</a></td><td>Reply to comments and manage reviews on 8 platforms: Instagram, Facebook, Threads, X, YouTube, Bluesky, LinkedIn and Google Business. <a class="zp-src" href="https://zernio.com/pricing" target="_blank" rel="noopener">source</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="zp-small">Read on each vendor's site on November 10, 2026. Zernio's docs advise reading the X-RateLimit headers on each response rather than hard-coding these numbers.</p>
 
   <h2>MCP, webhooks and SDKs</h2>
   <p>Zernio's MCP server lives at mcp.zernio.com. You sign in from Claude, ChatGPT, Cursor or another client, or an unattended agent sends an API key. It offers 20 core tools for common jobs plus one generated tool for each API endpoint. Zernio publishes official SDKs for Node.js, Python, Go, Ruby, Java, PHP, .NET and Rust, and lets each user register up to 50 webhook endpoints for events such as a post publishing, a DM arriving or an account disconnecting.</p>
@@ -75,3 +105,14 @@ const links = [
     <li>Which networks you need. Zernio covers social, messaging, blogs and ads; Postiz adds community and publishing destinations such as Mastodon, Lemmy, Medium and DEV.to.</li>
   </ul>
 </CompareTool>
+<style>
+  .zp-scroll { margin: 22px 0 10px; overflow-x: auto; border: 1px solid #303030; border-radius: 18px; background: #171717; }
+  .zp-table { width: 100%; min-width: 36rem; border-collapse: collapse; font-size: 14px; line-height: 1.65; }
+  .zp-table thead th { background: #222; color: #fff; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .zp-table th, .zp-table td { padding: 13px 16px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+  .zp-table tbody tr:last-child > * { border-bottom: 0; }
+  .zp-table tbody th { width: 22%; color: #fff; font-weight: 700; }
+  .zp-table td { color: #c4c4c4; }
+  .zp-src { margin-left: 2px; color: #b39aff !important; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .zp-small { color: #9a9a9a; font-size: 13px !important; }
+</style>

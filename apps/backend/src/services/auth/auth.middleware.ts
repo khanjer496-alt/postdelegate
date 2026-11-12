@@ -1,4 +1,11 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NestMiddleware,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { User } from '@prisma/client';
@@ -23,29 +30,36 @@ export const removeAuth = (res: Response) => {
 // gets. Only a session token is a login: reset, activation and invite links
 // are signed with the same secret and rejected here. The claims are never
 // trusted for authorization (isSuperAdmin, activated, ...), the user is
-// always re-resolved from the database using the id. null for anything that
-// is not a live session, it never throws
-export const getSessionUser = async (
+// always re-resolved from the database using the id.
+// null means the token is not a live session. It THROWS when the lookup itself
+// fails (the database is down), which says nothing about the session: the
+// caller must not treat that as a sign-out.
+const lookupSessionUser = async (
   usersService: UsersService,
   auth: string
 ): Promise<User | null> => {
+  let payload: { id: string; pv: string; sv?: number } | null | undefined;
   try {
-    const payload = AuthService.verifyTypedJWT<{
+    payload = AuthService.verifyTypedJWT<{
       id: string;
       pv: string;
       sv?: number;
     }>(auth, 'session');
+  } catch (err) {
+    return null;
+  }
 
-    if (!payload?.id || typeof payload.id !== 'string') {
-      return null;
-    }
+  if (!payload?.id || typeof payload.id !== 'string') {
+    return null;
+  }
 
-    const user = (await usersService.getUserById(payload.id)) as User | null;
+  const user = (await usersService.getUserById(payload.id)) as User | null;
 
-    if (!user) {
-      return null;
-    }
+  if (!user) {
+    return null;
+  }
 
+  try {
     // a password change signs out every session issued before it
     if (payload.pv !== AuthService.passwordFingerprint(user.password)) {
       return null;
@@ -61,8 +75,21 @@ export const getSessionUser = async (
     if (!user.activated) {
       return null;
     }
+  } catch (err) {
+    return null;
+  }
 
-    return user;
+  return user;
+};
+
+// The same answer for callers that only ask who is signed in: null for
+// anything that is not a live session, it never throws
+export const getSessionUser = async (
+  usersService: UsersService,
+  auth: string
+): Promise<User | null> => {
+  try {
+    return await lookupSessionUser(usersService, auth);
   } catch (err) {
     return null;
   }
@@ -76,19 +103,24 @@ export class AuthMiddleware implements NestMiddleware {
   ) {}
   async use(req: Request, res: Response, next: NextFunction) {
     const auth = req.headers.auth || req.cookies.auth;
+    // Only HttpForbiddenException signs the browser out (401 and the auth
+    // cookie cleared). It is reserved for a session that is truly not valid.
+    // No credentials at all is a plain 401: there is no session to end, and a
+    // cross-site request must not be able to clear the user's cookie.
     if (!auth) {
-      throw new HttpForbiddenException();
+      throw new UnauthorizedException();
     }
 
-    // the cookie authenticates whatever site the browser sends it from
+    // the cookie authenticates whatever site the browser sends it from. A
+    // rejected request says nothing about the session: plain 403, cookie kept
     if (isCrossSiteCookieRequest(req)) {
-      throw new HttpForbiddenException();
+      throw new ForbiddenException();
     }
 
     try {
       const orgHeader = req.cookies.showorg || req.headers.showorg;
 
-      let user = await getSessionUser(this._userService, auth as string);
+      let user = await lookupSessionUser(this._userService, auth as string);
 
       if (!user) {
         throw new HttpForbiddenException();
@@ -138,7 +170,7 @@ export class AuthMiddleware implements NestMiddleware {
         organization.find((org) => org.subscription) ||
         organization[0];
 
-      if (!organization) {
+      if (!setOrg) {
         throw new HttpForbiddenException();
       }
 
@@ -161,7 +193,15 @@ export class AuthMiddleware implements NestMiddleware {
         paymentId: setOrg.paymentId,
       });
     } catch (err) {
-      throw new HttpForbiddenException();
+      if (err instanceof HttpForbiddenException) {
+        throw err;
+      }
+      // the database or another dependency failed while checking the session:
+      // report the outage, keep the session and the cookie
+      new Logger('AuthMiddleware').error(
+        `Session check failed: ${(err as Error)?.name || 'Error'}`
+      );
+      throw new ServiceUnavailableException();
     }
     next();
   }

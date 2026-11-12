@@ -17,6 +17,10 @@ app.postdelegate.com {
         Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
         # the app asks for none of these
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        # The app (login, dashboard, legal copies) is not a search landing
+        # page: postdelegate.com is. Keep every app response out of search
+        # indexes; links in it are still followed.
+        X-Robots-Tag "noindex"
     }
     # Only Cloudflare may reach the origin, so CF-Connecting-IP (used for
     # per-visitor rate limits, TRUST_CF_CONNECTING_IP) cannot be forged.
@@ -106,6 +110,16 @@ app.postdelegate.com {
         rewrite * /data-deletion.html
         file_server
     }
+    # Brand icons: same artwork as postdelegate.com (PR #199). Served from
+    # /legal-public/brand-icons, which is already bind-mounted, so the app
+    # image does not need a rebuild. Rollback: restore the sibling
+    # Caddyfile.before-brand-icons-* backup and caddy reload.
+    @brandIcons path /postdelegate.svg /favicon.ico /postdelegate-apple-touch-icon.png
+    handle @brandIcons {
+        header Cache-Control "public, max-age=86400"
+        root * /legal-public/brand-icons
+        file_server
+    }
     handle {
         reverse_proxy postiz:5000
     }
@@ -147,6 +161,57 @@ staging.postdelegate.com {
     handle @swagger {
         respond 404
     }
+    # Public legal pages and the AGPL source offer for staging. Same mechanism
+    # as the app block: postdelegate-latest.tar.gz is the symlink a release
+    # updates, so no per-release name is ever written here (that is what made
+    # this copy drift before), and /source/REVISION names what it points at.
+    handle /source {
+        header Cache-Control "no-store"
+        redir * /source/postdelegate-latest.tar.gz 302
+    }
+    @sourceFiles path /source/*.tar.gz /source/REVISION
+    handle @sourceFiles {
+        header Cache-Control "no-store"
+        root * /source
+        uri strip_prefix /source
+        file_server
+    }
+    @privacy path /legal/privacy /legal/privacy/
+    handle @privacy {
+        root * /legal-public
+        rewrite * /privacy.html
+        file_server
+    }
+    @terms path /legal/terms /legal/terms/
+    handle @terms {
+        root * /legal-public
+        rewrite * /terms.html
+        file_server
+    }
+    @affiliateTerms path /legal/affiliate-terms /legal/affiliate-terms/
+    handle @affiliateTerms {
+        root * /legal-public
+        rewrite * /affiliate-terms.html
+        file_server
+    }
+    @dpa path /legal/dpa /legal/dpa/
+    handle @dpa {
+        root * /legal-public
+        rewrite * /dpa.html
+        file_server
+    }
+    @subprocessors path /legal/subprocessors /legal/subprocessors/
+    handle @subprocessors {
+        root * /legal-public
+        rewrite * /subprocessors.html
+        file_server
+    }
+    @deletion path /legal/data-deletion /legal/data-deletion/ /data-deletion /data-deletion/
+    handle @deletion {
+        root * /legal-public
+        rewrite * /data-deletion.html
+        file_server
+    }
     # Public API, MCP and the MCP OAuth endpoints: own auth, no basic auth.
     @machine path /api/public/* /api/mcp* /api/sse/* /api/message/* /api/.well-known/* /api/oauth/register /api/oauth/token /api/oauth/userinfo
     handle @machine {
@@ -164,6 +229,10 @@ staging.postdelegate.com {
     @mcpWellKnown path /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/api/mcp /.well-known/mcp.json /.well-known/mcp/server-card.json /.well-known/openai-apps-challenge
     handle @mcpWellKnown {
         rewrite * /api{uri}
+        reverse_proxy postdelegate-staging-app-1:5000
+    }
+    @stripeWebhook path /api/stripe /api/stripe/
+    handle @stripeWebhook {
         reverse_proxy postdelegate-staging-app-1:5000
     }
     handle {

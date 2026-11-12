@@ -1,7 +1,7 @@
 export const SITE = {
  name:'PostDelegate',url:'https://postdelegate.com',app:'https://app.postdelegate.com',
  signup:'https://app.postdelegate.com/auth',login:'https://app.postdelegate.com/auth/login',
- email:'support@postdelegate.com',source:'https://app.postdelegate.com/source',
+ email:'support@postdelegate.com',source:'https://github.com/khanjer496-alt/postdelegate-app',
  tagline:'Your social media. All in one clear calendar.',
  legal:{terms:'https://app.postdelegate.com/legal/terms/',privacy:'https://app.postdelegate.com/legal/privacy/',
  dataDeletion:'https://app.postdelegate.com/legal/data-deletion',licenses:'/licenses',

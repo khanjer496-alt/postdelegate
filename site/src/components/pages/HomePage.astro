@@ -30,7 +30,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 const appLd = { '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'PostDelegate', applicationCategory: 'BusinessApplication', operatingSystem: 'Web', url: SITE.url, description: h.appDescription(TRIAL_DAYS), featureList: h.appFeatures, inLanguage: lang, image: new URL('/og.png', SITE.url).href, screenshot: { '@type': 'ImageObject', url: new URL('/images/postdelegate-workspace.webp', SITE.url).href, width: 1600, height: 1000, caption: h.demoAlt }, offers: { '@type': 'AggregateOffer', priceCurrency: 'USD', lowPrice: lowestPrice, highPrice: Math.max(...PLANS.map((p) => p.monthly)), offerCount: PLANS.length } };
 // Hero orbit: live networks on the bright inner rings, networks waiting on approval greyed
 // out on the dashed outer ring.
-const innerKeys = ['youtube', 'bluesky', 'wordpress', 'devto'];
+const innerKeys = ['youtube', 'bluesky', 'slack', 'wordpress'];
 const orbitInner = AVAILABLE_NETWORKS.filter((n) => innerKeys.includes(n.key));
 const orbitMiddle = AVAILABLE_NETWORKS.filter((n) => !innerKeys.includes(n.key));
 const orbitOuter = WAITING_NETWORKS;
@@ -70,7 +70,7 @@ const aiLinks = [
         <h1 id="hero-title"><span class="mode-ai">{h.h1}<span class="hero-mark">{h.h1Mark}<OrbitAccent kind="arc" /></span></span>{' '}<span class="mode-classic">{h.classicH1}<span class="hero-mark">{h.classicH1Mark}<OrbitAccent kind="arc" /></span></span></h1>
         <p class="hero-description mode-ai">{h.lead(liveCount)}</p>
         <p class="hero-description mode-classic">{h.classicLead(liveCount)}</p>
-        <p class="hero-availability"><strong>{t.launch.available(liveCount)}</strong><span>YouTube · Bluesky · WordPress</span></p>
+        <p class="hero-availability"><strong>{t.launch.available(liveCount)}</strong><span>YouTube · Bluesky · Slack</span></p>
         <div class="hero-actions">
           <a class="hero-cta" href={SITE.signup} data-pulse-goal="trial_clicked"><span class="hero-cta-long">{t.common.ctaLabel}</span><span class="hero-cta-short">{t.pricing.startTrial}</span><span class="cta-orb" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
           <a class="text-link hero-compare" href={`${href('/pricing')}#compare-plans`}>{t.launch.compare}</a>

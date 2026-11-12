@@ -4,8 +4,9 @@ import { PLANS, TRIAL_DAYS } from '../../data/plans';
 const [starter] = PLANS;
 const faq = [
   { q: 'Does Blotato have a free trial?', a: 'Yes, 7 days on every plan. A card is required, nothing is charged during the trial, and you get the web app plus 60 AI credits. The trial does not include the API or MCP server: creating an API key ends the trial and starts the paid plan straight away.' },
+  { q: 'Can I test Blotato’s API on the free trial?', a: 'No. Blotato’s pricing says the trial excludes the API and MCP, and generating an API key immediately ends the trial and starts the paid subscription, even with trial days left. If you want to try an agent workflow first, plan on paying for Starter ($29 a month) or test with a tool whose trial includes its API, such as Postiz.' },
   { q: 'Can Postiz make videos?', a: 'Within monthly limits, yes. Every Postiz Cloud plan includes AI video credits (3 a month on Standard, up to 60 on Ultimate) and clipping minutes that cut a long YouTube video into short vertical clips with captions. Blotato puts more weight on generated media: Starter includes 1,250 credits a month shared between AI images and video, plus AI voiceovers.' },
-  { q: 'Which works with Claude?', a: 'Both. Blotato has a hosted MCP server with 35 tools, available once you are on a paid plan. Postiz includes a hosted MCP server on every Cloud plan, and its trial includes the API, so you can connect an agent before paying.' },
+  { q: 'Which works with Claude?', a: 'Both. Blotato has a hosted MCP server with 35 tools, available once you are on a paid plan. Postiz includes a hosted MCP server on every Cloud plan, with 16 tools in its reference, and its trial includes the API, so you can connect an agent before paying.' },
   { q: 'Which is cheaper for 20 accounts?', a: 'Blotato. Its $29 Starter plan covers 20 accounts. On Postiz, 20 channels need the Pro plan at $49 a month, which covers up to 30.' },
   { q: 'Is Postiz free?', a: 'The code is: Postiz is open source under AGPL-3.0, so you can self-host it with no license fee. Postiz Cloud has no free plan and starts at $29 a month after a 7-day trial that asks for a payment method.' },
 ];
@@ -18,15 +19,18 @@ const links = [
   { href: '/alternatives', label: 'All scheduler alternatives' },
   { href: '/pricing', label: 'PostDelegate pricing' },
   { href: '/mcp', label: 'PostDelegate MCP server' },
+  { href: '/docs/mcp/tools', label: 'PostDelegate MCP tools' },
+  { href: '/claude-cowork', label: 'PostDelegate for Claude Cowork' },
   { href: '/youtube-scheduler', label: 'YouTube scheduler' },
   { href: '/bluesky-scheduler', label: 'Bluesky scheduler' },
   { href: '/guides/schedule-social-media-posts-with-chatgpt', label: 'Schedule social media posts with ChatGPT' },
 ];
 ---
 <CompareTool
-  a="postiz" b="blotato" published="2026-11-02"
-  title="Postiz vs Blotato (2026): AI Content, Price, Channels"
-  description="Postiz vs Blotato on AI writing, image and video credits, account limits, networks, API and MCP access during the trial, and self-hosting. Prices with sources."
+  a="postiz" b="blotato" published="2026-11-02" updated="2026-11-10"
+  costPoints={['3', '5', '10', '20', '30']}
+  title="Postiz vs Blotato (2026): Pricing, MCP and 20-Account Cost"
+  description="Postiz vs Blotato: $49 vs $29 at 20 accounts, 16 vs 35 MCP tools, and why Blotato's free trial excludes its API and MCP. Prices checked on each vendor's site."
   h1="Postiz vs Blotato: scheduling first or AI content first?"
   shortAnswer="Pick Blotato if AI-made posts, images and faceless videos are the point and you post to the nine big feeds: $29 covers 20 accounts. Pick Postiz if scheduling across many networks comes first, or you want team seats, self-hosting or the API during your trial. Postiz starts at $29 for 5 channels."
   costIntro="Blotato's entry plan holds 20 accounts and Postiz's middle plans hold 10 and 30, so Blotato is cheaper from 6 to 20 accounts and Postiz from 21 to 30. Both plans also carry AI allowances that these totals do not price."
@@ -48,6 +52,25 @@ const links = [
 
   <h2>API and MCP</h2>
   <p>Both give AI agents a way in. Blotato's hosted MCP endpoint exposes 35 tools across its nine networks, and it ships official n8n and Make nodes. Every paid plan includes the API and MCP with no separate developer tier, but the trial does not: generating an API key ends the trial and starts billing, even with trial days left. Postiz includes its MCP server, CLI, public API and webhooks on every Cloud plan, and its trial includes the API, so you can wire up an agent before paying. Video clipping and some paid AI video tools unlock when billing starts.</p>
+
+  <h2>MCP tools and what they cover</h2>
+  <p>Tool counts are easy to quote and hard to compare, so here is what each server actually exposes, grouped by job. Blotato's tools reference lists 35. Postiz's MCP overview says 13 tools, while its tools reference documents 16, listed below. PostDelegate, the hosted Postiz-based service that makes this page, is shown for reference: its live server card lists 18 tools.</p>
+  <div class="bp-scroll">
+    <table class="bp-table">
+      <caption class="sr-only">MCP tools exposed by Postiz, Blotato and PostDelegate, by area</caption>
+      <thead><tr><th scope="col">Area</th><th scope="col">Postiz (16 documented)</th><th scope="col">Blotato (35)</th><th scope="col">PostDelegate (18, ours)</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Accounts and channels</th><td><code>integrationList</code>, <code>groupList</code>, <code>integrationSchema</code>, <code>triggerTool</code></td><td><code>blotato_get_user</code>, <code>blotato_list_accounts</code>, <code>blotato_list_pinterest_boards</code></td><td><code>integrationList</code>, <code>groupList</code>, <code>integrationSchema</code>, <code>triggerTool</code></td></tr>
+        <tr><th scope="row">Posts and calendar</th><td><code>schedulePostTool</code>, <code>postsListTool</code>, <code>postSettingsTool</code></td><td><code>blotato_create_post</code>, <code>blotato_get_post_status</code>, <code>blotato_list_posts</code>, <code>blotato_list_schedules</code>, <code>blotato_get_schedule</code>, <code>blotato_update_schedule</code>, <code>blotato_delete_schedule</code></td><td><code>integrationSchedulePostTool</code>, <code>postsListTool</code>, <code>postSettingsTool</code>, <code>deletePostTool</code></td></tr>
+        <tr><th scope="row">Media uploads</th><td><code>mediaListTool</code>, <code>uploadFromUrlTool</code>, <code>mediaStatusTool</code></td><td><code>blotato_create_presigned_upload_url</code></td><td><code>uploadFromUrlTool</code>, <code>mediaListTool</code>, <code>mediaStatusTool</code>, <code>uploadWidgetTool</code>, <code>uploadWidgetStatusTool</code>, <code>uploadWidgetTicketTool</code></td></tr>
+        <tr><th scope="row">Making images and video</th><td><code>generateImageTool</code>, <code>generateVideoOptions</code>, <code>videoFunctionTool</code>, <code>generateVideoTool</code>, <code>clippingTool</code>, <code>clippingStatusTool</code></td><td><code>blotato_list_design_templates</code>, <code>blotato_create_design</code>, <code>blotato_get_design_status</code>, <code>blotato_create_source</code>, <code>blotato_get_source_status</code>, <code>blotato_get_credits</code></td><td><code>studioTemplatesTool</code>, <code>studioRenderTool</code>, <code>studioRenderStatusTool</code>, <code>studioCancelTool</code></td></tr>
+        <tr><th scope="row">Analytics</th><td>None</td><td><code>blotato_list_top_posts</code>, <code>blotato_get_post_analytics</code></td><td>None</td></tr>
+        <tr><th scope="row">Comments and DMs</th><td>None</td><td><code>blotato_list_comments</code>, <code>blotato_get_comment</code>, <code>blotato_post_comment</code>, <code>blotato_list_conversations</code>, <code>blotato_get_conversation</code>, <code>blotato_list_messages</code>, <code>blotato_get_message</code>, <code>blotato_send_message</code></td><td>None</td></tr>
+        <tr><th scope="row">DM automations</th><td>None</td><td><code>blotato_create_automation</code>, <code>blotato_list_automations</code>, <code>blotato_update_automation</code>, <code>blotato_update_automation_trigger</code>, <code>blotato_delete_automation</code>, <code>blotato_list_automation_runs</code>, <code>blotato_list_automation_logs</code>, <code>blotato_get_automation_analytics</code></td><td>None</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="bp-small">Sources: <a href="https://docs.postiz.com/mcp/tools" target="_blank" rel="noopener">Postiz MCP tools reference</a>, <a href="https://help.blotato.com/start-with-an-ai-agent/mcp/tools" target="_blank" rel="noopener">Blotato MCP tools reference</a> and the PostDelegate <a href="https://app.postdelegate.com/.well-known/mcp/server-card.json" target="_blank" rel="noopener">server card</a> (see <a href="/docs/mcp/tools">MCP tools</a>), read on November 10, 2026. PostDelegate's Studio tools render vertical videos from your own media; its AI image tool needs your own OpenAI key and is not on the server card. The takeaway: Blotato's extra tools are mostly analytics, comments, DMs and DM automations on its nine networks, while Postiz and PostDelegate keep to channels, posts and media.</p>
 
   <h2>Self-hosting</h2>
   <p>Blotato is a hosted service, and its MCP server is hosted too. Postiz can also be self-hosted under AGPL-3.0. That route has no license fee, but you run the stack yourself and get your own developer app approved by each network.</p>
@@ -83,3 +106,14 @@ const links = [
     <li>Both trials ask for a card or payment method, so set a reminder before day seven.</li>
   </ul>
 </CompareTool>
+<style>
+  .bp-scroll { margin: 22px 0 10px; overflow-x: auto; border: 1px solid #303030; border-radius: 18px; background: #171717; }
+  .bp-table { width: 100%; min-width: 44rem; border-collapse: collapse; font-size: 13px; line-height: 1.7; }
+  .bp-table thead th { background: #222; color: #fff; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .bp-table th, .bp-table td { padding: 12px 14px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+  .bp-table tbody tr:last-child > * { border-bottom: 0; }
+  .bp-table tbody th { width: 16%; color: #fff; font-weight: 700; }
+  .bp-table td { color: #c4c4c4; overflow-wrap: anywhere; }
+  .bp-table code { font-size: 12px; }
+  .bp-small { color: #9a9a9a; font-size: 13px !important; }
+</style>
