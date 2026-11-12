@@ -2427,5 +2427,10 @@
   "choose_a_plan": "Choose a plan",
   "help_and_support": "Help & support",
   "edit_post": "Edit post",
-  "pick_channels_first": "Pick channels first"
+  "pick_channels_first": "Pick channels first",
+  "all_channels": "All channels",
+  "pd_time_slots": "Time slots",
+  "search_channels": "Search channels",
+  "search_posts_channels": "Search posts, channels, or jump to…",
+  "pd_media_library": "Media library"
 }
