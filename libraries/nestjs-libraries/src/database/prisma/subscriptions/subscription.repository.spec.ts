@@ -173,3 +173,60 @@ describe('SubscriptionRepository trial flag and provider status', () => {
     });
   });
 });
+
+describe('Payment event ledger', () => {
+  const setup = () => {
+    const rows = new Map<string, { claimToken: string; processedAt: Date | null }>();
+    const tx = {
+      $queryRaw: jest.fn(async (parts, provider, eventId, token) => {
+        const key = `${provider}:${eventId}`;
+        if (parts.join('').includes('INSERT INTO')) {
+          if (rows.has(key)) return [];
+          rows.set(key, { claimToken: token, processedAt: null }); return [{ claimToken: token }];
+        }
+        return rows.has(key) ? [rows.get(key)] : [];
+      }),
+      $executeRaw: jest.fn(async (parts, provider, eventId, token) => {
+        const key = `${provider}:${eventId}`; const row = rows.get(key);
+        if (!row || row.claimToken !== token) return 0;
+        if (parts.join('').includes('DELETE')) rows.delete(key);
+        else row.processedAt = new Date();
+        return 1;
+      }),
+    };
+    let inTransaction = false;
+    const transaction = { model: { $transaction: jest.fn(async fn => {
+      inTransaction = true; try { return await fn(tx); } finally { inTransaction = false; }
+    }) } };
+    const repo = new SubscriptionRepository({} as any, {} as any, {} as any, {} as any, {} as any, transaction as any);
+    return { repo, tx, rows, inTransaction: () => inTransaction };
+  };
+  it('executes duplicate ids once, without holding a connection through the handler', async () => {
+    const { repo, inTransaction } = setup();
+    const handler = jest.fn(async () => { expect(inTransaction()).toBe(false); return { ok: true }; });
+    await repo.processPaymentEvent('stripe', 'evt_1', handler);
+    await repo.processPaymentEvent('stripe', 'evt_1', handler);
+    expect(handler).toHaveBeenCalledTimes(1);
+    await repo.processPaymentEvent('other', 'evt_1', handler);
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+  it.each([{ retry: true }, { ok: false }])('releases failed events for retry: %j', async result => {
+    const { repo, rows } = setup();
+    const handler = jest.fn().mockResolvedValueOnce(result).mockResolvedValueOnce({ ok: true });
+    await repo.processPaymentEvent('stripe', 'evt_1', handler);
+    expect(rows.size).toBe(0);
+    await repo.processPaymentEvent('stripe', 'evt_1', handler);
+    expect(rows.get('stripe:evt_1').processedAt).toBeInstanceOf(Date);
+  });
+  it('requests retry while the event is claimed by another worker', async () => {
+    const { repo, rows } = setup(); rows.set('stripe:evt_1', { claimToken: 'other', processedAt: null });
+    const handler = jest.fn();
+    await expect(repo.processPaymentEvent('stripe', 'evt_1', handler)).resolves.toEqual({ retry: true });
+    expect(handler).not.toHaveBeenCalled();
+  });
+  it('releases exceptions', async () => {
+    const { repo, rows } = setup();
+    await expect(repo.processPaymentEvent('stripe', 'evt_1', async () => { throw new Error('down'); })).rejects.toThrow('down');
+    expect(rows.size).toBe(0);
+  });
+});

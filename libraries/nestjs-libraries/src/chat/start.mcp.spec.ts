@@ -1,6 +1,11 @@
 const mockServers: any[] = [];
+const mockRequestIds: unknown[] = [];
+const mockRelays: unknown[] = [];
+const mockHttpServers: any[] = [];
+const mockRelayExecute = jest.fn(async () => 'relayed');
+let mockRelayEnabled = false;
 jest.mock('@mastra/mcp', () => {
-  const { getAuth } = jest.requireActual(
+  const { getAuth, getRequestId, getRelay } = jest.requireActual(
     '@gitroom/nestjs-libraries/chat/async.storage'
   );
   return {
@@ -22,7 +27,14 @@ jest.mock('@mastra/mcp', () => {
           ),
         };
       }
-      async startHTTP({ res }: any) {
+      async startHTTP({ req, res }: any) {
+        mockRequestIds.push(getRequestId());
+        mockRelays.push(getRelay());
+        mockHttpServers.push(this);
+        if (req.body?.tool) {
+          try { await this.config.tools[req.body.tool].execute(); }
+          catch (error) { res.status(403).json({ error: String(error) }); return; }
+        }
         res.status(200).json({ handledBy: 'mcp', org: getAuth()?.id });
       }
     },
@@ -40,7 +52,7 @@ jest.mock(
 );
 jest.mock('@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service', () => ({
   OAuthService: class {},
-  selfHostedRelayEnabled: () => false,
+  selfHostedRelayEnabled: () => mockRelayEnabled,
 }));
 jest.mock('@gitroom/nestjs-libraries/chat/mcp.relay.service', () => ({
   McpRelayService: class {},
@@ -61,6 +73,7 @@ jest.mock('@gitroom/nestjs-libraries/chat/ui/clipping.widget', () => ({
 }));
 
 import express from 'express';
+import { runWithContext } from './async.storage';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startMcp } from '@gitroom/nestjs-libraries/chat/start.mcp';
@@ -74,6 +87,7 @@ const agent = {
   name: 'postdelegate',
   getDescription: () => 'Agent that helps schedule and list social media posts',
   listTools: async () => ({
+    deletePostTool: { id: 'deletePostTool', description: 'Delete a post', mcp: { annotations: { title: 'Delete Post', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true } }, execute: jest.fn(async () => 'deleted') },
     generateImageTool: {
       id: 'generateImageTool',
       description: 'Generate an image',
@@ -119,12 +133,12 @@ const services = new Map<unknown, unknown>([
     {
       getOrgByOAuthToken: async (token: string) =>
         token === 'pos_valid'
-          ? { organization: { id: 'org-oauth' }, oauthApp: { name: 'Smithery' } }
-          : null,
-      getSelfHostedByAccessToken: async () => null,
+          ? { organization: { id: 'org-oauth' }, oauthApp: { name: 'Smithery' }, scope: 'mcp:read mcp:write' }
+          : token === 'pos_readonly' ? { organization: { id: 'org-read' }, scope: 'mcp:read' } : null,
+      getSelfHostedByAccessToken: async (token: string) => token === 'psh_valid' ? { id: 'relay-fixture' } : null,
     },
   ],
-  [McpRelayService, {}],
+  [McpRelayService, { tools: () => ({ relayMarker: { execute: mockRelayExecute }, integrationList: { execute: mockRelayExecute }, deletePostTool: { execute: mockRelayExecute } }) }],
 ]);
 
 const env = { ...process.env };
@@ -141,6 +155,7 @@ const boot = async (extraEnv: Record<string, string> = {}) => {
     ...extraEnv,
   };
   const app = express();
+  app.use(express.json());
   await startMcp({
     get: (token: unknown) => services.get(token),
     use: (...args: any[]) => (app.use as any)(...args),
@@ -171,6 +186,24 @@ const expectMcpCors = (response: Response) => {
 };
 
 describe('startMcp', () => {
+  it.each(['/mcp', '/mcp-oauth', '/mcp-oauth-claude', '/mcp-oauth-dynamic', '/mcp-oauth-chatgpt'])(
+    '%s refuses a write by a read-only OAuth client', async path => {
+      const response = await fetch(base + path, { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer pos_readonly' },
+        body: JSON.stringify({ tool: 'deletePostTool' }),
+      });
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toContain('insufficient_scope');
+    });
+
+  it.each(['pos_valid', 'key-123'])('keeps write execution available to a fully authorized %s connection', async token => {
+    const response = await fetch(base + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tool: 'deletePostTool' }),
+    });
+    expect(response.status).toBe(200);
+  });
+
   beforeAll(() => boot());
   afterAll(async () => {
     await shutdown();
@@ -178,6 +211,22 @@ describe('startMcp', () => {
   });
 
   describe('/mcp API key auth', () => {
+    it('keeps legacy clients working with deprecation metadata and non-secret correlation IDs', async () => {
+      const first = await mcpPost('/mcp/key-123');
+      expect(first.status).toBe(200);
+      expect(first.headers.get('deprecation')).toBe('true');
+      expect(first.headers.get('link')).toContain('rel="deprecation"');
+      const firstId = mockRequestIds[mockRequestIds.length - 1];
+      const second = await mcpPost('/mcp', { Authorization: 'Bearer key-123' });
+      expect(second.status).toBe(200);
+      const secondId = mockRequestIds[mockRequestIds.length - 1];
+      expect(typeof firstId).toBe('string');
+      expect(typeof secondId).toBe('string');
+      expect(firstId).not.toBe('key-123');
+      expect(secondId).not.toBe('key-123');
+      expect(firstId).not.toBe(secondId);
+    });
+
     it.each([
       ['a bare key', 'key-123'],
       ['a Bearer key', 'Bearer key-123'],
@@ -369,7 +418,7 @@ describe('startMcp', () => {
       const names = card.tools.map((tool: { name: string }) => tool.name);
 
       // the Claude list: no agent, no AI media generation, no clipping
-      expect(names).toEqual(['integrationList']);
+      expect(names).toEqual(['deletePostTool', 'integrationList']);
       for (const tool of card.tools) {
         expect(tool.title).toEqual(expect.any(String));
         expect(tool.annotations).toMatchObject({
@@ -428,7 +477,8 @@ describe('startMcp', () => {
       const requestContext = new Map<string, string>();
 
       await expect(
-        tool.execute({ message: 'Schedule a post' }, { requestContext })
+        runWithContext({ requestId: 'test', auth: {}, scopes: ['mcp:read', 'mcp:write'] },
+          () => tool.execute({ message: 'Schedule a post' }, { requestContext }))
       ).resolves.toEqual({ text: 'Scheduled' });
       expect(agent.generate).toHaveBeenCalledWith('Schedule a post', {
         requestContext,
@@ -486,5 +536,63 @@ describe('startMcp', () => {
       expect(response.headers.get('content-type')).toContain('text/plain');
       expect(await response.text()).toBe('challenge-token');
     });
+  });
+});
+
+
+describe('canonical /mcp OAuth relay compatibility', () => {
+  beforeAll(async () => { mockRelayEnabled = true; await boot(); });
+  afterAll(async () => { await shutdown(); mockRelayEnabled = false; process.env = env; });
+  it.each(['/mcp', '/mcp-oauth-dynamic'])('routes a valid self-hosted OAuth connection on %s through the relay server', async path => {
+    const response = await mcpPost(path, { Authorization: 'Bearer psh_valid' });
+    expect(response.status).toBe(200);
+    expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
+    expect(mockHttpServers[mockHttpServers.length - 1].config.tools.relayMarker).toBeDefined();
+  });
+  it.each(['integrationList', 'deletePostTool'])('allows a validated psh_ token to execute %s on /mcp', async tool => {
+    mockRelayExecute.mockClear();
+    const response = await fetch(base + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer psh_valid' },
+      body: JSON.stringify({ tool }),
+    });
+    expect(response.status).toBe(200);
+    expect(mockRelays[mockRelays.length - 1]).toEqual({ id: 'relay-fixture' });
+    expect(mockRelayExecute).toHaveBeenCalledTimes(1);
+  });
+  it('denies a write on the relay-enabled canonical route for a read-scoped cloud token', async () => {
+    mockRelayExecute.mockClear();
+    const response = await fetch(base + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer pos_readonly' },
+      body: JSON.stringify({ tool: 'deletePostTool' }),
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain('insufficient_scope');
+    expect(mockRelayExecute).not.toHaveBeenCalled();
+  });
+  it('denies relay tool forwarding under a read-only execution context', async () => {
+    await mcpPost('/mcp', { Authorization: 'Bearer psh_valid' });
+    const relayTools = mockHttpServers[mockHttpServers.length - 1].config.tools;
+    mockRelayExecute.mockClear();
+    await expect(runWithContext({ requestId: 'test-read-only', relay: { id: 'relay-fixture' } as any, scopes: ['mcp:read'] },
+      () => relayTools.deletePostTool.execute())).rejects.toThrow('mcp:write required');
+    expect(mockRelayExecute).not.toHaveBeenCalled();
+  });
+  it('rejects a revoked relay token without starting the MCP server', async () => {
+    const calls = mockHttpServers.length;
+    const response = await mcpPost('/mcp', { Authorization: 'Bearer psh_revoked' });
+    expect(response.status).toBe(401);
+    expect(mockHttpServers).toHaveLength(calls);
+  });
+});
+
+
+describe('canonical /mcp relay-disabled boundary', () => {
+  beforeAll(async () => { mockRelayEnabled = false; await boot(); });
+  afterAll(async () => { await shutdown(); process.env = env; });
+  it('does not enable a self-hosted connection when the relay feature is off', async () => {
+    const calls = mockHttpServers.length;
+    const response = await mcpPost('/mcp', { Authorization: 'Bearer psh_valid' });
+    expect(response.status).toBe(401);
+    expect(mockHttpServers).toHaveLength(calls);
   });
 });

@@ -92,6 +92,7 @@ export function ForgotReturn({ token }: { token: string }) {
                 translationKey="label_new_password"
                 {...form.register('password')}
                 type="password"
+                autoComplete="new-password"
                 placeholder={t('label_password', 'Password')}
               />
               <Input
@@ -99,6 +100,7 @@ export function ForgotReturn({ token }: { token: string }) {
                 translationKey="label_repeat_password"
                 {...form.register('repeatPassword')}
                 type="password"
+                autoComplete="new-password"
                 placeholder={t('label_repeat_password', 'Repeat Password')}
               />
             </div>

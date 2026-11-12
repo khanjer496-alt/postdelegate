@@ -19,7 +19,12 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
-import { putExtensionCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
+import { handoffConnectCode } from '@gitroom/frontend/components/launches/helpers/extension.code';
+import { errorMessage } from '@gitroom/frontend/components/launches/import/import.posts.modal';
+import {
+  ownAppProviders,
+  ownAppRedirectUri,
+} from '@gitroom/frontend/components/launches/own.app.providers';
 const resolver = classValidatorResolver(ApiKeyDto);
 
 export const useAddProvider = (update?: () => void, invite?: boolean) => {
@@ -178,6 +183,11 @@ export const CustomVariables: FC<{
   const { close, gotoUrl, identifier, variables, onboarding, refresh } = props;
   const fetch = useFetch();
   const modals = useModals();
+  const toaster = useToaster();
+  const { show: showStorageError } = toaster;
+  const { frontEndUrl } = useVariables();
+  const ownApp = ownAppProviders[identifier];
+  const redirectUri = ownApp ? ownAppRedirectUri(frontEndUrl, identifier) : '';
   const schema = useMemo(() => {
     return object({
       ...variables.reduce((aIcc, item) => {
@@ -218,21 +228,55 @@ export const CustomVariables: FC<{
       ]
         .filter(Boolean)
         .join('&');
+      if (ownApp) {
+        // the app's keys go in the body, never in a url
+        const ownAppResponse = await fetch(
+          `/integrations/social/${identifier}/own-app${
+            params ? `?${params}` : ''
+          }`,
+          { method: 'POST', body: JSON.stringify(data) }
+        );
+        if (ownAppResponse.status === 402) {
+          return;
+        }
+        const { url: authUrl, message } = ownAppResponse.ok
+          ? await ownAppResponse.json().catch(() => ({} as any))
+          : ({} as any);
+        if (!authUrl) {
+          toaster.show(
+            message || `Could not connect to ${ownApp.platform}`,
+            'warning'
+          );
+          return;
+        }
+        modals.closeAll();
+        window.location.href = authUrl;
+        return;
+      }
       const response = await fetch(
         `/integrations/social/${identifier}${params ? `?${params}` : ''}`
       );
       if (response.status === 402) {
         return;
       }
-      const { url } = await response.json();
+      if (!response.ok) {
+        showStorageError(await errorMessage(response, 'Could not start this connection. Please try again.'), 'warning');
+        return;
+      }
+      const { url = '' } = await response.json().catch(() => ({}));
+      if (typeof url !== 'string' || !url.trim()) {
+        showStorageError('Could not start this connection. Please try again.', 'warning');
+        return;
+      }
+      const target = handoffConnectCode(identifier, url, Buffer.from(JSON.stringify(data)).toString('base64'), !!onboarding);
+      if (!target) {
+        showStorageError('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
+        return;
+      }
       modals.closeAll();
-      gotoUrl(
-        `/integrations/social/${identifier}?state=${url}&code=${Buffer.from(
-          JSON.stringify(data)
-        ).toString('base64')}${onboarding ? '&onboarding=true' : ''}`
-      );
+      gotoUrl(target);
     },
-    [variables, onboarding, refresh]
+    [variables, onboarding, refresh, identifier, gotoUrl, fetch, modals, showStorageError, toaster, ownApp]
   );
 
   const t = useT();
@@ -244,6 +288,48 @@ export const CustomVariables: FC<{
           className="gap-[8px] flex flex-col pt-[10px]"
           onSubmit={methods.handleSubmit(submit)}
         >
+          {!!ownApp && (
+            <div className="flex flex-col gap-[8px] text-[14px]">
+              <div>
+                Connect {ownApp.platform} through your own {ownApp.platform}{' '}
+                app:
+              </div>
+              <ol className="list-decimal ps-[20px] flex flex-col gap-[4px] text-textColor/80">
+                {ownApp.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <a
+                href={ownApp.appsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                {ownApp.appsUrl}
+              </a>
+              <div className="flex flex-col gap-[4px]">
+                <span>Redirect uri</span>
+                <div className="flex gap-[8px] items-center">
+                  <code
+                    data-testid="own-app-redirect-uri"
+                    className="flex-1 break-all rounded-[4px] bg-input px-[8px] py-[6px] text-[13px]"
+                  >
+                    {redirectUri}
+                  </code>
+                  <Button
+                    type="button"
+                    className="!h-[32px]"
+                    onClick={() => {
+                      copy(redirectUri);
+                      toaster.show('Redirect uri copied', 'success');
+                    }}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {variables.map((variable) => (
             <div key={variable.key}>
               {variable.hint ? (
@@ -463,9 +549,12 @@ export const AddProviderComponent: FC<{
               >
                 <Web3Providers
                   onComplete={(code, newState) => {
-                    window.location.href = `/integrations/social/${identifier}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(newState)}${
-                      onboarding ? '&onboarding=true' : ''
-                    }`;
+                    const target = handoffConnectCode(identifier, newState, code, !!onboarding);
+                    if (!target) {
+                      toaster.show('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
+                      return;
+                    }
+                    window.location.href = target;
                   }}
                   nonce={url}
                 />
@@ -653,17 +742,13 @@ export const AddProviderComponent: FC<{
             const code = Buffer.from(
               JSON.stringify(cookieResponse.cookies)
             ).toString('base64');
-            // the session cookies go to the connect page through this tab's
-            // sessionStorage, not the URL (history, logs, referrers)
-            // storage blocked (private mode): fall back to the URL
-            const codeInUrl = !putExtensionCode(url, code);
-            const params = new URLSearchParams({
-              state: url,
-              ...(codeInUrl ? { code } : {}),
-              ...(onboarding ? { onboarding: 'true' } : {}),
-            });
+            const target = handoffConnectCode(identifier, url, code, !!onboarding);
+            if (!target) {
+              toaster.show('Could not prepare a secure connection. Enable session storage in this tab and try again.', 'warning');
+              return;
+            }
             modal.closeAll();
-            window.location.href = `/integrations/social/${identifier}?${params.toString()}`;
+            window.location.href = target;
           } catch {
             toaster.show(
               t(

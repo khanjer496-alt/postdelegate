@@ -313,6 +313,84 @@ describe('hidden providers on the connect paths', () => {
     });
   });
 
+  describe('POST /integrations/social/:integration/own-app', () => {
+    const app = {
+      client_id: 'own_client-ID1',
+      client_secret: 'own-secret_value123',
+      instanceUrl: '',
+    };
+    const ownApp = (
+      urls: IntegrationsController,
+      integration: string,
+      orgId: string,
+      body: Record<string, unknown> = { clientId: app.client_id, clientSecret: app.client_secret }
+    ) =>
+      urls.getOwnAppIntegrationUrl(
+        integration,
+        '',
+        '',
+        '',
+        body,
+        { id: orgId } as any,
+        { id: 'u1' } as any,
+        { cookie: jest.fn() } as any
+      );
+    const ownAppExtras = () => ({
+      customFields: async (): Promise<unknown[]> => [],
+      ownAppCredentials: jest.fn((fields: Record<string, string>) =>
+        fields.clientId ? app : 'Paste the keys'
+      ),
+    });
+
+    it('starts the OAuth flow with the own app and keeps it for the callback', async () => {
+      const { urls, provider } = setup(ownAppExtras());
+      expect(await ownApp(urls, 'reddit-own-key', 'org-1')).toEqual({
+        url: 'https://auth.example',
+      });
+      expect(provider.generateAuthUrl).toHaveBeenCalledWith(app);
+      expect(JSON.parse(redis.data.get('external:st'))).toEqual(app);
+      expect(redis.data.get('organization:st')).toBe('org-1');
+    });
+
+    it('answers with the reason when the keys are not usable', async () => {
+      const { urls, provider } = setup(ownAppExtras());
+      expect(await ownApp(urls, 'reddit-own-key', 'org-1', {})).toEqual({
+        err: true,
+        message: 'Paste the keys',
+      });
+      expect(provider.generateAuthUrl).not.toHaveBeenCalled();
+    });
+
+    it('is refused for providers without an own app, and the GET refuses own-app providers', async () => {
+      const plain = setup();
+      expect(await ownApp(plain.urls, 'bluesky', 'org-1')).toEqual({ err: true });
+      expect(plain.provider.generateAuthUrl).not.toHaveBeenCalled();
+      const own = setup(ownAppExtras());
+      expect(await getUrl(own.urls, 'reddit-own-key', 'org-1')).toEqual({ err: true });
+      expect(own.provider.generateAuthUrl).not.toHaveBeenCalled();
+    });
+
+    it('blocks a hidden own-app provider for a normal workspace', async () => {
+      process.env.HIDDEN_PROVIDERS = 'reddit-own-key';
+      const { urls, provider } = setup(ownAppExtras());
+      await expect(ownApp(urls, 'reddit-own-key', 'org-1')).rejects.toMatchObject(
+        unavailable
+      );
+      expect(provider.generateAuthUrl).not.toHaveBeenCalled();
+    });
+
+    it('hands the kept app to authenticate on the callback', async () => {
+      const { callback, provider } = setup(ownAppExtras());
+      redis.data.set('external:s1', JSON.stringify(app));
+      await connect(callback, 'reddit-own-key', 'org-1');
+      expect(provider.authenticate).toHaveBeenCalledWith(
+        expect.anything(),
+        app
+      );
+      expect(redis.data.has('external:s1')).toBe(false);
+    });
+  });
+
   describe('POST /integrations/social-connect/:integration', () => {
     it('blocks a hidden provider for a normal workspace before authenticating', async () => {
       const { callback, provider, saved } = setup();

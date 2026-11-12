@@ -22,6 +22,10 @@ describe('Sentry request body scrubbing', () => {
     'https://app.example.com/api/ai-credentials/',
     'https://app.example.com/ai-credentials?x=1',
     'https://app.example.com/ai-credentials#x',
+    'https://app.example.com/api/integrations/social-connect/wordpress',
+    'https://app.example.com/integrations/extension-refresh',
+    'https://app.example.com/api/integrations/moltbook/status',
+    'https://app.example.com/integrations/moltbook/status?request=fixture',
   ])('drops the body of %s', (url) => {
     const event = dropSecretRequestBody({
       request: {
@@ -76,11 +80,14 @@ describe('Sentry request body scrubbing', () => {
       }
     }
 
-    expect(init).toHaveBeenCalledWith(
-      expect.objectContaining({
-        beforeSend: dropSecretRequestBody,
-        beforeSendTransaction: dropSecretRequestBody,
-      })
-    );
+    const options = init.mock.calls[init.mock.calls.length - 1][0];
+    for (const hook of ['beforeSend', 'beforeSendTransaction', 'beforeSendSpan', 'beforeSendLog', 'beforeBreadcrumb']) {
+      const result = options[hook]({
+        request: { url: 'https://app.example.com/api/mcp/EXAMPLE-path-key?code=EXAMPLE-code', data: { code: 'EXAMPLE-code' } },
+        message: 'POST /api/mcp/EXAMPLE-path-key',
+      });
+      expect(JSON.stringify(result)).not.toContain('EXAMPLE-path-key');
+      expect(JSON.stringify(result)).not.toContain('EXAMPLE-code');
+    }
   });
 });

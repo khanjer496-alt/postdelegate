@@ -54,6 +54,10 @@ export class SubscriptionService {
     private readonly _organizationService: OrganizationService
   ) {}
 
+  processPaymentEvent(provider: string, eventId: string, handle: () => Promise<any>) {
+    return this._subscriptionRepository.processPaymentEvent(provider, eventId, handle);
+  }
+
   getSubscriptionByOrganizationId(organizationId: string) {
     return this._subscriptionRepository.getSubscriptionByOrganizationId(
       organizationId

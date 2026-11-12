@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { Injectable } from '@nestjs/common';
 import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
 import { XOwnKeyProvider } from '@gitroom/nestjs-libraries/integrations/social/x.own.key.provider';
+import { RedditOwnKeyProvider } from '@gitroom/nestjs-libraries/integrations/social/reddit.own.key.provider';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
 import { RedditProvider } from '@gitroom/nestjs-libraries/integrations/social/reddit.provider';
@@ -46,6 +47,7 @@ export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new LinkedinProvider(),
   new LinkedinPageProvider(),
   new RedditProvider(),
+  new RedditOwnKeyProvider(),
   new InstagramProvider(),
   new InstagramStandaloneProvider(),
   new FacebookProvider(),
@@ -160,6 +162,7 @@ export class IntegrationManager {
             analyticsAvailable: p.analyticsAvailable,
             editor: p.editor,
             isExternal: !!p.externalUrl,
+            isOwnApp: !!p.ownAppCredentials,
             isWeb3: !!p.isWeb3,
             isChromeExtension: !!p.isChromeExtension,
             ...(p.extensionCookies

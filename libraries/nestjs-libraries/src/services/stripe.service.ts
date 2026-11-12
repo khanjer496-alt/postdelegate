@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import * as Sentry from '@sentry/nestjs';
 import { BadRequestException } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
@@ -35,6 +36,18 @@ import dayjs from 'dayjs';
 import { emailButton } from '@gitroom/nestjs-libraries/services/email.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
+
+class StripeCatalogMismatch extends Error {}
+
+const HANDLED_WEBHOOK_EVENTS = new Set([
+  'invoice.payment_succeeded', 'invoice.payment_failed',
+  'customer.subscription.created', 'customer.subscription.updated',
+  'customer.subscription.deleted', 'customer.subscription.trial_will_end',
+  'charge.refunded', 'charge.dispute.created',
+]);
+
+const isPaidTier = (value: string): value is 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE' =>
+  ['STANDARD', 'TEAM', 'PRO', 'ULTIMATE'].includes(value);
 
 // Resolve the Stripe price of a tier by its lookup_key (postdelegate_<slug>_<month|year>),
 // falling back to finding/creating the product and price by name for accounts without them
@@ -244,11 +257,12 @@ export async function resolveExtraChannelPrice(
 }
 
 // Events that are not created by our own Stripe objects, so they carry no
-// metadata.service. Invoices feed the pixel and the affiliate commissions, the
-// charge events reverse commissions. Anything unrelated to a commission is
-// ignored further down.
+// metadata.service. Invoices feed billing notices, the pixel and affiliate
+// commissions; charge events reverse commissions. Each handler resolves the
+// customer to one of our organizations before applying its effects.
 const EVENTS_WITHOUT_SERVICE_METADATA: string[] = [
   'invoice.payment_succeeded',
+  'invoice.payment_failed',
   'charge.refunded',
   'charge.dispute.created',
 ];
@@ -623,16 +637,39 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
+  private handlesWebhook(event: Stripe.Event) {
+    return HANDLED_WEBHOOK_EVENTS.has(event.type) && (
+      (event.data?.object as { metadata?: { service?: string } })?.metadata?.service === 'gitroom' ||
+      EVENTS_WITHOUT_SERVICE_METADATA.includes(event.type)
+    );
+  }
+
   async processWebhook(event: Stripe.Event) {
-    // Maybe it comes from another stripe webhook
-    if (
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      event?.data?.object?.metadata?.service !== 'gitroom' &&
-      !EVENTS_WITHOUT_SERVICE_METADATA.includes(event.type)
-    ) {
+    if (!event.id) throw new BadRequestException('Missing Stripe event id');
+    // A filtered delivery must remain replayable after its metadata is fixed.
+    if (!this.handlesWebhook(event)) return { ok: true };
+    try {
+      return await this._subscriptionService.processPaymentEvent(
+        STRIPE_PROVIDER, event.id, () => this.dispatchWebhook(event)
+      );
+    } catch (err) {
+      if (!(err instanceof StripeCatalogMismatch)) throw err;
+      // The ledger releases its claim on a thrown error. Acknowledge a logical
+      // mismatch without entitlements or a completed marker; operators can fix
+      // the catalog and replay it. Transport/database failures still retry.
+      const details = { stripe_event_id: event.id, stripe_event_type: event.type,
+        stripe_subscription_id: (event.data.object as { id?: string })?.id,
+        reason: err.message };
+      console.error('stripe_catalog_mismatch', details);
+      try {
+        Sentry.captureMessage('stripe_catalog_mismatch', { level: 'error', extra: details });
+      } catch { console.error('stripe_catalog_mismatch_alert_failed', { stripe_event_id: event.id }); }
       return { ok: true };
     }
+  }
+
+  async dispatchWebhook(event: Stripe.Event) {
+    if (!this.handlesWebhook(event)) return { ok: true };
 
     switch (event.type) {
       case 'invoice.payment_succeeded':
@@ -734,13 +771,72 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
-  async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
-    const { uniqueId, billing, period } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
-      period: 'MONTHLY' | 'YEARLY';
-      uniqueId: string;
-    };
+  // Identify products from server-owned lookup keys and known legacy names.
+  // Include archived products; current lookup keys alone lose older prices.
+  private async catalogProductIds(slug: string, names: string[]) {
+    const prices = await stripe.prices.list({
+      lookup_keys: [`postdelegate_${slug}_month`, `postdelegate_${slug}_year`], limit: 100,
+    });
+    const ids = new Set(prices.data.map(p => typeof p.product === 'string' ? p.product : p.product?.id).filter(Boolean));
+    const knownNames = new Set(names.map(name => name.toUpperCase()));
+    let after: string | undefined;
+    for (;;) {
+      const page = await stripe.products.list({ limit: 100, ...(after ? { starting_after: after } : {}) });
+      for (const product of page.data) {
+        if (knownNames.has(product.name?.toUpperCase())) ids.add(product.id);
+      }
+      if (!page.has_more || !page.data.length) break;
+      after = page.data[page.data.length - 1].id;
+    }
+    return ids;
+  }
 
+  // Match product identity and actual billing interval, rather than today's
+  // amount or active flag: existing customers may retain retired prices.
+  async validatedPlan(subscription: Stripe.Subscription) {
+    const { billing, period, uniqueId } = subscription.metadata || {};
+    const plan = Object.prototype.hasOwnProperty.call(pricing, billing) && pricing[billing];
+    const mismatch = (reason: string): never => { throw new StripeCatalogMismatch(reason); };
+    if (!plan || !plan.slug || !isPaidTier(billing) || !['MONTHLY', 'YEARLY'].includes(period) || !uniqueId) {
+      return mismatch('Invalid subscription plan metadata');
+    }
+    const interval = period === 'YEARLY' ? 'year' : 'month';
+    const items = subscription.items?.data || [];
+    if (!items.length || items.length > 2) return mismatch('Invalid subscription items');
+    const knownPlans = await this.catalogProductIds(plan.slug, [billing, plan.label || billing, `PostDelegate ${plan.label || billing}`]);
+    const resolved: Array<{ item: Stripe.SubscriptionItem; price: Stripe.Price; product: string }> = [];
+    for (const item of items) {
+      let price: Stripe.Price;
+      try { price = await stripe.prices.retrieve(item.price.id); }
+      catch (err) {
+        if ((err as { code?: string }).code === 'resource_missing') return mismatch('Unknown subscription price');
+        throw err;
+      }
+      if (price.id !== item.price.id || price.currency !== 'usd' || price.recurring?.interval !== interval ||
+          (price.recurring.interval_count ?? 1) !== 1 || price.unit_amount == null || price.unit_amount < 0) {
+        return mismatch('Subscription price does not match plan');
+      }
+      const product = typeof price.product === 'string' ? price.product : price.product?.id;
+      resolved.push({ item, price, product });
+    }
+    const base = resolved.filter(p => knownPlans.has(p.product));
+    if (base.length !== 1 || base[0].item.quantity !== 1) return mismatch('Missing subscription plan item');
+    const extras = resolved.filter(p => p !== base[0]);
+    let extraChannels = 0;
+    if (extras.length) {
+      if (!allowsExtraChannels(billing)) return mismatch('Plan does not allow add-ons');
+      const knownExtras = await this.catalogProductIds('extra_channel', ['Extra channel', 'PostDelegate Extra channel']);
+      const extra = extras[0];
+      if (!knownExtras.has(extra.product) || !Number.isInteger(extra.item.quantity) ||
+          extra.item.quantity < 1 || extra.item.quantity > MAX_EXTRA_CHANNELS) {
+        return mismatch('Invalid subscription add-on price');
+      }
+      extraChannels = extra.item.quantity;
+    }
+    return { billing, period: period as 'MONTHLY' | 'YEARLY', uniqueId, extraChannels };
+  }
+
+  async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
     const liveSubscriptions = await this.getLiveSubscriptions(
       event.data.object.customer as string
     );
@@ -777,21 +873,17 @@ export class StripeService extends PaymentProviderAbstract {
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
       return { ok: true };
     }
-    const currentPlan = (current.metadata || {}) as Partial<
-      typeof event.data.object.metadata & {
-        billing: 'STANDARD' | 'PRO';
-        period: 'MONTHLY' | 'YEARLY';
-      }
-    >;
+    const currentPlan = await this.validatedPlan(current);
+    const { uniqueId, billing, period, extraChannels } = currentPlan;
 
     const result = await this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
       isTrialOf(current),
-      currentPlan.uniqueId || uniqueId,
+      uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
-      currentPlan.billing || billing,
-      currentPlan.period || period,
+      totalChannelsOf(billing, extraChannels),
+      billing,
+      period,
       current.cancel_at,
       undefined,
       undefined,
@@ -825,12 +917,6 @@ export class StripeService extends PaymentProviderAbstract {
     return result;
   }
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
-    const { uniqueId, billing, period } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
-      period: 'MONTHLY' | 'YEARLY';
-      uniqueId: string;
-    };
-
     const check = await this.checkValidCard(event);
     if (!check) {
       return { ok: false };
@@ -851,21 +937,16 @@ export class StripeService extends PaymentProviderAbstract {
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
       return fresh ? this.deleteSubscription(event) : { retry: true };
     }
-    const currentPlan = (current.metadata || {}) as Partial<
-      typeof event.data.object.metadata & {
-        billing: 'STANDARD' | 'PRO';
-        period: 'MONTHLY' | 'YEARLY';
-      }
-    >;
+    const { uniqueId, billing, period, extraChannels } = await this.validatedPlan(current);
 
     return this._subscriptionService.createOrUpdateSubscription(
       STRIPE_PROVIDER,
       isTrialOf(current),
-      currentPlan.uniqueId || uniqueId,
+      uniqueId,
       event.data.object.customer as string,
-      totalChannelsOf(currentPlan.billing || billing, extraChannelsOf(current)),
-      currentPlan.billing || billing,
-      currentPlan.period || period,
+      totalChannelsOf(billing, extraChannels),
+      billing,
+      period,
       current.cancel_at,
       undefined,
       undefined,
@@ -918,11 +999,7 @@ export class StripeService extends PaymentProviderAbstract {
       return;
     }
 
-    const { uniqueId, billing, period } = survivor.metadata as {
-      billing: 'STANDARD' | 'PRO';
-      period: 'MONTHLY' | 'YEARLY';
-      uniqueId: string;
-    };
+    const { uniqueId, billing, period, extraChannels } = await this.validatedPlan(survivor);
     console.log('stripe_subscription_deleted_survivor_kept', {
       stripe_event_type: event.type,
       stripe_event_id: event.id,
@@ -940,7 +1017,7 @@ export class StripeService extends PaymentProviderAbstract {
       uniqueId,
       customer,
       // the survivor comes from a fresh list, not from the event
-      totalChannelsOf(billing, extraChannelsOf(survivor)),
+      totalChannelsOf(billing, extraChannels),
       billing,
       period,
       survivor.cancel_at,
@@ -2561,14 +2638,10 @@ export class StripeService extends PaymentProviderAbstract {
     // only feeds the Facebook pixel, it runs in the background so it can
     // never fail or slow down the webhook
     this.trackConversion(event.data.object).catch((err) => {});
-    await this.recordAffiliateCommission(event.data.object);
-    return { ok: true };
+    return this.recordAffiliateCommission(event.data.object);
   }
 
-  // A failure here is logged with the invoice id and never fails the webhook:
-  // the subscription events are handled by the same endpoint and a failing
-  // endpoint would stop all of them. The row is unique per invoice, so a
-  // missed one can be replayed from the Stripe dashboard.
+  // A failed financial write stays retryable; the row is unique per invoice.
   private async recordAffiliateCommission(invoice: Stripe.Invoice) {
     try {
       const customerId =
@@ -2596,12 +2669,14 @@ export class StripeService extends PaymentProviderAbstract {
           (invoice.status_transitions?.paid_at || invoice.created) * 1000
         ),
       });
+      return { ok: true };
     } catch (err) {
       console.error(
         'affiliate_commission_failed',
         { stripe_invoice_id: invoice.id },
         err
       );
+      return { retry: true };
     }
   }
 
@@ -2629,11 +2704,21 @@ export class StripeService extends PaymentProviderAbstract {
     return (typeof invoice === 'string' ? invoice : invoice?.id) || null;
   }
 
+  // Stripe does not order events: create the idempotent invoice commission
+  // before reversing it, even if invoice.payment_succeeded has not arrived.
+  private async ensureInvoiceCommission(invoiceId: string) {
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    if (invoice.status !== 'paid') return false;
+    const result = await this.recordAffiliateCommission(invoice);
+    return !result?.retry;
+  }
+
   async chargeRefunded(event: Stripe.ChargeRefundedEvent) {
     try {
       const charge = event.data.object;
       const invoiceId = await this.getInvoiceIdOfCharge(charge);
       if (invoiceId) {
+        if (!(await this.ensureInvoiceCommission(invoiceId))) return { retry: true };
         // amount_refunded adds up all the refunds of the charge
         await this._affiliateService.reverseCommission({
           invoiceId,
@@ -2647,8 +2732,78 @@ export class StripeService extends PaymentProviderAbstract {
         { stripe_charge_id: event.data.object.id },
         err
       );
+      return { retry: true };
+    }
+    // The Terms say a refund cancels the subscription in the same step. Any
+    // refund does (a yearly plan's policy refund is one twelfth, a partial
+    // one), but only a refund of the subscription's current invoice.
+    try {
+      const charge = event.data.object;
+      if (charge.amount_refunded > 0) {
+        const invoiceId = await this.getInvoiceIdOfCharge(charge);
+        if (invoiceId) {
+          await this.cancelSubscriptionOfRefundedInvoice(invoiceId);
+        }
+      }
+    } catch (err) {
+      console.error(
+        'subscription_refund_cancel_failed',
+        { stripe_charge_id: event.data.object.id },
+        err
+      );
+      return { retry: true };
     }
     return { ok: true };
+  }
+
+  // Cancels the subscription whose current invoice was refunded (in full or in part), without
+  // proration or a final invoice. The customer.subscription.deleted event that
+  // follows moves the workspace to the free limits. Safe to repeat: an ended
+  // subscription is left alone. Invoices without a subscription, invoices that are
+  // not the subscription's current one, and subscriptions of other services
+  // sharing the Stripe account are ignored.
+  private async cancelSubscriptionOfRefundedInvoice(invoiceId: string) {
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    // webhook payloads follow the API version of the endpoint: parent is the
+    // 2025-03-31+ shape, subscription the older one
+    const ref =
+      invoice.parent?.subscription_details?.subscription ||
+      (invoice as any).subscription;
+    const subscriptionId = typeof ref === 'string' ? ref : ref?.id;
+    if (!subscriptionId) {
+      return;
+    }
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (
+      subscription.metadata?.service !== 'gitroom' ||
+      ENDED_STATUSES.includes(subscription.status)
+    ) {
+      return;
+    }
+    // Only the refund of the payment for the CURRENT subscription cancels it.
+    // A refund of an older renewal, a proration or extra-channel invoice or a
+    // duplicate charge must not cut a period the customer was not refunded for.
+    const latest = subscription.latest_invoice;
+    const latestInvoiceId = typeof latest === 'string' ? latest : latest?.id;
+    if (latestInvoiceId !== invoiceId) {
+      return;
+    }
+    try {
+      await stripe.subscriptions.cancel(subscription.id, {
+        prorate: false,
+        invoice_now: false,
+      });
+    } catch (err) {
+      // cancelled by someone else since the read above: nothing left to do
+      const current = await stripe.subscriptions.retrieve(subscription.id);
+      if (!ENDED_STATUSES.includes(current.status)) {
+        throw err;
+      }
+    }
+    console.log('stripe_subscription_cancelled_by_refund', {
+      stripe_invoice_id: invoiceId,
+      stripe_subscription_id: subscription.id,
+    });
   }
 
   async chargeDisputed(event: Stripe.ChargeDisputeCreatedEvent) {
@@ -2659,6 +2814,7 @@ export class StripeService extends PaymentProviderAbstract {
       );
       const invoiceId = await this.getInvoiceIdOfCharge(charge);
       if (invoiceId) {
+        if (!(await this.ensureInvoiceCommission(invoiceId))) return { retry: true };
         await this._affiliateService.reverseCommission({
           invoiceId,
           reversedCents: dispute.amount,
@@ -2671,6 +2827,7 @@ export class StripeService extends PaymentProviderAbstract {
         { stripe_dispute_id: event.data.object.id },
         err
       );
+      return { retry: true };
     }
     return { ok: true };
   }
@@ -2828,7 +2985,8 @@ export class StripeService extends PaymentProviderAbstract {
 
   async refundCharges(organizationId: string, chargeIds: string[]) {
     const org = await this._organizationService.getOrgById(organizationId);
-    if (!stripeCustomerOf(org?.paymentId)) {
+    const customer = stripeCustomerOf(org?.paymentId);
+    if (!customer) {
       throw new Error('No payment customer found for this organization');
     }
 
@@ -2837,6 +2995,20 @@ export class StripeService extends PaymentProviderAbstract {
 
     for (const chargeId of chargeIds) {
       try {
+        // a refund now also cancels the subscription its invoice paid for, so
+        // only charges of this workspace's own Stripe customer may be refunded
+        const charge = await stripe.charges.retrieve(chargeId);
+        const chargeCustomer =
+          typeof charge.customer === 'string'
+            ? charge.customer
+            : charge.customer?.id;
+        if (chargeCustomer !== customer) {
+          console.error('refund_charge_customer_mismatch', {
+            stripe_charge_id: chargeId,
+          });
+          failed.push(chargeId);
+          continue;
+        }
         await stripe.refunds.create({ charge: chargeId });
         refunded.push(chargeId);
       } catch (err) {

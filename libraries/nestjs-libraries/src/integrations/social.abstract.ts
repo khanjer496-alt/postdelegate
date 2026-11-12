@@ -223,6 +223,24 @@ export class NotEnoughScopes {
   ) {}
 }
 
+// An explicit read failure, distinct from a successful empty analytics dataset.
+// Never attach the upstream response, request URL, token or exception cause.
+export class AnalyticsUnavailable extends Error {
+  constructor() {
+    super('Analytics are temporarily unavailable. Try again later.');
+  }
+}
+
+// A read that returned some cards while another request failed. The caller may
+// show what it has but must not cache it as if it were complete.
+const partialAnalytics = new WeakSet<object>();
+export const markPartialAnalytics = <T extends object>(result: T): T => {
+  partialAnalytics.add(result);
+  return result;
+};
+export const isPartialAnalytics = (result: unknown): boolean =>
+  typeof result === 'object' && result !== null && partialAnalytics.has(result);
+
 function safeStringify(obj: any) {
   const seen = new WeakSet();
 

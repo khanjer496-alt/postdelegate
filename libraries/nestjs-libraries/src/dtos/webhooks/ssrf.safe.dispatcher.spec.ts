@@ -20,6 +20,30 @@ describe('ssrfSafeFetch', () => {
     global.fetch = realFetch;
   });
 
+  it.each(['file:///etc/passwd', 'data:text/plain,secret', 'ftp://8.8.8.8/a'])('rejects non-http URL %s', async url => {
+    await expect(ssrfSafeFetch(url, {}, { allowHttp: true })).rejects.toThrow('Blocked URL');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('aborts a stalled fetch at the timeout', async () => {
+    fetchMock.mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    await expect(ssrfSafeFetch('https://8.8.8.8/media', {}, { timeoutMs: 20 })).rejects.toThrow();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it('preserves caller cancellation', async () => {
+    const ac = new AbortController();
+    fetchMock.mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    const request = ssrfSafeFetch('https://8.8.8.8/media', { signal: ac.signal });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    ac.abort(new Error('caller stopped'));
+    await expect(request).rejects.toThrow('caller stopped');
+  });
+
   it('never lets fetch follow redirects on its own and pins the dispatcher', async () => {
     fetchMock.mockResolvedValue(new Response('ok'));
 

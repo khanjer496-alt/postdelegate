@@ -96,16 +96,28 @@ export async function ssrfSafeFetch(
   }: SsrfSafeFetchOptions = {}
 ): Promise<Response> {
   const protocols = allowHttp ? ['https:', 'http:'] : ['https:'];
-  const signal = AbortSignal.timeout(timeoutMs);
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   let currentUrl = url;
   let method = init.method || 'GET';
   let body = init.body;
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    const safe =
-      process.env.DISABLE_SSRF_PROTECTION === 'true'
-        ? protocols.includes(new URL(currentUrl).protocol)
-        : await isSafePublicUrl(currentUrl, protocols);
+    signal.throwIfAborted();
+    // DNS preflight is part of the same deadline as the connection/body.
+    let onAbort: () => void;
+    const aborted = new Promise<never>((_resolve, reject) => {
+      onAbort = () => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    const safe = await Promise.race([
+      Promise.resolve().then(() =>
+        process.env.DISABLE_SSRF_PROTECTION === 'true'
+          ? protocols.includes(new URL(currentUrl).protocol)
+          : isSafePublicUrl(currentUrl, protocols)
+      ),
+      aborted,
+    ]).finally(() => signal.removeEventListener('abort', onAbort));
     if (!safe) {
       throw new Error('Blocked URL');
     }

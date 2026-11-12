@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nestjs';
+import { scrubTelemetry } from '@gitroom/helpers/utils/redact.url';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { capitalize } from 'lodash';
 
@@ -28,7 +29,7 @@ export const setSentryUserContext = (params: {
 // Requests to these paths post a secret (saving an AI key posts the
 // workspace's raw OpenAI key), so their body is never attached to an error or
 // a trace
-const secretBodyPaths = ['/ai-credentials'];
+const secretBodyPaths = ['/ai-credentials', '/integrations/social-connect', '/integrations/extension-refresh', '/integrations/moltbook'];
 
 export const dropSecretRequestBody = <T extends Sentry.Event>(event: T): T => {
   const path = (event.request?.url || '').split(/[?#]/)[0] + '/';
@@ -93,8 +94,11 @@ export const initializeSentry = (appName: string, allowLogs = false) => {
         { op: 'middleware.express' },
       ],
       enableLogs: true,
-      beforeSend: dropSecretRequestBody,
-      beforeSendTransaction: dropSecretRequestBody,
+      beforeSend: (event) => scrubTelemetry(dropSecretRequestBody(event)),
+      beforeSendTransaction: (event) => scrubTelemetry(dropSecretRequestBody(event)),
+      beforeSendSpan: (span) => scrubTelemetry(span),
+      beforeSendLog: (log) => scrubTelemetry(log),
+      beforeBreadcrumb: (breadcrumb) => scrubTelemetry(breadcrumb),
 
       // Profiling
       profileSessionSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.4,
