@@ -14,7 +14,7 @@ jest.mock('@gitroom/react/translation/translated-label', () => ({
   TranslatedLabel: ({ label }: any) => label,
 }));
 jest.mock('@gitroom/react/helpers/variable.context', () => ({
-  useVariables: () => ({ isGeneral: true }),
+  useVariables: () => mockVariables,
 }));
 jest.mock('@hookform/resolvers/class-validator', () => ({
   classValidatorResolver: () => async (values: any) => ({ values, errors: {} }),
@@ -53,7 +53,7 @@ jest.mock('@gitroom/frontend/components/auth/providers/oauth.provider', () => ({
 }));
 jest.mock(
   '@gitroom/frontend/components/auth/providers/farcaster.provider',
-  () => ({ FarcasterProvider: () => null })
+  () => ({ FarcasterProvider: () => React.createElement('button', { type: 'button', 'data-farcaster-login': '' }, 'Farcaster') })
 );
 jest.mock('@gitroom/frontend/components/layout/loading', () => ({
   LoadingComponent: () => null,
@@ -172,3 +172,18 @@ describe.each(cases)(
     });
   }
 );
+
+const mockVariables: Record<string, any> = { isGeneral: true };
+describe.each([['Login', Login, {}], ['Register', RegisterAfter, { token: '', provider: '' }]])('%s provider visibility', (_name, Component, props) => {
+  afterEach(() => { delete mockVariables.farcasterLoginEnabled; delete mockVariables.neynarClientId; });
+  it.each([undefined, false])('hides Farcaster with a client id and an absent/false auth flag (%s)', enabled => {
+    mockVariables.neynarClientId = 'example-client-id';
+    mockVariables.farcasterLoginEnabled = enabled;
+    expect(renderToString(React.createElement(Component as any, props))).not.toContain('data-farcaster-login');
+  });
+  it('shows Farcaster only when enabled with its client id', () => {
+    mockVariables.neynarClientId = 'example-client-id';
+    mockVariables.farcasterLoginEnabled = true;
+    expect(renderToString(React.createElement(Component as any, props))).toContain('data-farcaster-login');
+  });
+});
