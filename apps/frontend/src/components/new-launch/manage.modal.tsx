@@ -1255,6 +1255,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 ? t('edit_post', 'Edit post')
                 : t('new_post', 'New post')}
             </span>
+            {!existingData?.integration && (
+              <span className="text-[11px] font-[600] px-[8px] py-[2px] rounded-full bg-pdSurface2 border border-pdLine2 text-textItemBlur">
+                {t('draft', 'Draft')}
+              </span>
+            )}
             <CreationMethodBadge
               creationMethod={existingData?.posts?.[0]?.creationMethod}
               size="sm"

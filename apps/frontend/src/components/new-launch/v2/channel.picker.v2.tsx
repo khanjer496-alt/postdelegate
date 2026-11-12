@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { groupBy, orderBy } from 'lodash';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,6 +9,8 @@ import { useExistingData } from '@gitroom/frontend/components/launches/helpers/u
 import { isChannelConnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ChannelAvatarV2 } from '@gitroom/frontend/components/launches/v2/ui.v2';
+import { Icon } from '@gitroom/frontend/components/new-layout/v2/icons.v2';
+import { networkName } from '@gitroom/frontend/components/new-layout/v2/network.names';
 
 // the composer's left column in the v2 layout: the same channel selection
 // as PicksSocialsComponent (same store actions), grouped by customer
@@ -27,12 +29,21 @@ export const ChannelPickerV2: FC<{
       }))
     );
 
+  // narrows the list on screen only; the selection is untouched
+  const [query, setQuery] = useState('');
   const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const available = integrations.filter((f) =>
       existing.integration
         ? f.id === existing.integration ||
           !!existing.siblings?.some((sibling) => sibling.integration === f.id)
         : isChannelConnected(f)
+    ).filter(
+      (f) =>
+        !q ||
+        f.name?.toLowerCase().includes(q) ||
+        f.identifier?.toLowerCase().includes(q) ||
+        f.customer?.name?.toLowerCase().includes(q)
     );
     return orderBy(
       Object.values(groupBy(available, (i) => i.customer?.id || '')).map((list) => ({
@@ -42,7 +53,7 @@ export const ChannelPickerV2: FC<{
       })),
       [(g) => (g.id ? 0 : 1), 'name']
     );
-  }, [integrations, existing]);
+  }, [integrations, existing, query]);
 
   const isSelected = (id: string) =>
     selectedIntegrations.some((p) => p.integration.id === id);
@@ -58,6 +69,18 @@ export const ChannelPickerV2: FC<{
           {t('selected_count', '{{count}} selected', { count: selectedIntegrations.length })}
         </span>
       </div>
+      <div className="px-[10px] pt-[10px]">
+        <label className="flex items-center gap-[8px] h-[34px] px-[10px] rounded-[9px] bg-pdSurface border border-pdLine text-pdInk3 focus-within:border-pdLine2">
+          <Icon name="search" size={14} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('search_channels', 'Search channels')}
+            aria-label={t('search_channels', 'Search channels')}
+            className="flex-1 min-w-0 bg-transparent outline-none text-[12.5px] text-newTextColor placeholder:text-pdInk3"
+          />
+        </label>
+      </div>
       <div
         className={clsx(
           'flex-1 overflow-y-auto p-[10px] flex flex-col gap-[14px] scrollbar scrollbar-thumb-pdLine2 scrollbar-track-transparent',
@@ -67,7 +90,7 @@ export const ChannelPickerV2: FC<{
         {groups.map((group) => (
           <div key={group.id || 'none'} className="flex flex-col gap-[2px]">
             <div className="flex items-center justify-between px-[6px] h-[26px]">
-              <span className="text-[11px] uppercase tracking-[0.08em] font-[700] text-pdInk3 truncate">
+              <span className="text-[12px] font-[700] text-textItemBlur truncate">
                 {group.name || t('no_customer', 'No customer')}
               </span>
               {!!group.id && !existing.integration && onSelectCustomer && (
@@ -91,32 +114,32 @@ export const ChannelPickerV2: FC<{
                   disabled={!!existing.integration}
                   onClick={() => addOrRemoveSelectedIntegration(integration, {})}
                   className={clsx(
-                    'flex items-center gap-[10px] h-[44px] px-[8px] rounded-[10px] text-start outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+                    'flex items-center gap-[10px] h-[44px] px-[8px] rounded-[9px] text-start outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
                     selected ? 'bg-[#7357ff1f]' : 'hover:bg-boxHover'
                   )}
                 >
-                  <ChannelAvatarV2
-                    picture={integration.picture}
-                    identifier={integration.identifier}
-                    name={integration.name}
-                    size={30}
-                  />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-[600] truncate">{integration.name}</span>
-                    <span className="block text-[11px] text-pdInk3 truncate capitalize">
-                      {integration.identifier.replace(/-/g, ' ')}
-                    </span>
-                  </span>
                   <span
                     aria-hidden="true"
                     className={clsx(
-                      'w-[18px] h-[18px] rounded-[5px] grid place-items-center border',
+                      'w-[18px] h-[18px] shrink-0 rounded-[5px] grid place-items-center border',
                       selected ? 'bg-[#7357ff] border-[#7357ff] text-white' : 'border-pdLine2'
                     )}
                   >
                     {selected && (
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                     )}
+                  </span>
+                  <ChannelAvatarV2
+                    picture={integration.picture}
+                    identifier={integration.identifier}
+                    name={integration.name}
+                    size={28}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-[600] truncate">{integration.name}</span>
+                    <span className="block text-[11px] text-pdInk3 truncate">
+                      {networkName(integration.identifier)}
+                    </span>
                   </span>
                 </button>
               );
