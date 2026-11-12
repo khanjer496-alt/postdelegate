@@ -21,6 +21,33 @@ import { useReviewCount } from '@gitroom/frontend/components/approvals/approvals
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { NavItemV2 } from './nav.item.v2';
 import { setUiLayoutCookie } from './ui.flag.client';
+import { Icon } from './icons.v2';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useModals, useHasOpenModal } from '@gitroom/frontend/components/layout/new-modal';
+import { BillingHistory } from '@gitroom/frontend/components/billing/billing.history.component';
+
+// line icons for the menu items, by path (the labels and links stay the
+// classic menu's)
+const ICON_BY_PATH: Record<string, string> = {
+  '/launches': 'calendar-days',
+  '/review': 'badge-check',
+  '/ideas': 'lightbulb',
+  '/studio': 'clapperboard',
+  '/media': 'images',
+  '/agents': 'sparkles',
+  '/analytics': 'chart-no-axes-column',
+  '/channels': 'radio-tower',
+  '/settings': 'settings-2',
+  '/billing': 'credit-card',
+  '/affiliates': 'gift',
+};
+
+// a steady color per person for the initials avatar
+const AVATAR_COLORS = ['#2d6a4f', '#1f7a8c', '#8a5a2b', '#5b3fd6', '#9d4edd', '#b5651d'];
+const avatarColor = (seed: string) =>
+  AVATAR_COLORS[
+    Array.from(seed).reduce((sum, c) => sum + c.charCodeAt(0), 0) % AVATAR_COLORS.length
+  ];
 
 type MenuItem = ReturnType<typeof useMenuItem>['all'][number];
 
@@ -75,11 +102,6 @@ const useOrganizations = () => {
   });
 };
 
-const ChevronsIcon = () => (
-  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />
-  </svg>
-);
 
 const WorkspaceCard: FC<{ collapsed: boolean; activeChannels: number }> = ({
   collapsed,
@@ -126,7 +148,7 @@ const WorkspaceCard: FC<{ collapsed: boolean; activeChannels: number }> = ({
         </span>
       </span>
       <span className={clsx('text-pdInk3', collapsed && 'hidden mobile:block')}>
-        <ChevronsIcon />
+        <Icon name="chevrons-up-down" size={14} />
       </span>
     </Link>
   );
@@ -149,20 +171,32 @@ const NewPostButton: FC<{ collapsed: boolean; integrations: any[] }> = ({
     reloadCalendarView,
   });
   const usable = integrations.some((i: any) => !i.disabled);
+  // N opens the composer, like the hint on the button says (not while
+  // typing or with a dialog open)
+  const modalOpen = useHasOpenModal();
+  useHotkeys('n', () => createPost(), { enabled: usable && !modalOpen, preventDefault: true });
   const className = clsx(
-    'flex items-center justify-center gap-[8px] w-full h-[38px] rounded-[10px] bg-btnCta text-btnCtaText text-[13.5px] font-[600] hover:bg-btnCtaHover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
-    collapsed && 'mobile:w-full'
+    'flex items-center gap-[8px] w-full h-[38px] rounded-[9px] bg-btnCta text-btnCtaText text-[13.5px] font-[600] hover:bg-btnCtaHover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+    collapsed ? 'justify-center mobile:justify-start mobile:px-[12px]' : 'px-[12px]'
   );
-  const icon = (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.4 2.6a2.1 2.1 0 1 1 3 3L12 15l-4 1 1-4Z" />
-    </svg>
-  );
+  const icon = <Icon name="square-pen" size={16} />;
   const label = (
-    <span className={clsx(collapsed && 'hidden mobile:inline')}>
-      {t('new_post', 'New post')}
-    </span>
+    <>
+      <span className={clsx(collapsed && 'hidden mobile:inline')}>
+        {t('new_post', 'New post')}
+      </span>
+      {usable && (
+        <kbd
+          aria-hidden="true"
+          className={clsx(
+            'ms-auto font-sans text-[10.5px] leading-[16px] px-[5px] rounded-[5px] border border-black/15 bg-black/10 opacity-60',
+            collapsed && 'hidden mobile:inline'
+          )}
+        >
+          N
+        </kbd>
+      )}
+    </>
   );
   if (!usable) {
     return (
@@ -173,7 +207,13 @@ const NewPostButton: FC<{ collapsed: boolean; integrations: any[] }> = ({
     );
   }
   return (
-    <button type="button" onClick={createPost} className={className} title={t('new_post', 'New post')}>
+    <button
+      type="button"
+      onClick={createPost}
+      className={className}
+      title={t('new_post', 'New post')}
+      aria-keyshortcuts="N"
+    >
       {icon}
       {label}
     </button>
@@ -193,6 +233,7 @@ const TrialCard: FC = () => {
   return (
     <div className="rounded-[12px] border border-[#7357ff4d] bg-[#7357ff1a] p-[12px] mb-[8px]">
       <div className="flex items-center gap-[8px] text-[12.5px] font-[600]">
+        <Icon name="hourglass" size={14} className="text-pdBrand2" />
         {days === 0
           ? t('trial_countdown_today', 'Your trial ends today')
           : t('trial_days_left_short', 'Trial · {{days}} days left', { days })}
@@ -200,27 +241,13 @@ const TrialCard: FC = () => {
       <div className="h-[6px] rounded-full bg-black/30 mt-[8px] overflow-hidden">
         <div className="h-full rounded-full bg-[#b39aff]" style={{ width: `${used * 100}%` }} />
       </div>
-      <Link href="/billing" className="block text-[11.5px] font-[600] text-[#b39aff] mt-[8px] hover:underline">
+      <Link href="/billing" className="block text-[11.5px] font-[600] text-pdBrand2 mt-[8px] hover:underline">
         {t('choose_a_plan', 'Choose a plan')} →
       </Link>
     </div>
   );
 };
 
-const HelpIcon = (
-  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="4" />
-    <path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24" />
-  </svg>
-);
-const ChannelsIcon = (
-  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9M7.8 4.7a6.14 6.14 0 0 0-.8 7.5M16.2 4.8c2 2 2.26 5.11.8 7.47M19.1 1.9a9.96 9.96 0 0 1 0 14.1" />
-    <circle cx="12" cy="9" r="2" />
-    <path d="m8.5 22 3.5-11 3.5 11M9.5 18h5" />
-  </svg>
-);
 
 const UserRow: FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const t = useT();
@@ -228,6 +255,10 @@ const UserRow: FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const [open, setOpen] = useState(false);
   const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
   const label = user?.name || user?.email || '';
+  const { openModal } = useModals();
+  const { billingEnabled, isGeneral } = useVariables();
+  // billing history moved here from the top bar, same rule as before
+  const canSeeInvoices = billingEnabled && isGeneral && user?.role !== 'USER';
   const initials =
     label
       .split(/[\s@.]+/)
@@ -248,16 +279,20 @@ const UserRow: FC<{ collapsed: boolean }> = ({ collapsed }) => {
           collapsed && 'justify-center mobile:justify-start'
         )}
       >
-        <span className="flex items-center justify-center w-[32px] h-[32px] shrink-0 rounded-full bg-btnPrimary text-white text-[12px] font-[700]">
+        <span
+          className="flex items-center justify-center w-[32px] h-[32px] shrink-0 rounded-full text-white text-[12px] font-[700]"
+          style={{ background: avatarColor(label) }}
+        >
           {initials}
         </span>
         <span className={clsx('flex-1 min-w-0 leading-tight', collapsed && 'hidden mobile:block')}>
           <span className="block text-[13px] font-[600] truncate">{label}</span>
-          {!!user?.tier?.current && (
-            <span className="block text-[11px] text-textItemBlur truncate capitalize">
-              {String(user.tier.current).toLowerCase()} {t('plan_word', 'plan')}
-            </span>
+          {!!user?.email && user.email !== label && (
+            <span className="block text-[11px] text-pdInk3 truncate">{user.email}</span>
           )}
+        </span>
+        <span className={clsx('text-pdInk3', collapsed && 'hidden mobile:block')}>
+          <Icon name="ellipsis-vertical" size={16} />
         </span>
       </button>
       {open && (
@@ -273,6 +308,23 @@ const UserRow: FC<{ collapsed: boolean }> = ({ collapsed }) => {
           >
             {t('settings', 'Settings')}
           </Link>
+          {canSeeInvoices && (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                openModal({
+                  title: t('billing_history', 'Billing History'),
+                  size: '1000px',
+                  children: <BillingHistory modal={true} />,
+                });
+              }}
+              className="flex items-center w-full h-[34px] px-[10px] rounded-[8px] text-[13px] text-start hover:bg-boxHover"
+            >
+              {t('billing_history', 'Billing History')}
+            </button>
+          )}
           <button
             role="menuitem"
             type="button"
@@ -320,10 +372,18 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
   // Channels is a v2 page; it sits with the workspace items
   const channelsItem: MenuItem = {
     name: t('channels', 'Channels'),
-    icon: ChannelsIcon,
+    icon: <Icon name="radio-tower" size={16} />,
     path: '/channels',
   };
   const items = [...all.filter(visible), channelsItem];
+  // the affiliates page exists but the classic menu hides its entry; the
+  // v2 sidebar shows it at the bottom like the mockup, same role rule
+  const affiliatesItem = all.find((i) => i.path === '/affiliates');
+  const affiliates =
+    affiliatesItem &&
+    (!affiliatesItem.role || (!!user?.role && affiliatesItem.role.includes(user.role)))
+      ? affiliatesItem
+      : undefined;
   const known = GROUPS.flatMap((g) => g.paths);
   const groups = GROUPS.map((g) => ({
     ...g,
@@ -412,9 +472,11 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
                 <NavItemV2
                   key={item.path}
                   path={item.path}
-                  label={item.name}
                   title={item.title}
-                  icon={item.icon}
+                  icon={
+                    ICON_BY_PATH[item.path] ? <Icon name={ICON_BY_PATH[item.path]} size={16} /> : item.icon
+                  }
+                  label={item.path === '/media' ? t('pd_media_library', 'Media library') : item.name}
                   onClick={item.onClick}
                   collapsed={collapsed}
                   badge={item.path === '/review' ? reviewCount?.count : undefined}
@@ -427,10 +489,18 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
       </div>
       <div className="shrink-0 px-[12px] pb-[4px]">
         {!collapsed && <TrialCard />}
+        {!!affiliates && (
+          <NavItemV2
+            path={affiliates.path}
+            label={affiliates.name}
+            icon={<Icon name="gift" size={16} />}
+            collapsed={collapsed}
+          />
+        )}
         <NavItemV2
           path="mailto:support@postdelegate.com"
           label={t('help_and_support', 'Help & support')}
-          icon={HelpIcon}
+          icon={<Icon name="life-buoy" size={16} />}
           collapsed={collapsed}
         />
       </div>

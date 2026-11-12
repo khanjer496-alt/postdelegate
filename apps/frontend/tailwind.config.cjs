@@ -75,6 +75,7 @@ module.exports = {
         modalCustom: 'var(--color-modalCustom)',
 
         pdSide: 'var(--pd-side)',
+        pdBrand2: 'var(--pd-brand-2)',
         pdNavActive: 'var(--pd-nav-active)',
         pdNavActiveText: 'var(--pd-nav-active-text)',
         pdNavAccent: 'var(--pd-nav-accent)',

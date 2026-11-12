@@ -22,7 +22,7 @@ export const NavItemV2: FC<{
   const isActive = path.startsWith('/') && currentPath.indexOf(path) === 0;
 
   const className = clsx(
-    'group relative flex items-center w-full h-[36px] rounded-[9px] text-[13.5px] font-[500] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+    'group relative flex items-center w-full h-[34px] rounded-[9px] text-[13.5px] font-[500] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
     collapsed
       ? 'justify-center px-0 mobile:justify-start mobile:gap-[10px] mobile:px-[10px]'
       : 'gap-[10px] px-[10px]',
@@ -36,14 +36,14 @@ export const NavItemV2: FC<{
       {isActive && (
         <span
           aria-hidden="true"
-          className="absolute start-0 top-[8px] bottom-[8px] w-[3px] rounded-full bg-pdNavAccent"
+          className="absolute start-0 top-0 bottom-0 w-[2px] rounded-s-[9px] bg-pdNavAccent"
         />
       )}
       <span
         aria-hidden="true"
         className={clsx(
-          'relative flex items-center justify-center w-[20px] h-[20px] shrink-0 [&_svg]:max-w-[18px] [&_svg]:max-h-[18px]',
-          isActive && 'text-pdNavAccent'
+          'relative flex items-center justify-center w-[16px] h-[16px] shrink-0 [&_svg]:max-w-[16px] [&_svg]:max-h-[16px]',
+          isActive && 'text-pdBrand2'
         )}
       >
         {icon}
@@ -59,7 +59,7 @@ export const NavItemV2: FC<{
       {!badge && !!count && (
         <span
           className={clsx(
-            'min-w-[20px] h-[18px] px-[6px] rounded-[6px] bg-pdSurface2 text-textItemBlur text-[11px] leading-[18px] font-[600] text-center',
+            'min-w-[20px] h-[18px] px-[6px] rounded-[6px] bg-[#242428] text-textItemBlur text-[11px] leading-[18px] font-[600] text-center',
             collapsed && 'hidden mobile:block'
           )}
         >
