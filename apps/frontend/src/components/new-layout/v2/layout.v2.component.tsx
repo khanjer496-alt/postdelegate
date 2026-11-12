@@ -47,11 +47,10 @@ import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announce
 import { TitleV2 } from './title.v2';
 import { SidebarV2 } from '@gitroom/frontend/components/new-layout/v2/sidebar.v2';
 import { UI_V2_BODY_CLASS } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
-import { LanguageComponent } from '@gitroom/frontend/components/layout/language.component';
+import { LanguageMenuV2 } from './language.v2';
+import { TrialPillV2 } from './topbar.v2';
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
 import { OrganizationSelector } from '@gitroom/frontend/components/layout/organization.selector';
-import { InvoicesComponent } from '@gitroom/frontend/components/layout/invoices.component';
-import { StreakComponent } from '@gitroom/frontend/components/layout/streak.component';
 import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-condition.component';
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
@@ -232,7 +231,7 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
             <InviteError />
             <div
               className={clsx(
-                'flex flex-col min-h-screen min-w-screen text-newTextColor bg-newBgColor mobile:pb-[80px]',
+                'flex flex-col min-h-screen min-w-screen text-newTextColor bg-newBgColor',
                 jakartaSans.className
               )}
             >
@@ -309,24 +308,28 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                           <TitleV2 />
                         </div>
                         {/* wide centered search on desktop, the same quick menu button */}
-                        <div className="flex-1 flex justify-center tablet:flex-none [&>button]:w-[420px] [&>button]:max-w-full tablet:[&>button]:w-auto [&>button]:h-[36px] [&>button]:my-0 [&>button]:border [&>button]:border-newBorder [&>button]:bg-newBgColorInner [&>button>kbd]:ms-auto">
-                          <CommandPalette />
+                        <div className="flex-1 flex justify-center tablet:flex-none">
+                          <CommandPalette
+                            label={t('search_posts_channels', 'Search posts, channels, or jump to…')}
+                            className="flex items-center gap-[8px] w-[440px] max-w-full h-[36px] px-[12px] rounded-[10px] bg-pdSurface border border-pdLine text-pdInk3 hover:text-textItemBlur hover:border-pdLine2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary tablet:w-auto mobile:w-[40px] mobile:h-[40px] mobile:p-0 mobile:justify-center mobile:bg-transparent mobile:border-0 [&>span]:text-[13px] [&>kbd]:ms-auto [&>kbd]:font-sans [&>kbd]:text-[10.5px] [&>kbd]:leading-[16px] [&>kbd]:px-[5px] [&>kbd]:py-0 [&>kbd]:rounded-[5px] [&>kbd]:border [&>kbd]:border-pdLine2 [&>kbd]:bg-pdSurface [&>kbd]:text-textItemBlur [&>svg]:w-[14px] [&>svg]:h-[14px]"
+                          />
                         </div>
-                        <div className="flex gap-[14px] mobile:gap-[4px] items-center text-textItemBlur">
+                        <div className="flex gap-[6px] mobile:gap-[4px] items-center text-textItemBlur">
                           <TopBarMore>
-                            <StreakComponent />
-                            <div className="w-[1px] h-[20px] bg-blockSeparator mobile:hidden" />
+                            <TrialPillV2 />
+                            <div className="w-[1px] h-[20px] bg-pdLine mx-[4px] mobile:hidden" />
                             <OrganizationSelector />
-                            <InvoicesComponent />
-                            <div className="hover:text-newTextColor">
+                            <LanguageMenuV2 />
+                            <div className="flex items-center justify-center w-[32px] h-[32px] mobile:w-auto mobile:h-auto rounded-[8px] hover:bg-pdSurface2 hover:text-newTextColor [&_svg]:w-[18px] [&_svg]:h-[18px]">
                               <ModeComponent />
                             </div>
-                            <div className="w-[1px] h-[20px] bg-blockSeparator mobile:hidden" />
-                            <LanguageComponent />
-                            <div className="w-[1px] h-[20px] bg-blockSeparator mobile:hidden" />
-                            <AttachToFeedbackIcon />
+                            <div className="flex items-center justify-center empty:hidden w-[32px] h-[32px] mobile:w-auto mobile:h-auto rounded-[8px] hover:bg-pdSurface2 hover:text-newTextColor [&_svg]:w-[18px] [&_svg]:h-[18px]">
+                              <AttachToFeedbackIcon />
+                            </div>
                           </TopBarMore>
-                          <NotificationComponent />
+                          <div className="flex items-center justify-center w-[32px] h-[32px] rounded-[8px] hover:bg-pdSurface2 hover:text-newTextColor [&_svg]:max-w-[18px] [&_svg]:max-h-[18px]">
+                            <NotificationComponent />
+                          </div>
                         </div>
                       </header>
                       <main
