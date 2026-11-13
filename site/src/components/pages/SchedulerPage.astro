@@ -36,7 +36,7 @@ const alongside = AVAILABLE_NETWORKS.filter((n) => n.key !== s.key);
 
 const action = s.action || `Schedule ${s.name} Posts`;
 const howTo = `${action.charAt(0).toLowerCase()}${action.slice(1)}`;
-const title = available ? (local?.title ?? c.title(s.name, action)) : soon.title(s.name);
+const title = available ? (local?.title ?? (lang === 'en' ? Astro.props.s.title : undefined) ?? c.title(s.name, action)) : soon.title(s.name);
 const description = s.description || (available ? s.intro : soon.description(s.name, pending, openCount, TRIAL_DAYS));
 
 const faq = available

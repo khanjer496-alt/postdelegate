@@ -7,7 +7,8 @@ import Faq from './Faq.astro';
 import FactCell from './compare/FactCell.astro';
 import PostDelegateFit from './compare/PostDelegateFit.astro';
 import CompareNotes from './compare/CompareNotes.astro';
-import { tool, checkedOn, comparisonJsonLd, formatDate, COST_POINTS, type CostPoint, type Tool } from '../data/tools';
+import { tool, planFor, checkedOn, comparisonJsonLd, formatDate, COST_POINTS, type CostPoint, type Tool } from '../data/tools';
+import { SITE, CTA_LABEL } from '../data/site';
 interface Row { label: string; key: keyof Tool }
 interface Props {
   a: string; b: string; title: string; description: string; h1: string; shortAnswer: string;
@@ -53,6 +54,7 @@ const jsonLd = comparisonJsonLd({ path, title: h1, description, section: { name:
   <p class="ct-updated">Updated <time datetime={modified}>{formatDate(modified)}</time></p>
   <h2>Short answer</h2>
   <p class="short-answer">{shortAnswer}</p>
+  <p class="ct-third">A third option: <a href="/pricing">PostDelegate</a>, from ${planFor(1).monthly} a month, with MCP for AI assistants and an approval step for the posts they draft. <a href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a></p>
   <CompareNotes tools={pair} checked={checked} namesPostiz={namesPostiz} />
 
   <h2>At a glance</h2>
@@ -90,6 +92,7 @@ const jsonLd = comparisonJsonLd({ path, title: h1, description, section: { name:
 </Doc>
 <style>
   .short-answer { padding: 20px 24px; border-left: 3px solid #c8ff4d; border-radius: 0 14px 14px 0; background: #171717; color: #e6e6e6; font-size: 17px; line-height: 1.75; }
+  .ct-third { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 18px 0 8px; padding: 14px 18px; border: 1px solid #4a3d8f; border-radius: 14px; background: #1b1630; color: #e6e6e6; font-size: 15px; line-height: 1.6; }
   .ct-scroll { margin: 22px 0; overflow-x: auto; border: 1px solid #303030; border-radius: 18px; background: #171717; }
   .ct-table { width: 100%; min-width: 36rem; border-collapse: collapse; font-size: 14px; line-height: 1.65; }
   .ct-table thead th { background: #222; color: #fff; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }

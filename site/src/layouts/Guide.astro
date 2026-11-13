@@ -4,12 +4,19 @@ import { GUIDES } from '../data/guides';
 import { SITE, CTA_LABEL, pagePath } from '../data/site';
 import { ogCardFor } from '../data/og-cards.mjs';
 import AppShot from '../components/AppShot.astro';
+import Faq from '../components/Faq.astro';
 // Markdown guides pass { frontmatter }; .astro guides pass the same prop by hand.
 // `shot` is opt-in: the same picture on all eighteen guides is wallpaper, so a
 // guide asks for one only where it shows what that guide is describing.
-interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string; shot?: 'calendar' | 'composer'; shotCaption?: string } }
+// `answer` (optional) replaces the description as the one-sentence lead under the h1, for guides that
+// answer a question. `faq` (optional) renders a visible FAQ after the body and the matching FAQPage JSON-LD.
+// Answers are plain text; [label](/path) links are allowed in the visible FAQ and dropped in the JSON-LD.
+interface Props { frontmatter: { title: string; description: string; metaTitle?: string; date?: string; shot?: 'calendar' | 'composer'; shotCaption?: string; answer?: string; faq?: { q: string; a: string }[] } }
 const { frontmatter } = Astro.props;
-const { title, description, metaTitle, date = '2026-11-01', shot, shotCaption } = frontmatter;
+const { title, description, metaTitle, date = '2026-11-01', shot, shotCaption, answer, faq = [] } = frontmatter;
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const withLinks = (text: string) => escape(text).replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+const plain = (text: string) => text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 const path = pagePath(Astro.url);
 const url = new URL(path, SITE.url).href;
 const more = GUIDES.filter((guide) => `/guides/${guide.slug}` !== path);
@@ -24,12 +31,17 @@ const jsonLd = [
   { '@context': 'https://schema.org', '@type': 'Article', headline: title, description, url, mainEntityOfPage: url, inLanguage: 'en', datePublished: date, dateModified: date,
     ...(card ? { image: { '@type': 'ImageObject', url: new URL(card, SITE.url).href, width: 1200, height: 630 } } : {}),
     author: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url }, publisher: { '@type': 'Organization', name: 'PostDelegate', url: SITE.url } },
+  ...(faq.length ? [{ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((item) => ({ '@type': 'Question', name: item.q, acceptedAnswer: { '@type': 'Answer', text: plain(item.a) } })) }] : []),
 ];
 ---
-<Doc title={metaTitle ?? `${title} | PostDelegate`} description={description} h1={title} eyebrow="Guide" lead={description} jsonLd={jsonLd}>
+<Doc title={metaTitle ?? `${title} | PostDelegate`} description={description} h1={title} eyebrow="Guide" lead={answer ?? description} jsonLd={jsonLd}>
   <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{CTA_LABEL}</a>
   <a slot="actions" href="/guides" class="button button-outline">All guides</a>
   <div class="guide-body"><slot /></div>
+  {faq.length > 0 && <>
+    <h2>Frequently asked questions</h2>
+    <Faq items={faq.map((item) => ({ q: item.q, a: withLinks(item.a) }))} />
+  </>}
   {shot && shotCaption && <AppShot shot={shot} caption={shotCaption} />}
   <h2>More guides</h2>
   <ul>{more.map((guide) => <li><a href={`/guides/${guide.slug}`}>{guide.title}</a></li>)}</ul>

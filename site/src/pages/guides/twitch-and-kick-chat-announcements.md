@@ -1,14 +1,14 @@
 ---
 layout: ../../layouts/Guide.astro
-title: "How to schedule stream announcements to Twitch and Kick chat"
-metaTitle: "Schedule Twitch and Kick Chat Announcements | PostDelegate"
+title: "Twitch chat announcements: how to schedule them on Twitch and Kick"
+metaTitle: "Twitch Chat Announcements: How to Schedule Them | PostDelegate"
 description: "Sign in with Twitch and Kick, then schedule chat messages and highlighted Twitch announcements for stream reminders, schedules and links, from one calendar."
 date: "2026-11-01"
 ---
 
 Streamers repeat themselves a lot in chat: the schedule, the Discord link, the sponsor line, the reminder that the giveaway ends at nine. Typing it by hand in the middle of a stream is a distraction, and chat bots that loop the same line every few minutes can feel like noise. Scheduling those messages for the moments they matter is a quieter middle ground.
 
-This guide shows how to schedule chat messages to Twitch and Kick with PostDelegate, including highlighted Twitch announcements, and how to plan a stream's messages in one go. Both connections are available today.
+This guide shows how to schedule chat messages to Twitch and Kick with PostDelegate, including highlighted Twitch announcements, and how to plan a stream's messages in one go. Both connections are available today. The [Twitch chat message scheduler](/twitch-scheduler) is the short version.
 
 ## What a scheduled chat message is, and is not
 
