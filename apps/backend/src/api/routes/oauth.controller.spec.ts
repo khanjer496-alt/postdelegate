@@ -8,7 +8,7 @@ jest.mock('@gitroom/nestjs-libraries/chat/mcp.relay.service', () => ({
 }));
 
 import 'reflect-metadata';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
@@ -196,6 +196,51 @@ describe('OAuthController over HTTP', () => {
         // and the address bucket is per address
         expect((await post(path, body('nobody-1'), '198.51.100.9')).status).toBe(200);
       } finally {
+        await app.close();
+      }
+    }
+  );
+
+  it.each([
+    ['/oauth/token', refresh],
+    ['/oauth/revoke', revoke],
+  ])(
+    '%s: a 429 writes exactly one log line with the tracker type only',
+    async (path, body) => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      const { app, post } = await start();
+      try {
+        // a registered client: 3 allowed, no line
+        for (let i = 0; i < 3; i++) {
+          expect((await post(path, body('client-a'))).status).toBe(200);
+        }
+        expect(warn).not.toHaveBeenCalled();
+        expect((await post(path, body('client-a'))).status).toBe(429);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenLastCalledWith(
+          `OAuth rate limit hit: path=${path} tracker=client limit=3 ttl=${HOUR}`
+        );
+
+        // an unknown caller from another address: 2 allowed, then one line
+        for (const id of ['nobody-1', 'nobody-2']) {
+          expect((await post(path, body(id), '198.51.100.9')).status).toBe(200);
+        }
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect((await post(path, body('nobody-3'), '198.51.100.9')).status).toBe(429);
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(warn).toHaveBeenLastCalledWith(
+          `OAuth rate limit hit: path=${path} tracker=ip limit=2 ttl=${HOUR}`
+        );
+
+        // never the client id or the address
+        const logged = warn.mock.calls.map((c) => String(c[0])).join('\n');
+        for (const secret of ['client-a', 'nobody', '203.0.113.7', '198.51.100.9']) {
+          expect(logged).not.toContain(secret);
+        }
+      } finally {
+        warn.mockRestore();
         await app.close();
       }
     }

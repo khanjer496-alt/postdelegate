@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import {
   InjectThrottlerOptions,
   InjectThrottlerStorage,
   ThrottlerGuard,
+  ThrottlerLimitDetail,
   ThrottlerModuleOptions,
   ThrottlerRequest,
   ThrottlerStorage,
@@ -21,6 +22,8 @@ import {
 // only, with the lower limit (see RATE_LIMITS)
 @Injectable()
 export class ThrottlerOAuthClientGuard extends ThrottlerGuard {
+  private readonly _logger = new Logger(ThrottlerOAuthClientGuard.name);
+
   constructor(
     @InjectThrottlerOptions() options: ThrottlerModuleOptions,
     @InjectThrottlerStorage() storageService: ThrottlerStorage,
@@ -62,5 +65,22 @@ export class ThrottlerOAuthClientGuard extends ThrottlerGuard {
       getTracker: () =>
         clientId ? `client_${clientId}_${ip}` : `ip_${ip}`,
     });
+  }
+
+  // one line per refused request, so a production watch can tell a partner
+  // client from an unknown caller: only the tracker type, never the
+  // client_id, the address or the hashed key
+  protected override async throwThrottlingException(
+    context: ExecutionContext,
+    throttlerLimitDetail: ThrottlerLimitDetail
+  ): Promise<void> {
+    const { req } = this.getRequestResponse(context);
+    const tracker = throttlerLimitDetail.tracker.startsWith('client_')
+      ? 'client'
+      : 'ip';
+    this._logger.warn(
+      `OAuth rate limit hit: path=${req.route?.path || req.path} tracker=${tracker} limit=${throttlerLimitDetail.limit} ttl=${throttlerLimitDetail.ttl}`
+    );
+    return super.throwThrottlingException(context, throttlerLimitDetail);
   }
 }

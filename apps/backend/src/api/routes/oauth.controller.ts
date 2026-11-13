@@ -197,8 +197,8 @@ export class OAuthController {
   }
 
   // RFC 7009 token revocation, for the client that holds the token (people
-  // revoke from Settings > Approved apps). 200 with an empty body whether or
-  // not the token existed. Capped like /token
+  // revoke from Settings > Approved apps). 200 with an empty JSON object ({})
+  // whether or not the token existed. Capped like /token
   @UseGuards(ThrottlerOAuthClientGuard)
   @Throttle({
     default: { limit: RATE_LIMITS.oauthClient, ttl: RATE_LIMITS.ttl },
