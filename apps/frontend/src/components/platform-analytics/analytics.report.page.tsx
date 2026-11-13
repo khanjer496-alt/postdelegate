@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useEffect } from 'react';
+import React, { FC, useCallback, useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
@@ -23,6 +23,7 @@ import {
   InsightsData,
   useInsightLabels,
 } from '@gitroom/frontend/components/platform-analytics/analytics.insights';
+import { reportColors } from '@gitroom/frontend/components/features/report-templates/report.templates';
 
 interface ReportPost {
   id: string;
@@ -38,7 +39,14 @@ interface ReportPost {
 }
 
 interface ReportData {
-  brand: { name: string; logoUrl: string | null };
+  brand: {
+    name: string;
+    logoUrl: string | null;
+    // report template (PD_FF_REPORT_TEMPLATES); null keeps the default look
+    color?: string | null;
+    accent?: string | null;
+    template?: string | null;
+  };
   from: string;
   to: string;
   generatedAt: string;
@@ -129,7 +137,9 @@ const InsightTable: FC<{
       <tbody>
         {groups.map((group) => (
           <tr key={group.key} className="border-b border-[#f0eff5]">
-            <td className="py-[4px] pe-[8px]">{labels[group.key] || group.label}</td>
+            <td className="py-[4px] pe-[8px]">
+              {labels[group.key] || group.label}
+            </td>
             <td className="py-[4px] text-end tabular-nums">{group.posts}</td>
             <td className="py-[4px] text-end tabular-nums">
               {value(group.avgEngagement)}
@@ -167,9 +177,33 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
     views: t('analytics_compare_views', 'Views'),
   };
 
+  // the saved template and colors; the default look adds no styles
+  const look = useMemo(() => {
+    const colors = reportColors(data?.brand);
+    if (
+      !data ||
+      (!colors.color && !colors.accent && colors.template === 'classic')
+    ) {
+      return null;
+    }
+    const color = colors.color || '#5b3fe6';
+    const accent = colors.accent || color;
+    const scope = `article[data-report-template="${colors.template}"]`;
+    const css = [
+      `${scope} { -webkit-print-color-adjust: exact; print-color-adjust: exact; }`,
+      colors.template === 'bold'
+        ? `${scope} .pd-report-header { background: ${color}; color: ${colors.textOnColor}; border-radius: 12px; padding: 24px; } ${scope} .pd-report-header p { color: ${colors.textOnColor}; opacity: .85; } ${scope} h2 { border-bottom: 3px solid ${accent}; }`
+        : colors.template === 'minimal'
+        ? `${scope} .pd-report-header { border-inline-start: 4px solid ${color}; padding-inline-start: 16px; } ${scope} h2 { border-bottom-color: #f0eff5; font-weight: 600; }`
+        : `${scope} .pd-report-header { border-bottom: 4px solid ${color}; padding-bottom: 16px; } ${scope} h2 { border-bottom: 2px solid ${accent}; }`,
+    ].join(' ');
+    return { template: colors.template, css };
+  }, [data]);
+
   return (
     <div className="min-h-screen bg-[#ececf2] print:bg-white text-[#111118] py-[24px] print:py-0 px-[16px] print:px-0">
       <style>{`@page { size: A4; margin: 14mm; } @media print { html, body { background: #fff !important; } }`}</style>
+      {!!look && <style>{look.css}</style>}
       <div className="max-w-[860px] mx-auto flex items-center gap-[10px] mb-[16px] print:hidden">
         <Link
           href="/analytics"
@@ -188,7 +222,10 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
         </button>
       </div>
 
-      <article className="max-w-[860px] mx-auto bg-white rounded-[16px] print:rounded-none shadow-[0_1px_3px_rgba(0,0,0,0.08)] print:shadow-none p-[40px] mobile:p-[20px] print:p-0 flex flex-col gap-[28px]">
+      <article
+        data-report-template={look?.template}
+        className="max-w-[860px] mx-auto bg-white rounded-[16px] print:rounded-none shadow-[0_1px_3px_rgba(0,0,0,0.08)] print:shadow-none p-[40px] mobile:p-[20px] print:p-0 flex flex-col gap-[28px]"
+      >
         {!from || !to ? (
           <p className="text-[14px]">
             {t(
@@ -219,7 +256,7 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
           </div>
         ) : (
           <>
-            <header className="flex items-center gap-[16px] flex-wrap">
+            <header className="pd-report-header flex items-center gap-[16px] flex-wrap">
               {!!data.brand.logoUrl && (
                 <img
                   src={data.brand.logoUrl}
@@ -264,10 +301,14 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                     >
                       {item.change === null
                         ? t('analytics_report_no_previous', 'No earlier data')
-                        : t('analytics_report_change', '{{sign}}{{change}}% vs previous period', {
-                            sign: item.change >= 0 ? '+' : '−',
-                            change: Math.abs(item.change),
-                          })}
+                        : t(
+                            'analytics_report_change',
+                            '{{sign}}{{change}}% vs previous period',
+                            {
+                              sign: item.change >= 0 ? '+' : '−',
+                              change: Math.abs(item.change),
+                            }
+                          )}
                     </dd>
                   </div>
                 ))}
@@ -282,25 +323,40 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                     height={160}
                     dates={data.trends.followers.dates}
                     values={data.trends.followers.total}
-                    label={t('analytics_trends_total_followers', 'Total followers')}
+                    label={t(
+                      'analytics_trends_total_followers',
+                      'Total followers'
+                    )}
                   />
                   <table className="w-full text-[12px]">
                     <thead>
                       <tr className="text-[#6b6b78] border-b border-[#e7e5ef]">
-                        <th scope="col" className="text-start font-[500] py-[4px]">
+                        <th
+                          scope="col"
+                          className="text-start font-[500] py-[4px]"
+                        >
                           {t('analytics_report_channel', 'Channel')}
                         </th>
-                        <th scope="col" className="text-end font-[500] py-[4px]">
+                        <th
+                          scope="col"
+                          className="text-end font-[500] py-[4px]"
+                        >
                           {t('analytics_report_followers', 'Followers')}
                         </th>
-                        <th scope="col" className="text-end font-[500] py-[4px]">
+                        <th
+                          scope="col"
+                          className="text-end font-[500] py-[4px]"
+                        >
                           {t('analytics_report_gained', 'Gained')}
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.trends.followers.channels.map((channel) => (
-                        <tr key={channel.id} className="border-b border-[#f0eff5]">
+                        <tr
+                          key={channel.id}
+                          className="border-b border-[#f0eff5]"
+                        >
                           <td className="py-[4px]">{channel.name}</td>
                           <td className="py-[4px] text-end tabular-nums">
                             {value(channel.current)}
@@ -308,9 +364,9 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                           <td className="py-[4px] text-end tabular-nums">
                             {channel.gained === null
                               ? '–'
-                              : `${channel.gained >= 0 ? '+' : '−'}${formatNumber(
-                                  Math.abs(channel.gained)
-                                )}`}
+                              : `${
+                                  channel.gained >= 0 ? '+' : '−'
+                                }${formatNumber(Math.abs(channel.gained))}`}
                           </td>
                         </tr>
                       ))}
@@ -332,7 +388,10 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="text-[#6b6b78] border-b border-[#e7e5ef]">
-                      <th scope="col" className="text-start font-[500] py-[4px]">
+                      <th
+                        scope="col"
+                        className="text-start font-[500] py-[4px]"
+                      >
                         {t('analytics_top_posts_post', 'Post')}
                       </th>
                       <th scope="col" className="text-end font-[500] py-[4px]">
@@ -354,17 +413,29 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                   </thead>
                   <tbody>
                     {data.topPosts.map((post) => (
-                      <tr key={post.id} className="border-b border-[#f0eff5] align-top break-inside-avoid">
+                      <tr
+                        key={post.id}
+                        className="border-b border-[#f0eff5] align-top break-inside-avoid"
+                      >
                         <td className="py-[6px] pe-[8px]">
                           <div className="line-clamp-2">
                             {isWebUrl(post.url) ? (
-                              <a href={post.url} className="text-[#111118] underline decoration-[#d9d7e3]">
+                              <a
+                                href={post.url}
+                                className="text-[#111118] underline decoration-[#d9d7e3]"
+                              >
                                 {post.title ||
-                                  t('analytics_top_posts_untitled', 'Post without text')}
+                                  t(
+                                    'analytics_top_posts_untitled',
+                                    'Post without text'
+                                  )}
                               </a>
                             ) : (
                               post.title ||
-                              t('analytics_top_posts_untitled', 'Post without text')
+                              t(
+                                'analytics_top_posts_untitled',
+                                'Post without text'
+                              )
                             )}
                           </div>
                           <div className="text-[11px] text-[#6b6b78]">
@@ -372,10 +443,18 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                             {dayjs(post.publishedAt).format('MMM D, YYYY')}
                           </div>
                         </td>
-                        <td className="py-[6px] text-end tabular-nums">{value(post.views)}</td>
-                        <td className="py-[6px] text-end tabular-nums">{value(post.likes)}</td>
-                        <td className="py-[6px] text-end tabular-nums">{value(post.comments)}</td>
-                        <td className="py-[6px] text-end tabular-nums">{value(post.shares)}</td>
+                        <td className="py-[6px] text-end tabular-nums">
+                          {value(post.views)}
+                        </td>
+                        <td className="py-[6px] text-end tabular-nums">
+                          {value(post.likes)}
+                        </td>
+                        <td className="py-[6px] text-end tabular-nums">
+                          {value(post.comments)}
+                        </td>
+                        <td className="py-[6px] text-end tabular-nums">
+                          {value(post.shares)}
+                        </td>
                         <td className="py-[6px] text-end tabular-nums font-[600]">
                           {value(post.engagement)}
                         </td>
@@ -393,7 +472,9 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
               )}
             </Section>
 
-            <Section title={t('analytics_overview_best_times', 'Best days and hours')}>
+            <Section
+              title={t('analytics_overview_best_times', 'Best days and hours')}
+            >
               {data.bestTimes.basis === 'engagement' ? (
                 <div className="grid grid-cols-2 gap-[12px] text-[13px]">
                   <div>
@@ -402,7 +483,13 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                     </p>
                     <p className="font-[600]">
                       {data.bestTimes.bestDays
-                        .map((d) => `${weekdayName(d.weekday, 'dddd')} (${d.score.toFixed(1)}×)`)
+                        .map(
+                          (d) =>
+                            `${weekdayName(
+                              d.weekday,
+                              'dddd'
+                            )} (${d.score.toFixed(1)}×)`
+                        )
                         .join(', ') || '–'}
                     </p>
                   </div>
@@ -412,7 +499,9 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                     </p>
                     <p className="font-[600]">
                       {data.bestTimes.bestHours
-                        .map((h) => `${hourName(h.hour)} (${h.score.toFixed(1)}×)`)
+                        .map(
+                          (h) => `${hourName(h.hour)} (${h.score.toFixed(1)}×)`
+                        )
                         .join(', ') || '–'}
                     </p>
                   </div>
@@ -420,7 +509,10 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                     {t(
                       'analytics_best_times_engagement_note',
                       'Based on {{count}} posts with engagement data. 1× is a typical post on its channel. Times are in {{timezone}}.',
-                      { count: data.bestTimes.posts, timezone: data.bestTimes.timezone }
+                      {
+                        count: data.bestTimes.posts,
+                        timezone: data.bestTimes.timezone,
+                      }
                     )}
                   </p>
                 </div>
@@ -429,14 +521,19 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                   {t(
                     'analytics_report_best_times_thin',
                     'Not enough posts with engagement data in this range yet ({{count}} of {{required}} needed).',
-                    { count: data.bestTimes.posts, required: data.bestTimes.required }
+                    {
+                      count: data.bestTimes.posts,
+                      required: data.bestTimes.required,
+                    }
                   )}
                 </p>
               )}
             </Section>
 
             {!!data.insights.posts && (
-              <Section title={t('analytics_report_insights', 'Content insights')}>
+              <Section
+                title={t('analytics_report_insights', 'Content insights')}
+              >
                 <p className="text-[12px] text-[#6b6b78]">
                   {t(
                     'analytics_report_insights_note',
@@ -446,7 +543,10 @@ export const AnalyticsReportPage: FC<{ from: string; to: string }> = ({
                 </p>
                 <div className="grid grid-cols-2 mobile:grid-cols-1 gap-[20px]">
                   <InsightTable
-                    title={t('analytics_insights_content_type', 'By content type')}
+                    title={t(
+                      'analytics_insights_content_type',
+                      'By content type'
+                    )}
                     groups={data.insights.contentTypes}
                     labels={labels.contentTypes}
                   />

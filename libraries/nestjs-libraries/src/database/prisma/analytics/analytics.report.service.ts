@@ -15,6 +15,11 @@ import {
 } from '@gitroom/nestjs-libraries/services/email.service';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import {
+  buildReportPptx,
+  normalizeHexColor,
+  normalizeTemplate,
+} from '@gitroom/nestjs-libraries/database/prisma/analytics/report.pptx';
 
 dayjs.extend(utc);
 
@@ -41,6 +46,10 @@ export interface AnalyticsReportSettingsInput {
   recipients: string[];
   brandName?: string | null;
   logoUrl?: string | null;
+  // left out: kept as they are, so the older settings form doesn't clear them
+  brandColor?: string | null;
+  accentColor?: string | null;
+  template?: string | null;
 }
 
 @Injectable()
@@ -89,6 +98,9 @@ export class AnalyticsReportService {
       ),
       brandName: settings?.brandName || null,
       logoUrl: settings?.logoUrl || null,
+      brandColor: normalizeHexColor(settings?.brandColor),
+      accentColor: normalizeHexColor(settings?.accentColor),
+      template: normalizeTemplate(settings?.template),
       lastSentAt: settings?.lastSentAt || null,
       workspaceName: organization?.name || '',
       emailAvailable: this._emailService.hasProvider(),
@@ -109,10 +121,9 @@ export class AnalyticsReportService {
     now = new Date()
   ) {
     // only real, active members of this workspace can be recipients
-    const members = await this._analyticsRepository.getReportMembers(
-      orgId,
-      [...new Set(body.recipients || [])]
-    );
+    const members = await this._analyticsRepository.getReportMembers(orgId, [
+      ...new Set(body.recipients || []),
+    ]);
     const current = await this._analyticsRepository.getReportSettings(orgId);
     const changedSchedule =
       body.frequency !== AnalyticsReportFrequency.OFF &&
@@ -123,6 +134,15 @@ export class AnalyticsReportService {
       recipients: members.map((member) => member.user.id),
       brandName: body.brandName?.trim() || null,
       logoUrl: body.logoUrl?.trim() || null,
+      ...(body.brandColor !== undefined
+        ? { brandColor: normalizeHexColor(body.brandColor) }
+        : {}),
+      ...(body.accentColor !== undefined
+        ? { accentColor: normalizeHexColor(body.accentColor) }
+        : {}),
+      ...(body.template !== undefined
+        ? { template: normalizeTemplate(body.template) }
+        : {}),
       // a new schedule starts with the next full week or month, not a report
       // of the period that is already half over
       ...(changedSchedule ? { lastSentAt: now } : {}),
@@ -131,12 +151,7 @@ export class AnalyticsReportService {
   }
 
   // Everything the white-label report and the email show for one date range
-  async getReportData(
-    orgId: string,
-    from: Date,
-    to: Date,
-    timezone = 'UTC'
-  ) {
+  async getReportData(orgId: string, from: Date, to: Date, timezone = 'UTC') {
     const [organization, settings, trends, topPosts, insights, bestTimes] =
       await Promise.all([
         this._analyticsRepository.getOrganizationName(orgId),
@@ -155,6 +170,9 @@ export class AnalyticsReportService {
       brand: {
         name: settings?.brandName || organization?.name || '',
         logoUrl: settings?.logoUrl || null,
+        color: normalizeHexColor(settings?.brandColor),
+        accent: normalizeHexColor(settings?.accentColor),
+        template: normalizeTemplate(settings?.template),
       },
       from: trends.from,
       to: trends.to,
@@ -191,6 +209,53 @@ export class AnalyticsReportService {
       (end.isAfter(now) ? now : end).toDate(),
       timezone
     );
+  }
+
+  // The report as a PowerPoint deck, in the report template's colors
+  async getReportPptx(
+    orgId: string,
+    from: string,
+    to: string,
+    timezone = 'UTC'
+  ) {
+    const data = await this.getReportDataForRange(orgId, from, to, timezone);
+    const file = buildReportPptx(this.pptxInput(data));
+    const slug =
+      (data.brand.name || 'report')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'report';
+    return {
+      file,
+      filename: `${slug}-${dayjs.utc(data.from).format('YYYY-MM-DD')}-${dayjs
+        .utc(data.to)
+        .format('YYYY-MM-DD')}.pptx`,
+    };
+  }
+
+  pptxInput(
+    data: Awaited<ReturnType<AnalyticsReportService['getReportData']>>
+  ) {
+    return {
+      brand: {
+        name: data.brand.name,
+        color: data.brand.color,
+        accent: data.brand.accent,
+        template: data.brand.template,
+      },
+      from: data.from,
+      to: data.to,
+      comparison: data.trends.comparison,
+      topPosts: data.topPosts,
+      bestTimes: data.bestTimes,
+      insights: data.insights,
+      channels: data.trends.followers.channels.map((channel) => ({
+        name: channel.name,
+        current: channel.current,
+        gained: channel.gained,
+      })),
+    };
   }
 
   // The previous full week (Monday to Sunday) or month, in UTC
@@ -363,9 +428,11 @@ export class AnalyticsReportService {
         const change =
           item.change === null
             ? '<span class="pd-muted" style="color:#7a7a88">No earlier data</span>'
-            : `<span style="color:${item.change >= 0 ? '#356b00' : '#b42318'}">${
-                item.change >= 0 ? '▲' : '▼'
-              } ${Math.abs(item.change)}%</span>`;
+            : `<span style="color:${
+                item.change >= 0 ? '#356b00' : '#b42318'
+              }">${item.change >= 0 ? '▲' : '▼'} ${Math.abs(
+                item.change
+              )}%</span>`;
         return `<td valign="top" width="50%" style="padding:6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="pd-item" style="background:#f7f6fb;border:1px solid #e7e5ef;border-radius:12px;border-collapse:separate"><tr><td style="padding:12px 14px;font-family:${FONT}"><div class="pd-muted" style="font-size:12px;color:#7a7a88">${escape(
           COMPARISON_LABELS[item.key]
         )}</div><div class="pd-text" style="font-size:22px;font-weight:700;color:#0d0d0d;margin-top:2px">${formatNumber(
@@ -386,9 +453,7 @@ export class AnalyticsReportService {
     const posts = data.topPosts
       .slice(0, EMAIL_TOP_POSTS)
       .map((post: TopPostRow) => {
-        const title = escape(
-          (post.title || 'Untitled post').slice(0, 120)
-        );
+        const title = escape((post.title || 'Untitled post').slice(0, 120));
         const link =
           post.url && /^https?:\/\//i.test(post.url)
             ? `<a href="${escape(post.url)}" target="_blank">${title}</a>`

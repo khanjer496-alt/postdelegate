@@ -18,6 +18,11 @@ import {
   Skeleton,
   useCsvDownload,
 } from '@gitroom/frontend/components/platform-analytics/analytics.ui';
+import { useFeature } from '@gitroom/frontend/components/features/feature.flags.client';
+import {
+  REPORT_TEMPLATE_OPTIONS,
+  ReportTemplateId,
+} from '@gitroom/frontend/components/features/report-templates/report.templates';
 
 type Frequency = 'OFF' | 'WEEKLY' | 'MONTHLY';
 
@@ -26,6 +31,9 @@ interface ReportSettings {
   recipients: string[];
   brandName: string | null;
   logoUrl: string | null;
+  brandColor?: string | null;
+  accentColor?: string | null;
+  template?: ReportTemplateId | null;
   lastSentAt: string | null;
   workspaceName: string;
   emailAvailable: boolean;
@@ -139,6 +147,9 @@ const ExportCard: FC<{ days: Range }> = ({ days }) => {
 
 const PdfCard: FC<{ allowed: boolean }> = ({ allowed }) => {
   const t = useT();
+  const templates = useFeature('report_templates');
+  const download = useCsvDownload();
+  const [downloading, setDownloading] = useState(false);
   const fromId = useId();
   const toId = useId();
   const today = dayjs().format('YYYY-MM-DD');
@@ -192,9 +203,7 @@ const PdfCard: FC<{ allowed: boolean }> = ({ allowed }) => {
           <div className="flex items-center gap-[12px] flex-wrap">
             <a
               href={
-                valid
-                  ? `/analytics-report?from=${from}&to=${to}`
-                  : undefined
+                valid ? `/analytics-report?from=${from}&to=${to}` : undefined
               }
               aria-disabled={!valid}
               target="_blank"
@@ -206,6 +215,27 @@ const PdfCard: FC<{ allowed: boolean }> = ({ allowed }) => {
             >
               {t('analytics_reports_open', 'Open printable report')}
             </a>
+            {templates && (
+              <button
+                type="button"
+                disabled={!valid || downloading}
+                onClick={async () => {
+                  setDownloading(true);
+                  await download(
+                    `/analytics/reports/pptx?from=${from}&to=${to}&timezone=${encodeURIComponent(
+                      Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+                    )}`,
+                    `report-${from}-${to}.pptx`
+                  );
+                  setDownloading(false);
+                }}
+                className={clsx(secondaryButton, 'h-[40px]')}
+              >
+                {downloading
+                  ? t('analytics_reports_pptx_loading', 'Preparing…')
+                  : t('analytics_reports_pptx', 'Download PowerPoint')}
+              </button>
+            )}
             <p className="text-[12px] text-newTableText flex-1 min-w-[200px]">
               {t(
                 'analytics_reports_pdf_note',
@@ -216,6 +246,163 @@ const PdfCard: FC<{ allowed: boolean }> = ({ allowed }) => {
         </>
       )}
     </Card>
+  );
+};
+
+const ColorField: FC<{
+  label: string;
+  value: string;
+  fallback: string;
+  onChange: (value: string) => void;
+}> = ({ label, value, fallback, onChange }) => {
+  const t = useT();
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-[6px]">
+      <label htmlFor={id} className="text-[12px] text-newTableText">
+        {label}
+      </label>
+      <div className="flex gap-[8px] items-center">
+        <input
+          type="color"
+          aria-label={label}
+          value={value || fallback}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-[40px] w-[48px] shrink-0 rounded-[8px] border border-newTableBorder bg-newBgColorInner p-[4px] cursor-pointer"
+        />
+        <input
+          id={id}
+          value={value}
+          placeholder={fallback}
+          maxLength={7}
+          onChange={(e) => {
+            const next = e.target.value.trim();
+            onChange(next && !next.startsWith('#') ? `#${next}` : next);
+          }}
+          className={inputClass}
+        />
+        {!!value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className={clsx(secondaryButton, 'shrink-0 h-[40px]')}
+          >
+            {t('analytics_reports_color_reset', 'Default')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Template and brand colors of the PDF and PowerPoint report
+// (PD_FF_REPORT_TEMPLATES)
+const ReportTemplatePicker: FC<{
+  template: ReportTemplateId;
+  brandColor: string;
+  accentColor: string;
+  brandName: string;
+  onTemplate: (value: ReportTemplateId) => void;
+  onBrandColor: (value: string) => void;
+  onAccentColor: (value: string) => void;
+}> = (props) => {
+  const t = useT();
+  const color = /^#[0-9a-f]{6}$/i.test(props.brandColor)
+    ? props.brandColor
+    : '#7357ff';
+  const accent = /^#[0-9a-f]{6}$/i.test(props.accentColor)
+    ? props.accentColor
+    : '#c8ff4d';
+  return (
+    <fieldset className="flex flex-col gap-[10px]">
+      <legend className="text-[12px] text-newTableText mb-[6px]">
+        {t('analytics_reports_template', 'Report template')}
+      </legend>
+      <div
+        role="radiogroup"
+        className="grid grid-cols-3 mobile:grid-cols-1 gap-[10px]"
+      >
+        {REPORT_TEMPLATE_OPTIONS.map((option) => {
+          const selected = option.id === props.template;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => props.onTemplate(option.id)}
+              className={clsx(
+                'text-start rounded-[10px] border p-[8px] flex flex-col gap-[8px] outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+                selected
+                  ? 'border-btnPrimary bg-newBgColorInner'
+                  : 'border-newTableBorder'
+              )}
+            >
+              {/* a small cover slide in this template */}
+              <div
+                aria-hidden
+                className="aspect-[16/9] w-full rounded-[6px] overflow-hidden relative border border-newTableBorder"
+                style={{
+                  background: option.id === 'minimal' ? '#ffffff' : color,
+                }}
+              >
+                {option.id === 'minimal' && (
+                  <div
+                    className="absolute start-[8%] top-[22%] h-[44%] w-[2%]"
+                    style={{ background: color }}
+                  />
+                )}
+                <div
+                  className="absolute start-[14%] top-[30%] text-[11px] font-[700] truncate max-w-[80%]"
+                  style={{
+                    color: option.id === 'minimal' ? '#111118' : '#ffffff',
+                  }}
+                >
+                  {props.brandName}
+                </div>
+                {option.id !== 'minimal' && (
+                  <div
+                    className="absolute start-[8%] bottom-[22%] h-[4px] w-[18%]"
+                    style={{ background: accent }}
+                  />
+                )}
+              </div>
+              <div>
+                <div className="text-[13px] font-[600] text-newTextColor">
+                  {t(`analytics_reports_template_${option.id}`, option.label)}
+                </div>
+                <div className="text-[11px] text-newTableText">
+                  {t(
+                    `analytics_reports_template_${option.id}_hint`,
+                    option.hint
+                  )}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 tablet:grid-cols-1 gap-[12px]">
+        <ColorField
+          label={t('analytics_reports_brand_color', 'Brand color')}
+          value={props.brandColor}
+          fallback="#7357ff"
+          onChange={props.onBrandColor}
+        />
+        <ColorField
+          label={t('analytics_reports_accent_color', 'Accent color')}
+          value={props.accentColor}
+          fallback="#c8ff4d"
+          onChange={props.onAccentColor}
+        />
+      </div>
+      <p className="text-[12px] text-newTableText">
+        {t(
+          'analytics_reports_template_note',
+          'Used by the printable PDF report and the PowerPoint download.'
+        )}
+      </p>
+    </fieldset>
   );
 };
 
@@ -230,6 +417,10 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
   const [recipients, setRecipients] = useState<string[]>([]);
   const [brandName, setBrandName] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const templates = useFeature('report_templates');
+  const [template, setTemplate] = useState<ReportTemplateId>('classic');
+  const [brandColor, setBrandColor] = useState('');
+  const [accentColor, setAccentColor] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
@@ -241,6 +432,9 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
     setRecipients(data.recipients);
     setBrandName(data.brandName || '');
     setLogoUrl(data.logoUrl || '');
+    setTemplate(data.template || 'classic');
+    setBrandColor(data.brandColor || '');
+    setAccentColor(data.accentColor || '');
   }, [data]);
 
   const save = useCallback(async () => {
@@ -260,13 +454,24 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
           recipients,
           brandName: brandName.trim() || null,
           logoUrl: logoUrl.trim() || null,
+          // only with the template flag, so the older form keeps saved colors
+          ...(templates
+            ? {
+                template,
+                brandColor: brandColor || null,
+                accentColor: accentColor || null,
+              }
+            : {}),
         }),
       });
       if (!response.ok) {
         throw new Error('save');
       }
       await mutate(await response.json(), { revalidate: false });
-      toaster.show(t('analytics_reports_saved', 'Report settings saved'), 'success');
+      toaster.show(
+        t('analytics_reports_saved', 'Report settings saved'),
+        'success'
+      );
     } catch (err) {
       toaster.show(
         t(
@@ -277,24 +482,47 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
       );
     }
     setSaving(false);
-  }, [frequency, recipients, brandName, logoUrl]);
+  }, [
+    frequency,
+    recipients,
+    brandName,
+    logoUrl,
+    templates,
+    template,
+    brandColor,
+    accentColor,
+  ]);
 
   const sendTest = useCallback(async () => {
     setTesting(true);
     try {
-      const response = await fetch('/analytics/reports/test', { method: 'POST' });
+      const response = await fetch('/analytics/reports/test', {
+        method: 'POST',
+      });
       const result = response.ok ? await response.json() : null;
       toaster.show(
         result?.sent
-          ? t('analytics_reports_test_sent', 'A sample report is on its way to your inbox')
+          ? t(
+              'analytics_reports_test_sent',
+              'A sample report is on its way to your inbox'
+            )
           : result?.reason === 'too_soon'
-          ? t('analytics_reports_test_wait', 'A sample was sent a moment ago. Try again in a few minutes.')
-          : t('analytics_reports_test_failed', 'The sample report could not be sent.'),
+          ? t(
+              'analytics_reports_test_wait',
+              'A sample was sent a moment ago. Try again in a few minutes.'
+            )
+          : t(
+              'analytics_reports_test_failed',
+              'The sample report could not be sent.'
+            ),
         result?.sent ? 'success' : 'warning'
       );
     } catch (err) {
       toaster.show(
-        t('analytics_reports_test_failed', 'The sample report could not be sent.'),
+        t(
+          'analytics_reports_test_failed',
+          'The sample report could not be sent.'
+        ),
         'warning'
       );
     }
@@ -303,8 +531,14 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
 
   const frequencies: Array<{ value: Frequency; label: string }> = [
     { value: 'OFF', label: t('analytics_reports_off', 'Off') },
-    { value: 'WEEKLY', label: t('analytics_reports_weekly', 'Weekly, on Mondays') },
-    { value: 'MONTHLY', label: t('analytics_reports_monthly', 'Monthly, on the 1st') },
+    {
+      value: 'WEEKLY',
+      label: t('analytics_reports_weekly', 'Weekly, on Mondays'),
+    },
+    {
+      value: 'MONTHLY',
+      label: t('analytics_reports_monthly', 'Monthly, on the 1st'),
+    },
   ];
 
   return (
@@ -394,7 +628,9 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
                       />
                       <span className="truncate">
                         {member.name ? `${member.name} · ` : ''}
-                        <span className="text-newTableText">{member.email}</span>
+                        <span className="text-newTableText">
+                          {member.email}
+                        </span>
                       </span>
                     </label>
                   </li>
@@ -405,7 +641,10 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
 
           <div className="grid grid-cols-2 tablet:grid-cols-1 gap-[12px]">
             <div className="flex flex-col gap-[6px]">
-              <label htmlFor={brandId} className="text-[12px] text-newTableText">
+              <label
+                htmlFor={brandId}
+                className="text-[12px] text-newTableText"
+              >
                 {t('analytics_reports_brand_name', 'Name on the report')}
               </label>
               <input
@@ -439,7 +678,9 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
                 />
                 <button
                   type="button"
-                  onClick={() => showMediaBox((media) => setLogoUrl(media.path))}
+                  onClick={() =>
+                    showMediaBox((media) => setLogoUrl(media.path))
+                  }
                   className={clsx(secondaryButton, 'shrink-0 h-[40px]')}
                 >
                   {t('analytics_reports_choose_logo', 'Choose')}
@@ -447,6 +688,18 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
               </div>
             </div>
           </div>
+
+          {templates && (
+            <ReportTemplatePicker
+              template={template}
+              brandColor={brandColor}
+              accentColor={accentColor}
+              brandName={brandName || data.workspaceName}
+              onTemplate={setTemplate}
+              onBrandColor={setBrandColor}
+              onAccentColor={setAccentColor}
+            />
+          )}
 
           <div className="flex items-center gap-[10px] flex-wrap">
             <Button type="submit" loading={saving} className="rounded-[8px]">
@@ -462,9 +715,13 @@ const ScheduleCard: FC<{ allowed: boolean }> = ({ allowed }) => {
             </button>
             {!!data.lastSentAt && data.frequency !== 'OFF' && (
               <span className="text-[12px] text-newTableText">
-                {t('analytics_reports_last_sent', 'Schedule updated or last sent {{date}}', {
-                  date: dayjs(data.lastSentAt).format('MMM D, YYYY'),
-                })}
+                {t(
+                  'analytics_reports_last_sent',
+                  'Schedule updated or last sent {{date}}',
+                  {
+                    date: dayjs(data.lastSentAt).format('MMM D, YYYY'),
+                  }
+                )}
               </span>
             )}
           </div>
