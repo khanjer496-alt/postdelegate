@@ -6,9 +6,13 @@
 set -euo pipefail
 EMAIL="${1:?usage: $0 email}"
 case "$EMAIL" in *"'"*|*'\\'*) echo "invalid email" >&2; exit 2;; esac
-HOST="${PD_HOST:-ubuntu@57.129.186.135}"
+HOST="${PD_HOST:-ubuntu@postdelegate-prod}"
 SSHK="${PD_SSH_KEY:-$HOME/.ssh/postdelegate_prod}"
-ssh -o BatchMode=yes -i "$SSHK" "$HOST" 'sudo docker exec -i postdelegate-postiz-postgres-1 psql -U postiz -d postiz -v ON_ERROR_STOP=1' <<SQL
+# The VPS accepts SSH only over Tailscale (public port 22 is closed by ufw). PD_HOST defaults to the tailnet
+# machine name; the host key is checked against the existing known_hosts entry for the public address
+# (HostKeyAlias). Override PD_HOST / PD_SSH_OPTS for any other setup. Never reopen public port 22 for this.
+read -r -a SSH_OPTS <<< "${PD_SSH_OPTS:--o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes}"
+ssh -o BatchMode=yes "${SSH_OPTS[@]}" -i "$SSHK" "$HOST" 'sudo docker exec -i postdelegate-postiz-postgres-1 psql -U postiz -d postiz -v ON_ERROR_STOP=1' <<SQL
 BEGIN;
 INSERT INTO "Subscription" (id, "organizationId", "subscriptionTier", provider, period, "totalChannels", "isLifetime", "createdAt", "updatedAt")
 SELECT 'owner-comp-' || o.id, o.id, 'ULTIMATE', 'manual', 'YEARLY', 100, true, now(), now()
