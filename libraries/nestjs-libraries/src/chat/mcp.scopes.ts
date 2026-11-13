@@ -6,6 +6,9 @@ const readTools = new Set([
   'mediaListTool', 'mediaStatusTool', 'videoStatusTool', 'generateVideoOptions',
   'videoFunctionTool', 'clippingStatusTool', 'studioTemplatesTool',
   'studioRenderStatusTool', 'uploadWidgetStatusTool',
+  // analytics only read what the networks report
+  'analyticsMetricsTool', 'analyticsTopPostsTool', 'bestTimeToPostTool',
+  'channelAnalyticsTool',
 ]);
 export const requiredMcpScope = (name: string) =>
   readTools.has(name) ? 'mcp:read' : 'mcp:write';

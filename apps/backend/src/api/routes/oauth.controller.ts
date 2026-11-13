@@ -24,6 +24,7 @@ import {
   AuthorizeSelfHostedDto,
 } from '@gitroom/nestjs-libraries/dtos/oauth/authorize-oauth.dto';
 import { TokenExchangeDto } from '@gitroom/nestjs-libraries/dtos/oauth/token-exchange.dto';
+import { RevokeTokenDto } from '@gitroom/nestjs-libraries/dtos/oauth/revoke-token.dto';
 import { RegisterClientDto } from '@gitroom/nestjs-libraries/dtos/oauth/register-client.dto';
 import { HubspotInstallQueryDto } from '@gitroom/nestjs-libraries/dtos/oauth/hubspot-install.dto';
 import { extractBasicCredentials } from '@gitroom/nestjs-libraries/chat/oauth-types';
@@ -146,12 +147,13 @@ export class OAuthController {
     const basic = extractBasicCredentials(authorization);
     const clientId = basic?.clientId || body.client_id;
 
-    // Only HubSpot gets refresh tokens, the service answers every other
-    // client with unsupported_grant_type, as before
+    // HubSpot and dynamically registered MCP clients get refresh tokens, the
+    // service answers every other client with unsupported_grant_type
     if (body.grant_type === 'refresh_token') {
       return this._oauthService.refreshAccessToken(
         clientId,
-        body.refresh_token
+        body.refresh_token,
+        basic?.clientSecret || body.client_secret
       );
     }
 
@@ -175,6 +177,23 @@ export class OAuthController {
       basic?.clientSecret || body.client_secret,
       body.code_verifier,
       body.redirect_uri
+    );
+  }
+
+  // RFC 7009 token revocation, for the client that holds the token (people
+  // revoke from Settings > Approved apps). 200 with an empty body whether or
+  // not the token existed
+  @Post('/revoke')
+  @HttpCode(200)
+  async revoke(
+    @Body() body: RevokeTokenDto,
+    @Headers('authorization') authorization?: string
+  ) {
+    const basic = extractBasicCredentials(authorization);
+    return this._oauthService.revokeToken(
+      basic?.clientId || body.client_id,
+      body.token,
+      basic?.clientSecret || body.client_secret
     );
   }
 

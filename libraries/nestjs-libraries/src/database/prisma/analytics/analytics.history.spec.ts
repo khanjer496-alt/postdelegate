@@ -494,3 +494,37 @@ describe('CSV output', () => {
     ]);
   });
 });
+
+describe('AnalyticsService.bestTimesFor per network (MCP bestTimeToPostTool)', () => {
+  const posts = [
+    { id: 'a', integrationId: 'li-1', publishedAt: new Date('2026-11-02T09:00:00Z'), likes: 10, comments: 0, shares: 0 },
+    { id: 'b', integrationId: 'li-2', publishedAt: new Date('2026-11-03T10:00:00Z'), likes: 10, comments: 0, shares: 0 },
+    { id: 'c', integrationId: 'x-1', publishedAt: new Date('2026-11-04T18:00:00Z'), likes: 10, comments: 0, shares: 0 },
+  ];
+  const build = () => {
+    const made = makeService();
+    made.repository.getOverviewChannels.mockResolvedValue([
+      channel('li-1', { providerIdentifier: 'linkedin' }),
+      channel('li-2', { providerIdentifier: 'linkedin-page' }),
+      channel('x-1', { providerIdentifier: 'x' }),
+    ]);
+    made.repository.getAnalyticsPosts.mockResolvedValue(posts);
+    return made;
+  };
+
+  it('counts only the channels of that network, its page variant included', async () => {
+    const { service } = build();
+    const result = await service.bestTimesFor("org-1", new Date(0), new Date(), 'UTC', {
+      provider: 'LinkedIn',
+    });
+    expect(result.posts).toBe(2);
+  });
+
+  it('can be narrowed to some channels, and covers all of them by default', async () => {
+    const { service } = build();
+    expect(
+      (await service.bestTimesFor("org-1", new Date(0), new Date(), 'UTC', { integrationIds: ['x-1'] })).posts
+    ).toBe(1);
+    expect((await service.bestTimesFor("org-1", new Date(0), new Date(), 'UTC')).posts).toBe(3);
+  });
+});

@@ -333,6 +333,35 @@ export class ApprovalsService {
     return { id: post.id, approvalStatus: 'IN_REVIEW', state: 'DRAFT' };
   }
 
+  // An AI agent (MCP client, in-app agent) asks for a review of a post that
+  // was not published yet: it becomes a draft waiting in the Review inbox and
+  // the approvers are told. Agents can only hold posts, never approve them.
+  // The workspace's channel limit for agents still applies.
+  async submitAsAgent(
+    organizationId: string,
+    postId: string,
+    actor: Extract<ApprovalActor, { type: 'agent' }>
+  ) {
+    const post = await this.getPost(organizationId, postId);
+    await this._approvalPolicyService.assertAgentGuardrails(
+      organizationId,
+      actor,
+      [post.integration.id],
+      { countsTowardLimit: false }
+    );
+    const sent = await this.hold(organizationId, post, {
+      actorType: 'AGENT',
+      actorName: actor.source,
+    });
+    return {
+      id: post.id,
+      approvalStatus: 'IN_REVIEW' as const,
+      state: 'DRAFT' as const,
+      // false: it was already waiting for review, nobody was told again
+      submitted: sent,
+    };
+  }
+
   private async approveAs(
     organizationId: string,
     post: RootPost,

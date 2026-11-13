@@ -23,6 +23,17 @@ import { UploadWidgetStatusTool } from '@gitroom/nestjs-libraries/chat/tools/upl
 import { StudioTemplatesTool } from '@gitroom/nestjs-libraries/chat/tools/studio.templates.tool';
 import { StudioRenderTool } from '@gitroom/nestjs-libraries/chat/tools/studio.render.tool';
 import { StudioRenderStatusTool } from '@gitroom/nestjs-libraries/chat/tools/studio.render.status.tool';
+import {
+  CreatePostForReviewTool,
+  SendPostForReviewTool,
+} from '@gitroom/nestjs-libraries/chat/tools/post.review.tool';
+import { PostUpdateTool } from '@gitroom/nestjs-libraries/chat/tools/post.update.tool';
+import {
+  AnalyticsMetricsTool,
+  AnalyticsTopPostsTool,
+  BestTimeToPostTool,
+  ChannelAnalyticsTool,
+} from '@gitroom/nestjs-libraries/chat/tools/analytics.tools';
 import { StudioCancelTool } from '@gitroom/nestjs-libraries/chat/tools/studio.cancel.tool';
 
 export const toolList = [
@@ -33,7 +44,14 @@ export const toolList = [
   IntegrationSchedulePostTool,
   PostsListTool,
   PostSettingsTool,
+  PostUpdateTool,
+  CreatePostForReviewTool,
+  SendPostForReviewTool,
   DeletePostTool,
+  AnalyticsMetricsTool,
+  AnalyticsTopPostsTool,
+  BestTimeToPostTool,
+  ChannelAnalyticsTool,
   GenerateVideoOptionsTool,
   VideoFunctionTool,
   GenerateVideoTool,

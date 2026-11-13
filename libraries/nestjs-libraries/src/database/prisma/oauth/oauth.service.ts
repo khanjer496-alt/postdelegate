@@ -345,7 +345,8 @@ export class OAuthService {
       client_name: app.name,
       redirect_uris: redirectUris,
       token_endpoint_auth_method: tokenEndpointAuthMethod,
-      grant_types: ['authorization_code'],
+      // refresh tokens too, see refreshFields
+      grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
       scope: 'mcp:read mcp:write',
     };
@@ -605,22 +606,7 @@ export class OAuthService {
       );
     }
 
-    if (!this.isPublicClient(app)) {
-      if (
-        !clientSecret ||
-        !app.clientSecret ||
-        !this.secretMatches(
-          clientSecret,
-          app.clientSecret,
-          OAUTH_SECRET_LABELS.clientSecret
-        )
-      ) {
-        throw new HttpException(
-          { error: 'invalid_client' },
-          HttpStatus.UNAUTHORIZED
-        );
-      }
-    }
+    this.assertClientSecret(app, clientSecret);
 
     if (code.startsWith('psc_')) {
       return this.exchangeSelfHostedCodeForToken(
@@ -674,6 +660,66 @@ export class OAuthService {
       scope: this.grantedScope(app),
       ...this.refreshFields(app, token),
     };
+  }
+
+  // A confidential client authenticates with its secret, a public one
+  // (PKCE-only DCR clients, HubSpot) has none
+  private assertClientSecret(app: OAuthApp, clientSecret?: string) {
+    if (this.isPublicClient(app)) {
+      return;
+    }
+    if (
+      !clientSecret ||
+      !app.clientSecret ||
+      !this.secretMatches(
+        clientSecret,
+        app.clientSecret,
+        OAUTH_SECRET_LABELS.clientSecret
+      )
+    ) {
+      throw new HttpException(
+        { error: 'invalid_client' },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+  }
+
+  // RFC 7009 token revocation: a client ends its own connection (the access
+  // token, which is also its refresh token). Unknown, already revoked or
+  // another client's tokens are answered the same way, so the response never
+  // tells whether a token exists
+  async revokeToken(clientId?: string, token?: string, clientSecret?: string) {
+    const app = clientId
+      ? await this._oauthRepository.getAppByClientId(clientId)
+      : null;
+    if (!app) {
+      throw new HttpException(
+        { error: 'invalid_client' },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    this.assertClientSecret(app, clientSecret);
+
+    if (!token) {
+      throw new HttpException(
+        { error: 'invalid_request', error_description: 'token is required' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const lookup = this.lookupSecrets(token, OAUTH_SECRET_LABELS.accessToken);
+    if (!lookup.length) {
+      return {};
+    }
+    if (token.startsWith('psh_')) {
+      await this._oauthRepository.revokeSelfHostedByAccessTokenForApp(
+        lookup,
+        app.id
+      );
+    } else {
+      await this._oauthRepository.revokeByAccessTokenForApp(lookup, app.id);
+    }
+    return {};
   }
 
   // Expiry, PKCE and redirect_uri checks of an authorization code, shared by
@@ -760,12 +806,23 @@ export class OAuthService {
     };
   }
 
-  // HubSpot refuses a token response without a refresh token. Postiz access
-  // tokens never expire, so the refresh token is the access token itself:
-  // refreshing hands it back unchanged, and it stops working exactly when the
-  // access token does. No other client gets these fields
-  private refreshFields(app: Pick<OAuthApp, 'clientId'>, token: string) {
-    if (app.clientId !== hubspotOAuthClientId()) {
+  // HubSpot refuses a token response without a refresh token, and MCP
+  // clients that registered themselves (DCR: Claude, Cursor, Grok, ...)
+  // reconnect silently with one instead of sending the person through
+  // consent again. Access tokens never expire, so the refresh token is the
+  // access token itself: refreshing hands it back unchanged, and it stops
+  // working exactly when the access token does (revoked in Settings, revoked
+  // through /oauth/revoke, or replaced by a new consent). Static apps of the
+  // public API keep the plain response
+  private issuesRefreshTokens(app: Pick<OAuthApp, 'clientId' | 'dynamic'>) {
+    return app.dynamic || app.clientId === hubspotOAuthClientId();
+  }
+
+  private refreshFields(
+    app: Pick<OAuthApp, 'clientId' | 'dynamic'>,
+    token: string
+  ) {
+    if (!this.issuesRefreshTokens(app)) {
       return {};
     }
 
@@ -775,23 +832,34 @@ export class OAuthService {
     };
   }
 
-  // The refresh_token grant, HubSpot only (see refreshFields): the refresh
-  // token is looked up like an access token and handed back while it is valid
-  async refreshAccessToken(clientId?: string, refreshToken?: string) {
-    if (!clientId || clientId !== hubspotOAuthClientId()) {
+  // The refresh_token grant, HubSpot and dynamically registered clients (see
+  // refreshFields): the refresh token is looked up like an access token and
+  // handed back while it is valid. A confidential client proves itself with
+  // its secret, as on the code exchange
+  async refreshAccessToken(
+    clientId?: string,
+    refreshToken?: string,
+    clientSecret?: string
+  ) {
+    const app = clientId
+      ? await this._oauthRepository.getAppByClientId(clientId)
+      : null;
+    if (!clientId || (clientId === hubspotOAuthClientId() && !app)) {
+      throw new HttpException(
+        clientId
+          ? { error: 'invalid_client' }
+          : { error: 'unsupported_grant_type' },
+        clientId ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST
+      );
+    }
+    if (!app || !this.issuesRefreshTokens(app)) {
       throw new HttpException(
         { error: 'unsupported_grant_type' },
         HttpStatus.BAD_REQUEST
       );
     }
 
-    const app = await this._oauthRepository.getAppByClientId(clientId);
-    if (!app) {
-      throw new HttpException(
-        { error: 'invalid_client' },
-        HttpStatus.UNAUTHORIZED
-      );
-    }
+    this.assertClientSecret(app, clientSecret);
 
     if (!refreshToken) {
       throw new HttpException(
