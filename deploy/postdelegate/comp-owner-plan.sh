@@ -11,8 +11,11 @@ SSHK="${PD_SSH_KEY:-$HOME/.ssh/postdelegate_prod}"
 # The VPS accepts SSH only over Tailscale (public port 22 is closed by ufw). PD_HOST defaults to the tailnet
 # machine name; the host key is checked against the existing known_hosts entry for the public address
 # (HostKeyAlias). Override PD_HOST / PD_SSH_OPTS for any other setup. Never reopen public port 22 for this.
+# PD_SSH_OPTS REPLACES the defaults (it does not add to them): when you override it, include
+# "-o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes" yourself if you still want them. Options are split on
+# whitespace, so a value that contains spaces (for example a quoted ProxyCommand) cannot be passed this way.
 read -r -a SSH_OPTS <<< "${PD_SSH_OPTS:--o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes}"
-ssh -o BatchMode=yes "${SSH_OPTS[@]}" -i "$SSHK" "$HOST" 'sudo docker exec -i postdelegate-postiz-postgres-1 psql -U postiz -d postiz -v ON_ERROR_STOP=1' <<SQL
+ssh -o BatchMode=yes ${SSH_OPTS[@]+"${SSH_OPTS[@]}"} -i "$SSHK" "$HOST" 'sudo docker exec -i postdelegate-postiz-postgres-1 psql -U postiz -d postiz -v ON_ERROR_STOP=1' <<SQL
 BEGIN;
 INSERT INTO "Subscription" (id, "organizationId", "subscriptionTier", provider, period, "totalChannels", "isLifetime", "createdAt", "updatedAt")
 SELECT 'owner-comp-' || o.id, o.id, 'ULTIMATE', 'manual', 'YEARLY', 100, true, now(), now()
