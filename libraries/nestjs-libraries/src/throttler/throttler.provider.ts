@@ -7,7 +7,29 @@ import {
 import { Request } from 'express';
 import { isIP } from 'net';
 
-const isPublicComment = (method: string, url: string) =>
+// Limits of the public OAuth endpoints and the live MCP analytics reads, per
+// hour. They protect against abuse and must never throttle a partner's real
+// users: /oauth/token, /oauth/revoke and /oauth/register are called from the
+// partner's own servers (Claude, Canva, HubSpot), so one partner address
+// carries all of its users. A refused call is a 429 with Retry-After
+export const RATE_LIMITS = {
+  ttl: 60 * 60 * 1000,
+  // /oauth/token and /oauth/revoke, per registered client and address
+  // (ThrottlerOAuthClientGuard). Access tokens never expire, so a client
+  // calls them about once per connection
+  oauthClient: 600,
+  // the same endpoints with no or an unknown client_id: per address only, so
+  // made-up ids never buy a fresh allowance
+  oauthUnknownClient: 60,
+  // Dynamic Client Registration, per address: Claude-style connectors
+  // register once per user install, from shared partner addresses
+  oauthRegister: 300,
+  // channelAnalyticsTool, per workspace: each read can call the network's
+  // API and refresh the channel's token
+  channelAnalytics: 60,
+};
+
+const isPublicComment =(method: string, url: string) =>
   method === 'POST' && /^\/public\/posts\/[^/]+\/comments/.test(url);
 
 // Starting a Studio render, not cancelling one

@@ -29,7 +29,11 @@ import { RegisterClientDto } from '@gitroom/nestjs-libraries/dtos/oauth/register
 import { HubspotInstallQueryDto } from '@gitroom/nestjs-libraries/dtos/oauth/hubspot-install.dto';
 import { extractBasicCredentials } from '@gitroom/nestjs-libraries/chat/oauth-types';
 import { McpRelayService } from '@gitroom/nestjs-libraries/chat/mcp.relay.service';
-import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
+import {
+  RATE_LIMITS,
+  ThrottlerRealIpGuard,
+} from '@gitroom/nestjs-libraries/throttler/throttler.provider';
+import { ThrottlerOAuthClientGuard } from '@gitroom/nestjs-libraries/throttler/oauth.client.throttler.guard';
 
 @ApiTags('OAuth')
 @Controller('/oauth')
@@ -39,7 +43,12 @@ export class OAuthController {
     private _mcpRelayService: McpRelayService
   ) {}
 
-  // Dynamic Client Registration (RFC 7591), used by MCP clients like Claude
+  // Dynamic Client Registration (RFC 7591), used by MCP clients like Claude.
+  // Public and capped per client address, since every call creates an app
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({
+    default: { limit: RATE_LIMITS.oauthRegister, ttl: RATE_LIMITS.ttl },
+  })
   @Post('/register')
   @HttpCode(201)
   async register(@Body() body: RegisterClientDto) {
@@ -135,6 +144,13 @@ export class OAuthController {
     return { redirect: redirectUrl.toString() };
   }
 
+  // Public and capped per registered client and address: each attempt checks
+  // a client secret and a code or refresh token (ThrottlerOAuthClientGuard
+  // sets the limit, lower for an unknown client_id)
+  @UseGuards(ThrottlerOAuthClientGuard)
+  @Throttle({
+    default: { limit: RATE_LIMITS.oauthClient, ttl: RATE_LIMITS.ttl },
+  })
   @Post('/token')
   // RFC 6749 §5.1: successful token responses are 200; strict clients (Canva) reject Nest's default 201
   @HttpCode(200)
@@ -182,7 +198,11 @@ export class OAuthController {
 
   // RFC 7009 token revocation, for the client that holds the token (people
   // revoke from Settings > Approved apps). 200 with an empty body whether or
-  // not the token existed
+  // not the token existed. Capped like /token
+  @UseGuards(ThrottlerOAuthClientGuard)
+  @Throttle({
+    default: { limit: RATE_LIMITS.oauthClient, ttl: RATE_LIMITS.ttl },
+  })
   @Post('/revoke')
   @HttpCode(200)
   async revoke(

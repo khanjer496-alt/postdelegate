@@ -37,6 +37,7 @@ import {
   AnalyticsTopPostsTool,
   BestTimeToPostTool,
   ChannelAnalyticsTool,
+  CHANNEL_ANALYTICS_HOURLY_LIMIT,
 } from '@gitroom/nestjs-libraries/chat/tools/analytics.tools';
 import { requiredMcpScope } from '@gitroom/nestjs-libraries/chat/mcp.scopes';
 
@@ -147,6 +148,52 @@ describe('createPostForReviewTool', () => {
     expect(result.output.errors).toContain('createPostForReviewTool');
     expect(postsService.createPost).not.toHaveBeenCalled();
     expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
+
+  it('reports the posts already created when sending one for review fails', async () => {
+    const { tool, postsService, approvals } = build();
+    const input = socialPost('schedule');
+    input.socialPost.push({ ...input.socialPost[0], integrationId: 'int-2' });
+    postsService.createPost
+      .mockResolvedValueOnce([{ postId: 'post-1', integration: 'int-1' }])
+      .mockResolvedValueOnce([
+        { postId: 'post-2', integration: 'int-2' },
+        { postId: 'post-3', integration: 'int-2' },
+      ]);
+    approvals.submitAsAgent
+      .mockResolvedValueOnce({ id: 'post-1' })
+      .mockResolvedValueOnce({ id: 'post-2' })
+      .mockRejectedValueOnce(
+        new BadRequestException('Agents can create 5 posts a day.')
+      );
+
+    const result = await call(tool, input);
+
+    expect(typeof result.output.errors).toBe('string');
+    expect(result.output.errors).toContain('Agents can create 5 posts a day.');
+    expect(result.output.errors).toContain('in review: post-1, post-2;');
+    expect(result.output.errors).toContain(
+      'saved as drafts, not sent for review: post-3.'
+    );
+    expect(approvals.submitAsAgent).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not show an internal error when sending for review fails', async () => {
+    const { tool, approvals } = build();
+    approvals.submitAsAgent.mockRejectedValueOnce(
+      new Error('connect ECONNREFUSED 10.0.0.5:5432')
+    );
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const result = await call(tool, socialPost('schedule'));
+
+    expect(result.output.errors).toContain('Sending the post for review failed.');
+    expect(result.output.errors).toContain('in review: none;');
+    expect(result.output.errors).toContain(
+      'saved as drafts, not sent for review: post-1.'
+    );
+    expect(result.output.errors).not.toContain('ECONNREFUSED');
+    spy.mockRestore();
   });
 
   it('the schedule tool itself never sends for review', async () => {
@@ -353,6 +400,68 @@ describe('analytics tools', () => {
     expect(
       (await call(tool, { days: 30, postId: 'a', integrationId: 'b' })).output.errors
     ).toBeDefined();
+  });
+
+  it('channelAnalyticsTool caps the live reads of a workspace per hour', async () => {
+    const integrations = { checkAnalytics: jest.fn().mockResolvedValue([]) };
+    const posts = { checkPostAnalytics: jest.fn().mockResolvedValue([]) };
+    const tool = new ChannelAnalyticsTool(integrations as any, posts as any);
+    const counts = new Map<string, number>();
+    const redis = {
+      incr: jest.fn(async (key: string) => {
+        counts.set(key, (counts.get(key) || 0) + 1);
+        return counts.get(key)!;
+      }),
+      expire: jest.fn().mockResolvedValue(1),
+      ttl: jest.fn().mockResolvedValue(3000),
+    };
+    tool.redis = redis as any;
+
+    for (let i = 0; i < CHANNEL_ANALYTICS_HOURLY_LIMIT; i++) {
+      const input = i % 2 ? { postId: 'post-1', days: 7 } : { integrationId: 'int-1', days: 7 };
+      expect((await call(tool, input)).output.errors).toBeUndefined();
+    }
+    const refused = await call(tool, { integrationId: 'int-1', days: 7 });
+
+    expect(refused.output.errors).toContain(
+      `reached ${CHANNEL_ANALYTICS_HOURLY_LIMIT} live analytics reads`
+    );
+    expect(
+      integrations.checkAnalytics.mock.calls.length +
+        posts.checkPostAnalytics.mock.calls.length
+    ).toBe(CHANNEL_ANALYTICS_HOURLY_LIMIT);
+    expect(redis.incr).toHaveBeenCalledWith('mcp-channel-analytics:org-1');
+    // the window starts with the first read only
+    expect(redis.expire).toHaveBeenCalledTimes(1);
+    expect(redis.expire).toHaveBeenCalledWith('mcp-channel-analytics:org-1', 3600);
+  });
+
+  it('channelAnalyticsTool sets the window again when its expiry was lost', async () => {
+    const integrations = { checkAnalytics: jest.fn().mockResolvedValue([]) };
+    const tool = new ChannelAnalyticsTool(integrations as any, {} as any);
+    const redis = {
+      // a key left without a TTL after a crash between incr and expire
+      incr: jest.fn().mockResolvedValue(7),
+      ttl: jest.fn().mockResolvedValue(-1),
+      expire: jest.fn().mockResolvedValue(1),
+    };
+    tool.redis = redis as any;
+
+    await call(tool, { integrationId: 'int-1', days: 7 });
+
+    expect(redis.expire).toHaveBeenCalledWith('mcp-channel-analytics:org-1', 3600);
+  });
+
+  it('channelAnalyticsTool keeps reading when the limit can not be checked', async () => {
+    const integrations = { checkAnalytics: jest.fn().mockResolvedValue([{ label: 'Views' }]) };
+    const tool = new ChannelAnalyticsTool(integrations as any, {} as any);
+    tool.redis = { incr: jest.fn().mockRejectedValue(new Error('down')) } as any;
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(call(tool, { integrationId: 'int-1', days: 7 })).resolves.toEqual({
+      output: [{ label: 'Views' }],
+    });
+    spy.mockRestore();
   });
 
   it('read-only tokens can use the analytics tools, but not the post tools', () => {

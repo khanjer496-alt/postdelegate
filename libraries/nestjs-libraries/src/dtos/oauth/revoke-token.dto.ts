@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 // RFC 7009 token revocation request (application/x-www-form-urlencoded or JSON)
 export class RevokeTokenDto {
@@ -6,9 +6,10 @@ export class RevokeTokenDto {
   @IsOptional()
   token?: string;
 
+  // only a hint (RFC 7009 §2.1): an unknown value is ignored, never a 400.
+  // The token is looked up the same way whatever the hint says
   @IsString()
   @IsOptional()
-  @IsIn(['access_token', 'refresh_token'])
   token_type_hint?: string;
 
   // client_secret_basic clients send these in the Authorization header

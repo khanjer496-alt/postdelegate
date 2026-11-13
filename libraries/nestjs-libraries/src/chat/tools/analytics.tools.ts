@@ -6,6 +6,8 @@ import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { RATE_LIMITS } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 
 // the organization the MCP connection (or the dashboard chat) acts for
 const organizationOf = (inputData: unknown, context: any) => {
@@ -224,6 +226,12 @@ weekday 0 is Sunday. "basis" is "engagement" once there are at least "required" 
   }
 }
 
+// Live reads per workspace and hour (RATE_LIMITS.channelAnalytics). Redis is
+// the only state; when it is unavailable the reads keep working (fail open),
+// as in LoginLockoutService
+export const CHANNEL_ANALYTICS_HOURLY_LIMIT = RATE_LIMITS.channelAnalytics;
+const CHANNEL_ANALYTICS_WINDOW_SECONDS = RATE_LIMITS.ttl / 1000;
+
 @Injectable()
 export class ChannelAnalyticsTool implements AgentToolInterface {
   constructor(
@@ -232,6 +240,27 @@ export class ChannelAnalyticsTool implements AgentToolInterface {
   ) {}
   name = 'channelAnalyticsTool';
   optionalOnSelfHosted = true;
+  // replaced in tests
+  public redis = ioRedis;
+
+  private async overLimit(orgId: string) {
+    try {
+      const key = `mcp-channel-analytics:${orgId}`;
+      const count = await this.redis.incr(key);
+      // also when an earlier expire was lost (a crash or a Redis error right
+      // after the first incr), or the key would never reset
+      if (count === 1 || (await this.redis.ttl(key)) < 0) {
+        await this.redis.expire(key, CHANNEL_ANALYTICS_WINDOW_SECONDS);
+      }
+      return count > CHANNEL_ANALYTICS_HOURLY_LIMIT;
+    } catch (err) {
+      console.error(
+        'Channel analytics limit check failed',
+        (err as Error).message
+      );
+      return false;
+    }
+  }
 
   run() {
     return createTool({
@@ -262,6 +291,13 @@ Each metric comes back as { label, data: [{ total, date }], percentageChange }. 
         if (!inputData.integrationId === !inputData.postId) {
           return {
             output: { errors: 'Pass either integrationId or postId' },
+          };
+        }
+        if (await this.overLimit(org.id)) {
+          return {
+            output: {
+              errors: `This workspace reached ${CHANNEL_ANALYTICS_HOURLY_LIMIT} live analytics reads in the last hour. Try again later, or use analyticsMetricsTool or analyticsTopPostsTool, which read the stored history.`,
+            },
           };
         }
         try {

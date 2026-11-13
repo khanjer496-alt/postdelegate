@@ -372,12 +372,41 @@ If validation fails, or the workspace limits what agents can do (allowed channel
         throw err;
       }
       if (options.forReview) {
-        for (const created of output) {
-          await this._approvalsService.submitAsAgent(
-            organizationId,
-            created.postId,
-            actor as Extract<ApprovalActor, { type: 'agent' }>
-          );
+        for (const [index, created] of output.entries()) {
+          try {
+            await this._approvalsService.submitAsAgent(
+              organizationId,
+              created.postId,
+              actor as Extract<ApprovalActor, { type: 'agent' }>
+            );
+          } catch (err) {
+            // the posts so far exist: say which, so the client does not
+            // create them again
+            if (!(err instanceof HttpException)) {
+              console.error(
+                'Sending a post for review failed',
+                (err as Error)?.message
+              );
+            }
+            const inReview = [
+              ...finalOutput.map((p) => p.postId),
+              ...output.slice(0, index).map((p) => p.postId),
+            ];
+            const drafts = output.slice(index).map((p) => p.postId);
+            return {
+              output: {
+                errors: `${
+                  err instanceof HttpException
+                    ? err.message
+                    : 'Sending the post for review failed.'
+                } Already created, do not create them again: in review: ${
+                  inReview.join(', ') || 'none'
+                }; saved as drafts, not sent for review: ${drafts.join(
+                  ', '
+                )}. The rest of this request was not created. Send each draft with sendPostForReviewTool once the problem is fixed.`,
+              },
+            };
+          }
           created.approvalStatus = 'IN_REVIEW';
         }
       }
