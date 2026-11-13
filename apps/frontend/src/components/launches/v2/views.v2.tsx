@@ -88,6 +88,16 @@ export const WeekViewV2: FC = () => {
     const top = (hour >= 8 && hour < 18 ? 8 : Math.max(0, Math.min(hour - 2, 16))) * HOUR;
     // a little above the hour so its label isn't under the sticky day row
     scroller.current?.scrollTo({ top: Math.max(0, top - 12) });
+    // narrow screens scroll sideways: start on today's column
+    const el = scroller.current;
+    const today = el?.querySelector<HTMLElement>('[data-pd-today]');
+    if (el && today && el.scrollWidth > el.clientWidth) {
+      const box = el.getBoundingClientRect();
+      const cell = today.getBoundingClientRect();
+      const rtl = getComputedStyle(el).direction === 'rtl';
+      const gutter = 56;
+      el.scrollLeft += rtl ? cell.right - box.right + gutter : cell.left - box.left - gutter;
+    }
   }, [startDate]);
 
   return (
@@ -96,13 +106,14 @@ export const WeekViewV2: FC = () => {
         ref={scroller}
         className="absolute inset-0 overflow-auto scrollbar scrollbar-thumb-pdLine2 scrollbar-track-transparent"
       >
-        <div className="grid [grid-template-columns:56px_repeat(7,minmax(0,1fr))] tablet:[grid-template-columns:56px_repeat(7,minmax(110px,1fr))] min-w-full">
-          <div className="sticky top-0 z-[25] h-[44px] bg-newBgColorInner border-b border-pdLine" />
+        <div className="grid [grid-template-columns:56px_repeat(7,minmax(0,1fr))] tablet:[grid-template-columns:56px_repeat(7,minmax(110px,1fr))] mobile:[grid-template-columns:56px_repeat(7,minmax(108px,1fr))] min-w-full tablet:min-w-[826px] mobile:min-w-[812px]">
+          <div className="sticky top-0 start-0 z-[27] h-[44px] bg-newBgColorInner border-b border-pdLine" />
           {days.map((day) => {
             const isToday = day.isSame(now, 'day');
             return (
               <div
                 key={day.format('YYYY-MM-DD')}
+                data-pd-today={isToday ? '' : undefined}
                 className={clsx(
                   'sticky top-0 z-[25] h-[44px] bg-newBgColorInner border-b border-s border-pdLine flex items-center gap-[8px] px-[10px] text-[12px]',
                   isToday ? 'text-newTextColor' : 'text-textItemBlur'
@@ -125,7 +136,7 @@ export const WeekViewV2: FC = () => {
           {hours.map((hour) => (
             <Fragment key={hour}>
               <div
-                className="relative text-end pe-[8px] text-[11px] text-pdInk3"
+                className="relative text-end pe-[8px] text-[11px] text-pdInk3 sticky start-0 z-[20] bg-newBgColorInner"
                 style={{ minHeight: HOUR }}
               >
                 <span className="relative -top-[7px]">{hour === 0 ? '' : hourLabel(hour)}</span>
@@ -296,10 +307,14 @@ export const ListViewV2: FC = () => {
   ];
   const cols =
     '[grid-template-columns:84px_minmax(150px,1.1fr)_minmax(240px,2.6fr)_minmax(120px,1fr)_110px_130px_112px]';
+  // phones and tablets: each post is a small card (time, channel, status /
+  // text / approval, actions) instead of a wide table row
+  const mobileRow =
+    'mobile:[grid-template-columns:auto_minmax(0,1fr)_auto] mobile:gap-x-[10px] mobile:gap-y-[6px] mobile:py-[10px]';
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-[48px] shrink-0 flex items-center gap-[4px] px-[20px] border-b border-pdLine">
+      <div className="h-[48px] mobile:h-[56px] shrink-0 flex items-center gap-[4px] px-[20px] mobile:px-[12px] border-b border-pdLine overflow-x-auto scrollbar-none">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -307,7 +322,7 @@ export const ListViewV2: FC = () => {
             aria-pressed={listState === tab.key}
             onClick={() => setListState(tab.key)}
             className={clsx(
-              'h-[30px] px-[12px] rounded-[8px] text-[12.5px] font-[600]',
+              'h-[30px] mobile:h-[44px] px-[12px] rounded-[8px] text-[12.5px] mobile:text-[13px] font-[600] whitespace-nowrap',
               listState === tab.key
                 ? 'bg-pdSurface2 text-newTextColor ring-1 ring-pdLine2'
                 : 'text-textItemBlur hover:text-newTextColor'
@@ -319,10 +334,10 @@ export const ListViewV2: FC = () => {
       </div>
       <div className="flex-1 relative min-h-0">
         <div className="absolute inset-0 overflow-auto scrollbar scrollbar-thumb-pdLine2 scrollbar-track-transparent">
-          <div className="min-w-[960px] pb-[20px]">
+          <div className="min-w-[960px] mobile:min-w-0 pb-[20px] mobile:pb-[84px]">
             <div
               className={clsx(
-                'grid gap-[12px] px-[36px] h-[38px] items-center sticky top-0 z-[5] bg-newBgColorInner border-b border-pdLine text-[11px] font-[700] uppercase tracking-[0.08em] text-pdInk3',
+                'grid mobile:!hidden gap-[12px] px-[36px] h-[38px] items-center sticky top-0 z-[5] bg-newBgColorInner border-b border-pdLine text-[11px] font-[700] uppercase tracking-[0.08em] text-pdInk3',
                 cols
               )}
             >
@@ -351,14 +366,14 @@ export const ListViewV2: FC = () => {
             {!loading &&
               grouped.map(([key, posts]) => (
                 <Fragment key={key}>
-                  <div className="px-[20px] pt-[16px] pb-[8px] text-[12px] font-[700] text-textItemBlur flex items-center gap-[8px]">
+                  <div className="px-[20px] mobile:px-[12px] pt-[16px] pb-[8px] text-[12px] mobile:text-[13px] font-[700] text-textItemBlur flex items-center gap-[8px]">
                     {newDayjs(key).isSame(newDayjs(), 'day') && (
                       <span className="text-[#c8ff4d]">{t('today', 'Today')} ·</span>
                     )}
                     {newDayjs(key).format(isUSCitizen() ? 'dddd, MMMM D' : 'dddd, D MMMM')}
                     <span className="text-pdInk3 font-[500]">· {posts.length}</span>
                   </div>
-                  <div className="mx-[20px] rounded-[12px] border border-pdLine bg-pdSurface overflow-hidden">
+                  <div className="mx-[20px] mobile:mx-[12px] rounded-[12px] border border-pdLine bg-pdSurface overflow-hidden">
                   {posts.map((post: any) => {
                     const integration =
                       (integrations as any[]).find((i) => i.id === post.integration?.id) ||
@@ -371,8 +386,9 @@ export const ListViewV2: FC = () => {
                       <div
                         key={post.id}
                         className={clsx(
-                          'group grid gap-[12px] px-[16px] min-h-[54px] items-center border-b border-pdLine last:border-b-0 hover:bg-boxHover',
-                          cols
+                          'group grid gap-[12px] px-[16px] mobile:px-[12px] min-h-[54px] items-center border-b border-pdLine last:border-b-0 hover:bg-boxHover',
+                          cols,
+                          mobileRow
                         )}
                       >
                         <span className="text-[13px] font-[600] tabular-nums">
@@ -390,20 +406,20 @@ export const ListViewV2: FC = () => {
                         <button
                           type="button"
                           onClick={editPost(post, false)}
-                          className="text-start text-[13px] text-newTextColor/90 truncate hover:underline"
+                          className="text-start text-[13px] mobile:text-[14px] text-newTextColor/90 truncate mobile:whitespace-normal mobile:line-clamp-2 mobile:min-h-[44px] mobile:col-span-3 mobile:order-4 hover:underline"
                         >
                           {text || t('pd_no_content', 'No content')}
                         </button>
-                        <span className="text-[12.5px] text-textItemBlur truncate">
+                        <span className="text-[12.5px] text-textItemBlur truncate mobile:hidden">
                           {integration.customer?.name || '—'}
                         </span>
-                        <span>
+                        <span className="mobile:order-3">
                           <Pill className={statusPill[status]}>{statusText(status, t)}</Pill>
                         </span>
-                        <span className={clsx('text-[12.5px] font-[600]', approval.className)}>
+                        <span className={clsx('text-[12.5px] mobile:text-[13px] font-[600] mobile:order-5 mobile:col-span-2', approval.className)}>
                           {approval.label}
                         </span>
-                        <span className="flex justify-end gap-[2px] opacity-70 group-hover:opacity-100">
+                        <span className="flex justify-end gap-[2px] opacity-70 group-hover:opacity-100 mobile:opacity-100 mobile:order-6 mobile:-me-[10px]">
                           <IconButton label={t('edit', 'Edit')} onClick={editPost(post, false)}>
                             <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z" /></svg>
                           </IconButton>
@@ -429,7 +445,7 @@ export const ListViewV2: FC = () => {
         </div>
       </div>
       {listTotalPages > 1 && (
-        <div className="h-[48px] shrink-0 border-t border-pdLine flex items-center justify-between px-[20px] text-[12.5px] text-textItemBlur">
+        <div className="h-[48px] mobile:h-[60px] shrink-0 border-t border-pdLine flex items-center justify-between px-[20px] mobile:px-[12px] text-[12.5px] mobile:text-[13px] text-textItemBlur">
           <span>
             {t('page', 'Page')} {listPage + 1} / {listTotalPages}
           </span>
@@ -438,7 +454,7 @@ export const ListViewV2: FC = () => {
               type="button"
               disabled={listPage <= 0}
               onClick={() => setListPage(listPage - 1)}
-              className="h-[30px] px-[12px] rounded-[8px] bg-pdSurface2 border border-pdLine2 disabled:opacity-40"
+              className="h-[30px] mobile:h-[44px] px-[12px] rounded-[8px] bg-pdSurface2 border border-pdLine2 disabled:opacity-40"
             >
               {t('previous', 'Previous')}
             </button>
@@ -446,7 +462,7 @@ export const ListViewV2: FC = () => {
               type="button"
               disabled={listPage >= listTotalPages - 1}
               onClick={() => setListPage(listPage + 1)}
-              className="h-[30px] px-[12px] rounded-[8px] bg-pdSurface2 border border-pdLine2 disabled:opacity-40"
+              className="h-[30px] mobile:h-[44px] px-[12px] rounded-[8px] bg-pdSurface2 border border-pdLine2 disabled:opacity-40"
             >
               {t('next', 'Next')}
             </button>

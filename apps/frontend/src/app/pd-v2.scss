@@ -672,3 +672,71 @@ body.pd-v2 [data-pd-month-cell] {
     }
   }
 }
+
+// ---- mobile pass: phones and tablets (the app's `mobile` breakpoint) ----
+@media (max-width: 1025px) {
+  body.pd-v2 {
+    // nothing under 12px on small screens
+    .text-\[9px\],
+    .text-\[10px\],
+    .text-\[10\.5px\],
+    .text-\[11px\],
+    .text-\[11\.5px\] {
+      font-size: 12px !important;
+    }
+    // 16px inputs keep iOS Safari from zooming in on focus
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select,
+    .ProseMirror,
+    [contenteditable='true'] {
+      font-size: 16px !important;
+    }
+    // tap targets: 44px in the top bar, the drawer and the menus
+    header button,
+    header a[href] {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    #main-menu a[href],
+    #main-menu button {
+      min-height: 44px;
+    }
+    #main-menu a[href] {
+      display: flex;
+      align-items: center;
+    }
+    [role='menu'] [role='menuitem'],
+    [role='menuitemradio'] {
+      min-height: 44px;
+    }
+    [data-pd-panel] button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    // week cards: readable time on a phone
+    [data-pd-week-cell] [data-pd-body] > div:first-child .tabular-nums {
+      font-size: 12px;
+    }
+    [data-pd-week-cell] [data-pd-body] > div:last-child {
+      font-size: 12.5px !important;
+      line-height: 15px !important;
+    }
+    // composer on a phone: icon tabs like the rest of the phone composer
+    [data-pd-composer] [data-pd-tab-label] {
+      display: none;
+    }
+    .post-toolbar button[aria-label] {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    // sticky composer action bar clears the home indicator
+    .post-toolbar {
+      padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+    }
+    // the floating panel button and the assistant bubble share the corner
+    .copilotKitButton {
+      bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+}

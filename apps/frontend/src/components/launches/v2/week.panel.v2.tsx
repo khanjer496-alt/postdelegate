@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useCalendar } from '@gitroom/frontend/components/launches/calendar.context';
@@ -35,6 +35,14 @@ export const WeekPanelV2: FC<{
   const { approve, requestChanges } = useApprovalActions();
   const { data: reviewCount } = useReviewCount();
   const [tab, setTab] = useState<Tab>('next');
+  // below 1300px the panel opens as a bottom sheet from a floating button
+  const [sheet, setSheet] = useState(false);
+  useEffect(() => {
+    if (!sheet) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setSheet(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [sheet]);
 
   const byStatus = useMemo(() => {
     const now = newDayjs();
@@ -99,12 +107,60 @@ export const WeekPanelV2: FC<{
     return null;
   }
 
+  const attentionCount = byStatus.approval.length + byStatus.upNext.filter((p: any) => pdStatus(p.state, p.approvalStatus) === 'failed').length;
+
   return (
-    <aside className="w-[300px] shrink-0 border-s border-pdLine bg-pdPanel flex flex-col min-h-0 tablet:hidden">
+    <>
+    <button
+      type="button"
+      data-pd-panel-toggle=""
+      onClick={() => setSheet(true)}
+      aria-expanded={sheet}
+      className={clsx(
+        'hidden tablet:flex fixed z-[470] start-1/2 -translate-x-1/2 rtl:translate-x-1/2 bottom-[calc(16px+env(safe-area-inset-bottom))] items-center gap-[8px] h-[44px] px-[16px] rounded-full bg-pdSurface2 border border-pdLine2 shadow-menu text-[14px] font-[600]',
+        sheet && 'tablet:hidden'
+      )}
+    >
+      {rangeWord}
+      <span className="text-[13px] text-pdInk3 tabular-nums">{byStatus.scheduled.length + byStatus.review.length}</span>
+      {attentionCount > 0 && (
+        <span className="min-w-[20px] h-[20px] px-[6px] rounded-full bg-[#ffb54733] text-[#ffb547] text-[12px] font-[700] grid place-items-center">
+          {attentionCount}
+        </span>
+      )}
+    </button>
+    {sheet && (
+      <div
+        aria-hidden="true"
+        className="hidden tablet:block fixed inset-0 z-[480] bg-newBackdrop opacity-60"
+        onClick={() => setSheet(false)}
+      />
+    )}
+    <aside
+      data-pd-panel=""
+      aria-label={rangeWord}
+      className={clsx(
+        'w-[300px] shrink-0 border-s border-pdLine bg-pdPanel flex flex-col min-h-0',
+        sheet
+          ? 'tablet:fixed tablet:inset-x-0 tablet:bottom-0 tablet:z-[481] tablet:w-full tablet:max-h-[85vh] tablet:rounded-t-[20px] tablet:border-s-0 tablet:border-t tablet:shadow-menu tablet:pb-[env(safe-area-inset-bottom)]'
+          : 'tablet:hidden'
+      )}
+    >
       <div className="p-[16px] pb-[12px]">
+        <div className="hidden tablet:block mx-auto -mt-[6px] mb-[10px] w-[40px] h-[4px] rounded-full bg-pdLine2" aria-hidden="true" />
         <div className="flex items-center justify-between mb-[10px] h-[32px]">
           <div className="text-[14px] font-[700]">{rangeWord}</div>
-          {tools}
+          <div className="flex items-center gap-[6px]">
+            {tools}
+            <button
+              type="button"
+              onClick={() => setSheet(false)}
+              aria-label={t('close', 'Close')}
+              className="hidden tablet:grid w-[44px] h-[44px] -me-[8px] place-items-center rounded-[10px] text-textItemBlur hover:text-newTextColor"
+            >
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-[8px]">
           {(
@@ -286,11 +342,12 @@ export const WeekPanelV2: FC<{
           <button type="button" onClick={copyPrompt} className="flex-1 h-[30px] rounded-[8px] bg-[#7357ff] text-white text-[12px] font-[600]">
             {t('copy_mcp_prompt', 'Copy MCP prompt')}
           </button>
-          <Link href="/channels" className="h-[30px] px-[10px] rounded-[8px] bg-pdSurface2 border border-pdLine2 text-[12px] font-[600] grid place-items-center whitespace-nowrap">
+          <Link href="/channels" className="h-[30px] tablet:h-[44px] px-[10px] rounded-[8px] bg-pdSurface2 border border-pdLine2 text-[12px] font-[600] grid place-items-center whitespace-nowrap">
             {t('pd_edit_time_slots', 'Edit time slots')}
           </Link>
         </div>
       </div>
     </aside>
+    </>
   );
 };

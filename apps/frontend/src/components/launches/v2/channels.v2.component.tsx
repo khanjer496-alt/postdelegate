@@ -171,7 +171,7 @@ export const ChannelsComponentV2: FC = () => {
   return (
     <div className="flex flex-1 min-h-0 min-w-0 bg-newBgColorInner">
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <div className="h-[48px] shrink-0 flex items-end gap-[20px] px-[24px] border-b border-pdLine overflow-x-auto scrollbar-none mobile:px-[12px]">
+        <div className="h-[48px] mobile:h-[52px] shrink-0 flex items-end gap-[20px] px-[24px] border-b border-pdLine overflow-x-auto scrollbar-none mobile:px-[12px]">
           {tabs.map((item) => (
             <button
               key={item.key}
@@ -179,7 +179,7 @@ export const ChannelsComponentV2: FC = () => {
               aria-pressed={tab === item.key}
               onClick={() => setTab(item.key)}
               className={clsx(
-                'h-[40px] -mb-px border-b-2 text-[12.5px] font-[600] whitespace-nowrap',
+                'shrink-0 h-[40px] mobile:h-[48px] mobile:min-w-[44px] -mb-px border-b-2 text-[12.5px] mobile:text-[13px] font-[600] whitespace-nowrap',
                 tab === item.key
                   ? 'border-[#7357ff] text-newTextColor'
                   : 'border-transparent text-textItemBlur hover:text-newTextColor'
@@ -192,14 +192,14 @@ export const ChannelsComponentV2: FC = () => {
         </div>
         <div className="flex-1 overflow-y-auto p-[24px] mobile:p-[12px] scrollbar scrollbar-thumb-pdLine2 scrollbar-track-transparent">
           <div className="flex flex-wrap items-center gap-[8px] mb-[20px]">
-            <label className="flex items-center gap-[8px] h-[32px] px-[10px] w-[260px] mobile:w-full rounded-[9px] bg-pdSurface border border-pdLine text-textItemBlur focus-within:border-[#7357ff]">
+            <label className="flex items-center gap-[8px] h-[32px] mobile:h-[44px] px-[10px] w-[260px] mobile:w-full rounded-[9px] bg-pdSurface border border-pdLine text-textItemBlur focus-within:border-[#7357ff]">
               <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('filter_channels', 'Filter channels')}
                 aria-label={t('filter_channels', 'Filter channels')}
-                className="bg-transparent outline-none flex-1 min-w-0 text-[12.5px] text-newTextColor placeholder:text-pdInk3"
+                className="bg-transparent outline-none flex-1 min-w-0 self-stretch text-[12.5px] mobile:text-[16px] text-newTextColor placeholder:text-pdInk3"
               />
             </label>
             <button type="button" className={ghostButton} onClick={invite}>
@@ -209,7 +209,7 @@ export const ChannelsComponentV2: FC = () => {
             <button
               type="button"
               onClick={add}
-              className="ms-auto inline-flex items-center gap-[6px] h-[32px] px-[14px] rounded-[9px] bg-[#c8ff4d] text-[#0a0a0b] text-[13px] font-[700] hover:brightness-95"
+              className="ms-auto inline-flex items-center gap-[6px] h-[32px] mobile:h-[44px] px-[14px] rounded-[9px] bg-[#c8ff4d] text-[#0a0a0b] text-[13px] font-[700] hover:brightness-95"
             >
               <span aria-hidden="true" className="text-[16px] leading-none">+</span>
               {t('pd_add_channel', 'Add channel')}
@@ -300,7 +300,7 @@ export const ChannelsComponentV2: FC = () => {
                           <button
                             type="button"
                             onClick={refreshChannel(integration)}
-                            className="flex-1 h-[32px] rounded-[9px] bg-[#ff5a5f26] text-[#ff5a5f] text-[12.5px] font-[700]"
+                            className="flex-1 h-[32px] mobile:h-[44px] rounded-[9px] bg-[#ff5a5f26] text-[#ff5a5f] text-[12.5px] font-[700]"
                           >
                             <span className="inline-flex items-center gap-[6px]">
                               <Icon name="refresh-cw" size={13} />

@@ -39,7 +39,7 @@ const ToolsMenu: FC = () => {
         aria-label={t('more_tools', 'More tools')}
         title={t('more_tools', 'More tools')}
         onClick={() => setOpen(!open)}
-        className="w-[32px] h-[32px] grid place-items-center rounded-[9px] bg-pdSurface2 border border-pdLine2 text-textItemBlur hover:text-newTextColor"
+        className="w-[32px] h-[32px] mobile:w-[44px] mobile:h-[44px] grid place-items-center rounded-[9px] bg-pdSurface2 border border-pdLine2 text-textItemBlur hover:text-newTextColor"
       >
         <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
       </button>

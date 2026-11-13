@@ -100,7 +100,7 @@ export const IconButton: FC<{
     title={label}
     onClick={onClick}
     className={clsx(
-      'w-[28px] h-[28px] grid place-items-center rounded-[7px] text-textItemBlur hover:text-newTextColor hover:bg-boxHover outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+      'w-[28px] h-[28px] mobile:w-[44px] mobile:h-[44px] grid place-items-center rounded-[7px] text-textItemBlur hover:text-newTextColor hover:bg-boxHover outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
       className
     )}
   >
@@ -109,4 +109,4 @@ export const IconButton: FC<{
 );
 
 export const ghostButton =
-  'inline-flex items-center gap-[7px] h-[32px] px-[12px] rounded-[9px] text-[13px] font-[600] whitespace-nowrap bg-pdSurface2 border border-pdLine2 text-newTextColor hover:border-textItemBlur/40 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary';
+  'inline-flex items-center justify-center gap-[7px] h-[32px] mobile:h-[44px] mobile:min-w-[44px] px-[12px] rounded-[9px] text-[13px] font-[600] whitespace-nowrap bg-pdSurface2 border border-pdLine2 text-newTextColor hover:border-textItemBlur/40 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary';

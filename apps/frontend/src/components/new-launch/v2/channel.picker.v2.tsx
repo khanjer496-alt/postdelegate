@@ -77,7 +77,7 @@ export const ChannelPickerV2: FC<{
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('search_channels', 'Search channels')}
             aria-label={t('search_channels', 'Search channels')}
-            className="flex-1 min-w-0 bg-transparent outline-none text-[12.5px] text-newTextColor placeholder:text-pdInk3"
+            className="flex-1 min-w-0 bg-transparent outline-none text-[12.5px] mobile:text-[16px] text-newTextColor placeholder:text-pdInk3"
           />
         </label>
       </div>

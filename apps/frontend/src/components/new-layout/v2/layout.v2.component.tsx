@@ -94,7 +94,7 @@ const TopBarMore: FC<{ children: ReactNode }> = ({ children }) => {
       <button
         ref={buttonRef}
         type="button"
-        className="hidden mobile:flex items-center justify-center w-[40px] h-[40px] rounded-[8px] hover:text-newTextColor hover:bg-boxFocused"
+        className="hidden mobile:flex items-center justify-center w-[44px] h-[44px] rounded-[8px] hover:text-newTextColor hover:bg-boxFocused"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={t('more_options', 'More options')}
@@ -268,8 +268,13 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                         !menuOpen && 'mobile:hidden'
                       )}
                       onClick={(e) => {
-                        // links close the drawer, the collapse and user buttons do not
-                        if ((e.target as HTMLElement).closest('a')) {
+                        // links, New post and user-menu actions close the drawer;
+                        // the collapse and menu toggles do not
+                        if (
+                          (e.target as HTMLElement).closest(
+                            'a, [data-pd-close-drawer], [role=menuitem]'
+                          )
+                        ) {
                           setMenuOpen(false);
                         }
                       }}
@@ -311,12 +316,17 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                         <div className="flex-1 flex justify-center tablet:flex-none">
                           <CommandPalette
                             label={t('search_posts_channels', 'Search posts, channels, or jump to…')}
-                            className="flex items-center gap-[8px] w-[440px] max-w-full h-[36px] px-[12px] rounded-[10px] bg-pdSurface border border-pdLine text-pdInk3 hover:text-textItemBlur hover:border-pdLine2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary tablet:w-auto mobile:w-[40px] mobile:h-[40px] mobile:p-0 mobile:justify-center mobile:bg-transparent mobile:border-0 [&>span]:text-[13px] [&>kbd]:ms-auto [&>kbd]:font-sans [&>kbd]:text-[10.5px] [&>kbd]:leading-[16px] [&>kbd]:px-[5px] [&>kbd]:py-0 [&>kbd]:rounded-[5px] [&>kbd]:border [&>kbd]:border-pdLine2 [&>kbd]:bg-pdSurface [&>kbd]:text-textItemBlur [&>svg]:w-[14px] [&>svg]:h-[14px]"
+                            className="flex items-center gap-[8px] w-[440px] max-w-full h-[36px] px-[12px] rounded-[10px] bg-pdSurface border border-pdLine text-pdInk3 hover:text-textItemBlur hover:border-pdLine2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary tablet:w-auto mobile:!w-[44px] mobile:!h-[44px] mobile:p-0 mobile:justify-center mobile:bg-transparent mobile:border-0 [&>span]:text-[13px] [&>kbd]:ms-auto [&>kbd]:font-sans [&>kbd]:text-[10.5px] [&>kbd]:leading-[16px] [&>kbd]:px-[5px] [&>kbd]:py-0 [&>kbd]:rounded-[5px] [&>kbd]:border [&>kbd]:border-pdLine2 [&>kbd]:bg-pdSurface [&>kbd]:text-textItemBlur [&>svg]:w-[14px] [&>svg]:h-[14px]"
                           />
                         </div>
                         <div className="flex gap-[6px] mobile:gap-[4px] items-center text-textItemBlur">
+                          <span className="hidden mobile:flex">
+                            <TrialPillV2 compact={true} />
+                          </span>
                           <TopBarMore>
-                            <TrialPillV2 />
+                            <span className="contents mobile:hidden">
+                              <TrialPillV2 />
+                            </span>
                             <div className="w-[1px] h-[20px] bg-pdLine mx-[4px] mobile:hidden" />
                             <OrganizationSelector />
                             <LanguageMenuV2 />

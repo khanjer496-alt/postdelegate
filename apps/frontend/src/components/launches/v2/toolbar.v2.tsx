@@ -71,9 +71,15 @@ const CustomerSelectV2: FC<{
   };
   return (
     <div ref={ref} className="relative">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={ghostButton}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={current?.name || t('all_customers', 'All customers')}
+        onClick={() => setOpen(!open)}
+        className={ghostButton}
+      >
         <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></svg>
-        <span className="max-w-[140px] truncate">{current?.name || t('all_customers', 'All customers')}</span>
+        <span className="max-w-[140px] truncate mobile:hidden">{current?.name || t('all_customers', 'All customers')}</span>
         <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {open && (
@@ -177,7 +183,7 @@ export const ToolbarV2: FC = () => {
               type="button"
               aria-label={t('previous', 'Previous')}
               onClick={() => move(-1)}
-              className="w-[32px] h-[32px] grid place-items-center rounded-s-[9px] bg-pdSurface2 border border-pdLine2 hover:text-textItemFocused"
+              className="w-[32px] h-[32px] mobile:w-[44px] mobile:h-[44px] grid place-items-center rounded-s-[9px] bg-pdSurface2 border border-pdLine2 hover:text-textItemFocused"
             >
               <Chevron dir="left" />
             </button>
@@ -185,7 +191,7 @@ export const ToolbarV2: FC = () => {
               type="button"
               aria-label={t('next', 'Next')}
               onClick={() => move(1)}
-              className="w-[32px] h-[32px] grid place-items-center rounded-e-[9px] bg-pdSurface2 border border-pdLine2 border-s-0 hover:text-textItemFocused"
+              className="w-[32px] h-[32px] mobile:w-[44px] mobile:h-[44px] grid place-items-center rounded-e-[9px] bg-pdSurface2 border border-pdLine2 border-s-0 hover:text-textItemFocused"
             >
               <Chevron dir="right" />
             </button>
@@ -199,8 +205,8 @@ export const ToolbarV2: FC = () => {
           {tz}
         </span>
       )}
-      <div className="ms-auto flex flex-wrap items-center gap-[8px] justify-end">
-        <div role="group" aria-label={t('calendar', 'Calendar')} className="flex p-[3px] rounded-[10px] bg-pdSurface border border-pdLine">
+      <div className="ms-auto flex flex-wrap items-center gap-[8px] justify-end mobile:w-full mobile:ms-0 mobile:flex-nowrap">
+        <div role="group" aria-label={t('calendar', 'Calendar')} className="flex p-[3px] rounded-[10px] bg-pdSurface border border-pdLine mobile:flex-1 mobile:min-w-0">
           {views.map((v) => (
             <button
               key={v.key}
@@ -208,7 +214,7 @@ export const ToolbarV2: FC = () => {
               aria-pressed={display === v.key}
               onClick={() => display !== v.key && setView(v.key)}
               className={clsx(
-                'px-[10px] h-[26px] rounded-[7px] text-[12.5px] font-[600] transition-colors',
+                'px-[10px] h-[26px] mobile:h-[38px] mobile:flex-1 mobile:px-[4px] rounded-[7px] text-[12.5px] mobile:text-[13px] font-[600] transition-colors',
                 display === v.key ? 'bg-pdSurface2 text-newTextColor shadow-sm ring-1 ring-pdLine2' : 'text-textItemBlur hover:text-newTextColor'
               )}
             >
@@ -226,11 +232,12 @@ export const ToolbarV2: FC = () => {
             <button
               type="button"
               aria-expanded={filtersOpen}
+              aria-label={t('filters', 'Filters')}
               onClick={() => setFiltersOpen(!filtersOpen)}
               className={ghostButton}
             >
               <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" /></svg>
-              {t('filters', 'Filters')}
+              <span className="mobile:hidden">{t('filters', 'Filters')}</span>
               {activeFilters > 0 && (
                 <span className="text-[11px] font-[700] px-[6px] rounded-full bg-[#7357ff33] text-[#b39aff]">
                   {activeFilters}

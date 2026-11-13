@@ -213,6 +213,7 @@ const NewPostButton: FC<{ collapsed: boolean; integrations: any[] }> = ({
       className={className}
       title={t('new_post', 'New post')}
       aria-keyshortcuts="N"
+      data-pd-close-drawer=""
     >
       {icon}
       {label}
