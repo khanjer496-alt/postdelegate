@@ -15,6 +15,7 @@ import {
 import { newDayjs, getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ghostButton } from './ui.v2';
+import { BestTimesLegend } from '@gitroom/frontend/components/features/best-times/use.best.times';
 
 type Display = 'day' | 'week' | 'month' | 'list';
 
@@ -199,6 +200,7 @@ export const ToolbarV2: FC = () => {
         </>
       )}
       <div className="text-[15px] font-[700] whitespace-nowrap">{label}</div>
+      {display === 'week' && <BestTimesLegend />}
       {!!tz && (
         <span className="text-[11.5px] text-pdInk3 whitespace-nowrap flex items-center gap-[4px] tablet:hidden">
           <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></svg>
