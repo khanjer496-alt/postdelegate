@@ -15,7 +15,12 @@ const CommandPaletteDialog = dynamic(
   { ssr: false }
 );
 
-export const CommandPalette: FC = () => {
+// label and className let the v2 top bar restyle the trigger; without them
+// it renders as before
+export const CommandPalette: FC<{ label?: string; className?: string }> = ({
+  label,
+  className,
+}) => {
   const t = useT();
   const [open, setOpen] = useState(false);
   const isMac = useMemo(
@@ -44,7 +49,10 @@ export const CommandPalette: FC = () => {
         aria-haspopup="dialog"
         aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}
         aria-label={t('quick_menu_open', 'Search and quick actions')}
-        className="flex items-center self-center gap-[8px] h-[32px] -my-[4px] ps-[10px] pe-[6px] rounded-[8px] bg-btnSimple text-textItemBlur hover:text-newTextColor transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary mobile:w-[40px] mobile:h-[40px] mobile:my-0 mobile:p-0 mobile:justify-center mobile:bg-transparent mobile:hover:bg-boxFocused"
+        className={
+          className ||
+          'flex items-center self-center gap-[8px] h-[32px] -my-[4px] ps-[10px] pe-[6px] rounded-[8px] bg-btnSimple text-textItemBlur hover:text-newTextColor transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary mobile:w-[40px] mobile:h-[40px] mobile:my-0 mobile:p-0 mobile:justify-center mobile:bg-transparent mobile:hover:bg-boxFocused'
+        }
       >
         <svg
           aria-hidden="true"
@@ -60,7 +68,7 @@ export const CommandPalette: FC = () => {
           <path d="M20 20l-3.5-3.5" />
         </svg>
         <span className="text-[13px] tablet:hidden">
-          {t('quick_menu_search', 'Search')}
+          {label || t('quick_menu_search', 'Search')}
         </span>
         <kbd className="mobile:hidden font-sans text-[11px] leading-none px-[6px] py-[4px] rounded-[5px] border border-newTableBorder bg-newBgColorInner">
           {isMac ? '⌘K' : 'Ctrl K'}

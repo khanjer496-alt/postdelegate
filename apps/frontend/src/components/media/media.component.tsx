@@ -911,8 +911,14 @@ export const MultiMediaComponent: FC<{
 
   return (
     <>
-      <div className="b1 flex flex-col gap-[8px] mobile:gap-[16px] rounded-bl-[8px] select-none w-full">
-        <div className="flex gap-[10px] px-[12px] mobile:px-0 mobile:empty:hidden">
+      <div
+        data-pd-media=""
+        className="b1 flex flex-col gap-[8px] mobile:gap-[16px] rounded-bl-[8px] select-none w-full"
+      >
+        <div
+          data-pd-media-list=""
+          className="flex gap-[10px] px-[12px] mobile:px-0 mobile:empty:hidden"
+        >
           {!!currentMedia?.length && (
             <ReactSortable
               list={currentMedia}
@@ -986,6 +992,7 @@ export const MultiMediaComponent: FC<{
           <div className="hidden mobile:flex justify-end">{information}</div>
         )}
         <div
+          data-pd-media-tools=""
           className={clsx(
             'flex gap-[8px] px-[12px] mobile:px-0 border-t border-newColColor mobile:border-t-0 w-full b1 text-textColor',
             toolsClassName

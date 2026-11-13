@@ -253,3 +253,61 @@
     --color-modalCustom: transparent;
   }
 }
+
+/* PostDelegate layout v2 (PD_UI_V2). The v2 shell adds .pd-v2 to <body>;
+   with the flag off these rules never match and the classic colors stay. */
+:root {
+  .dark.pd-v2 {
+    --pd-side: #0e0e10;
+    --pd-nav-active: rgba(115, 87, 255, 0.16);
+    --pd-nav-active-text: #ffffff;
+    --pd-nav-accent: #7357ff;
+    --pd-section: #6e6e74;
+    --pd-surface: #141416;
+    --pd-surface-2: #1b1b1e;
+    --pd-line: #232327;
+    --pd-line-2: #2e2e33;
+    --pd-ink-3: #6e6e74;
+    --pd-panel: #0c0c0e;
+    --pd-brand-2: #b39aff;
+    --new-back-drop: #030303;
+    --new-settings: #1b1b1e;
+    --new-border: #232327;
+    --new-bgColor: #0a0a0b;
+    --new-bgColorInner: #0a0a0b;
+    --new-sep: #3a3a40;
+    --new-bgLineColor: #232327;
+    --new-textItemBlur: #a3a3a8;
+    --new-boxFocused: #221c45;
+    --new-blockSeparator: #232327;
+    --new-btn-simple: #1b1b1e;
+    --new-box-hover: #19191c;
+    --new-table-border: #2a2a2f;
+    --new-table-header: #141416;
+    --new-table-text: #a3a3a8;
+    --new-small-strips: #141416;
+    --new-big-strips: #0e0e10;
+    --new-col-color: #18181b;
+    --new-menu-dots: #6e6e74;
+    --new-orbit-ring: #0a0a0b;
+    --color-primary: #0a0a0b;
+    --color-secondary: #0d0d0f;
+    --color-third: #0b0b0d;
+    --color-gray: #a3a3a8;
+  }
+  .light.pd-v2 {
+    --pd-side: #fbfbf8;
+    --pd-nav-active: #ece8ff;
+    --pd-nav-active-text: #11141c;
+    --pd-nav-accent: #5b3fe6;
+    --pd-section: #8a8f9c;
+    --pd-surface: #ffffff;
+    --pd-surface-2: #f3f3ee;
+    --pd-line: #e6e7e0;
+    --pd-line-2: #d9dad2;
+    --pd-ink-3: #8a8f9c;
+    --pd-panel: #fbfbf8;
+    --pd-brand-2: #5b3fe6;
+    --new-bgLineColor: #e6e7e0;
+  }
+}
