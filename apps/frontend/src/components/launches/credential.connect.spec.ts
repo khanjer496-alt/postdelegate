@@ -430,13 +430,12 @@ it.each(['cancel', 'abandon', 'confirm'])('consumes the handoff while a shared c
   sessionStorage.setItem('extension-code:review-state', fixture);
   mockFetch.mockImplementation(async (_url, options) => {
     if (mockFetch.mock.calls.length === 1) return { status: 200, ok: true, clone() { return this; }, json: async () => ({ needsConfirmation: true }) };
-    if (action === 'confirm') expect(JSON.parse(options.body).code).toBe(fixture);
     return { status: 401, ok: false, json: async () => ({}) };
   });
   const view = render(React.createElement(ContinueIntegration, { provider: 'wordpress', logged: false, searchParams: { state: 'review-state' } }));
   await view.findByRole('button', { name: 'Connect' });
   if (action === 'cancel') fireEvent.click(view.getByRole('button', { name: 'Cancel' }));
-  if (action === 'confirm') { fireEvent.click(view.getByRole('button', { name: 'Connect' })); await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2)); }
+  if (action === 'confirm') { fireEvent.click(view.getByRole('button', { name: 'Connect' })); await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2)); expect(JSON.parse(mockFetch.mock.calls[1][1].body).code).toBe(fixture); }
   if (action === 'abandon') view.unmount();
   await waitFor(() => expect(sessionStorage.getItem('extension-code:review-state')).toBe(null));
 });
@@ -451,4 +450,20 @@ it('shows the provider-start API error rather than a session-storage warning', a
   expect(mockToast.show.mock.calls.flat().join(' ')).not.toMatch(/session storage/i);
   expect(navigate).not.toHaveBeenCalled();
   expect(sessionStorage.length).toBe(0);
+});
+
+it('captures the MeWe hash token for POST and removes it from current history first', async () => {
+  window.history.replaceState({ router: 'keep' }, '', '/integrations/social/mewe?onboarding=true#loginRequestToken=EXAMPLE-mewe-token&state=hash-state&safe=keep');
+  const snapshots: any[] = [];
+  mockFetch.mockImplementation(async (_url, options) => {
+    snapshots.push({ href: window.location.href, history: window.history.state, search: window.location.search, hash: window.location.hash, body: JSON.parse(options.body) });
+    return { status: 401, ok: false, json: async () => ({}) };
+  });
+  render(React.createElement(ContinueIntegration, { provider: 'mewe', logged: false, searchParams: { onboarding: 'true' } }));
+  await waitFor(() => expect(snapshots).toHaveLength(1));
+  expect(snapshots[0].href).not.toContain('EXAMPLE-mewe-token');
+  expect(snapshots[0].history).toEqual({ router: 'keep' });
+  expect(snapshots[0].search).toBe('?onboarding=true');
+  expect(snapshots[0].hash).toBe('#state=hash-state&safe=keep');
+  expect(snapshots[0].body).toMatchObject({ code: 'EXAMPLE-mewe-token', state: 'hash-state' });
 });

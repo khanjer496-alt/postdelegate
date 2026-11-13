@@ -525,6 +525,7 @@ export const EditorWrapper: FC<{
       {items.map((g, index) => (
         <div
           key={g.id}
+          data-pd-post-item=""
           className={clsx(
             'relative flex flex-col gap-[20px] flex-1 bg-newSettings mobile:bg-transparent',
             index !== last && 'mobile:flex-none',
@@ -947,7 +948,11 @@ export const Editor: FC<{
         id={id}
       >
         <div className="relative cursor-text flex flex-1 flex-col">
-          <div {...getRootProps()} className="flex flex-1 flex-col">
+          <div
+            {...getRootProps()}
+            data-pd-editor-box=""
+            className="flex flex-1 flex-col"
+          >
             <div
               className={clsx(
                 'absolute left-0 top-0 w-full h-full bg-black/70 z-[300] transition-all items-center justify-center flex text-white text-sm',
@@ -958,6 +963,7 @@ export const Editor: FC<{
             </div>
             <div
               onFocus={onActive}
+              data-pd-editor-text=""
               className={clsx(
                 'px-[10px] pt-[10px] bg-newBgColorInner rounded-t-[6px] relative z-[99]',
                 flat && 'mobile:px-0 mobile:pt-0',
@@ -1018,7 +1024,10 @@ export const Editor: FC<{
               }}
             />
             <div className={clsx('flex flex-col', flat && 'mobile:pt-[16px]')}>
-              <div className="flex bg-newBgColorInner rounded-b-[6px] cursor-default">
+              <div
+                data-pd-editor-foot=""
+                className="flex bg-newBgColorInner rounded-b-[6px] cursor-default"
+              >
                 {setImages && (
                   <MultiMediaComponent
                     mediaNotAvailable={num > 0 && comments === 'no-media'}
@@ -1156,7 +1165,9 @@ export const Editor: FC<{
                   />
                 )}
               </div>
-              <div className="mobile:hidden">{childButton}</div>
+              <div className="mobile:hidden" data-pd-editor-after="">
+                {childButton}
+              </div>
             </div>
           </div>
         </div>

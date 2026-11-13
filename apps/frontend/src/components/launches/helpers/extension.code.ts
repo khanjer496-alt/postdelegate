@@ -73,6 +73,22 @@ export const stripConnectCodeFromHistory = () => {
         changed = true;
       }
     }
+    // MeWe returns loginRequestToken in a parameter-style URL fragment.
+    // Preserve non-sensitive fragment state while removing callback credentials.
+    const hashParams = new URLSearchParams(url.hash.substring(1));
+    const hashKeys: string[] = [];
+    hashParams.forEach((_value, key) => hashKeys.push(key));
+    let hashChanged = false;
+    for (const key of hashKeys) {
+      if (sensitive.test(key)) {
+        hashParams.delete(key);
+        hashChanged = true;
+      }
+    }
+    if (hashChanged) {
+      url.hash = hashParams.toString();
+      changed = true;
+    }
     if (changed)
       window.history.replaceState(
         window.history.state,

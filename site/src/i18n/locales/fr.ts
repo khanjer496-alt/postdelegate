@@ -217,7 +217,7 @@ const dict: Dict = {
       { title: 'Content Studio', text: 'Transformez un clip en vidéo verticale sous-titrée, prête à programmer.' },
       { title: 'Vidéos en masse', text: 'Déposez jusqu’à 50 vidéos et PostDelegate les répartit sur vos créneaux de publication.' },
     ],
-    demoAlt: 'Le calendrier PostDelegate actuel en vue semaine : six canaux de démonstration dans la barre latérale (YouTube, Bluesky, Discord, Telegram, Slack et DEV) et une semaine de publications de lancement, pour la plupart programmées, une publiée et deux brouillons',
+    demoAlt: 'Le calendrier PostDelegate en vue semaine : une barre latérale libellée, une bande de canaux pour trois marques d’exemple (Harbor Fitness, Lumen Coffee et Northwind), une semaine de publications programmées, publiées et en brouillon, et un panneau This week avec des actions d’approbation',
     aiEyebrow: 'Utilisez votre propre IA',
     aiTitleA: 'Aucune marge sur l’IA. Utilisez l’assistant',
     aiTitleB: 'que vous ',
