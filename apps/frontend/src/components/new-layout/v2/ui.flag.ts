@@ -7,6 +7,8 @@
 export const UI_FLAG_ENV = 'PD_UI_V2';
 export const UI_FLAG_COOKIE = 'pd_ui';
 export const UI_FLAG_QUERY = 'pd_ui';
+// one year, the same for the server redirect and the in-app switch
+export const UI_FLAG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export type UiFlagMode = 'off' | 'optin' | 'on';
 
