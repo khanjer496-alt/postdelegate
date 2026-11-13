@@ -4,6 +4,16 @@ title: "How to schedule YouTube videos (title, thumbnail, visibility)"
 metaTitle: "How to Schedule YouTube Videos (Title, Thumbnail) | PostDelegate"
 description: "Connect a YouTube channel, set the title, visibility, thumbnail and tags, and schedule a video upload for a time you choose. Covers quotas and Shorts."
 date: "2026-11-01"
+answer: "Yes, you can schedule YouTube videos in PostDelegate: connect your channel, attach the MP4, set the title and visibility, pick a date and time and choose Add to Calendar, and the upload starts by itself at that time."
+faq:
+  - q: "Can you schedule YouTube videos?"
+    a: "Yes. Connect your YouTube channel from Add Channel, attach an MP4, set a title and a visibility, pick a date and time and choose Add to Calendar. The post then publishes automatically at that time. Use Save as draft to keep a video back until the file and title are final."
+  - q: "How to schedule YouTube videos?"
+    a: "Connect your channel (Add Channel, then YouTube, then sign in with Google), choose Create Post and attach the MP4, set the title (2 to 100 characters) and the visibility (Public, Private or Unlisted), add an optional thumbnail, then pick a date and time and choose Add to Calendar. The steps above go through each one."
+  - q: "How do I schedule an upload on YouTube for a specific time?"
+    a: "To schedule an upload on YouTube, pick the date and time in the composer and choose Add to Calendar. Times follow the timezone set in Settings > Global Settings. Post now starts the upload right away, and a draft never publishes until you schedule it."
+  - q: "Is PostDelegate a YouTube video scheduler?"
+    a: "Yes, alongside the other live networks. As a YouTube video scheduler it keeps the video, title, visibility, thumbnail and tags together for each upload and puts the upload on the same calendar as your other posts. The [YouTube scheduler page](/youtube-scheduler) is the short version of this guide. Every plan starts with a 7-day free trial that needs no credit card."
 ---
 
 A YouTube upload has more moving parts than a text post: a video file, a title, a description, a visibility choice, often a thumbnail, and tags. Scheduling means getting all of that ready ahead of time and letting the upload happen at the moment you chose. This guide walks through doing that in PostDelegate, including the details that most often trip people up.

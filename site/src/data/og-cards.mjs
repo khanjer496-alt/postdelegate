@@ -33,7 +33,7 @@ export const OG_CARDS = {
   '/guides/social-media-character-limits': { kicker: 'Guide', title: 'Social media character limits in 2026' },
   '/guides/social-media-mcp-server': { kicker: 'Guide', title: 'What is a social media MCP server?' },
   '/guides/telegram-channel-scheduling': { kicker: 'Guide', title: 'How to schedule posts to a Telegram channel' },
-  '/guides/twitch-and-kick-chat-announcements': { kicker: 'Guide', title: 'How to schedule Twitch and Kick announcements' },
+  '/guides/twitch-and-kick-chat-announcements': { kicker: 'Guide', title: 'Twitch chat announcements: how to schedule them' },
 
   '/compare/blotato-vs-buffer': { kicker: 'Compare', title: 'Blotato vs Buffer: AI content or per channel?' },
   '/compare/blotato-vs-metricool': { kicker: 'Compare', title: 'Blotato vs Metricool: AI content or analytics?' },

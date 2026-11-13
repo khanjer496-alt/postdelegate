@@ -645,9 +645,54 @@ const dict: Dict = {
     },
     'slack-scheduler': {
       action: 'Programar mensajes',
-      description: `Programa mensajes de Slack con texto e imágenes en el canal que elijas, con respuestas en hilo. Agrega PostDelegate a tu espacio de trabajo. Prueba de ${TRIAL_DAYS} días.`,
-      h1: 'Programa mensajes de Slack en cualquier canal.',
-      intro: 'Agrega PostDelegate a un espacio de trabajo de Slack y envía mensajes programados con texto e imágenes al canal que elijas.',
+      title: 'Programar un mensaje en Slack: guía (computadora y móvil)',
+      description: 'Programar un mensaje en Slack: en la computadora con la flecha junto a enviar, en el móvil con pulsación larga. PostDelegate lo programa con tus otros canales.',
+      h1: 'Programar un mensaje en Slack: cómo se hace.',
+      intro: 'En Slack programas un mensaje en la computadora con el ícono de la flecha junto al ícono del avión de papel, y en el móvil manteniendo pulsado ese ícono. Los mensajes periódicos se crean con un flujo de trabajo. Con PostDelegate programas Slack junto a tus otros canales en un solo calendario.',
+      nativeHowTo: {
+        title: 'Programar en Slack mismo',
+        intro: 'Para un mensaje suelto no necesitas ninguna herramienta adicional. Así se hace, según la ayuda de Slack:',
+        sections: [
+          { heading: 'En la computadora', steps: [
+            'Abre el canal, la conversación de mensajes directos o el hilo donde quieres enviar el mensaje.',
+            'Escribe el mensaje y agrega, si quieres, archivos adjuntos, emojis, menciones o formato.',
+            'Haz clic en el ícono de la flecha junto al ícono del avión de papel y elige la fecha y la hora.',
+          ] },
+          { heading: 'En el móvil', steps: [
+            'Abre el canal, la conversación de mensajes directos o el hilo.',
+            'Pulsa el campo de mensaje y escribe el mensaje.',
+            'Mantén pulsado el ícono del avión de papel y elige cuándo se enviará.',
+          ] },
+          { heading: 'Encontrar y cambiar los mensajes programados', steps: [
+            'Haz clic en «Borradores y enviados» en la parte superior de la barra lateral (en el móvil, en la pestaña Inicio, pulsa «Borradores y enviados»).',
+            'Abre la pestaña «Programado».',
+            'En la computadora, pasa el cursor sobre el mensaje para ver sus opciones, como editarlo o eliminarlo. En el móvil, mantenlo pulsado para editarlo, reprogramarlo, enviarlo, cancelarlo o eliminarlo.',
+          ] },
+          { heading: 'Mensajes periódicos con un flujo de trabajo', steps: [
+            'En la computadora, haz clic en «Agentes y herramientas» en la barra lateral y, en «Flujos de trabajo», selecciona «Plantillas».',
+            'Elige la plantilla «Enviar un mensaje programado».',
+            'Haz clic en el primer ícono del lápiz, edita la fecha y la hora de inicio, elige una frecuencia y guarda.',
+            'Haz clic en el segundo ícono del lápiz, escribe el nombre del canal y selecciónalo en la lista, personaliza el mensaje y guarda.',
+            'Haz clic en «Finalizar», ponle un nombre al flujo de trabajo, haz clic en «Siguiente» y luego en «Publicar».',
+          ] },
+        ],
+        sourcesLabel: 'Fuentes (ayuda de Slack):',
+        sources: [
+          { label: 'Cómo enviar y leer mensajes', href: 'https://slack.com/intl/es-la/help/articles/201457107-C%C3%B3mo-enviar-y-leer-mensajes' },
+          { label: 'Programar mensajes periódicos en un canal', href: 'https://slack.com/intl/es-es/help/articles/23814859584659-Automatizaciones--Programar-mensajes-peri%C3%B3dicos-en-un-canal' },
+        ],
+      },
+      fitTitle: 'Cuándo conviene PostDelegate',
+      fitPoints: [
+        'Programas Slack junto a otros canales, como Discord, Telegram o Mastodon, y quieres verlo todo en un solo calendario.',
+        'Otra persona debe revisar y aprobar los mensajes antes de que salgan.',
+        'Quieres que Claude, ChatGPT u otro asistente de IA prepare borradores por MCP y que tú los apruebes.',
+        'Quieres que el mensaje salga desde una app y no desde tu cuenta personal de Slack.',
+      ],
+      localFaq: [
+        { q: '¿Se pueden programar mensajes periódicos en Slack?', a: 'Sí, con un flujo de trabajo. En la computadora haz clic en «Agentes y herramientas», en «Flujos de trabajo» selecciona «Plantillas», elige «Enviar un mensaje programado», define la fecha, la hora y la frecuencia y publica el flujo de trabajo. Un mensaje programado de la forma normal se envía una sola vez.' },
+        { q: '¿Dónde encuentro los mensajes programados en Slack?', a: 'En la parte superior de la barra lateral, en «Borradores y enviados», dentro de la pestaña «Programado». Desde ahí puedes ver las opciones de cada mensaje, como editarlo o eliminarlo. En PostDelegate, los mensajes de Slack programados aparecen en el calendario junto a tus otros canales.' },
+      ],
       plan: [
         'Agrega PostDelegate a un espacio de trabajo desde Agregar canal.',
         'Escribe un mensaje y elige el canal de Slack al que va.',
