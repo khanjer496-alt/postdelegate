@@ -247,7 +247,9 @@ export class ChannelAnalyticsTool implements AgentToolInterface {
     try {
       const key = `mcp-channel-analytics:${orgId}`;
       const count = await this.redis.incr(key);
-      if (count === 1) {
+      // also when an earlier expire was lost (a crash or a Redis error right
+      // after the first incr), or the key would never reset
+      if (count === 1 || (await this.redis.ttl(key)) < 0) {
         await this.redis.expire(key, CHANNEL_ANALYTICS_WINDOW_SECONDS);
       }
       return count > CHANNEL_ANALYTICS_HOURLY_LIMIT;

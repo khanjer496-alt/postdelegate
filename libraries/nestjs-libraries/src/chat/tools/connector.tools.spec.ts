@@ -413,6 +413,7 @@ describe('analytics tools', () => {
         return counts.get(key)!;
       }),
       expire: jest.fn().mockResolvedValue(1),
+      ttl: jest.fn().mockResolvedValue(3000),
     };
     tool.redis = redis as any;
 
@@ -432,6 +433,22 @@ describe('analytics tools', () => {
     expect(redis.incr).toHaveBeenCalledWith('mcp-channel-analytics:org-1');
     // the window starts with the first read only
     expect(redis.expire).toHaveBeenCalledTimes(1);
+    expect(redis.expire).toHaveBeenCalledWith('mcp-channel-analytics:org-1', 3600);
+  });
+
+  it('channelAnalyticsTool sets the window again when its expiry was lost', async () => {
+    const integrations = { checkAnalytics: jest.fn().mockResolvedValue([]) };
+    const tool = new ChannelAnalyticsTool(integrations as any, {} as any);
+    const redis = {
+      // a key left without a TTL after a crash between incr and expire
+      incr: jest.fn().mockResolvedValue(7),
+      ttl: jest.fn().mockResolvedValue(-1),
+      expire: jest.fn().mockResolvedValue(1),
+    };
+    tool.redis = redis as any;
+
+    await call(tool, { integrationId: 'int-1', days: 7 });
+
     expect(redis.expire).toHaveBeenCalledWith('mcp-channel-analytics:org-1', 3600);
   });
 

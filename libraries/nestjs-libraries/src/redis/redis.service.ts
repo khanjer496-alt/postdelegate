@@ -38,6 +38,11 @@ class MockRedis {
     return 1;
   }
 
+  // keys never expire here
+  async ttl() {
+    return -1;
+  }
+
   // Add other Redis methods as needed for your tests
 }
 
