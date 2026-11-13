@@ -8,11 +8,11 @@ const { shot, caption, class: className } = Astro.props;
 const SHOTS = {
   calendar: {
     src: '/images/postdelegate-calendar-month.webp',
-    alt: 'The PostDelegate calendar in month view: a sidebar of six connected channels on the left, and scheduled posts laid out across a week of November.',
+    alt: 'The PostDelegate calendar in month view: a labeled sidebar, a channel strip grouped by customer, and scheduled, draft and in-review posts laid out across November.',
   },
   composer: {
     src: '/images/postdelegate-composer.webp',
-    alt: 'The PostDelegate composer: a post being written for Bluesky with a live character count of 97 of 300, and a preview of it beside the editor showing the channel name and handle.',
+    alt: 'The PostDelegate composer: a post being written for Bluesky, LinkedIn and YouTube, with a live character count of 172 of 300 for Bluesky, and a preview of the post beside the editor.',
   },
 } as const;
 const { src, alt } = SHOTS[shot];

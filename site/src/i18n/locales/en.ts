@@ -218,7 +218,7 @@ const en = {
       { title: 'Content Studio', text: 'Turn a clip into a captioned vertical video, ready to schedule.' },
       { title: 'Bulk video', text: 'Drop in up to 50 videos and PostDelegate spreads them across your posting slots.' },
     ] as Card[],
-    demoAlt: 'The current PostDelegate calendar in week view: six demo channels in the sidebar (YouTube, Bluesky, Discord, Telegram, Slack and DEV) and a week of launch posts, mostly scheduled, one published and two drafts',
+    demoAlt: 'The PostDelegate calendar in week view: a labeled sidebar, a channel strip for three example brands (Harbor Fitness, Lumen Coffee and Northwind), a week of scheduled, published and draft posts, and a This week panel with approval actions',
     aiEyebrow: 'Bring your own AI',
     aiTitleA: 'No AI markup. Use the assistant',
     aiTitleB: 'you already ',
