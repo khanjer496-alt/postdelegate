@@ -684,6 +684,12 @@ export class OAuthService {
     }
   }
 
+  // whether a client_id belongs to an app, for the rate limit of /oauth/token
+  // and /oauth/revoke (ThrottlerOAuthClientGuard)
+  async isRegisteredClient(clientId: string) {
+    return !!(await this._oauthRepository.getAppByClientId(clientId));
+  }
+
   // RFC 7009 token revocation: a client ends its own connection (the access
   // token, which is also its refresh token). Unknown, already revoked or
   // another client's tokens are answered the same way, so the response never

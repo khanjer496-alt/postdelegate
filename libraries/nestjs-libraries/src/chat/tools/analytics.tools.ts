@@ -7,6 +7,7 @@ import { AnalyticsService } from '@gitroom/nestjs-libraries/database/prisma/anal
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { RATE_LIMITS } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 
 // the organization the MCP connection (or the dashboard chat) acts for
 const organizationOf = (inputData: unknown, context: any) => {
@@ -225,11 +226,11 @@ weekday 0 is Sunday. "basis" is "engagement" once there are at least "required" 
   }
 }
 
-// Live reads per workspace and hour: each one can call the network's API and
-// refresh the channel's token. Redis is the only state; when it is
-// unavailable the reads keep working (fail open), as in LoginLockoutService
-export const CHANNEL_ANALYTICS_HOURLY_LIMIT = 60;
-const CHANNEL_ANALYTICS_WINDOW_SECONDS = 60 * 60;
+// Live reads per workspace and hour (RATE_LIMITS.channelAnalytics). Redis is
+// the only state; when it is unavailable the reads keep working (fail open),
+// as in LoginLockoutService
+export const CHANNEL_ANALYTICS_HOURLY_LIMIT = RATE_LIMITS.channelAnalytics;
+const CHANNEL_ANALYTICS_WINDOW_SECONDS = RATE_LIMITS.ttl / 1000;
 
 @Injectable()
 export class ChannelAnalyticsTool implements AgentToolInterface {
