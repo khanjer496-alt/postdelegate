@@ -27,7 +27,15 @@ export const WeekPanelV2: FC<{
 }> = ({ refreshChannel, tools }) => {
   const t = useT();
   const toaster = useToaster();
-  const { posts: rangePosts, listPosts, integrations, reloadCalendarView, display } = useCalendar();
+  const {
+    posts: rangePosts,
+    listPosts,
+    integrations,
+    reloadCalendarView,
+    display,
+    startDate: calendarStart,
+    endDate: calendarEnd,
+  } = useCalendar();
   // the list view loads its own page of posts
   const posts = display === 'list' ? listPosts : rangePosts;
   const openSlots = useOpenSlotCount();
@@ -93,14 +101,26 @@ export const WeekPanelV2: FC<{
     }
   };
 
+  // "This week" / "Today" only while the shown range holds today;
+  // another week or day is named by its dates
+  const rangeStart = newDayjs(calendarStart);
+  const rangeEnd = newDayjs(calendarEnd);
+  const holdsToday =
+    !newDayjs().isBefore(rangeStart, 'day') && !newDayjs().isAfter(rangeEnd, 'day');
   const rangeWord =
     display === 'month'
       ? t('this_month', 'This month')
-      : display === 'day'
-      ? t('today', 'Today')
       : display === 'list'
       ? t('upcoming', 'Upcoming')
-      : t('this_week', 'This week');
+      : display === 'day'
+      ? holdsToday
+        ? t('today', 'Today')
+        : rangeStart.format('ddd, MMM D')
+      : holdsToday
+      ? t('this_week', 'This week')
+      : `${rangeStart.format('MMM D')} – ${rangeEnd.format(
+          rangeStart.month() === rangeEnd.month() ? 'D' : 'MMM D'
+        )}`;
 
   // month and list use the whole width, like the mockups
   if (display === 'list' || display === 'month') {
@@ -330,7 +350,7 @@ export const WeekPanelV2: FC<{
         <div className="text-[12.5px] font-[700] flex items-center gap-[8px]">
           <Icon name="sparkles" size={14} className="text-pdBrand2 shrink-0" />
           {display !== 'list' && openSlots > 0
-            ? display === 'week'
+            ? display === 'week' && holdsToday
               ? t('open_slots_this_week', '{{count}} open slots this week', { count: openSlots })
               : t('open_slots_in_view', '{{count}} open slots in view', { count: openSlots })
             : t('let_your_assistant_fill_slots', 'Let your assistant fill open slots')}

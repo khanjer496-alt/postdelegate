@@ -344,9 +344,12 @@ export const ChannelsComponentV2: FC = () => {
               <span className="text-[12px] text-textItemBlur">
                 {t('of_total_channels', 'of {{total}} channels', { total })}
               </span>
-              <Link href="/billing" className="ms-auto text-[12px] font-[600] text-[#b39aff] hover:underline">
-                {t('upgrade', 'Upgrade')}
-              </Link>
+              {/* nothing to upgrade to on the top plan */}
+              {String(user?.tier?.current || '').toUpperCase() !== 'ULTIMATE' && (
+                <Link href="/billing" className="ms-auto text-[12px] font-[600] text-[#b39aff] hover:underline">
+                  {t('upgrade', 'Upgrade')}
+                </Link>
+              )}
             </div>
             <div className="h-[6px] rounded-full bg-pdSurface2 mt-[10px] overflow-hidden">
               <div
