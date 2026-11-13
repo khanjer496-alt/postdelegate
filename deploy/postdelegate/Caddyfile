@@ -213,7 +213,7 @@ staging.postdelegate.com {
         file_server
     }
     # Public API, MCP and the MCP OAuth endpoints: own auth, no basic auth.
-    @machine path /api/public/* /api/mcp* /api/sse/* /api/message/* /api/.well-known/* /api/oauth/register /api/oauth/token /api/oauth/userinfo
+    @machine path /api/public/* /api/mcp* /api/sse/* /api/message/* /api/.well-known/* /api/oauth/register /api/oauth/token /api/oauth/revoke /api/oauth/userinfo
     handle @machine {
         reverse_proxy postdelegate-staging-app-1:5000
     }

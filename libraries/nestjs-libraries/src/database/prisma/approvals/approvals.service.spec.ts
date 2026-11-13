@@ -706,3 +706,83 @@ describe('ApprovalsService client links', () => {
     expect(repository.revokeLink).toHaveBeenCalledWith('org-2', 'link-1');
   });
 });
+
+describe('ApprovalsService.submitAsAgent (MCP sendPostForReviewTool)', () => {
+  const agent = { type: 'agent' as const, source: 'Claude (MCP)' };
+
+  const withGuardrails = (made: ReturnType<typeof makeService>) => {
+    (made.policy as any).assertAgentGuardrails = jest
+      .fn()
+      .mockResolvedValue(undefined);
+    return made;
+  };
+
+  it('holds a scheduled post as a draft in review and tells the approvers', async () => {
+    const made = withGuardrails(
+      makeService({ post: makePost({ state: 'QUEUE', approvalStatus: 'NONE' }) })
+    );
+
+    await expect(made.service.submitAsAgent(ORG, 'p-1', agent)).resolves.toEqual({
+      id: 'p-1',
+      approvalStatus: 'IN_REVIEW',
+      state: 'DRAFT',
+      submitted: true,
+    });
+
+    expect(moved(made.repository).data).toMatchObject({
+      state: 'DRAFT',
+      approvalStatus: 'IN_REVIEW',
+    });
+    expect(made.activity.recordSafely).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SUBMITTED',
+        actorType: 'AGENT',
+        actorName: 'Claude (MCP)',
+      })
+    );
+    expect(made.policy.notifyApprovers).toHaveBeenCalled();
+    // the channel limit for agents applies, the daily post count does not
+    expect((made.policy as any).assertAgentGuardrails).toHaveBeenCalledWith(
+      ORG,
+      agent,
+      ['i-1'],
+      { countsTowardLimit: false }
+    );
+  });
+
+  it('does nothing for a post already waiting', async () => {
+    const made = withGuardrails(makeService());
+    await expect(made.service.submitAsAgent(ORG, 'p-1', agent)).resolves.toMatchObject({
+      submitted: false,
+    });
+    expect(made.repository.transitionGroup).not.toHaveBeenCalled();
+    expect(made.policy.notifyApprovers).not.toHaveBeenCalled();
+  });
+
+  it('refuses a published post, and a post of another workspace', async () => {
+    const published = withGuardrails(
+      makeService({ post: makePost({ state: 'PUBLISHED', approvalStatus: 'NONE' }) })
+    );
+    await expect(
+      published.service.submitAsAgent(ORG, 'p-1', agent)
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const other = withGuardrails(makeService());
+    await expect(
+      other.service.submitAsAgent('org-2', 'p-1', agent)
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('respects the channels open to agents', async () => {
+    const made = withGuardrails(
+      makeService({ post: makePost({ state: 'QUEUE', approvalStatus: 'NONE' }) })
+    );
+    (made.policy as any).assertAgentGuardrails.mockRejectedValue(
+      new BadRequestException("AI agents can't post to \"Brand X\"")
+    );
+    await expect(
+      made.service.submitAsAgent(ORG, 'p-1', agent)
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(made.repository.transitionGroup).not.toHaveBeenCalled();
+  });
+});

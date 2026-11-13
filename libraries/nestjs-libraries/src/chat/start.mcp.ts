@@ -262,10 +262,12 @@ export const startMcp = async (app: INestApplication) => {
       registration: false,
       refresh: false,
     },
+    // dynamically registered clients get refresh tokens (see
+    // OAuthService.refreshFields)
     '/mcp-oauth-dynamic': {
       issuer: new URL('/mcp-oauth-dynamic', process.env.NEXT_PUBLIC_BACKEND_URL!).toString(),
       registration: true,
-      refresh: false,
+      refresh: true,
     },
     ...(hubspotOAuthClientId
       ? {
@@ -284,6 +286,8 @@ export const startMcp = async (app: INestApplication) => {
     issuer: server.issuer,
     authorization_endpoint: `${process.env.FRONTEND_URL}/oauth/authorize`,
     token_endpoint: `${backendUrl}/oauth/token`,
+    revocation_endpoint: `${backendUrl}/oauth/revoke`,
+    revocation_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
     ...(server.registration && {
       registration_endpoint: `${backendUrl}/oauth/register`,
     }),
@@ -395,7 +399,7 @@ export const startMcp = async (app: INestApplication) => {
       version: '1.0.0',
     },
     description:
-      'Schedule, list, update and delete social media posts on the channels connected to a PostDelegate workspace, and upload the media they use.',
+      'Schedule, review, list, update and delete social media posts on the channels connected to a PostDelegate workspace, send posts for approval, read analytics and the best time to post, and upload the media posts use.',
     version: '1.0.0',
     protocolVersion: mcpProtocolVersion,
     websiteUrl: mcpWebsiteUrl,

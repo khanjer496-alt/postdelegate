@@ -1,0 +1,375 @@
+// the tools are built with stub services, their modules only need to load
+jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
+  IntegrationManager: class {},
+  socialIntegrationList: [],
+}));
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service',
+  () => ({ IntegrationService: class {} })
+);
+jest.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => ({
+  PostsService: class {},
+}));
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.service',
+  () => ({ AnalyticsService: class {} })
+);
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/approvals/approvals.service',
+  () => ({ ApprovalsService: class {} })
+);
+jest.mock(
+  '@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service',
+  () => ({ ApprovalPolicyService: class {} })
+);
+
+import 'reflect-metadata';
+import { BadRequestException } from '@nestjs/common';
+import { runWithContext } from '@gitroom/nestjs-libraries/chat/async.storage';
+import { IntegrationSchedulePostTool } from '@gitroom/nestjs-libraries/chat/tools/integration.schedule.post';
+import {
+  CreatePostForReviewTool,
+  SendPostForReviewTool,
+} from '@gitroom/nestjs-libraries/chat/tools/post.review.tool';
+import { PostUpdateTool } from '@gitroom/nestjs-libraries/chat/tools/post.update.tool';
+import {
+  AnalyticsMetricsTool,
+  AnalyticsTopPostsTool,
+  BestTimeToPostTool,
+  ChannelAnalyticsTool,
+} from '@gitroom/nestjs-libraries/chat/tools/analytics.tools';
+import { requiredMcpScope } from '@gitroom/nestjs-libraries/chat/mcp.scopes';
+
+// the request context the MCP server fills (checkAuth copies the auth in)
+const contextFor = (orgId = 'org-1') => {
+  const values = new Map<string, string>();
+  return {
+    requestContext: {
+      get: (key: string) => values.get(key),
+      set: (key: string, value: string) => values.set(key, value),
+    },
+  };
+};
+
+// runs a tool the way an MCP client call does
+const call = (tool: any, input: unknown, source = 'Claude (MCP)') =>
+  runWithContext(
+    { requestId: 'r', auth: { id: 'org-1', name: 'QA' }, source },
+    () => tool.run().execute(input, contextFor())
+  );
+
+const UPLOAD = 'https://uploads.postdelegate.com/a.png';
+
+const socialPost = (type = 'draft') => ({
+  socialPost: [
+    {
+      integrationId: 'int-1',
+      isPremium: false,
+      date: '2030-01-01T09:00:00',
+      shortLink: false,
+      type,
+      postsAndComments: [{ content: '<p>Hello</p>', attachments: [] }],
+      settings: [],
+    },
+  ],
+});
+
+describe('createPostForReviewTool', () => {
+  const build = () => {
+    const postsService = {
+      validatePosts: jest.fn().mockResolvedValue([
+        { name: 'QA LinkedIn', valid: true, errors: true, tooLong: false },
+      ]),
+      createPost: jest
+        .fn()
+        .mockResolvedValue([{ postId: 'post-1', integration: 'int-1' }]),
+    };
+    const integrationService = {
+      getIntegrationById: jest
+        .fn()
+        .mockResolvedValue({ id: 'int-1', providerIdentifier: 'linkedin' }),
+    };
+    const policy = { assertAgentGuardrails: jest.fn() };
+    const approvals = {
+      submitAsAgent: jest.fn().mockResolvedValue({ id: 'post-1' }),
+    };
+    const schedule = new IntegrationSchedulePostTool(
+      postsService as any,
+      integrationService as any,
+      policy as any,
+      approvals as any
+    );
+    return {
+      tool: new CreatePostForReviewTool(schedule),
+      schedule,
+      postsService,
+      approvals,
+    };
+  };
+
+  it('saves a draft, checks it like a scheduled post and sends it for review', async () => {
+    const { tool, postsService, approvals } = build();
+
+    const result = await call(tool, socialPost('draft'));
+
+    // a draft would skip the checks: the review copy is checked as scheduled
+    expect(postsService.validatePosts.mock.calls[0][2]).toBe('schedule');
+    expect(postsService.createPost.mock.calls[0][1].type).toBe('draft');
+    expect(postsService.createPost.mock.calls[0][4]).toEqual({
+      type: 'agent',
+      source: 'Claude (MCP)',
+    });
+    expect(approvals.submitAsAgent).toHaveBeenCalledWith('org-1', 'post-1', {
+      type: 'agent',
+      source: 'Claude (MCP)',
+    });
+    expect(result.output[0]).toMatchObject({
+      postId: 'post-1',
+      approvalStatus: 'IN_REVIEW',
+      previewUrl: expect.stringContaining('/p/post-1'),
+    });
+  });
+
+  it('never publishes "now" posts directly', async () => {
+    const { tool, postsService } = build();
+    await call(tool, socialPost('now'));
+    expect(postsService.createPost.mock.calls[0][1].type).toBe('draft');
+  });
+
+  it('returns validation problems instead of creating anything', async () => {
+    const { tool, postsService, approvals } = build();
+    postsService.validatePosts.mockResolvedValue([
+      { name: 'QA X', valid: true, errors: true, tooLong: true, maximumCharacters: 280 },
+    ]);
+
+    const result = await call(tool, socialPost('schedule'));
+
+    expect(result.output.errors).toContain('createPostForReviewTool');
+    expect(postsService.createPost).not.toHaveBeenCalled();
+    expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
+
+  it('the schedule tool itself never sends for review', async () => {
+    const { schedule, approvals, postsService } = build();
+    await call(schedule, socialPost('schedule'));
+    expect(postsService.createPost.mock.calls[0][1].type).toBe('schedule');
+    expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendPostForReviewTool', () => {
+  it('sends the post for review as the MCP client', async () => {
+    const approvals = {
+      submitAsAgent: jest.fn().mockResolvedValue({
+        id: 'post-1',
+        approvalStatus: 'IN_REVIEW',
+        state: 'DRAFT',
+        submitted: true,
+      }),
+    };
+    const result = await call(new SendPostForReviewTool(approvals as any), {
+      postId: 'post-1',
+    });
+    expect(approvals.submitAsAgent).toHaveBeenCalledWith('org-1', 'post-1', {
+      type: 'agent',
+      source: 'Claude (MCP)',
+    });
+    expect(result).toEqual({
+      output: {
+        postId: 'post-1',
+        approvalStatus: 'IN_REVIEW',
+        state: 'DRAFT',
+        submitted: true,
+      },
+    });
+  });
+
+  it('explains why a post cannot be sent', async () => {
+    const approvals = {
+      submitAsAgent: jest
+        .fn()
+        .mockRejectedValue(
+          new BadRequestException('This post was already published.')
+        ),
+    };
+    await expect(
+      call(new SendPostForReviewTool(approvals as any), { postId: 'p' })
+    ).resolves.toEqual({
+      output: { errors: 'This post was already published.' },
+    });
+  });
+});
+
+describe('postUpdateTool', () => {
+  const build = () => {
+    const postsService = {
+      updatePostInPlace: jest.fn().mockResolvedValue({
+        postId: 'post-1',
+        publishDate: '2030-01-02T10:00:00',
+      }),
+    };
+    return { tool: new PostUpdateTool(postsService as any), postsService };
+  };
+
+  it('changes text, media, date and settings in place', async () => {
+    const { tool, postsService } = build();
+
+    const result = await call(tool, {
+      id: 'post-1',
+      date: '2030-01-02T10:00:00',
+      postsAndComments: [
+        { content: '<p>New</p>', attachments: [{ path: UPLOAD, alt: 'A' }] },
+        { content: '<p>Comment</p>' },
+      ],
+      settings: [{ key: 'post_as_images_carousel', value: true }],
+    });
+
+    expect(postsService.updatePostInPlace).toHaveBeenCalledWith(
+      'org-1',
+      'post-1',
+      {
+        date: '2030-01-02T10:00:00',
+        settings: { post_as_images_carousel: true },
+        value: [
+          {
+            content: '<p>New</p>',
+            image: [
+              { path: UPLOAD, alt: 'A', thumbnail: undefined, thumbnailTimestamp: undefined },
+            ],
+          },
+          // media left out is kept
+          { content: '<p>Comment</p>', image: undefined },
+        ],
+      },
+      'MCP',
+      { type: 'agent', source: 'Claude (MCP)' }
+    );
+    expect(result.output).toMatchObject({
+      postId: 'post-1',
+      previewUrl: expect.stringContaining('/p/post-1'),
+    });
+  });
+
+  it('asks for something to change', async () => {
+    const { tool, postsService } = build();
+    const result = await call(tool, { id: 'post-1' });
+    expect(result.output.errors).toContain('Nothing to change');
+    expect(postsService.updatePostInPlace).not.toHaveBeenCalled();
+  });
+
+  it('turns service refusals into errors the client can show', async () => {
+    const { tool, postsService } = build();
+    postsService.updatePostInPlace.mockRejectedValue(
+      new BadRequestException('The new date of a scheduled post must be in the future')
+    );
+    await expect(
+      call(tool, { id: 'post-1', date: '2020-01-01T00:00:00' })
+    ).resolves.toEqual({
+      output: {
+        errors: 'The new date of a scheduled post must be in the future',
+      },
+    });
+  });
+});
+
+describe('analytics tools', () => {
+  it('analyticsMetricsTool reads the trends of the workspace', async () => {
+    const analytics = { getTrends: jest.fn().mockResolvedValue({ collecting: true }) };
+    await expect(
+      call(new AnalyticsMetricsTool(analytics as any), { days: 7, integrationId: 'int-1' })
+    ).resolves.toEqual({ output: { collecting: true } });
+    expect(analytics.getTrends).toHaveBeenCalledWith('org-1', 7, 'int-1');
+  });
+
+  it('analyticsTopPostsTool passes the ranking and a default limit', async () => {
+    const analytics = { getTopPosts: jest.fn().mockResolvedValue({ posts: [] }) };
+    await call(new AnalyticsTopPostsTool(analytics as any), {
+      days: 30,
+      sort: 'views',
+      integrationIds: ['int-1'],
+    });
+    expect(analytics.getTopPosts).toHaveBeenCalledWith('org-1', 30, {
+      sort: 'views',
+      order: undefined,
+      integrations: ['int-1'],
+      limit: 10,
+    });
+  });
+
+  it('bestTimeToPostTool narrows to a network in the given timezone', async () => {
+    const analytics = { getBestTimes: jest.fn().mockResolvedValue({ bestHours: [] }) };
+    await call(new BestTimeToPostTool(analytics as any), {
+      days: 90,
+      timezone: 'Asia/Dubai',
+      platform: 'linkedin',
+    });
+    expect(analytics.getBestTimes).toHaveBeenCalledWith(
+      'org-1',
+      90,
+      'Asia/Dubai',
+      expect.any(Date),
+      { provider: 'linkedin', integrationIds: undefined }
+    );
+  });
+
+  it('bestTimeToPostTool refuses an unknown timezone', async () => {
+    const analytics = { getBestTimes: jest.fn() };
+    const result = await call(new BestTimeToPostTool(analytics as any), {
+      days: 90,
+      timezone: 'Mars/Olympus',
+    });
+    expect(result.output.errors).toContain('Unknown timezone');
+    expect(analytics.getBestTimes).not.toHaveBeenCalled();
+  });
+
+  it('channelAnalyticsTool reads a channel without ever disconnecting it', async () => {
+    const integrations = { checkAnalytics: jest.fn().mockResolvedValue([{ label: 'Followers' }]) };
+    const posts = { checkPostAnalytics: jest.fn() };
+    const result = await call(
+      new ChannelAnalyticsTool(integrations as any, posts as any),
+      { integrationId: 'int-1', days: 7 }
+    );
+    expect(result).toEqual({ output: [{ label: 'Followers' }] });
+    expect(integrations.checkAnalytics).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'org-1' }),
+      'int-1',
+      '7',
+      false,
+      'soft'
+    );
+  });
+
+  it('channelAnalyticsTool reads one post, and needs exactly one id', async () => {
+    const integrations = { checkAnalytics: jest.fn() };
+    const posts = {
+      checkPostAnalytics: jest.fn().mockResolvedValue({ missing: true }),
+    };
+    const tool = new ChannelAnalyticsTool(integrations as any, posts as any);
+    await expect(call(tool, { postId: 'post-1', days: 30 })).resolves.toEqual({
+      output: [],
+    });
+    expect(posts.checkPostAnalytics).toHaveBeenCalledWith('org-1', 'post-1', 30);
+    expect((await call(tool, { days: 30 })).output.errors).toBeDefined();
+    expect(
+      (await call(tool, { days: 30, postId: 'a', integrationId: 'b' })).output.errors
+    ).toBeDefined();
+  });
+
+  it('read-only tokens can use the analytics tools, but not the post tools', () => {
+    for (const name of [
+      'analyticsMetricsTool',
+      'analyticsTopPostsTool',
+      'bestTimeToPostTool',
+      'channelAnalyticsTool',
+    ]) {
+      expect(requiredMcpScope(name)).toBe('mcp:read');
+    }
+    for (const name of [
+      'postUpdateTool',
+      'createPostForReviewTool',
+      'sendPostForReviewTool',
+    ]) {
+      expect(requiredMcpScope(name)).toBe('mcp:write');
+    }
+  });
+});
