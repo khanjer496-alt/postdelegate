@@ -374,10 +374,15 @@ export const startMcp = async (app: INestApplication) => {
   // generation, no clipping), which every endpoint offers
   const dynamicIssuer = authorizationServers['/mcp-oauth-dynamic'].issuer;
   const oauthMcpUrl = new URL('/mcp-oauth-dynamic', process.env.NEXT_PUBLIC_BACKEND_URL!).toString();
-  // MCP lists a tool under its id, which is not always its key in claudeTools
+  // MCP lists a tool under its key in claudeTools, which is not always its id
+  // (integrationSchedulePostTool is keyed by its name but has the id
+  // schedulePostTool), so both are mapped
   const annotationsById = Object.fromEntries(
-    Object.values(claudeTools as Record<string, { id: string; mcp?: { annotations?: { title?: string } } }>).map(
-      (tool) => [tool.id, tool.mcp?.annotations]
+    Object.entries(claudeTools as Record<string, { id: string; mcp?: { annotations?: { title?: string } } }>).flatMap(
+      ([key, tool]) => [
+        [tool.id, tool.mcp?.annotations],
+        [key, tool.mcp?.annotations],
+      ]
     )
   );
   const serverCardTools = (await claudeOauthServer.getToolListInfo()).tools.map((tool) => {
