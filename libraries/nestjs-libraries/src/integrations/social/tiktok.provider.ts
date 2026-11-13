@@ -52,14 +52,19 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   name = 'TikTok';
   isBetweenSteps = false;
   convertToJPEG = true;
-  scopes = [
-    'video.list',
-    'user.info.basic',
-    'video.publish',
-    'video.upload',
-    'user.info.profile',
-    'user.info.stats',
-  ];
+  optionalScopes = ['video.list', 'user.info.profile', 'user.info.stats'];
+  override get analyticsAvailable() {
+    return ['user.info.stats', 'video.list'].every((scope) =>
+      this.scopes.includes(scope)
+    );
+  }
+  get scopes() {
+    return this.requestedScopes([
+      'user.info.basic',
+      'video.publish',
+      'video.upload',
+    ]);
+  }
   override maxConcurrentJob = 10000;
   dto = TikTokDto;
   editor = 'normal' as const;
@@ -350,11 +355,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
     const {
       data: {
-        user: { avatar_url, display_name, open_id, username },
+        user: { avatar_url, display_name, open_id },
       },
     } = await (
       await fetch(
-        'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id,username',
+        'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id',
         {
           method: 'GET',
           headers: {
@@ -371,7 +376,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       id: open_id.replace(/-/g, ''),
       name: display_name,
       picture: avatar_url || '',
-      username: username,
+      username: '',
     };
   }
 
@@ -426,14 +431,15 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     this.checkScopes(this.scopes, scope);
+    const scopeWarnings = this.scopeWarnings(scope);
 
     const {
       data: {
-        user: { avatar_url, display_name, open_id, username },
+        user: { avatar_url, display_name, open_id },
       },
     } = await (
       await fetch(
-        'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id,username',
+        'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id',
         {
           method: 'GET',
           headers: {
@@ -443,14 +449,18 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       )
     ).json();
 
+    // Direct Post creator info provides the username without user.info.profile.
+    const username = await this.creatorUsername(access_token);
+
     return {
+      scopeWarnings,
       id: open_id.replace(/-/g, ''),
       name: display_name,
       accessToken: access_token,
       refreshToken: refresh_token,
       expiresIn: dayjs().add(23, 'hours').unix() - dayjs().unix(),
       picture: avatar_url,
-      username: username,
+      username,
     };
   }
 
@@ -551,7 +561,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     if (!isPhoto && creator.duetDisabled && this.assetBoolean(settings.duet)) {
       invalid('Duet is disabled by this TikTok account.');
     }
-    if (!isPhoto && creator.stitchDisabled && this.assetBoolean(settings.stitch)) {
+    if (
+      !isPhoto &&
+      creator.stitchDisabled &&
+      this.assetBoolean(settings.stitch)
+    ) {
       invalid('Stitch is disabled by this TikTok account.');
     }
     const branded = this.assetBoolean(settings.brand_content_toggle);
@@ -626,8 +640,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       return {
         status: 'completed',
         releaseURL: !publicPostId
-          ? `https://www.tiktok.com/@${integration.profile}`
-          : this.postUrl(integration, pendingData.publishId, publicPostId),
+          ? await this.profileUrl(integration, accessToken)
+          : await this.postUrl(integration, pendingData.publishId, publicPostId, accessToken),
         postId: !publicPostId ? pendingData.publishId : publicPostId,
       };
     }
@@ -647,8 +661,24 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
   // photo posts (p_pub_... / p_inbox_...) live under /photo/, TikTok rejects
   // /video/ for them
-  private postUrl(integration: Integration, publishId: string, postId: string) {
-    return `https://www.tiktok.com/@${integration.profile}/${
+  private async creatorUsername(accessToken: string): Promise<string> {
+    try {
+      return (await this.creatorInfo(accessToken)).creatorUsername;
+    } catch {
+      // Posting limits and temporary creator-info errors must not block OAuth.
+      return '';
+    }
+  }
+
+  private async profileUrl(integration: Integration, accessToken: string) {
+    const username = integration.profile || await this.creatorUsername(accessToken);
+    return username ? `https://www.tiktok.com/@${username}` : 'https://www.tiktok.com';
+  }
+
+  private async postUrl(integration: Integration, publishId: string, postId: string, accessToken: string) {
+    const profileUrl = await this.profileUrl(integration, accessToken);
+    if (profileUrl === 'https://www.tiktok.com') return profileUrl;
+    return `${profileUrl}/${
       publishId.indexOf('p_') === 0 ? 'photo' : 'video'
     }/${postId}`;
   }
@@ -747,7 +777,9 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
     return {
       post_info: {
-        ...(firstPost.settings.title ? { title: firstPost.settings.title } : {}),
+        ...(firstPost.settings.title
+          ? { title: firstPost.settings.title }
+          : {}),
         description: firstPost.message,
       },
     };
@@ -882,10 +914,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     release();
     const text = await upload.text().catch(() => '{}');
 
-    if (
-      (upload.status >= 500 || upload.status === 429) &&
-      totalRetries <= 2
-    ) {
+    if ((upload.status >= 500 || upload.status === 429) && totalRetries <= 2) {
       await timer(5000);
       return this.uploadTikTokChunk(
         uploadUrl,
@@ -1448,7 +1477,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
     return {
       postId: publicPostId,
-      releaseURL: this.postUrl(integration, publishId, publicPostId),
+      releaseURL: await this.postUrl(integration, publishId, publicPostId, accessToken),
     };
   }
 

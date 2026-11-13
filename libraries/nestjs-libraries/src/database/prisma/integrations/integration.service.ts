@@ -698,6 +698,8 @@ export class IntegrationService {
       getIntegration.providerIdentifier
     );
 
+    if (integrationProvider.analyticsAvailable === false) return [];
+
     if (
       dayjs(getIntegration?.tokenExpiration).isBefore(dayjs()) ||
       forceRefresh
@@ -810,6 +812,8 @@ export class IntegrationService {
       unavailable: true as const,
       posts: [] as RecentPostStat[],
     };
+
+    if (integrationProvider.analyticsAvailable === false) return unavailable;
 
     if (
       dayjs(getIntegration.tokenExpiration).isBefore(dayjs()) ||

@@ -1092,6 +1092,20 @@ export class PostsRepository {
     });
   }
 
+  // Optional-feature defaults must not reject an edit of an already saved
+  // sequence. Derive its group server-side; caller IDs cannot admit new replies.
+  async isExistingPostSequence(orgId: string, integrationId: string, entryIds: string[]) {
+    if (entryIds.length < 2 || new Set(entryIds).size !== entryIds.length || entryIds.some(id => !id)) return false;
+    const root = await this._post.model.post.findFirst({
+      where: { id: entryIds[0], organizationId: orgId, integrationId, parentPostId: null, deletedAt: null },
+      select: { group: true },
+    });
+    if (!root) return false;
+    return await this._post.model.post.count({
+      where: { organizationId: orgId, integrationId, group: root.group, deletedAt: null, id: { in: entryIds } },
+    }) === entryIds.length;
+  }
+
   // The organization is required: see getPost above.
   async getPostById(id: string, org: OrgScope) {
     const post = await this._post.model.post.findUnique({

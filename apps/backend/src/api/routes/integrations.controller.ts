@@ -128,7 +128,11 @@ export class IntegrationsController {
       await ioRedis.del(`organization:${state}`);
       await deleteConnectBinding(state);
       if (binding.type === 'session') {
-        res.cookie(connectNonceCookie(state), '', connectNonceCookieOptions(-1));
+        res.cookie(
+          connectNonceCookie(state),
+          '',
+          connectNonceCookieOptions(-1)
+        );
       }
     }
 
@@ -215,7 +219,8 @@ export class IntegrationsController {
             stripLinks: !!findIntegration?.stripLinks?.(),
             picture: p.picture || '/no-picture.jpg',
             identifier: p.providerIdentifier,
-            dataDeletionNotice: findIntegration.authorizationPolicy?.deletionNotice,
+            dataDeletionNotice:
+              findIntegration.authorizationPolicy?.deletionNotice,
             inBetweenSteps: p.inBetweenSteps,
             refreshNeeded: p.refreshNeeded,
             // what those two flags and `disabled` mean together, decided in
@@ -230,7 +235,11 @@ export class IntegrationsController {
             time: JSON.parse(p.postingTimes),
             changeProfilePicture: !!findIntegration?.changeProfilePicture,
             changeNickName: !!findIntegration?.changeNickname,
-            recentPosts: !!findIntegration?.recentPosts,
+            commentsAvailable: findIntegration.plugsAvailable !== false,
+            analyticsAvailable: findIntegration.analyticsAvailable !== false,
+            recentPosts:
+              findIntegration.analyticsAvailable !== false &&
+              !!findIntegration?.recentPosts,
             customer: p.customer,
             additionalSettings: p.additionalSettings || '[]',
           };
@@ -529,10 +538,8 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
   ) {
-    const getIntegration = await this._integrationService.getActiveIntegrationById(
-      org.id,
-      body.id
-    );
+    const getIntegration =
+      await this._integrationService.getActiveIntegrationById(org.id, body.id);
     if (!getIntegration) {
       throw new Error('Invalid integration');
     }
@@ -587,10 +594,8 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
   ): Promise<any> {
-    const getIntegration = await this._integrationService.getIntegrationForFunction(
-      org.id,
-      body.id
-    );
+    const getIntegration =
+      await this._integrationService.getIntegrationForFunction(org.id, body.id);
     if (!getIntegration) {
       throw new Error('Invalid integration');
     }

@@ -200,6 +200,7 @@ export type GenerateAuthUrlResponse = {
 };
 
 export type AuthTokenDetails = {
+  scopeWarnings?: string[];
   id: string;
   name: string;
   error?: string;
@@ -395,6 +396,8 @@ export interface SocialProvider
   oneTimeToken?: boolean;
   isBetweenSteps: boolean;
   scopes: string[];
+  analyticsAvailable?: boolean;
+  plugsAvailable?: boolean;
   externalUrl?: (
     url: string
   ) => Promise<{ client_id: string; client_secret: string }>;

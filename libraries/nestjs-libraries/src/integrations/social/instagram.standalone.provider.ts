@@ -9,6 +9,7 @@ import {
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import dayjs from 'dayjs';
 import {
+  BadBody,
   AnalyticsUnavailable,
   markPartialAnalytics,
   SocialAbstract,
@@ -33,13 +34,25 @@ export class InstagramStandaloneProvider
   name = 'Instagram\n(Standalone)';
   isBetweenSteps = false;
   refreshCron = true;
-  scopes = [
-    'instagram_business_basic',
-    'instagram_business_content_publish',
+  optionalScopes = [
     'instagram_business_manage_comments',
     'instagram_business_manage_insights',
   ];
-    override maxConcurrentJob = 200; // Instagram standalone has stricter limits
+  override get analyticsAvailable() {
+    return ['instagram_business_manage_insights'].every((scope) =>
+      this.scopes.includes(scope)
+    );
+  }
+  override get plugsAvailable() {
+    return this.scopes.includes('instagram_business_manage_comments');
+  }
+  get scopes() {
+    return this.requestedScopes([
+      'instagram_business_basic',
+      'instagram_business_content_publish',
+    ]);
+  }
+  override maxConcurrentJob = 200; // Instagram standalone has stricter limits
   dto = InstagramDto;
 
   editor = 'normal' as const;
@@ -182,6 +195,7 @@ export class InstagramStandaloneProvider
     ).json();
 
     this.checkScopes(this.scopes, getAccessToken.permissions);
+    const scopeWarnings = this.scopeWarnings(getAccessToken.permissions);
 
     const { user_id, name, username, profile_picture_url } = await (
       await fetch(
@@ -190,6 +204,7 @@ export class InstagramStandaloneProvider
     ).json();
 
     return {
+      scopeWarnings,
       id: user_id,
       name,
       accessToken: access_token,
@@ -253,7 +268,11 @@ export class InstagramStandaloneProvider
     pendingData: any,
     integration: Integration
   ) {
-    return instagramProvider.finalizePost(accessToken, pendingData, integration);
+    return instagramProvider.finalizePost(
+      accessToken,
+      pendingData,
+      integration
+    );
   }
 
   async comment(
@@ -264,6 +283,7 @@ export class InstagramStandaloneProvider
     postDetails: PostDetails<InstagramDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
+    // Existing scheduled replies use their token grants, not consent defaults.
     return instagramProvider.comment(
       id,
       postId,
@@ -276,7 +296,11 @@ export class InstagramStandaloneProvider
   }
 
   async accountStats(id: string, accessToken: string) {
-    return instagramProvider.accountStats(id, accessToken, 'graph.instagram.com');
+    return instagramProvider.accountStats(
+      id,
+      accessToken,
+      'graph.instagram.com'
+    );
   }
 
   // percentageChange 0 hides the trend badge: nothing here measures a real

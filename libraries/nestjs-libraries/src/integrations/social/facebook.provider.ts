@@ -35,14 +35,24 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
   identifier = 'facebook';
   name = 'Facebook Page';
   isBetweenSteps = true;
-  scopes = [
-    'pages_show_list',
+  optionalScopes = [
     'business_management',
-    'pages_manage_posts',
     'pages_manage_engagement',
-    'pages_read_engagement',
     'read_insights',
   ];
+  override get analyticsAvailable() {
+    return ['read_insights'].every((scope) => this.scopes.includes(scope));
+  }
+  override get plugsAvailable() {
+    return this.scopes.includes('pages_manage_engagement');
+  }
+  get scopes() {
+    return this.requestedScopes([
+      'pages_show_list',
+      'pages_manage_posts',
+      'pages_read_engagement',
+    ]);
+  }
   override maxConcurrentJob = 500; // Facebook has reasonable rate limits
   editor = 'normal' as const;
 
@@ -190,7 +200,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       return {
         type: 'bad-body' as const,
         value: 'Invalid file',
-      }
+      };
     }
 
     if (body.indexOf('1404102') > -1) {
@@ -420,6 +430,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       .filter((d: any) => d.status === 'granted')
       .map((p: any) => p.permission);
     this.checkScopes(this.scopes, permissions);
+    const scopeWarnings = this.scopeWarnings(permissions);
 
     const { id, name, picture } = await (
       await fetch(
@@ -428,6 +439,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     return {
+      scopeWarnings,
       id,
       name,
       accessToken: access_token,
@@ -1042,6 +1054,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     postDetails: PostDetails<FacebookDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
+    // Existing scheduled replies use their token grants, not consent defaults.
     const [commentPost] = postDetails;
     const replyToId = lastCommentId || postId;
 

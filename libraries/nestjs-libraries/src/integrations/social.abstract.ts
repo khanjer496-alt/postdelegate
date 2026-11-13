@@ -389,17 +389,19 @@ export abstract class SocialAbstract {
       return (
         // the media path is user-influenced, so it goes through the same
         // SSRF-safe client as every other outbound media read
-        await this.getSsrfSafeAxios()({
-          url: path,
-          method: 'GET',
-          responseType: 'arraybuffer',
-          // Same stall as the ranged reads: headers arrive fast and the body
-          // then stops, and without a deadline the read never settles and
-          // holds the activity's worker slot. Images are a few MB and arrive
-          // in about a second.
-          signal: AbortSignal.timeout(MEDIA_READ_TIMEOUT),
-        })
-      ).data;
+        (
+          await this.getSsrfSafeAxios()({
+            url: path,
+            method: 'GET',
+            responseType: 'arraybuffer',
+            // Same stall as the ranged reads: headers arrive fast and the body
+            // then stops, and without a deadline the read never settles and
+            // holds the activity's worker slot. Images are a few MB and arrive
+            // in about a second.
+            signal: AbortSignal.timeout(MEDIA_READ_TIMEOUT),
+          })
+        ).data
+      );
     } catch (err: any) {
       // axios reports an aborted signal as a canceled request
       if (err?.code !== 'ERR_CANCELED' && !isReadTimeout(err)) {
@@ -412,7 +414,10 @@ export abstract class SocialAbstract {
 
       throw new BadBody(
         '',
-        JSON.stringify({ timeoutMs: MEDIA_READ_TIMEOUT, path: stripQuery(path) }),
+        JSON.stringify({
+          timeoutMs: MEDIA_READ_TIMEOUT,
+          path: stripQuery(path),
+        }),
         Buffer.from('{}'),
         'We could not read the media for this post, so it was not published'
       );
@@ -482,9 +487,7 @@ export abstract class SocialAbstract {
     retried = false
   ): Promise<Buffer> {
     if (path.indexOf('http') === 0) {
-      setHeartbeatDetails(
-        `media chunk ${start}-${end} ${stripQuery(path)}`
-      );
+      setHeartbeatDetails(`media chunk ${start}-${end} ${stripQuery(path)}`);
       try {
         const response = await fetch(path, {
           headers: {
@@ -770,12 +773,7 @@ export abstract class SocialAbstract {
     }
 
     if (handleError?.type === 'disconnect') {
-      throw new Disconnect(
-        identifier,
-        json,
-        options.body!,
-        handleError?.value
-      );
+      throw new Disconnect(identifier, json, options.body!, handleError?.value);
     }
 
     if (
@@ -799,23 +797,59 @@ export abstract class SocialAbstract {
     );
   }
 
-  checkScopes(required: string[], got: string | string[]) {
-    if (Array.isArray(got)) {
-      if (!required.every((scope) => got.includes(scope))) {
-        throw new NotEnoughScopes();
-      }
+  optionalScopes: string[] = [];
+  get analyticsAvailable() {
+    return true;
+  }
+  get plugsAvailable() {
+    return true;
+  }
 
-      return true;
+  // Explicit allowlist: an env typo must never request an unreviewed permission.
+  requestedScopes(minimum: string[]) {
+    const identifier = this.identifier;
+    const enabled = (
+      process.env[
+        `${identifier.toUpperCase().replace(/-/g, '_')}_OPTIONAL_SCOPES`
+      ] || ''
+    )
+      .split(/[\s,]+/)
+      .filter(Boolean);
+    return [
+      ...minimum,
+      ...this.optionalScopes.filter((scope) => enabled.includes(scope)),
+    ];
+  }
+
+  private grantedScopes(got: string | string[]) {
+    if (Array.isArray(got)) return got;
+    try {
+      return decodeURIComponent(got || '')
+        .split(/[\s,]+/)
+        .filter(Boolean);
+    } catch {
+      return [];
     }
+  }
 
-    const newGot = decodeURIComponent(got);
+  scopeWarnings(got: string | string[]) {
+    const granted = this.grantedScopes(got);
+    return this.requestedScopes([])
+      .filter((scope) => !granted.includes(scope))
+      .map(
+        (scope) =>
+          `Connected for publishing. Optional permission ${scope} was not granted; features that need it are unavailable.`
+      );
+  }
 
-    const splitType = newGot.indexOf(',') > -1 ? ',' : ' ';
-    const gotArray = newGot.split(splitType);
-    if (!required.every((scope) => gotArray.includes(scope))) {
+  checkScopes(required: string[], got: string | string[]) {
+    const granted = this.grantedScopes(got);
+    const minimum = required.filter(
+      (scope) => !this.optionalScopes.includes(scope)
+    );
+    if (!minimum.every((scope) => granted.includes(scope))) {
       throw new NotEnoughScopes();
     }
-
     return true;
   }
 }

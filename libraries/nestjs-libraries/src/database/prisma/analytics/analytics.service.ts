@@ -104,6 +104,7 @@ type PostContentRow = Awaited<
 // authorization policy allows keeping its analytics (YouTube does not)
 export const isHistoryProvider = (provider?: SocialProvider) =>
   !!provider &&
+  provider.analyticsAvailable !== false &&
   !provider.authorizationPolicy?.bypassAnalyticsCache &&
   !!(
     provider.accountStats ||

@@ -74,6 +74,8 @@ import {
 } from '@gitroom/frontend/components/ui/icons';
 import { DelayComponent } from '@gitroom/frontend/components/new-launch/delay.component';
 
+import { CompositionCapabilityNotice } from './composition.capability.notice';
+
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
 
 const InterceptBoldShortcut = Extension.create({
@@ -248,8 +250,9 @@ export const EditorWrapper: FC<{
   // phones show one toolbar, for the post that is being edited
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  // without comments only the first post is shown
-  const last = comments ? items.length - 1 : 0;
+  // The store preserves saved replies while respecting native provider support.
+  const showAllEntries = !!comments;
+  const last = showAllEntries ? items.length - 1 : 0;
   const active = canEdit ? Math.min(activeIndex ?? last, last) : -1;
 
   const setValue = useCallback(
@@ -461,11 +464,15 @@ export const EditorWrapper: FC<{
       className={clsx(
         // on phones the toolbar is fixed at the bottom, the posts leave room for it
         'relative flex-col gap-[20px] flex-1 min-w-0 mobile:flex mobile:gap-0 mobile:pb-[64px]',
-        (items.length === 1 || !canEdit || !comments) && 'flex',
-        ((!canEdit && !isCreateSet) || !comments) &&
+        (items.length === 1 || !canEdit || !showAllEntries) && 'flex',
+        ((!canEdit && !isCreateSet) || !showAllEntries) &&
           'bg-newSettings mobile:bg-transparent rounded-[12px]'
       )}
     >
+      <CompositionCapabilityNotice
+        commentsUnavailable={selectedIntegration.some(p => (current === 'global' || p.integration.id === current) && p.integration.commentsAvailable === false)}
+        analyticsUnavailable={selectedIntegration.some(p => (current === 'global' || p.integration.id === current) && p.integration.analyticsAvailable === false)}
+      />
       {isCreateSet && current !== 'global' && (
         <>
           <div className="text-center absolute w-full h-full left-0 top-0 items-center justify-center flex z-[101] flex-col gap-[16px]">
@@ -523,9 +530,9 @@ export const EditorWrapper: FC<{
             'relative flex flex-col gap-[20px] flex-1 bg-newSettings mobile:bg-transparent',
             index !== last && 'mobile:flex-none',
             index === 0 && 'rounded-t-[12px]',
-            (index === items.length - 1 || !comments) && 'rounded-b-[12px]',
+            (index === items.length - 1 || !showAllEntries) && 'rounded-b-[12px]',
             !canEdit && !isCreateSet && 'blur-s',
-            ((!canEdit && index > 0) || (!comments && index > 0)) && 'hidden'
+            (!canEdit || !showAllEntries) && index > 0 && 'hidden'
           )}
         >
           <div className="flex gap-[5px] mobile:gap-[16px] flex-1 w-full min-w-0">
@@ -563,14 +570,14 @@ export const EditorWrapper: FC<{
                 selectedIntegration={selectedIntegration}
                 chars={chars}
                 childButton={
-                  (canEdit && items.length - 1 === index) || !comments
+                  (canEdit && items.length - 1 === index) || !showAllEntries
                     ? postButtons(index)
                     : null
                 }
                 toolBarEnd={active === index ? postButtons(index) : undefined}
               />
             </div>
-            {comments && (
+            {showAllEntries && (
               <div
                 className={clsx(
                   // on phones the icons sit in the corner, next to the first line
