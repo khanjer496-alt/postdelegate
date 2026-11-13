@@ -31,6 +31,11 @@ const EXEMPT: Record<string, string> = {
   // the approval link itself is the capability, and it is a signed token
   'public.approvals.controller.ts#getLink': 'signed approval token is the capability',
   'public.approvals.controller.ts#act': 'signed approval token is the capability',
+  // the published link-in-bio page (PD_FF_SMARTLINKS) is public by design;
+  // unpublished pages 404, and only counts (no visitor data) are written
+  'public.smartlinks.controller.ts#page': 'published public link-in-bio page, by slug',
+  'public.smartlinks.controller.ts#view': 'published public link-in-bio page, view counter',
+  'public.smartlinks.controller.ts#click': 'published public link-in-bio page, click counter',
   // the OAuth/connect flows run before an organization is in context; each
   // resolves its own tenant from the state or token it was given
   'no.auth.integrations.controller.ts#connectSocialMedia': 'pre-auth OAuth callback, resolves its own org',

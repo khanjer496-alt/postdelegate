@@ -69,6 +69,8 @@ import { PostsImportController } from '@gitroom/backend/api/routes/posts.import.
 import { PostsBulkVideosController } from '@gitroom/backend/api/routes/posts.bulk.videos.controller';
 import { WeeklySummaryController } from '@gitroom/backend/api/routes/weekly.summary.controller';
 import { StudioController } from '@gitroom/backend/api/routes/studio.controller';
+import { SmartLinksController } from '@gitroom/backend/api/routes/smartlinks.controller';
+import { PublicSmartLinksController } from '@gitroom/backend/api/routes/public.smartlinks.controller';
 
 const authenticatedController = [
   UsersController,
@@ -102,6 +104,7 @@ const authenticatedController = [
   PostsBulkVideosController,
   WeeklySummaryController,
   StudioController,
+  SmartLinksController,
 ];
 @Module({
   imports: [UploadModule],
@@ -120,6 +123,7 @@ const authenticatedController = [
         PublicController,
         PublicReviewsController,
         PublicApprovalsController,
+        PublicSmartLinksController,
         MonitorController,
         EnterpriseController,
         NoAuthIntegrationsController,
