@@ -162,6 +162,7 @@ export const aggregateMeasurement = (
           (row) =>
             row.organizationId === trial.organizationId &&
             row.kind === 'qualifying_schedule' &&
+            eligible(row) &&
             row.occurredAt >= trial.occurredAt &&
             row.occurredAt.getTime() < after48
         )

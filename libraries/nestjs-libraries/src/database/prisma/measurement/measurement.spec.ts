@@ -322,3 +322,15 @@ it.each([
   await service.payment('cus_synthetic', 'sub_synthetic', 'in_other', 1500, 'usd', new Date(now));
   expect(saved.size).toBe(2);
 });
+
+it.each([false, true])('counts a cohort schedule only when the schedule itself is eligible (diagnostic=%s)', internalOrTest => {
+  const trialAt = new Date(now - 4 * 86400000);
+  const report = aggregateMeasurement([
+    row('trial_started', { occurredAt: trialAt }),
+    row('qualifying_schedule', { occurredAt: new Date(now - 3 * 86400000), internalOrTest,
+      humanApproval: true, acceptedPublishAt: new Date(now + 86400000) }),
+  ], new Set(), new Date(now - 10 * 86400000), new Date(now + 1), new Date(now - 5 * 86400000), new Date(now));
+  expect(report.cohorts[0]).toMatchObject({eligible_trials: 1, fully_observed_48h_trials: 1,
+    first_qualifying_schedules_within_48h: internalOrTest ? 0 : 1});
+  expect(report.reconciliation.internal_excluded).toBe(internalOrTest ? 1 : 0);
+});
