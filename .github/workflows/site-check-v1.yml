@@ -37,6 +37,8 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 site/scripts/test-public-payload.py -v
       - name: Comparison cost-label regression
         run: node site/scripts/test-comparison-cost-labels.mjs
+      - name: Synthetic runtime diagnostic checks (no native spawn)
+        run: node site/scripts/test-preview-runtime-diagnostics.mjs
       - name: Install standalone site
         working-directory: site
         run: pnpm install --ignore-workspace --frozen-lockfile
@@ -61,12 +63,16 @@ jobs:
         run: |
           set -euo pipefail
           stage="$(mktemp -d "$RUNNER_TEMP/site-preview.XXXXXX")"
-          mkdir "$stage/payload" "$stage/evidence"
+          mkdir "$stage/payload" "$stage/evidence" "$stage/diagnostics"
+          echo "diagnostics=$stage/diagnostics/*.json" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           cp -R site/dist/. "$stage/payload/"
           # No repository/config/functions discovery or production bindings in preview.
           node --version > "$stage/evidence/node-version.txt"
           pnpm --version > "$stage/evidence/pnpm-version.txt"
           "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" --version > "$stage/evidence/wrangler-version.txt"
+          node "$GITHUB_WORKSPACE/site/scripts/preview-runtime-diagnostics.mjs" \
+            "$RUNNER_TEMP/site-cli" "$stage/diagnostics/runtime-diagnostics.json"
           cd "$stage"
           setsid "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages dev "$stage/payload" --no-bundle --ip 127.0.0.1 --port 8789 > "$stage/preview.log" 2>&1 &
           preview_pid=$!
@@ -76,11 +82,32 @@ jobs:
             wait "$preview_pid" 2>/dev/null || true
           }
           trap cleanup EXIT
+          acceptance_exit=0
           python3 "$GITHUB_WORKSPACE/site/scripts/accept-public-payload.py" \
             --payload "$stage/payload" --base http://127.0.0.1:8789 \
-            --source "$GITHUB_WORKSPACE" --output "$stage/evidence"
+            --source "$GITHUB_WORKSPACE" --output "$stage/evidence" \
+            --diagnostics "$stage/diagnostics/preview-diagnostics.json" || acceptance_exit=$?
+          preview_state=running
+          preview_exit=''
+          if ! kill -0 "$preview_pid" 2>/dev/null; then
+            preview_state=exited
+            preview_exit=0
+            wait "$preview_pid" || preview_exit=$?
+          fi
+          python3 "$GITHUB_WORKSPACE/site/scripts/accept-public-payload.py" \
+            --finalize-diagnostics "$stage/diagnostics/preview-diagnostics.json" \
+            --process-state "$preview_state" --process-exit "$preview_exit" \
+            --acceptance-exit "$acceptance_exit" --version-dir "$stage/evidence"
+          if [ "$acceptance_exit" -ne 0 ]; then exit "$acceptance_exit"; fi
           echo "path=$stage/evidence" >> "$GITHUB_OUTPUT"
-          echo "sha=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Upload failure-only structured preview diagnostics (never a release payload)
+        if: ${{ failure() && steps.accept.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview-diagnostics-${{ steps.accept.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.accept.outputs.diagnostics }}
+          if-no-files-found: error
+          retention-days: 3
       - name: Upload checked source-bound bundle and evidence
         uses: actions/upload-artifact@v4
         with:

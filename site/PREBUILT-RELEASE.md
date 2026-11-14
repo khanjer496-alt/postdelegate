@@ -20,6 +20,20 @@ ID/digest is external provenance: it cannot be embedded before upload in its own
 manifest. Failed checks never upload a release artifact. Page count is measured
 from actual generated HTML and recorded in acceptance evidence.
 
+If preview acceptance fails, a separate three-day `site-preview-diagnostics-*`
+artifact contains only structured diagnostics: phase/check/category, at most 100
+loopback request outcomes, pre-cleanup process state/exit (null while running),
+acceptance exit, public configured flags and configured/observed Wrangler version.
+The sibling runtime diagnostic resolves the installed native workerd dependency,
+records file/executable/version/probe-exit or fixed spawn-error category, and labels
+the isolated project's explicit script policy and observed `ignore-scripts` setting.
+Absent manifest policy is not proof that an install script was blocked. Native
+version/config probes run only on the hosted runner, each limited to five seconds.
+It is marked `releasable: false`; it includes no payload, raw preview log, response
+body/header, exception text, environment, binding or credential. It is never a
+release artifact. A startup failure or security/sandbox refusal must be investigated
+before altering platform/flags; these diagnostics do not authorize bypassing it.
+
 ## Release Engineer gates (no ready uploader supplied)
 
 1. Obtain Reviewer plus specialist/QA approval and CEO go for the exact final

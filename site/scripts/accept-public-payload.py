@@ -17,7 +17,7 @@ import tarfile
 import time
 from html import unescape
 from html.parser import HTMLParser
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 REPOSITORY = 'khanjer496-alt/postdelegate'
@@ -26,11 +26,69 @@ ROUTES = ['/alternatives/' + name for name in ('recurpost', 'post-planner', 'cos
 CONTROL = ('_worker.js', '_routes.json', '_headers', '_redirects')
 EXTENSIONS = {'.html', '.js', '.css', '.json', '.xml', '.txt', '.md', '.mdc', '.png', '.svg',
               '.ico', '.webp', '.woff2', '.webmanifest', '.zip'}
+DIAGNOSTICS = {'phase': 'setup', 'loopbackRequests': []}
+DIAGNOSTICS_PATH = None
+CHECK_LABELS = ('preview readiness timeout', 'canonical', 'H1 count', 'title count/length',
+                'description length', 'inherited trial CTA/hook', 'FAQPage count',
+                'hidden FAQ subtree/ancestor', 'visible/schema FAQ mismatch', 'CSP preservation',
+                'HTTP status', 'sitemap inclusion', 'hub outbound link', 'page return link',
+                'HTML preference', 'Markdown twin', 'direct Markdown pass-through', 'Content-Location',
+                'canonical Link', 'Vary', 'cache', 'static pass-through', 'static cache headers',
+                'static CSP preservation', 'unexpected tool versions', 'payload changed during preview')
 
 
 def require(condition, message):
     if not condition:
+        DIAGNOSTICS['validationCheck'] = next((label for label in CHECK_LABELS
+                                              if message == label or message.endswith(': ' + label)),
+                                             'other-validation')
         raise ValueError(message)
+
+
+def exception_category(error):
+    if isinstance(error, HTTPError):
+        return 'http-error'
+    if isinstance(error, URLError):
+        return exception_category(error.reason) if isinstance(error.reason, Exception) else 'network-error'
+    for kind, label in ((ConnectionRefusedError, 'connection-refused'), (TimeoutError, 'timeout'),
+                        (ConnectionResetError, 'connection-reset'), (PermissionError, 'permission-error'),
+                        (FileNotFoundError, 'file-not-found'), (ValueError, 'validation-error'),
+                        (OSError, 'os-error')):
+        if isinstance(error, kind):
+            return label
+    return 'unexpected-error'
+
+
+def record_request(path, accept, category, status=None):
+    # Never retain URL/query, headers, bodies, exception messages, env or raw CLI logs.
+    known = ['/alternatives', *ROUTES, '/docs', '/docs.md', '/docs/channels/telegram',
+             '/docs/channels/telegram.md']
+    label = path if path in known else 'static-asset' if path.startswith('/_astro/') else 'other-local'
+    mode = {'text/html': 'html', 'text/markdown': 'markdown',
+            'text/html;q=1, text/markdown;q=0.5': 'html-preferred'}.get(accept, 'other')
+    records = DIAGNOSTICS['loopbackRequests']
+    if len(records) < 100:
+        records.append({'route': label, 'accept': mode, 'category': category,
+                        'status': status if isinstance(status, int) else None})
+
+
+def write_diagnostics(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(DIAGNOSTICS, indent=2) + '\n')
+
+
+def finalize_diagnostics(path, process_state, process_exit, acceptance_exit, version_dir):
+    data = json.loads(path.read_text()) if path.exists() else {'phase': 'setup', 'loopbackRequests': []}
+    data.update({'schemaVersion': 1, 'releasable': False, 'processStateBeforeCleanup': process_state,
+                 'processExitBeforeCleanup': int(process_exit) if process_exit else None,
+                 'acceptanceExit': acceptance_exit,
+                 'configuredCommand': ['wrangler', 'pages', 'dev', '<disposable-public-payload>',
+                                       '--no-bundle', '--ip', '127.0.0.1', '--port', '8789'],
+                 'configuredWranglerVersion': '4.162.0'})
+    output = (version_dir / 'wrangler-version.txt').read_text()[:4096]
+    match = re.search(r'(?<![\d.])(4\.162\.0)(?![\d.])', output)
+    data['observedWranglerVersion'] = match.group(1) if match else None
+    path.write_text(json.dumps(data, indent=2) + '\n')
 
 
 def digest(data):
@@ -186,9 +244,15 @@ def client(base):
     def get(path, accept='text/html', ua='site-acceptance-v1'):
         require(path.startswith('/') and not path.startswith('//'), 'nonlocal request')
         request = Request(base + path, headers={'Accept': accept, 'User-Agent': ua})
-        with opener.open(request, timeout=5) as response:
-            require(response.status == 200, path + ': HTTP status')
-            return response.read(), response.headers
+        try:
+            with opener.open(request, timeout=5) as response:
+                record_request(path, accept, 'response', response.status)
+                require(response.status == 200, path + ': HTTP status')
+                return response.read(), response.headers
+        except Exception as error:
+            record_request(path, accept, exception_category(error),
+                           error.code if isinstance(error, HTTPError) else None)
+            raise
     return get
 
 
@@ -212,6 +276,7 @@ def global_csp(payload):
 def check_preview(payload, base, signup):
     get = client(base)
     expected_csp = global_csp(payload)
+    DIAGNOSTICS['phase'] = 'readiness'
     deadline = time.monotonic() + 60
     while True:
         try:
@@ -220,6 +285,7 @@ def check_preview(payload, base, signup):
         except (URLError, TimeoutError):
             require(time.monotonic() < deadline, 'preview readiness timeout')
             time.sleep(1)
+    DIAGNOSTICS['phase'] = 'pages'
     pages = {}
     sitemap = ''.join(file.read_text() for file in payload.glob('sitemap*.xml'))
     for route in ['/alternatives', *ROUTES]:
@@ -238,6 +304,7 @@ def check_preview(payload, base, signup):
                 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'}
     # Check both root docs and a nested twin: root and nested middleware must survive compilation.
     docs = []
+    DIAGNOSTICS['phase'] = 'docs'
     for route in ('/docs', '/docs/channels/telegram'):
         html, html_headers = get(route)
         markdown, md_headers = get(route, 'text/markdown', 'Googlebot')
@@ -262,6 +329,7 @@ def check_preview(payload, base, signup):
                 require(headers.get(name) == value, route + ': security ' + name)
             require(headers.get('Content-Security-Policy') == expected_csp, route + ': CSP preservation')
         docs.append(route)
+    DIAGNOSTICS['phase'] = 'static-asset'
     asset = next(iter(sorted(payload.glob('_astro/*.css'))), None)
     require(asset is not None, 'no built CSS asset')
     body, headers = get('/' + asset.relative_to(payload).as_posix(), 'text/markdown', 'Googlebot')
@@ -315,6 +383,7 @@ def extract_bundle(bundle, destination, approved_sha):
 
 
 def main():
+    global DIAGNOSTICS_PATH
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--payload', type=Path)
     parser.add_argument('--base')
@@ -323,7 +392,20 @@ def main():
     parser.add_argument('--extract', type=Path)
     parser.add_argument('--destination', type=Path)
     parser.add_argument('--approved-sha')
+    parser.add_argument('--diagnostics', type=Path)
+    parser.add_argument('--finalize-diagnostics', type=Path)
+    parser.add_argument('--process-state', choices=('running', 'exited'))
+    parser.add_argument('--process-exit', default='')
+    parser.add_argument('--acceptance-exit', type=int)
+    parser.add_argument('--version-dir', type=Path)
     args = parser.parse_args()
+    if args.finalize_diagnostics:
+        finalize_diagnostics(args.finalize_diagnostics, args.process_state, args.process_exit,
+                             args.acceptance_exit, args.version_dir)
+        return
+    DIAGNOSTICS_PATH = args.diagnostics
+    if DIAGNOSTICS_PATH:
+        write_diagnostics(DIAGNOSTICS_PATH)
     if args.extract:
         require(args.destination and re.fullmatch(r'[0-9a-f]{40}', args.approved_sha or ''),
                 'extract requires destination and approved SHA')
@@ -333,6 +415,7 @@ def main():
     require(all((args.payload, args.base, args.source, args.output)), 'missing acceptance arguments')
     require(os.environ.get('GITHUB_ACTIONS') == 'true', 'actual preview acceptance is hosted CI only')
     require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY, 'noncanonical repository')
+    DIAGNOSTICS['phase'] = 'payload-validation'
     files = inventory(args.payload)
     for name in CONTROL[1:]:
         require((args.payload / name).read_bytes() == (args.source / 'site/public' / name).read_bytes(),
@@ -340,6 +423,7 @@ def main():
     site_source = (args.source / 'site/src/data/site.ts').read_text()
     signup = re.search(r"signup:\s*['\"]([^'\"]+)['\"]", site_source).group(1)
     evidence = check_preview(args.payload, args.base, signup)
+    DIAGNOSTICS['phase'] = 'sealing'
     require(inventory(args.payload) == files, 'payload changed during preview')
     sha = subprocess.check_output(['git', '-C', str(args.source), 'rev-parse', 'HEAD'], text=True).strip()
     require(re.fullmatch(r'[0-9a-f]{40}', sha), 'invalid checkout SHA')
@@ -361,7 +445,18 @@ def main():
     (args.output / 'acceptance.json').write_text(json.dumps({'status': 'passed', 'sourceSha': sha,
                                                           **evidence}, indent=2) + '\n')
     print(json.dumps({'status': 'passed', 'sourceSha': sha, **evidence}))
+    DIAGNOSTICS['phase'] = 'passed'
+    if DIAGNOSTICS_PATH:
+        write_diagnostics(DIAGNOSTICS_PATH)
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        if DIAGNOSTICS_PATH is None:
+            raise
+        DIAGNOSTICS['acceptanceExceptionCategory'] = exception_category(error)
+        write_diagnostics(DIAGNOSTICS_PATH)
+        print('Acceptance failed (' + exception_category(error) + '); see structured diagnostics.')
+        raise SystemExit(1)

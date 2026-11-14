@@ -8,6 +8,7 @@ import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 
 spec = importlib.util.spec_from_file_location('acceptance', Path(__file__).with_name('accept-public-payload.py'))
 acceptance = importlib.util.module_from_spec(spec)
@@ -30,6 +31,10 @@ def page(canonical='https://postdelegate.com/alternatives/recurpost'):
 
 
 class PublicPayloadTests(unittest.TestCase):
+    def setUp(self):
+        acceptance.DIAGNOSTICS.clear()
+        acceptance.DIAGNOSTICS.update({'phase': 'setup', 'loopbackRequests': []})
+
     def test_expected_page_pass(self):
         acceptance.check_page(page(), '/alternatives/recurpost', SIGNUP)
 
@@ -245,6 +250,50 @@ class PublicPayloadTests(unittest.TestCase):
                 get = self.synthetic_preview(payload, weak_csp_on=kind)
                 with patch.object(acceptance, 'client', return_value=get), self.assertRaisesRegex(ValueError, 'CSP'):
                     acceptance.check_preview(payload, 'http://127.0.0.1:8789', SIGNUP)
+
+    def test_diagnostic_request_categories_are_bounded_and_no_raw_values(self):
+        errors = ((URLError(ConnectionRefusedError('private runtime text')), 'connection-refused'),
+                  (TimeoutError('private timeout text'), 'timeout'),
+                  (PermissionError('private sandbox text'), 'permission-error'),
+                  (HTTPError('https://private.invalid/?token=hidden', 503, 'private reason', {}, None),
+                   'http-error'))
+        for error, category in errors:
+            opener = unittest.mock.Mock()
+            opener.open.side_effect = error
+            with patch.object(acceptance, 'build_opener', return_value=opener):
+                get = acceptance.client('http://127.0.0.1:8789')
+                with self.assertRaises(type(error)):
+                    get('/alternatives')
+            record = acceptance.DIAGNOSTICS['loopbackRequests'][-1]
+            self.assertEqual(record['category'], category)
+            self.assertEqual(record['status'], 503 if isinstance(error, HTTPError) else None)
+            if isinstance(error, HTTPError):
+                error.close()
+        for _ in range(150):
+            acceptance.record_request('/private?token=hidden', 'private accept', 'network-error')
+        self.assertEqual(len(acceptance.DIAGNOSTICS['loopbackRequests']), 100)
+        encoded = json.dumps(acceptance.DIAGNOSTICS)
+        for forbidden in ('private', 'token', 'hidden', 'sandbox text', 'https://'):
+            self.assertNotIn(forbidden, encoded)
+
+    def test_failure_diagnostic_keeps_only_public_command_version_and_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'diagnostics.json'
+            acceptance.DIAGNOSTICS['phase'] = 'readiness'
+            acceptance.DIAGNOSTICS['acceptanceExceptionCategory'] = 'validation-error'
+            acceptance.record_request('/alternatives', 'text/html', 'connection-refused')
+            acceptance.write_diagnostics(path)
+            (root / 'wrangler-version.txt').write_text('private prefix: wrangler 4.162.0 private suffix')
+            acceptance.finalize_diagnostics(path, 'exited', '1', 1, root)
+            data = json.loads(path.read_text())
+            self.assertFalse(data['releasable'])
+            self.assertEqual(data['processExitBeforeCleanup'], 1)
+            self.assertEqual(data['observedWranglerVersion'], '4.162.0')
+            self.assertIn('--no-bundle', data['configuredCommand'])
+            self.assertNotIn('private', path.read_text())
+            acceptance.finalize_diagnostics(path, 'running', '', 1, root)
+            self.assertIsNone(json.loads(path.read_text())['processExitBeforeCleanup'])
 
 
 if __name__ == '__main__':
