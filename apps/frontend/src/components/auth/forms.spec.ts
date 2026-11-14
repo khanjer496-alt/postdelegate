@@ -14,7 +14,7 @@ jest.mock('@gitroom/react/translation/translated-label', () => ({
   TranslatedLabel: ({ label }: any) => label,
 }));
 jest.mock('@gitroom/react/helpers/variable.context', () => ({
-  useVariables: () => ({ isGeneral: true }),
+  useVariables: () => mockVariables,
 }));
 jest.mock('@hookform/resolvers/class-validator', () => ({
   classValidatorResolver: () => async (values: any) => ({ values, errors: {} }),
@@ -53,7 +53,7 @@ jest.mock('@gitroom/frontend/components/auth/providers/oauth.provider', () => ({
 }));
 jest.mock(
   '@gitroom/frontend/components/auth/providers/farcaster.provider',
-  () => ({ FarcasterProvider: () => null })
+  () => ({ FarcasterProvider: () => React.createElement('button', { type: 'button', 'data-farcaster-login': '' }, 'Farcaster') })
 );
 jest.mock('@gitroom/frontend/components/layout/loading', () => ({
   LoadingComponent: () => null,
@@ -100,6 +100,24 @@ describe.each(cases)(
       expect(form.action).not.toContain('example-reset-token');
     });
 
+    it('declares the purpose of each autofill field', () => {
+      const container = document.createElement('div');
+      container.innerHTML = renderToString(
+        React.createElement(Component as any, props)
+      );
+      const purposes: Record<string, string> = {
+        email: 'email',
+        password: _name === 'login' ? 'current-password' : 'new-password',
+        repeatPassword: 'new-password',
+        company: 'organization',
+      };
+      for (const input of container.querySelectorAll<HTMLInputElement>(
+        'input'
+      )) {
+        expect(input.autocomplete).toBe(purposes[input.name]);
+      }
+    });
+
     it('enables submission after hydration and prevents native URL navigation', async () => {
       const element = React.createElement(Component as any, props);
       const container = document.createElement('div');
@@ -113,6 +131,12 @@ describe.each(cases)(
         'button[type="submit"]'
       )!;
       expect(button.disabled).toBe(false);
+      const password = container.querySelector('input[type="password"]');
+      if (password) {
+        const paste = new Event('paste', { bubbles: true, cancelable: true });
+        password.dispatchEvent(paste);
+        expect(paste.defaultPrevented).toBe(false);
+      }
       mockFetch.mockResolvedValue({
         ok: false,
         status: 400,
@@ -148,3 +172,18 @@ describe.each(cases)(
     });
   }
 );
+
+const mockVariables: Record<string, any> = { isGeneral: true };
+describe.each([['Login', Login, {}], ['Register', RegisterAfter, { token: '', provider: '' }]])('%s provider visibility', (_name, Component, props) => {
+  afterEach(() => { delete mockVariables.farcasterLoginEnabled; delete mockVariables.neynarClientId; });
+  it.each([undefined, false])('hides Farcaster with a client id and an absent/false auth flag (%s)', enabled => {
+    mockVariables.neynarClientId = 'example-client-id';
+    mockVariables.farcasterLoginEnabled = enabled;
+    expect(renderToString(React.createElement(Component as any, props))).not.toContain('data-farcaster-login');
+  });
+  it('shows Farcaster only when enabled with its client id', () => {
+    mockVariables.neynarClientId = 'example-client-id';
+    mockVariables.farcasterLoginEnabled = true;
+    expect(renderToString(React.createElement(Component as any, props))).toContain('data-farcaster-login');
+  });
+});

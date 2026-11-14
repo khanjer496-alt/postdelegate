@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   PostDetails,
   PostResponse,
@@ -8,6 +9,9 @@ import {
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import dayjs from 'dayjs';
 import {
+  BadBody,
+  AnalyticsUnavailable,
+  markPartialAnalytics,
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -30,13 +34,25 @@ export class InstagramStandaloneProvider
   name = 'Instagram\n(Standalone)';
   isBetweenSteps = false;
   refreshCron = true;
-  scopes = [
-    'instagram_business_basic',
-    'instagram_business_content_publish',
+  optionalScopes = [
     'instagram_business_manage_comments',
     'instagram_business_manage_insights',
   ];
-    override maxConcurrentJob = 200; // Instagram standalone has stricter limits
+  override get analyticsAvailable() {
+    return ['instagram_business_manage_insights'].every((scope) =>
+      this.scopes.includes(scope)
+    );
+  }
+  override get plugsAvailable() {
+    return this.scopes.includes('instagram_business_manage_comments');
+  }
+  get scopes() {
+    return this.requestedScopes([
+      'instagram_business_basic',
+      'instagram_business_content_publish',
+    ]);
+  }
+  override maxConcurrentJob = 200; // Instagram standalone has stricter limits
   dto = InstagramDto;
 
   editor = 'normal' as const;
@@ -179,6 +195,7 @@ export class InstagramStandaloneProvider
     ).json();
 
     this.checkScopes(this.scopes, getAccessToken.permissions);
+    const scopeWarnings = this.scopeWarnings(getAccessToken.permissions);
 
     const { user_id, name, username, profile_picture_url } = await (
       await fetch(
@@ -187,6 +204,7 @@ export class InstagramStandaloneProvider
     ).json();
 
     return {
+      scopeWarnings,
       id: user_id,
       name,
       accessToken: access_token,
@@ -250,7 +268,11 @@ export class InstagramStandaloneProvider
     pendingData: any,
     integration: Integration
   ) {
-    return instagramProvider.finalizePost(accessToken, pendingData, integration);
+    return instagramProvider.finalizePost(
+      accessToken,
+      pendingData,
+      integration
+    );
   }
 
   async comment(
@@ -261,6 +283,7 @@ export class InstagramStandaloneProvider
     postDetails: PostDetails<InstagramDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
+    // Existing scheduled replies use their token grants, not consent defaults.
     return instagramProvider.comment(
       id,
       postId,
@@ -273,16 +296,105 @@ export class InstagramStandaloneProvider
   }
 
   async accountStats(id: string, accessToken: string) {
-    return instagramProvider.accountStats(id, accessToken, 'graph.instagram.com');
-  }
-
-  async analytics(id: string, accessToken: string, date: number) {
-    return instagramProvider.analytics(
+    return instagramProvider.accountStats(
       id,
       accessToken,
-      date,
       'graph.instagram.com'
     );
+  }
+
+  // percentageChange 0 hides the trend badge: nothing here measures a real
+  // comparison against an earlier period, so no trend is claimed.
+  // A finite total_value is the card number when the daily series is missing
+  // or is only zeros. A real series is kept. One failed request does not drop
+  // totals already read from the other. Same two requests as production.
+  private insightCard(metric: any): AnalyticsData | null {
+    const labels: Record<string, string> = {
+      follower_count: 'Follower Count',
+      reach: 'Reach',
+      likes: 'Likes',
+      views: 'Views',
+      comments: 'Comments',
+      shares: 'Shares',
+      saves: 'Saves',
+      replies: 'Replies',
+    };
+    const label =
+      metric && typeof metric.name === 'string' ? labels[metric.name] : undefined;
+    if (!label) return null;
+    const rawTotal = metric.total_value?.value;
+    const total =
+      typeof rawTotal === 'number' && Number.isFinite(rawTotal) && rawTotal >= 0
+        ? rawTotal
+        : undefined;
+    const series = Array.isArray(metric.values)
+      ? metric.values.filter(
+          (point: any) =>
+            typeof point?.value === 'number' &&
+            Number.isFinite(point.value) &&
+            point.value >= 0
+        )
+      : [];
+    const seriesSum = series.reduce(
+      (sum: number, point: any) => sum + point.value,
+      0
+    );
+    const today = dayjs().format('YYYY-MM-DD');
+    if (total !== undefined && (series.length === 0 || (seriesSum === 0 && total > 0))) {
+      return {
+        label,
+        percentageChange: 0,
+        data: [{ total: String(total), date: today }],
+      };
+    }
+    if (series.length === 0) return null;
+    return {
+      label,
+      percentageChange: 0,
+      data: series.map((point: any) => ({
+        total: String(point.value),
+        date: dayjs(point.end_time).format('YYYY-MM-DD'),
+      })),
+    };
+  }
+
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    const [token] = accessToken.split('___');
+    const until = dayjs().startOf('day').unix();
+    const since = dayjs().subtract(date, 'day').unix();
+    const root = `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${id}/insights`;
+    const urls = [
+      `${root}?metric=follower_count,reach&access_token=${token}&period=day&since=${since}&until=${until}`,
+      `${root}?metric_type=total_value&metric=likes,views,comments,shares,saves,replies&access_token=${token}&period=day&since=${since}&until=${until}`,
+    ];
+    const analytics: AnalyticsData[] = [];
+    let failed = false;
+    for (const url of urls) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          failed = true;
+          continue;
+        }
+        const body = await response.json();
+        if (body?.error || !Array.isArray(body?.data)) {
+          failed = true;
+          continue;
+        }
+        for (const metric of body.data) {
+          const card = this.insightCard(metric);
+          if (card) analytics.push(card);
+        }
+      } catch {
+        failed = true;
+      }
+    }
+    if (analytics.length === 0 && failed) throw new AnalyticsUnavailable();
+    return failed ? markPartialAnalytics(analytics) : analytics;
   }
 
   async postAnalytics(

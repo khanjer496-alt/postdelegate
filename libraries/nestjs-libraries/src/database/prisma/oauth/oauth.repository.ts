@@ -417,6 +417,39 @@ export class OAuthRepository {
     });
   }
 
+  // RFC 7009: a client revokes one of its own tokens, nothing happens for a
+  // token of another client
+  revokeByAccessTokenForApp(storedTokens: string[], oauthAppId: string) {
+    return this._oauthAuth.model.oAuthAuthorization.updateMany({
+      where: {
+        accessToken: { in: storedTokens },
+        oauthAppId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        ...pendingConsent,
+      },
+    });
+  }
+
+  revokeSelfHostedByAccessTokenForApp(
+    storedTokens: string[],
+    oauthAppId: string
+  ) {
+    return this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.updateMany({
+      where: {
+        accessToken: { in: storedTokens },
+        oauthAppId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        ...pendingConsent,
+      },
+    });
+  }
+
   async revokeAllForApp(oauthAppId: string) {
     await this._oauthSelfHosted.model.oAuthSelfHostedAuthorization.updateMany({
       where: {

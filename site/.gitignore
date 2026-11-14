@@ -4,4 +4,3 @@ dist
 
 .wrangler
 .DS_Store
-public/website-source.tar.gz

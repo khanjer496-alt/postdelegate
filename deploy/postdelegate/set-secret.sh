@@ -11,8 +11,15 @@ set -euo pipefail
 
 NAME="${1:-}"
 FILE="${2:-/etc/postiz/runtime.env}"
-HOST="${PD_HOST:-ubuntu@57.129.186.135}"
+HOST="${PD_HOST:-ubuntu@postdelegate-prod}"
 KEY="${PD_SSH_KEY:-$HOME/.ssh/postdelegate_prod}"
+# The VPS accepts SSH only over Tailscale (public port 22 is closed by ufw). PD_HOST defaults to the tailnet
+# machine name; the host key is checked against the existing known_hosts entry for the public address
+# (HostKeyAlias). Override PD_HOST / PD_SSH_OPTS for any other setup. Never reopen public port 22 for this.
+# PD_SSH_OPTS REPLACES the defaults (it does not add to them): when you override it, include
+# "-o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes" yourself if you still want them. Options are split on
+# whitespace, so a value that contains spaces (for example a quoted ProxyCommand) cannot be passed this way.
+read -r -a SSH_OPTS <<< "${PD_SSH_OPTS:--o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes}"
 
 if [[ ! "$NAME" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
   echo "usage: $0 NAME [server-env-file]   (NAME like FACEBOOK_APP_SECRET)" >&2
@@ -31,7 +38,7 @@ if [[ -z "$VALUE" || "$VALUE" == *$'\n'* ]]; then
 fi
 
 # The value travels on stdin over SSH, never on a command line.
-printf '%s' "$VALUE" | ssh -o BatchMode=yes -i "$KEY" "$HOST" \
+printf '%s' "$VALUE" | ssh -o BatchMode=yes ${SSH_OPTS[@]+"${SSH_OPTS[@]}"} -i "$KEY" "$HOST" \
   "sudo NAME='$NAME' FILE='$FILE' bash -c '
     set -euo pipefail
     IFS= read -r VALUE || true

@@ -18,7 +18,9 @@ interface Props { s: Scheduler; lang: Lang }
 const { lang } = Astro.props;
 const t = strings(lang);
 const c = t.scheduler;
-const s: Scheduler = lang === 'en' ? Astro.props.s : { ...Astro.props.s, ...t.schedulers[Astro.props.s.slug], about: undefined, steps: undefined, settings: undefined, faq: undefined, guides: undefined };
+const local = lang === 'en' ? undefined : t.schedulers[Astro.props.s.slug];
+const s: Scheduler = lang === 'en' ? Astro.props.s : { ...Astro.props.s, ...local, about: undefined, steps: undefined, settings: undefined, faq: undefined, guides: undefined };
+const native = local?.nativeHowTo;
 const availableKeys = new Set(AVAILABLE_NETWORKS.map((network) => network.key));
 const isAvailable = (item: { key: string }) => availableKeys.has(item.key);
 const available = isAvailable(s);
@@ -34,11 +36,12 @@ const alongside = AVAILABLE_NETWORKS.filter((n) => n.key !== s.key);
 
 const action = s.action || `Schedule ${s.name} Posts`;
 const howTo = `${action.charAt(0).toLowerCase()}${action.slice(1)}`;
-const title = available ? c.title(s.name, action) : soon.title(s.name);
+const title = available ? (local?.title ?? (lang === 'en' ? Astro.props.s.title : undefined) ?? c.title(s.name, action)) : soon.title(s.name);
 const description = s.description || (available ? s.intro : soon.description(s.name, pending, openCount, TRIAL_DAYS));
 
 const faq = available
   ? [
+      ...(local?.localFaq ?? []),
       { q: c.freeQ(s.name), a: c.freeA(s.name, TRIAL_DAYS, starter.monthly) },
       ...(s.faq ?? []),
       { q: c.aiQ(s.name), a: c.aiA(s.name) },
@@ -54,6 +57,19 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
 <Doc title={title} description={description} h1={s.h1} eyebrow={available ? c.eyebrow(s.name) : soon.eyebrow(s.name)} lead={s.intro} jsonLd={[crumbs, ...(howToLd ? [howToLd] : []), faqLd]} lang={lang}>
   <a slot="actions" href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{t.common.ctaLabel}</a>
   <a slot="actions" href="/tools/caption-checker" class="button button-outline">{c.tryCaption}</a>
+  {available && native && <>
+    <h2>{native.title}</h2>
+    <p>{native.intro}</p>
+    {native.sections.map((section) => <>
+      <h3>{section.heading}</h3>
+      <ol>{section.steps.map((step) => <li>{step}</li>)}</ol>
+    </>)}
+    <p class="sch-src">{native.sourcesLabel} {native.sources.map((source, i) => <>{i > 0 && ' · '}<a href={source.href} target="_blank" rel="noopener">{source.label}</a></>)}</p>
+  </>}
+  {available && local?.fitTitle && !!local.fitPoints?.length && <>
+    <h2>{local.fitTitle}</h2>
+    <ul>{local.fitPoints.map((point) => <li>{point}</li>)}</ul>
+  </>}
   {network && <div class:list={['sch-head', { 'is-soon': !available }]}>
     <NetworkBadge n={network} size="lg" />
     <p><strong>{available ? c.head(s.name) : soon.head(s.name)}</strong><span>{available ? c.headSub(alongside.length) : soon.headSub(openCount)}</span></p>
@@ -106,5 +122,6 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   .sch-head p strong { color: #fff; font-size: 16px; }
   .sch-head.is-soon > :global(span[aria-hidden]) { filter: grayscale(1); opacity: .55; }
   .sch-grid { margin: 22px 0 36px; }
+  .sch-src { color: #9a9a9a; font-size: 13px !important; }
   .sch-grid :global(.ng-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 </style>

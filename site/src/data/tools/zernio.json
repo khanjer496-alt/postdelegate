@@ -3,7 +3,7 @@
   "slug": "zernio",
   "site": "https://zernio.com",
   "pricingUrl": "https://zernio.com/pricing",
-  "checked": "2026-11-02",
+  "checked": "2026-11-10",
   "kind": {
     "value": "Social media API for developers",
     "src": "https://zernio.com/pricing"
@@ -20,12 +20,16 @@
     "value": "First 2 accounts free, no credit card",
     "src": "https://zernio.com/pricing"
   },
+  "trial": {
+    "value": "No trial needed: the first 2 connected accounts are free with the full API, no credit card",
+    "src": "https://zernio.com/pricing"
+  },
   "entryPaid": {
     "value": "$6 per account/month for accounts 3 to 10",
     "src": "https://zernio.com/pricing"
   },
   "plans": {
-    "value": "Accounts 1–2 free, 3–10 $6/month each, 11–100 $3/month each, 101+ $1/month each",
+    "value": "No named plans or seats (“no plans, no seats”): accounts 1–2 free, 3–10 $6/month each, 11–100 $3/month each, 101+ $1/month each, every feature on every account",
     "src": "https://zernio.com/pricing"
   },
   "cost": {
@@ -34,9 +38,19 @@
       "note": "2 free + 1 × $6",
       "src": "https://zernio.com/pricing"
     },
+    "5": {
+      "value": "$18",
+      "note": "2 free + 3 × $6",
+      "src": "https://zernio.com/pricing"
+    },
     "10": {
       "value": "$48",
       "note": "2 free + 8 × $6",
+      "src": "https://zernio.com/pricing"
+    },
+    "20": {
+      "value": "$78",
+      "note": "2 free + 8 × $6 + 10 × $3",
       "src": "https://zernio.com/pricing"
     },
     "30": {
@@ -56,5 +70,12 @@
   "mcp": {
     "value": "MCP server, documented at docs.zernio.com/mcp",
     "src": "https://docs.zernio.com/mcp"
+  },
+  "teams": {
+    "value": "No seat fees; owner and invited members share one team. SAML and OIDC SSO on self-serve; SCIM, audit logs and role-based access on Enterprise",
+    "src": [
+      "https://zernio.com/pricing",
+      "https://docs.zernio.com/guides/rate-limits"
+    ]
   }
 }

@@ -12,7 +12,7 @@ import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal'
 import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
 import clsx from 'clsx';
 
-// Remote clients can't set headers, they get a URL to paste (hint = where)
+// Remote clients use OAuth; credentials must never be embedded in a URL.
 export const remoteMcpClients = {
   Claude:
     'In Claude go to Settings > Connectors > Add custom connector and paste this URL.',
@@ -39,19 +39,16 @@ export type McpClient = (typeof mcpClients)[number];
 export type AnyMcpClient = RemoteMcpClient | McpClient;
 
 // oauth: no API key, the client registers itself (DCR) and the user signs in to PostDelegate
-// apikey: the organization API key, as a Bearer header (or inside the URL for remote clients)
+// apikey: the organization API key as a Bearer header, for clients supporting headers
 export type McpAuth = 'oauth' | 'apikey';
 
-// The OAuth-protected MCP endpoint. The backend advertises it (resource and
-// issuer metadata) at the root of its origin, whatever path prefix the API is
-// served under, so the URL is built from the origin of the configured URL.
-export const getMcpOauthUrl = (mcpBase: string) => {
-  try {
-    return `${new URL(mcpBase).origin}/mcp-oauth-dynamic`;
-  } catch (err) {
-    return `${mcpBase}/mcp-oauth-dynamic`;
-  }
-};
+// /mcp accepts OAuth and Authorization headers. Preserve the configured API
+// prefix (production: /api), matching its protected-resource discovery metadata.
+export const getMcpOauthUrl = (mcpBase: string) =>
+  `${mcpBase.replace(/\/+$/, '')}/mcp`;
+
+// Clients without a documented custom-header setting must use OAuth.
+export const apiKeyMcpClients = mcpClients.filter(client => client !== 'NanoClaw');
 
 export const isRemoteMcpClient = (client: string): client is RemoteMcpClient =>
   client in remoteMcpClients;
@@ -64,14 +61,13 @@ export const getMcpConfig = (
 ): { config: string; hint: string } => {
   if (isRemoteMcpClient(client)) {
     return {
-      config:
-        auth === 'oauth' ? getMcpOauthUrl(mcpBase) : `${mcpBase}/mcp/${apiKey}`,
-      hint: remoteMcpClients[client],
+      config: getMcpOauthUrl(mcpBase),
+      hint: remoteMcpClients[client] + ' Sign in with OAuth; API keys in connector URLs are not supported.',
     };
   }
 
   const oauthUrl = getMcpOauthUrl(mcpBase);
-  const urlBase = `${mcpBase}/mcp`;
+  const urlBase = oauthUrl;
   const bearer = `Bearer ${apiKey}`;
 
   const json = (obj: object) => JSON.stringify(obj, null, 2);
@@ -231,10 +227,10 @@ export const getMcpConfig = (
         hint: 'Add to ~/.openclaw/openclaw.json',
       };
     case 'NanoClaw':
-      // No headers flag, the key travels inside the URL like remote clients
+      // No documented header setting: use the existing OAuth setup instead.
       return {
-        config: `ncl groups config add-mcp-server --id <group-id> --name postdelegate --url ${mcpBase}/mcp/${apiKey}`,
-        hint: 'Run this in your terminal, replace <group-id> with the agent group that should get PostDelegate.',
+        config: `ncl groups config add-mcp-server --id <group-id> --name postdelegate --url ${oauthUrl}`,
+        hint: 'Use OAuth for this client. Replace <group-id> with the agent group that should get PostDelegate.',
       };
   }
 };
@@ -516,7 +512,7 @@ const McpSection = ({
     user.publicApi
   );
 
-  const baseUrl = `${mcpBase}/mcp`;
+  const baseUrl = getMcpOauthUrl(mcpBase);
 
   const maskedConfig = revealed
     ? config
@@ -535,7 +531,7 @@ const McpSection = ({
           <div className="text-[13px] text-textItemBlur mt-[2px]">
             {t(
               'mcp_api_key_description',
-              'Prefer a key over signing in? Connect any MCP client (HTTP streaming) with your API key.'
+              'For clients supporting custom headers, use Authorization: Bearer with the URL below. Other clients must use OAuth above. Never put the key in a URL.'
             )}
           </div>
         </div>
@@ -546,7 +542,7 @@ const McpSection = ({
             {t('mcp_client', 'Client')}
           </div>
           <div className="flex flex-wrap gap-[6px]">
-            {[...Object.keys(remoteMcpClients), ...mcpClients].map((client) => (
+            {apiKeyMcpClients.map((client) => (
               <button
                 key={client}
                 type="button"

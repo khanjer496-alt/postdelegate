@@ -104,6 +104,7 @@ type PostContentRow = Awaited<
 // authorization policy allows keeping its analytics (YouTube does not)
 export const isHistoryProvider = (provider?: SocialProvider) =>
   !!provider &&
+  provider.analyticsAvailable !== false &&
   !provider.authorizationPolicy?.bypassAnalyticsCache &&
   !!(
     provider.accountStats ||
@@ -1432,18 +1433,42 @@ export class AnalyticsService {
     orgId: string,
     days: number,
     timezone = 'UTC',
-    now = new Date()
+    now = new Date(),
+    filter: { integrationIds?: string[]; provider?: string } = {}
   ) {
     const { from, to } = this.historyRange(days, now);
-    return this.bestTimesFor(orgId, from, to, timezone);
+    return this.bestTimesFor(orgId, from, to, timezone, filter);
   }
 
-  async bestTimesFor(orgId: string, from: Date, to: Date, timezone = 'UTC') {
+  async bestTimesFor(
+    orgId: string,
+    from: Date,
+    to: Date,
+    timezone = 'UTC',
+    // narrows the posts to some channels or to one network (e.g. "linkedin",
+    // which also covers "linkedin-page")
+    filter: { integrationIds?: string[]; provider?: string } = {}
+  ) {
     const [channels, posts] = await Promise.all([
       this._analyticsRepository.getOverviewChannels(orgId),
       this._analyticsRepository.getAnalyticsPosts(orgId, from, to),
     ]);
-    const live = new Set(channels.map((channel) => channel.id));
+    const provider = filter.provider?.trim().toLowerCase();
+    const live = new Set(
+      channels
+        .filter(
+          (channel) =>
+            !filter.integrationIds?.length ||
+            filter.integrationIds.includes(channel.id)
+        )
+        .filter(
+          (channel) =>
+            !provider ||
+            channel.providerIdentifier === provider ||
+            channel.providerIdentifier.split('-')[0] === provider
+        )
+        .map((channel) => channel.id)
+    );
     return this.aggregateBestTimes(
       timezone,
       posts.filter((post) => live.has(post.integrationId))

@@ -84,6 +84,9 @@ export class LoadToolsService {
         - Schedule posts into the future, or now, adding texts, images and videos
         - List the posts scheduled between two dates (postsListTool)
         - Update the settings of a scheduled post or draft that was not published yet (postSettingsTool)
+        - Edit the text, media or date of a scheduled post or draft that was not published yet (postUpdateTool)
+        - Create a post that waits for a teammate's approval (createPostForReviewTool), or send an existing unpublished post for review (sendPostForReviewTool)
+        - Read analytics: key metrics (analyticsMetricsTool), top posts (analyticsTopPostsTool), best time to post (bestTimeToPostTool), live channel or post metrics (channelAnalyticsTool)
         - Delete a post (deletePostTool)
         - Generate pictures for posts
         ${renderArray(['Generate videos for posts'], canGenerateVideos)}

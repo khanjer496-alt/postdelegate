@@ -38,6 +38,8 @@ import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id'
 import * as Sentry from '@sentry/nestjs';
 import { FarcasterProvider } from '@gitroom/nestjs-libraries/integrations/social/farcaster.provider';
 import { AFFILIATE_COOKIE_NAME } from '@gitroom/helpers/affiliate/affiliate.cookie';
+import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
 
 // Per client address (see getClientIp), on top of the global limits. Every one
 // of these is public and either sends an email, checks a password or burns
@@ -51,6 +53,7 @@ export class AuthController {
   constructor(
     private _authService: AuthService,
     private _emailService: EmailService,
+    private _usersService: UsersService,
     private _measurement?: MeasurementService
   ) {}
 
@@ -278,6 +281,7 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: HOUR } })
   @Post('/activate')
   async activate(
+    @Req() req: Request,
     @Body('code') code: string,
     @Body('datafast_visitor_id') datafast_visitor_id: string,
     @Res({ passthrough: false }) response: Response
@@ -288,6 +292,18 @@ export class AuthController {
     );
     if ('failed' in activate) {
       return response.status(200).json({ can: false, reason: activate.failed });
+    }
+
+    // Anyone holding the link can activate the account it was made for, but
+    // it must not switch a browser that is signed in to ANOTHER account into
+    // this one (a link sent by someone else would otherwise sign the visitor
+    // into the sender's workspace). A stale or invalid cookie is no session
+    // and is replaced as before.
+    const current = req.cookies?.auth
+      ? await getSessionUser(this._usersService, req.cookies.auth)
+      : null;
+    if (current && current.id !== activate.userId) {
+      return response.status(200).json({ can: true, signedInElsewhere: true });
     }
 
     response.cookie('auth', activate.jwt, {

@@ -84,8 +84,8 @@ export class AuthService {
         }
 
         if (!(await this.canRegister(provider))) {
-          throw new Error('Registration is disabled');
-        }
+      throw new Error('Registration is disabled');
+    }
 
         const create = await this._organizationService.createOrgAndUser(
           body,
@@ -240,8 +240,8 @@ export class AuthService {
     }
 
     if (!(await this.canRegister(provider))) {
-          throw new Error('Registration is disabled');
-        }
+      throw new Error('Registration is disabled');
+    }
 
     await this.assertNoPasswordAccount(providerUser.email);
 
@@ -401,7 +401,7 @@ export class AuthService {
   async activate(
     code: string,
     tracking: string
-  ): Promise<{ jwt: string } | { failed: ActivationFailure }> {
+  ): Promise<{ jwt: string; userId: string } | { failed: ActivationFailure }> {
     let token: { id: string; email: string };
     try {
       token = AuthChecker.verifyTypedJWT(code, 'activation');
@@ -428,7 +428,7 @@ export class AuthService {
     await this._measurement?.activated(user.id);
     this._track('register', user.email, tracking).catch((err) => {});
     await NewsletterService.register(user.email);
-    return { jwt: await this.jwt(user) };
+    return { jwt: await this.jwt(user), userId: user.id };
   }
 
   async resendActivationEmail(email: string) {

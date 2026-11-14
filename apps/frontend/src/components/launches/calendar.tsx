@@ -1067,6 +1067,8 @@ export const CalendarColumn: FC<{
           : 'border border-newTextColor/5 rounded-[8px]'
       )}
       ref={drop as any}
+      data-pd-cell=""
+      data-pd-past={isBeforeNow ? '' : undefined}
     >
       {display === 'month' && (
         <div
@@ -1365,6 +1367,9 @@ const CalendarItem: FC<{
     <div
       // @ts-ignore
       ref={dragRef}
+      // hooks for the v2 layout's styles (colors.scss .pd-v2), no behavior
+      data-pd-card=""
+      data-pd-status={pdStatus(state, post.approvalStatus)}
       className={clsx(
         'w-full flex h-full flex-1 flex-col group',
         'relative',
@@ -1389,6 +1394,7 @@ const CalendarItem: FC<{
         </div>
       )}
       <div
+        data-pd-strip=""
         className={clsx(
           'text-white text-[11px] max-h-[24px] h-[24px] min-h-[24px] w-full rounded-tr-[10px] rounded-tl-[10px] flex items-center justify-center gap-[6px] px-[5px] bg-btnPrimary',
           display === 'month' && 'mobile:hidden'
@@ -1504,6 +1510,7 @@ const CalendarItem: FC<{
           }
         }}
         onBlur={closePreview}
+        data-pd-body=""
         className={clsx(
           'w-full flex h-full flex-1 rounded-br-[10px] rounded-bl-[10px] text-[14px] bg-newColColor outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
           'relative',
@@ -1547,6 +1554,12 @@ const CalendarItem: FC<{
                 {time}
               </div>
             )}
+            {/* the v2 layout shows the time on month chips (hidden otherwise) */}
+            {compact && (
+              <div data-pd-month-time="" className="hidden">
+                {time}
+              </div>
+            )}
           </div>
         </div>
         <div
@@ -1582,6 +1595,18 @@ const CalendarItem: FC<{
   );
 });
 
+// the status the v2 layout colors a card by
+export const pdStatus = (state: State, approvalStatus?: string | null) =>
+  state === 'ERROR'
+    ? 'failed'
+    : state === 'PUBLISHED'
+    ? 'published'
+    : state === 'DRAFT' &&
+      (approvalStatus === 'IN_REVIEW' || approvalStatus === 'CHANGES_REQUESTED')
+    ? 'review'
+    : state === 'DRAFT'
+    ? 'draft'
+    : 'scheduled';
 // a provider can name the published state, like media sent to an inbox
 const statusLabel = (
   t: ReturnType<typeof useT>,

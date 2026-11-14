@@ -3,7 +3,8 @@
 import { Button } from '@gitroom/react/form/button';
 import React, { FC } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { PostComment } from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
+import { PostComment } from '@gitroom/frontend/components/new-launch/providers/post-comment.enum';
+import { useLaunchStore } from './store';
 export const AddPostButton: FC<{
   onClick: () => void;
   num: number;
@@ -11,11 +12,14 @@ export const AddPostButton: FC<{
 }> = (props) => {
   const { onClick, num } = props;
   const t = useT();
+  const canAddComments = useLaunchStore(state => state.canAddComments);
+  if (!canAddComments) return null;
 
   return (
     <div className="flex">
       <div
         onClick={onClick}
+        data-pd-add-post=""
         className="select-none cursor-pointer h-[34px] rounded-[6px] flex bg-[#D82D7E] gap-[8px] justify-center items-center pl-[16px] pr-[20px] text-[13px] font-[600] mt-[12px] mobile:w-[40px] mobile:h-[40px] mobile:p-0 mobile:mt-0 mobile:rounded-[8px]"
       >
         <div>

@@ -6,9 +6,16 @@
 # prints row counts next to the live database, then deletes everything it made.
 set -euo pipefail
 KEY="${1:-$HOME/postdelegate-backup.agekey}"
-HOST="${PD_HOST:-ubuntu@57.129.186.135}"
+HOST="${PD_HOST:-ubuntu@postdelegate-prod}"
 SSHK="${PD_SSH_KEY:-$HOME/.ssh/postdelegate_prod}"
-ssh_() { ssh -o BatchMode=yes -i "$SSHK" "$HOST" "$@"; }
+# The VPS accepts SSH only over Tailscale (public port 22 is closed by ufw). PD_HOST defaults to the tailnet
+# machine name; the host key is checked against the existing known_hosts entry for the public address
+# (HostKeyAlias). Override PD_HOST / PD_SSH_OPTS for any other setup. Never reopen public port 22 for this.
+# PD_SSH_OPTS REPLACES the defaults (it does not add to them): when you override it, include
+# "-o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes" yourself if you still want them. Options are split on
+# whitespace, so a value that contains spaces (for example a quoted ProxyCommand) cannot be passed this way.
+read -r -a SSH_OPTS <<< "${PD_SSH_OPTS:--o HostKeyAlias=57.129.186.135 -o StrictHostKeyChecking=yes}"
+ssh_() { ssh -o BatchMode=yes ${SSH_OPTS[@]+"${SSH_OPTS[@]}"} -i "$SSHK" "$HOST" "$@"; }
 command -v age >/dev/null || { echo "install age: brew install age" >&2; exit 2; }
 [ -r "$KEY" ] || { echo "age key not found: $KEY" >&2; exit 2; }
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"; ssh_ "sudo docker rm -f pd-restore-drill >/dev/null 2>&1 || true"' EXIT

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
@@ -261,10 +262,12 @@ export const startMcp = async (app: INestApplication) => {
       registration: false,
       refresh: false,
     },
+    // dynamically registered clients get refresh tokens (see
+    // OAuthService.refreshFields)
     '/mcp-oauth-dynamic': {
       issuer: new URL('/mcp-oauth-dynamic', process.env.NEXT_PUBLIC_BACKEND_URL!).toString(),
       registration: true,
-      refresh: false,
+      refresh: true,
     },
     ...(hubspotOAuthClientId
       ? {
@@ -283,6 +286,8 @@ export const startMcp = async (app: INestApplication) => {
     issuer: server.issuer,
     authorization_endpoint: `${process.env.FRONTEND_URL}/oauth/authorize`,
     token_endpoint: `${backendUrl}/oauth/token`,
+    revocation_endpoint: `${backendUrl}/oauth/revoke`,
+    revocation_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
     ...(server.registration && {
       registration_endpoint: `${backendUrl}/oauth/register`,
     }),
@@ -369,10 +374,15 @@ export const startMcp = async (app: INestApplication) => {
   // generation, no clipping), which every endpoint offers
   const dynamicIssuer = authorizationServers['/mcp-oauth-dynamic'].issuer;
   const oauthMcpUrl = new URL('/mcp-oauth-dynamic', process.env.NEXT_PUBLIC_BACKEND_URL!).toString();
-  // MCP lists a tool under its id, which is not always its key in claudeTools
+  // MCP lists a tool under its key in claudeTools, which is not always its id
+  // (integrationSchedulePostTool is keyed by its name but has the id
+  // schedulePostTool), so both are mapped
   const annotationsById = Object.fromEntries(
-    Object.values(claudeTools as Record<string, { id: string; mcp?: { annotations?: { title?: string } } }>).map(
-      (tool) => [tool.id, tool.mcp?.annotations]
+    Object.entries(claudeTools as Record<string, { id: string; mcp?: { annotations?: { title?: string } } }>).flatMap(
+      ([key, tool]) => [
+        [tool.id, tool.mcp?.annotations],
+        [key, tool.mcp?.annotations],
+      ]
     )
   );
   const serverCardTools = (await claudeOauthServer.getToolListInfo()).tools.map((tool) => {
@@ -394,7 +404,7 @@ export const startMcp = async (app: INestApplication) => {
       version: '1.0.0',
     },
     description:
-      'Schedule, list, update and delete social media posts on the channels connected to a PostDelegate workspace, and upload the media they use.',
+      'Schedule, review, list, update and delete social media posts on the channels connected to a PostDelegate workspace, send posts for approval, read analytics and the best time to post, and upload the media posts use.',
     version: '1.0.0',
     protocolVersion: mcpProtocolVersion,
     websiteUrl: mcpWebsiteUrl,
@@ -572,7 +582,7 @@ export const startMcp = async (app: INestApplication) => {
 
     endListenStream(req, res);
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token!, auth, relay: relay || undefined, source, scopes: result.tokenValidation?.scopes || [] }, async () => {
+    await runWithContext({ requestId: randomUUID(), auth, relay: relay || undefined, source, scopes: result.tokenValidation?.scopes || [] }, async () => {
       await (relay ? selfHostedServer! : mcpServer).startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -605,11 +615,16 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const resolved = await resolveAuthWithSource(token);
+    // The canonical resource offers the same self-hosted OAuth choice as the
+    // older /mcp-oauth resources. Relay credentials never become cloud auth.
+    const relay = token.startsWith('psh_') ? await resolveSelfHosted(token) : undefined;
+    const resolved = token.startsWith('psh_')
+      ? { auth: undefined, source: undefined, scopes: relay ? ['mcp:read', 'mcp:write'] : [] }
+      : await resolveAuthWithSource(token);
     // @ts-ignore
     req.auth = resolved.auth;
     // @ts-ignore
-    if (!req.auth) {
+    if (!req.auth && !(relay && selfHostedServer)) {
       // RFC 6750: a wrong, rotated or revoked key or token
       res.setHeader(
         'WWW-Authenticate',
@@ -637,8 +652,8 @@ export const startMcp = async (app: INestApplication) => {
     endListenStream(req, res);
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: token, auth: req.auth, source: resolved.source, scopes: resolved.scopes }, async () => {
-      await server.startHTTP({
+    await runWithContext({ requestId: randomUUID(), auth: req.auth, relay: relay || undefined, source: resolved.source, scopes: resolved.scopes }, async () => {
+      await (relay ? selfHostedServer! : server).startHTTP({
         url,
         httpPath: url.pathname,
         options: {
@@ -679,7 +694,7 @@ export const startMcp = async (app: INestApplication) => {
     fixAcceptHeader(req);
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await server.startHTTP({
           url,
@@ -718,7 +733,7 @@ export const startMcp = async (app: INestApplication) => {
 
     await runWithContext(
       // @ts-ignore
-      { requestId: req.params.id, auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await new MCPServer(serverConfig).startSSE({
           url,

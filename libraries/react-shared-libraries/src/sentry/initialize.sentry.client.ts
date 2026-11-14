@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { scrubTelemetry, isSensitiveTelemetryPath } from '@gitroom/helpers/utils/redact.url';
 import { initializeSentryBasic } from '@gitroom/react/sentry/initialize.sentry.next.basic';
 
 export const setSentryUser = (
@@ -21,6 +22,12 @@ export const setSentryUser = (
 };
 
 export const initializeSentryClient = (environment: string, dsn: string) => {
+  // Replay's DOM metadata cannot be scrubbed by its custom-event hook. Do not
+  // initialize it on credential/auth pages; discard an existing SPA buffer.
+  if (typeof window !== 'undefined' && isSensitiveTelemetryPath(window.location.pathname)) {
+    try { void Sentry.getReplay()?.stop({ flush: false }).catch(() => {}); } catch {}
+    return;
+  }
   // A remounted layout must not build a second replay integration, Sentry throws on it
   if (Sentry.getClient()) {
     return;
@@ -37,6 +44,8 @@ export const initializeSentryClient = (environment: string, dsn: string) => {
         maskAllText: true,
         maskAllInputs: true,
         blockAllMedia: true,
+        networkCaptureBodies: false,
+        beforeAddRecordingEvent: (event) => scrubTelemetry(event),
       }),
       Sentry.feedbackIntegration({
         // Disable the injection of the default widget

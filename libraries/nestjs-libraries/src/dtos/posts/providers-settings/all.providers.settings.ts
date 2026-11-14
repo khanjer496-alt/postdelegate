@@ -28,6 +28,7 @@ import { TumblrDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settin
 export type ProviderExtension<T extends string, M> = { __type: T } & M;
 export type AllProvidersSettings =
   | ProviderExtension<'reddit', RedditSettingsDto>
+  | ProviderExtension<'reddit-own-key', RedditSettingsDto>
   | ProviderExtension<'lemmy', LemmySettingsDto>
   | ProviderExtension<'youtube', YoutubeSettingsDto>
   | ProviderExtension<'pinterest', PinterestSettingsDto>
@@ -69,6 +70,7 @@ type None = NonNullable<unknown>;
 export const allProviders = (setEmpty?: any) => {
   return [
     { value: RedditSettingsDto, name: 'reddit' },
+    { value: RedditSettingsDto, name: 'reddit-own-key' },
     { value: LemmySettingsDto, name: 'lemmy' },
     { value: YoutubeSettingsDto, name: 'youtube' },
     { value: PinterestSettingsDto, name: 'pinterest' },

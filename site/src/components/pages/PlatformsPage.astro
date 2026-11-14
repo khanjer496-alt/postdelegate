@@ -3,7 +3,7 @@ import Base from '../../layouts/Base.astro';
 import NetworkBadge from '../NetworkBadge.astro';
 import PageHero from '../PageHero.astro';
 import CtaBand from '../CtaBand.astro';
-import { AVAILABLE_NETWORKS, WAITING_NETWORKS, type Network } from '../../data/networks';
+import { AVAILABLE_NETWORKS, OWN_APP_NETWORKS, WAITING_NETWORKS, type Network } from '../../data/networks';
 import { TRIAL_DAYS } from '../../data/plans';
 import { SITE } from '../../data/site';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
@@ -15,9 +15,10 @@ const p = t.platformsPage;
 // not offered at all are not listed.
 const sections = [
   { id: 'live', title: p.liveTitle(AVAILABLE_NETWORKS.length), networks: AVAILABLE_NETWORKS, live: true },
+  { id: 'own-app', title: p.ownAppTitle, text: p.ownAppText(AVAILABLE_NETWORKS.length), networks: OWN_APP_NETWORKS, live: true, ownApp: true, docs: '/docs/channels/reddit' },
   { id: 'waiting', title: p.waitingTitle(WAITING_NETWORKS.length), text: p.waitingText, networks: WAITING_NETWORKS, live: false },
 ];
-const href = (network: Network) => localeHref(lang, network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon');
+const href = (network: Network, docs?: string) => docs ? localeHref(lang, docs) : localeHref(lang, network.scheduler ? `/${network.scheduler}` : network.available ? `/docs/channels/${network.key}` : '/docs/channels/coming-soon');
 ---
 <Base title={p.title(AVAILABLE_NETWORKS.length)} description={p.description(AVAILABLE_NETWORKS.length)} lang={lang}>
   <PageHero eyebrow={p.eyebrow} title={p.h1(AVAILABLE_NETWORKS.length)} lead={p.lead}>
@@ -33,10 +34,10 @@ const href = (network: Network) => localeHref(lang, network.scheduler ? `/${netw
         {section.text && <p class="coverage-text muted">{section.text}</p>}
         <ul class="network-grid">
           {section.networks.map((network) => (
-            <li><a href={href(network)} class="network-card">
+            <li><a href={href(network, section.docs)} class="network-card">
               <NetworkBadge n={network} size="lg" />
-              <span class="network-copy"><strong>{network.name}</strong><span>{section.live ? p.connectIt : p.notYet}</span></span>
-              <span class={section.live ? 'rollout-label is-available' : 'rollout-label'}>{section.live ? p.available : p.waiting}</span>
+              <span class="network-copy"><strong>{network.name}</strong><span>{section.ownApp ? p.ownAppCard : section.live ? p.connectIt : p.notYet}</span></span>
+              <span class={section.live && !section.ownApp ? 'rollout-label is-available' : 'rollout-label'}>{section.ownApp ? p.ownAppLabel : section.live ? p.available : p.waiting}</span>
             </a></li>
           ))}
         </ul>

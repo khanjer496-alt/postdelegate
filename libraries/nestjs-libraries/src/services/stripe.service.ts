@@ -2763,7 +2763,76 @@ export class StripeService extends PaymentProviderAbstract {
       );
       return { retry: true };
     }
+    // The Terms say a refund cancels the subscription in the same step. Any
+    // refund does (a yearly plan's policy refund is one twelfth, a partial
+    // one), but only a refund of the subscription's current invoice.
+    try {
+      const charge = event.data.object;
+      if (charge.amount_refunded > 0) {
+        const invoiceId = await this.getInvoiceIdOfCharge(charge);
+        if (invoiceId) {
+          await this.cancelSubscriptionOfRefundedInvoice(invoiceId);
+        }
+      }
+    } catch (err) {
+      console.error(
+        'subscription_refund_cancel_failed',
+        { stripe_charge_id: event.data.object.id },
+        err
+      );
+      return { retry: true };
+    }
     return { ok: true };
+  }
+
+  // Cancels the subscription whose current invoice was refunded (in full or in part), without
+  // proration or a final invoice. The customer.subscription.deleted event that
+  // follows moves the workspace to the free limits. Safe to repeat: an ended
+  // subscription is left alone. Invoices without a subscription, invoices that are
+  // not the subscription's current one, and subscriptions of other services
+  // sharing the Stripe account are ignored.
+  private async cancelSubscriptionOfRefundedInvoice(invoiceId: string) {
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    // webhook payloads follow the API version of the endpoint: parent is the
+    // 2025-03-31+ shape, subscription the older one
+    const ref =
+      invoice.parent?.subscription_details?.subscription ||
+      (invoice as any).subscription;
+    const subscriptionId = typeof ref === 'string' ? ref : ref?.id;
+    if (!subscriptionId) {
+      return;
+    }
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (
+      subscription.metadata?.service !== 'gitroom' ||
+      ENDED_STATUSES.includes(subscription.status)
+    ) {
+      return;
+    }
+    // Only the refund of the payment for the CURRENT subscription cancels it.
+    // A refund of an older renewal, a proration or extra-channel invoice or a
+    // duplicate charge must not cut a period the customer was not refunded for.
+    const latest = subscription.latest_invoice;
+    const latestInvoiceId = typeof latest === 'string' ? latest : latest?.id;
+    if (latestInvoiceId !== invoiceId) {
+      return;
+    }
+    try {
+      await stripe.subscriptions.cancel(subscription.id, {
+        prorate: false,
+        invoice_now: false,
+      });
+    } catch (err) {
+      // cancelled by someone else since the read above: nothing left to do
+      const current = await stripe.subscriptions.retrieve(subscription.id);
+      if (!ENDED_STATUSES.includes(current.status)) {
+        throw err;
+      }
+    }
+    console.log('stripe_subscription_cancelled_by_refund', {
+      stripe_invoice_id: invoiceId,
+      stripe_subscription_id: subscription.id,
+    });
   }
 
   async chargeDisputed(event: Stripe.ChargeDisputeCreatedEvent) {
@@ -2945,7 +3014,8 @@ export class StripeService extends PaymentProviderAbstract {
 
   async refundCharges(organizationId: string, chargeIds: string[]) {
     const org = await this._organizationService.getOrgById(organizationId);
-    if (!stripeCustomerOf(org?.paymentId)) {
+    const customer = stripeCustomerOf(org?.paymentId);
+    if (!customer) {
       throw new Error('No payment customer found for this organization');
     }
 
@@ -2954,6 +3024,20 @@ export class StripeService extends PaymentProviderAbstract {
 
     for (const chargeId of chargeIds) {
       try {
+        // a refund now also cancels the subscription its invoice paid for, so
+        // only charges of this workspace's own Stripe customer may be refunded
+        const charge = await stripe.charges.retrieve(chargeId);
+        const chargeCustomer =
+          typeof charge.customer === 'string'
+            ? charge.customer
+            : charge.customer?.id;
+        if (chargeCustomer !== customer) {
+          console.error('refund_charge_customer_mismatch', {
+            stripe_charge_id: chargeId,
+          });
+          failed.push(chargeId);
+          continue;
+        }
         await stripe.refunds.create({ charge: chargeId });
         refunded.push(chargeId);
       } catch (err) {

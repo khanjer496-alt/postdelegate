@@ -9,22 +9,140 @@
 //   Content Studio, the plan names and every network name.
 import { SITE, CTA_LABEL, CTA_SHORT, CTA_NOTE } from '../../data/site';
 import { BUYER_FAQ } from '../../data/faq';
-import { PLANS } from '../../data/plans';
+import { PLANS, TRIAL_DAYS, planChannels } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
 import { LIVE_SCHEDULERS } from '../../data/schedulers';
 
 type QA = { q: string; a: string };
 type Card = { title: string; text: string };
 // Per live network: the fields of its scheduler page that are translated.
-export type SchedulerStrings = { action: string; description: string; h1: string; intro: string; plan: string[]; limits: string[] };
+export type SchedulerStrings = {
+  action: string; description: string; h1: string; intro: string; plan: string[]; limits: string[];
+  /** Optional <title> override for search intent the default "{name} scheduler" title misses. */
+  title?: string;
+  /** Optional how-to for doing it in the network itself, shown before the product sections. */
+  nativeHowTo?: { title: string; intro: string; sections: { heading: string; steps: string[] }[]; sources: { label: string; href: string }[]; sourcesLabel: string };
+  /** Optional "when PostDelegate fits better" section shown after the native how-to. */
+  fitTitle?: string; fitPoints?: string[];
+  /** Optional page-specific questions for this language; plain text answers. */
+  localFaq?: QA[];
+};
 type Site = typeof SITE;
+
+// The English /mcp page body. Facts come only from docs/mcp, docs/mcp/tools, docs/approvals and plans.ts;
+// the plan rows are generated from PLANS so the prices on this page never drift from the product.
+const mcpPriceRows = PLANS.map((plan) => `<tr><td>${plan.name}</td><td>$${plan.monthly}</td><td>$${plan.yearly}</td><td>${planChannels(plan)}</td></tr>`).join('');
+const mcpBody = `<h2>What an MCP server does for your social calendar</h2>
+<p>MCP, the Model Context Protocol, is a standard way for an AI assistant to use tools in another service. PostDelegate runs an MCP server. Once your assistant is connected it can list your channels, read the rules of each network, upload media, create drafts and scheduled posts, and look at what is already on your calendar. You keep working in the assistant you already use, and the posts it prepares land in the same calendar as everything you schedule by hand.</p>
+<p>PostDelegate does not provide an AI of its own. MCP is how you use your own assistant, such as Claude, ChatGPT or an editor like Cursor, with your PostDelegate workspace. Any usage costs on the assistant's side are between you and its provider. The MCP server is included on every plan, and every plan starts with a ${TRIAL_DAYS}-day free trial that needs no card.</p>
+
+<h2>From a conversation to a draft</h2>
+<p>A compatible client discovers the tools the server offers and uses them to look up your channels, read each network's rules, upload media and create drafts. The useful starting point is a single draft that you can inspect in the calendar before anything is scheduled. Each post an assistant creates comes back with a preview link, so you can see it as it will look before you decide.</p>
+
+<h2>Connect your assistant in four steps</h2>
+<ol>
+<li><strong>Create a workspace.</strong> Start your free trial and sign in to PostDelegate. You need an account because the assistant signs in as you.</li>
+<li><strong>Copy the server address.</strong> The recommended address is <code>https://app.postdelegate.com/mcp-oauth-dynamic</code>. Settings, then Agents / Dev in the app shows the addresses with your own values filled in, ready to copy.</li>
+<li><strong>Add it to your assistant.</strong> In Claude and ChatGPT this is a custom connector. In Claude Code and Cursor it is one command or a few lines of configuration. The next section has each one.</li>
+<li><strong>Sign in with PostDelegate.</strong> The assistant opens a PostDelegate page in your browser, you sign in and click Authorize, and the assistant gets its own token for your workspace. You never copy an API key.</li>
+</ol>
+<p>Then start small. Ask your assistant to list your PostDelegate channels, and only after that ask for a draft. Say "draft" when you want to review first and "schedule" only when you are ready.</p>
+
+<h2>Set up Claude, ChatGPT, Claude Code and Cursor</h2>
+<h3>Claude</h3>
+<p>Claude connects to PostDelegate as a custom connector. In Claude open Settings, then Connectors, then Add custom connector. Enter a name such as PostDelegate, paste the server address above as the server URL, choose Add and then Connect, sign in to PostDelegate and click Authorize. PostDelegate is not in Claude's connector directory, so you add it by address, and whether custom connectors are available depends on your Claude plan. The <a href="/docs/mcp/claude">Claude setup guide</a> has the details.</p>
+<h3>ChatGPT</h3>
+<p>ChatGPT also uses a custom connector. Open Settings, then Connectors, and choose Create. If you do not see a way to create a connector, look under advanced settings for a developer mode switch, or ask your workspace admin. Enter a name, paste the server address, choose OAuth for authentication and then Connect. ChatGPT registers itself with PostDelegate automatically. The <a href="/docs/mcp/chatgpt">ChatGPT setup guide</a> has the steps.</p>
+<h3>Claude Code, Cursor and other clients</h3>
+<p>For Claude Code, add the server with one command, then run <code>/mcp</code> inside Claude Code to authenticate it:</p>
+<pre><code>claude mcp add postdelegate --transport http "https://app.postdelegate.com/mcp-oauth-dynamic"</code></pre>
+<p>Cursor takes the same address in <code>.cursor/mcp.json</code> under <code>mcpServers</code>, or through a one-click install link on the <a href="/docs/mcp/clients">clients page</a>. That page also has copy-paste configuration for Claude Desktop, VS Code, Codex, Windsurf and other clients, using either sign in with PostDelegate or an API key.</p>
+
+<h2>Server addresses and the two ways to sign in</h2>
+<p>The MCP server uses the streamable HTTP transport. Three addresses cover every kind of client:</p>
+<table>
+<thead><tr><th>Address</th><th>Sign-in</th><th>Use it for</th></tr></thead>
+<tbody>
+<tr><td><code>https://app.postdelegate.com/mcp-oauth-dynamic</code></td><td>Sign in with PostDelegate (OAuth)</td><td>Recommended. Claude, ChatGPT, Claude Code, Cursor and any client that can register itself.</td></tr>
+<tr><td><code>https://app.postdelegate.com/api/mcp</code></td><td>API key as a Bearer header, or OAuth</td><td>Clients and scripts that can set a header.</td></tr>
+<tr><td><code>https://app.postdelegate.com/api/mcp/YOUR_API_KEY</code></td><td>API key inside the address</td><td>Clients that can only take a URL.</td></tr>
+</tbody>
+</table>
+<p>With sign in with PostDelegate, the client registers itself using dynamic client registration and PKCE, and asks for the scopes <code>mcp:read</code> and <code>mcp:write</code>. Approvals appear under Settings, then Apps, then Approved Apps, where you can choose Revoke to cut an assistant off. These tokens do not expire on their own, so revoking is how you end access.</p>
+<p>The alternative is your workspace API key from Settings, then Agents / Dev. It works anywhere, but the key is as powerful as your account, so prefer OAuth where the client supports it. Rotating the key invalidates it everywhere. MCP directories and clients that discover servers on their own can read the server card at <code>https://app.postdelegate.com/.well-known/mcp/server-card.json</code>.</p>
+
+<h2>What your assistant can do: the tools</h2>
+<p>Your assistant discovers these tools by itself when it connects, and you do not call them directly. Tool names are shown exactly as the server reports them. The <a href="/docs/mcp/tools">tools reference</a> has the full detail.</p>
+<h3>Channels and settings</h3>
+<ul>
+<li><code>integrationList</code> lists your connected channels, and <code>groupList</code> lists your customers. Neither changes anything.</li>
+<li><code>integrationSchema</code> returns a channel's post rules, its length limit and the settings fields it needs. Assistants call it before scheduling.</li>
+<li><code>triggerTool</code> runs a helper lookup named by <code>integrationSchema</code>, for example fetching WordPress categories or Listmonk lists.</li>
+</ul>
+<h3>Posts</h3>
+<ul>
+<li><code>integrationSchedulePostTool</code> creates a draft, a scheduled post or an immediate post on one or more channels. It runs the same validation as the app and the API, and returns a post id and a preview link for each post, or a list of errors to fix.</li>
+<li><code>postsListTool</code> lists your posts between two dates with their state, errors, content and channel.</li>
+<li><code>postSettingsTool</code> updates the network settings of a scheduled post or draft that has not published. Content and date stay as they are.</li>
+<li><code>deletePostTool</code> deletes a post and its comments on that channel. A deleted scheduled post does not publish, and the deletion cannot be undone.</li>
+</ul>
+<h3>Media</h3>
+<ul>
+<li><code>uploadFromUrlTool</code> adds an image or video from a public URL to your media library, and can resize and re-encode it for the networks.</li>
+<li><code>mediaListTool</code> and <code>mediaStatusTool</code> let an assistant reuse a file and check whether an adjusted upload is ready or still processing.</li>
+<li>Assistants that support interactive MCP apps can show an upload widget so you can add a file from your own device. An assistant cannot read files on your computer.</li>
+</ul>
+<h3>Studio and AI media</h3>
+<p>Studio renders vertical 1080×1920 videos from the videos in your media library. An assistant can list the templates, start a render, check its status and cancel it. The seven templates are Hook over clip, Talking head + captions, Image slideshow, Before/after, Top-N list, Quote card and AI UGC. A render only saves a new video to your media library. It never creates, schedules or publishes a post.</p>
+<p>The server also defines tools for generating images and video and for turning long YouTube videos into short clips. PostDelegate does not provide AI generation of its own: the image tool needs your workspace's own OpenAI key, added by an admin in Settings, then AI, and the video and clipping tools are not set up today. You can use your own assistant's image and video features and bring the result in with the upload-from-URL tool.</p>
+<p>Tools that change data are marked as such to clients, so assistants that support confirmation prompts will ask you first. Tools only act on the workspace you approved, and a different workspace needs a separate sign-in.</p>
+
+<h2>The approval flow: AI drafts, you decide</h2>
+<p>Approvals put a second pair of eyes on a post before it goes out. A post that waits for approval is held as a draft and does not publish until someone approves it. For AI assistants this is a setting you control under Settings, then Approvals, in the AI agent guardrails section. The rules are checked on PostDelegate's servers, and an assistant gets a clear message when a rule stops it.</p>
+<ul>
+<li><strong>Require approval for AI-created posts.</strong> Posts from MCP clients and the PostDelegate Agent wait in Approvals until someone approves them. New workspaces start with this on.</li>
+<li><strong>Also require approval for API and CLI posts.</strong> Posts from the public API and the CLI wait for approval too. MCP clients always follow the setting above.</li>
+<li><strong>Channels agents can post to.</strong> Leave every channel unchecked to allow all channels, or check some to limit agents to them.</li>
+<li><strong>Max posts agents can create per day.</strong> A whole number from 1 to 10,000, or empty for no limit. It is counted per day in UTC across all agents, and a post to several channels counts once per channel.</li>
+</ul>
+<p>The Approvals page in the main menu lists every post that waits for a decision, with a badge for how many are waiting. Each post shows its channel, its planned time and which connected app or agent sent it, and the From AI agents tab narrows the list to posts that agents created. Approvers can approve, edit, request changes or reject each post, or tick several and choose Approve selected. Nothing in that list publishes until it is approved.</p>
+<p>When an assistant's post is held, the MCP tool reports it as <code>IN_REVIEW</code>, and the assistant is told the post is waiting for a teammate to approve it. An assistant's draft stays a draft: approval applies when it schedules a post or posts it now. If you need a client's yes before a post goes out, a client approval link lets someone outside your workspace approve a post without an account. The <a href="/docs/approvals">approvals guide</a> covers statuses, who can approve and activity history, and <a href="/guides/ai-social-media-agent-guardrails">how to let an AI agent post to social media safely</a> goes through the guardrails step by step.</p>
+
+<h2>Staying in control</h2>
+<ol>
+<li>Ask for a draft first and check it in the calendar before anything is scheduled.</li>
+<li>Keep your assistant's tool approval prompts on, so you confirm each action that changes something. Scheduling and deleting are the ones to watch.</li>
+<li>Open the preview link each post returns, <code>https://app.postdelegate.com/p/POST_ID?share=true</code>, to inspect it.</li>
+<li>Look for the label on posts created this way, which tells them apart on the calendar.</li>
+<li>Never paste an API key into a chat. Use OAuth, or put the key in the client's configuration.</li>
+</ol>
+<p>Content from your posts and videos is just data for the assistant to show you. Be wary of any assistant that treats text in a post as instructions.</p>
+
+<h2>Plans and prices</h2>
+<p>Public API and MCP are included on every plan, and every plan starts with a ${TRIAL_DAYS}-day free trial that needs no card. Prices are in US dollars.</p>
+<table>
+<thead><tr><th>Plan</th><th>Per month</th><th>Per year</th><th>Channels</th></tr></thead>
+<tbody>${mcpPriceRows}</tbody>
+</table>
+<p>The API key and MCP setup live in Settings, then Agents / Dev. <a href="/pricing">See the pricing page</a> for what each plan includes and <a href="/docs/billing">plans and billing</a> for how billing works.</p>
+
+<h2>If something does not work</h2>
+<ul>
+<li><strong>A 401, or "Invalid API Key or OAuth token".</strong> The key was rotated, mistyped or sent in the wrong form. The MCP address takes the key with or without the word Bearer in front.</li>
+<li><strong>The browser sign-in window never opens.</strong> Your client may not support OAuth for remote servers. Use the API key address instead.</li>
+<li><strong>"redirect_uri host is not a verified domain".</strong> A web client is trying to register a callback outside the allowed list. Use a local client or the API key address.</li>
+<li><strong>A tool is missing.</strong> The server lists only the tools your connection address offers. See the <a href="/docs/mcp/tools">tools reference</a>.</li>
+</ul>
+
+<aside class="doc-note">PostDelegate does not provide an AI of its own, and does not claim an official directory listing in Claude or ChatGPT. You add the server as a custom connector. The MCP server is included on every plan.</aside>
+<p>Related: <a href="/docs/mcp">MCP documentation</a> · <a href="/docs/mcp/agent-files">agent files</a> · <a href="/api">REST API</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude and Cowork</a>.</p>`;
 
 const en = {
   // BCP 47 tag for formatting numbers (1,000). Arabic uses Western digits, like the prices.
   numberLocale: 'en-US',
   launch: {
     available: (count: number) => `${count} networks available today`,
-    examples: 'Including YouTube, Bluesky, WordPress and LinkedIn personal profiles. Publish to connected channels.',
+    examples: 'Including YouTube, Bluesky, Slack and LinkedIn personal profiles. Publish to connected channels.',
     pending: 'Coming soon · awaiting platform approval',
     unavailable: 'Not available',
     modes: 'Use AI through MCP, or schedule posts yourself.',
@@ -208,7 +326,7 @@ const en = {
       { title: 'Content Studio', text: 'Turn a clip into a captioned vertical video, ready to schedule.' },
       { title: 'Bulk video', text: 'Drop in up to 50 videos and PostDelegate spreads them across your posting slots.' },
     ] as Card[],
-    demoAlt: 'The current PostDelegate calendar in week view: six demo channels in the sidebar (YouTube, Bluesky, Discord, Telegram, Slack and DEV) and a week of launch posts, mostly scheduled, one published and two drafts',
+    demoAlt: 'The PostDelegate calendar in week view: a labeled sidebar, a channel strip for three example brands (Harbor Fitness, Lumen Coffee and Northwind), a week of scheduled, published and draft posts, and a This week panel with approval actions',
     aiEyebrow: 'Bring your own AI',
     aiTitleA: 'No AI markup. Use the assistant',
     aiTitleB: 'you already ',
@@ -287,6 +405,10 @@ const en = {
     liveTitle: (count: number) => `Live today (${count})`,
     waitingTitle: (count: number) => `Coming soon (awaiting platform approval): ${count}`,
     waitingText: 'None of these can be connected yet. Each one opens once its platform approves PostDelegate and the connection is switched on. We don’t give dates.',
+    ownAppTitle: 'Reddit: bring your own app',
+    ownAppText: (count: number) => `Reddit is not one of the ${count} networks above, and PostDelegate doesn’t offer a shared Reddit connection. Instead, Add Channel offers “Reddit (Own app)”: you create a Reddit “web app” in your own Reddit account and paste its client ID and secret. It is meant for your personal, non-commercial use (check Reddit’s Data API terms), and it is connected in the app, not through the public API.`,
+    ownAppCard: 'Connect it with your own Reddit app',
+    ownAppLabel: 'Your own app',
     xTitle: 'X: not available',
     xText: 'PostDelegate does not post to X, and you cannot connect an X account.',
     googleNote: 'A Google login creates access to PostDelegate; it does not connect a YouTube channel or Google Business Profile. Each publishing destination has its own connection flow.',
@@ -318,7 +440,7 @@ const en = {
     h1: 'Social media MCP server for Claude, ChatGPT and Cursor',
     lead: 'MCP gives compatible AI tools a way to work with a publishing workspace. Bring your own assistant, sign in with PostDelegate and keep every post under your review.',
     readDocs: 'Read the MCP docs',
-    body: '<h2>From a conversation to a draft</h2><p>A compatible client discovers the tools the server offers and uses them to list your channels, read each network\'s rules, upload media and create drafts. The useful starting point is a single draft that you can inspect in the calendar before anything is scheduled.</p><h2>Set it up</h2><p>The server address is <code>https://app.postdelegate.com/mcp-oauth-dynamic</code>. Add it to your assistant and sign in with your PostDelegate account. There are step-by-step guides for <a href="/docs/mcp/claude">Claude</a>, <a href="/docs/mcp/chatgpt">ChatGPT</a> and <a href="/docs/mcp/clients">Claude Code, Cursor and other clients</a>.</p><h2>What to verify first</h2><ol><li>The client is connected to the intended PostDelegate workspace.</li><li>You understand which tools can change or publish content. The <a href="/docs/mcp/tools">tools reference</a> lists them.</li><li>A draft is visible in the app and the destination channel is correct.</li></ol><aside class="doc-note">PostDelegate does not provide an AI of its own, and does not claim an official directory listing in Claude or ChatGPT. You add the server as a custom connector. The MCP server is included on every plan.</aside><p>Related: <a href="/api">REST API</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude and Cowork</a>.</p>',
+    body: mcpBody,
   },
   claudePage: {
     title: 'Claude and Cowork — PostDelegate',

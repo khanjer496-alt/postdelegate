@@ -24,11 +24,16 @@ import {
   AuthorizeSelfHostedDto,
 } from '@gitroom/nestjs-libraries/dtos/oauth/authorize-oauth.dto';
 import { TokenExchangeDto } from '@gitroom/nestjs-libraries/dtos/oauth/token-exchange.dto';
+import { RevokeTokenDto } from '@gitroom/nestjs-libraries/dtos/oauth/revoke-token.dto';
 import { RegisterClientDto } from '@gitroom/nestjs-libraries/dtos/oauth/register-client.dto';
 import { HubspotInstallQueryDto } from '@gitroom/nestjs-libraries/dtos/oauth/hubspot-install.dto';
 import { extractBasicCredentials } from '@gitroom/nestjs-libraries/chat/oauth-types';
 import { McpRelayService } from '@gitroom/nestjs-libraries/chat/mcp.relay.service';
-import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
+import {
+  RATE_LIMITS,
+  ThrottlerRealIpGuard,
+} from '@gitroom/nestjs-libraries/throttler/throttler.provider';
+import { ThrottlerOAuthClientGuard } from '@gitroom/nestjs-libraries/throttler/oauth.client.throttler.guard';
 
 @ApiTags('OAuth')
 @Controller('/oauth')
@@ -38,7 +43,12 @@ export class OAuthController {
     private _mcpRelayService: McpRelayService
   ) {}
 
-  // Dynamic Client Registration (RFC 7591), used by MCP clients like Claude
+  // Dynamic Client Registration (RFC 7591), used by MCP clients like Claude.
+  // Public and capped per client address, since every call creates an app
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({
+    default: { limit: RATE_LIMITS.oauthRegister, ttl: RATE_LIMITS.ttl },
+  })
   @Post('/register')
   @HttpCode(201)
   async register(@Body() body: RegisterClientDto) {
@@ -134,6 +144,13 @@ export class OAuthController {
     return { redirect: redirectUrl.toString() };
   }
 
+  // Public and capped per registered client and address: each attempt checks
+  // a client secret and a code or refresh token (ThrottlerOAuthClientGuard
+  // sets the limit, lower for an unknown client_id)
+  @UseGuards(ThrottlerOAuthClientGuard)
+  @Throttle({
+    default: { limit: RATE_LIMITS.oauthClient, ttl: RATE_LIMITS.ttl },
+  })
   @Post('/token')
   // RFC 6749 §5.1: successful token responses are 200; strict clients (Canva) reject Nest's default 201
   @HttpCode(200)
@@ -146,12 +163,13 @@ export class OAuthController {
     const basic = extractBasicCredentials(authorization);
     const clientId = basic?.clientId || body.client_id;
 
-    // Only HubSpot gets refresh tokens, the service answers every other
-    // client with unsupported_grant_type, as before
+    // HubSpot and dynamically registered MCP clients get refresh tokens, the
+    // service answers every other client with unsupported_grant_type
     if (body.grant_type === 'refresh_token') {
       return this._oauthService.refreshAccessToken(
         clientId,
-        body.refresh_token
+        body.refresh_token,
+        basic?.clientSecret || body.client_secret
       );
     }
 
@@ -175,6 +193,27 @@ export class OAuthController {
       basic?.clientSecret || body.client_secret,
       body.code_verifier,
       body.redirect_uri
+    );
+  }
+
+  // RFC 7009 token revocation, for the client that holds the token (people
+  // revoke from Settings > Approved apps). 200 with an empty JSON object ({})
+  // whether or not the token existed. Capped like /token
+  @UseGuards(ThrottlerOAuthClientGuard)
+  @Throttle({
+    default: { limit: RATE_LIMITS.oauthClient, ttl: RATE_LIMITS.ttl },
+  })
+  @Post('/revoke')
+  @HttpCode(200)
+  async revoke(
+    @Body() body: RevokeTokenDto,
+    @Headers('authorization') authorization?: string
+  ) {
+    const basic = extractBasicCredentials(authorization);
+    return this._oauthService.revokeToken(
+      basic?.clientId || body.client_id,
+      body.token,
+      basic?.clientSecret || body.client_secret
     );
   }
 

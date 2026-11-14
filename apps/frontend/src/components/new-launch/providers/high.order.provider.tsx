@@ -68,6 +68,7 @@ export const withProvider = function <T extends object>(params: {
     const {
       current,
       selectedIntegration,
+      integrations,
       setCurrent,
       internal,
       global,
@@ -150,7 +151,7 @@ export const withProvider = function <T extends object>(params: {
               )
         );
       }
-    }, [justCurrent, current, isGlobal, setTotalChars]);
+    }, [justCurrent, current, isGlobal, setTotalChars, integrations, internal?.integrationValue?.length, global.length]);
 
     const hasMediaSettings = useMediaSettingsValues().some(
       (p) => p.media?.length

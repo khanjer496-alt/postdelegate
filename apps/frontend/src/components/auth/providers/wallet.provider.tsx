@@ -42,6 +42,7 @@ import { clusterApiUrl } from '@solana/web3.js';
 // Default styles that can be overridden by your app
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { WalletUiProvider } from '@gitroom/frontend/components/auth/providers/placeholder/wallet.ui.provider';
 const WalletProvider = () => {
   const gotoLogin = useCallback(async (code: string) => {
@@ -50,6 +51,12 @@ const WalletProvider = () => {
   return <ButtonCaster login={gotoLogin} />;
 };
 export const ButtonCaster: FC<{
+  login: (code: string) => void;
+}> = (props) => {
+  const { walletLoginEnabled } = useVariables();
+  return walletLoginEnabled ? <WalletConnection {...props} /> : null;
+};
+const WalletConnection: FC<{
   login: (code: string) => void;
 }> = (props) => {
   const network = WalletAdapterNetwork.Mainnet;

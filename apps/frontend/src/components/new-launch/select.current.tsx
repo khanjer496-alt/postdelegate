@@ -26,6 +26,8 @@ import {
 } from '@gitroom/frontend/components/layout/new-modal';
 import { countLength } from '@gitroom/helpers/utils/count.length';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { isUiV2Client } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
+import { networkName } from '@gitroom/frontend/components/new-layout/v2/network.names';
 
 export function useHasScroll(ref: RefObject<HTMLElement | null>): boolean {
   const [hasHorizontalScroll, setHasHorizontalScroll] = useState(false);
@@ -62,6 +64,9 @@ export function useHasScroll(ref: RefObject<HTMLElement | null>): boolean {
 }
 
 export const SelectCurrent: FC = () => {
+  const t = useT();
+  // the v2 layout labels the tabs; classic keeps the icons only
+  const [uiV2] = useState(isUiV2Client);
   const modals = useDecisionModal();
   const existingData = useExistingData();
   const {
@@ -109,6 +114,7 @@ export const SelectCurrent: FC = () => {
       <div className="select-none left-0 absolute w-full z-[100] px-[20px] mobile:static mobile:px-0">
         <div
           ref={contentRef}
+          data-pd-tabs=""
           className={clsx(
             'flex gap-[6px] mobile:gap-[4px] w-full overflow-x-auto scrollbar scrollbar-thumb-tableBorder scrollbar-track-secondary mobile:scrollbar-none',
             locked && 'opacity-50 pointer-events-none'
@@ -121,6 +127,7 @@ export const SelectCurrent: FC = () => {
                 setHide(true);
                 setCurrent('global');
               }}
+              data-pd-tab={current === 'global' ? 'active' : ''}
               className={clsx(
                 'cursor-pointer flex gap-[8px] rounded-[8px] w-[40px] h-[40px] mobile:w-[44px] mobile:h-[44px] mobile:shrink-0 justify-center items-center bg-newBgLineColor mobile:bg-newSettings',
                 current !== 'global'
@@ -131,6 +138,9 @@ export const SelectCurrent: FC = () => {
               <div>
                 <GlobalIcon className="mobile:w-[24px] mobile:h-[24px]" />
               </div>
+              {uiV2 && (
+                <span data-pd-tab-label="">{t('all_channels', 'All channels')}</span>
+              )}
             </div>
           )}
           {selectedIntegrations.map(({ integration }) => (
@@ -153,6 +163,7 @@ export const SelectCurrent: FC = () => {
               tabIndex={0}
               aria-pressed={current === integration.id}
               key={integration.id}
+              data-pd-tab={current === integration.id ? 'active' : ''}
               className={clsx(
                 'border mobile:border-[1.5px] cursor-pointer relative flex gap-[4px] min-w-[40px] h-[40px] mobile:min-w-[44px] mobile:h-[44px] mobile:shrink-0 rounded-[8px] items-center bg-newBgLineColor mobile:bg-newSettings justify-center outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
                 current === integration.id
@@ -208,6 +219,9 @@ export const SelectCurrent: FC = () => {
                   />
                 )}
               </div>
+              {uiV2 && (
+                <span data-pd-tab-label="">{networkName(integration.identifier)}</span>
+              )}
               <ChannelCharCount integration={integration} />
             </div>
           ))}

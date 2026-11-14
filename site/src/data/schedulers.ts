@@ -12,6 +12,8 @@ export interface Scheduler {
   action?: string;
   /** Meta description override, 140-160 characters. */
   description?: string;
+  /** English <title> override (65 characters at most) for search intent the default "{name} Scheduler: {action} | PostDelegate" title misses. */
+  title?: string;
   /** Paragraphs under "What you can publish". */
   about?: string[];
   /** Numbered steps; they render as the how-to section and its HowTo JSON-LD. */
@@ -334,7 +336,7 @@ export const SCHEDULERS: Scheduler[] = [
     action: "Schedule Slack Messages",
     description: "Schedule Slack messages with text and images to the channel you pick, with replies sent in a thread. Add PostDelegate to your workspace. 7-day free trial.",
     h1: "Schedule Slack messages to any channel.",
-    intro: "Add PostDelegate to a Slack workspace, then send scheduled messages with text and images to the channel you pick.",
+    intro: "Add PostDelegate to a Slack workspace, then send scheduled messages with text and images to the channel you pick. This schedules Slack messages, not meetings or appointments.",
     about: [
       "Slack is a workplace chat app, and scheduled messages are useful for announcements, reminders and updates that should land at a set time. PostDelegate sends each post as a message to the channel you choose, and text uses Slack's own formatting.",
       "Messages appear from the PostDelegate app, not from your own Slack account. Add images as PNG, JPG or GIF. Video is not supported. Follow-up entries in a post are sent as replies in a thread under the first message.",
@@ -438,6 +440,7 @@ export const SCHEDULERS: Scheduler[] = [
     ],
     limits: ["Messages are text only. Images and video are not sent.", "If Twitch stops accepting the saved sign-in, the channel asks you to reconnect and scheduled messages will not send until you do."],
     docs: "/docs/channels/twitch",
+    guides: [{ href: "/guides/twitch-and-kick-chat-announcements", label: "Twitch chat announcements" }],
     faq: [
       { q: "Can I schedule Twitch announcements as well as chat messages?", a: "Yes. Set Message Type to Announcement and choose a colour: Primary, Blue, Green, Orange or Purple. Announcements are highlighted in chat." },
       { q: "Does the message come from my own Twitch account?", a: "Yes. Each post is sent to your channel's chat from your own Twitch account, as text of up to 500 characters." },
@@ -524,9 +527,10 @@ export const SCHEDULERS: Scheduler[] = [
   {
     slug: "google-business-scheduler", key: "google_business", name: "Google Business Profile",
     action: "Schedule Google Business Profile Posts",
+    title: "Google Business Profile Scheduler | PostDelegate",
     description: "Schedule Google Business Profile updates, events and offers with an image and a button, connected with Google sign-in. 7-day free trial, no card.",
     h1: "Schedule Google Business Profile posts.",
-    intro: "Connect a business location with Google sign-in, then schedule updates, events and offers with an optional image and button.",
+    intro: "Schedule Google My Business (GMB) posts: the updates, events and offers on your Google Business Profile. Connect a business location with Google sign-in, then add an optional image and button.",
     about: [
       "A Google Business Profile post is up to 1,500 characters with one optional image. Pick a standard update, an event with a title and dates, or an offer with a title and dates, plus an optional coupon code, redeem link and terms. Add an optional button, such as Book or Learn more, that opens a link you choose, or Call (uses your business phone number). Videos are not supported.",
       "You connect through Google's own sign-in, then pick the business location to post to. Each location is its own channel, so connect each location you manage. Signing in to PostDelegate with Google does not connect a Business Profile.",

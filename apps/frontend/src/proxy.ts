@@ -9,6 +9,13 @@ import {
   languages,
   normalizeLanguage,
 } from '@gitroom/react/translation/i18n.config';
+import {
+  normalizeUiFlagMode,
+  UI_FLAG_COOKIE,
+  UI_FLAG_COOKIE_MAX_AGE,
+  UI_FLAG_ENV,
+  UI_FLAG_QUERY,
+} from '@gitroom/frontend/components/new-layout/v2/ui.flag';
 acceptLanguage.languages(languages);
 
 // This function can be marked `async` if using `await` inside
@@ -134,6 +141,19 @@ export async function proxy(request: NextRequest) {
     );
   }
 
+  // An emailed one-time link (activate the account, reset the password) is
+  // opened by whoever holds it, whatever cookie the browser already has. This
+  // check only sees that an auth cookie exists, not that it is valid, so a
+  // stale or other account's cookie used to send the visitor to the app before
+  // the link was ever used: the account stayed inactive on the first click
+  // and the app's 401 cleared the cookie, which is why the second click worked.
+  if (
+    authCookie &&
+    /^\/auth\/(activate|forgot)\/[^/]+\/?$/.test(nextUrl.pathname)
+  ) {
+    return topResponse;
+  }
+
   // If the url is /auth and the cookie exists, redirect to /
   if (nextUrl.pathname.startsWith('/auth') && authCookie) {
     return NextResponse.redirect(new URL(`/${url}`, nextUrl.href));
@@ -200,6 +220,27 @@ export async function proxy(request: NextRequest) {
           expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
         });
       }
+      return redirect;
+    }
+    // ?pd_ui=v2 (or v1) chooses the layout. The cookie is set here, on a
+    // redirect that drops the param, so the request that follows already
+    // carries it and the server renders the chosen shell. Set client-side, it
+    // landed after the server render: the switch showed one load late, and the
+    // client swap of the shell could leave a blank first load.
+    const uiLayout = nextUrl.searchParams.get(UI_FLAG_QUERY);
+    if (
+      (uiLayout === 'v1' || uiLayout === 'v2') &&
+      normalizeUiFlagMode(process.env[UI_FLAG_ENV]) !== 'off'
+    ) {
+      const target = new URL(nextUrl.href);
+      target.searchParams.delete(UI_FLAG_QUERY);
+      const redirect = NextResponse.redirect(target);
+      // readable and host-only like the in-app switch, which rewrites it
+      redirect.cookies.set(UI_FLAG_COOKIE, uiLayout, {
+        path: '/',
+        maxAge: UI_FLAG_COOKIE_MAX_AGE,
+        sameSite: 'lax',
+      });
       return redirect;
     }
     if (nextUrl.pathname === '/') {

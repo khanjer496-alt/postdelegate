@@ -2,7 +2,9 @@ import { useIntegration } from '@gitroom/frontend/components/launches/helpers/us
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import clsx from 'clsx';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
-import { FC } from 'react';
+import { FC, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { isUiV2Client } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
 import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
@@ -14,6 +16,9 @@ export const GeneralPreviewComponent: FC<{
   const { value: topValue, integration } = useIntegration();
   const current = useLaunchStore((state) => state.current);
   const mediaDir = useMediaDirectory();
+  const t = useT();
+  // the v2 layout names the global preview; classic keeps its label
+  const [uiV2] = useState(isUiV2Client);
 
   const renderContent = topValue.map((p) => {
     const newContent = stripHtmlValidation(
@@ -49,7 +54,7 @@ export const GeneralPreviewComponent: FC<{
   });
 
   return (
-    <div className={clsx('w-full p-[15px]')}>
+    <div className={clsx('w-full p-[15px]')} data-pd-preview="">
       <div className="w-full h-full relative flex flex-col">
         {renderContent.map((value, index) => (
           <div
@@ -89,7 +94,11 @@ export const GeneralPreviewComponent: FC<{
             <div className="flex-1 flex flex-col gap-[4px]">
               <div className="flex">
                 <div className="h-[22px] text-[15px] font-[700]">
-                  {current === 'global' ? 'Global Edit' : integration?.name}
+                  {current === 'global'
+                    ? uiV2
+                      ? t('all_channels', 'All channels')
+                      : 'Global Edit'
+                    : integration?.name}
                 </div>
                 {/* No verification badge. The only verification-ish datum we
                     hold is X's `Verified` additionalSettings checkbox, and

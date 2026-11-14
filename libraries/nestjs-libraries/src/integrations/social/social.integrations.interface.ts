@@ -200,6 +200,7 @@ export type GenerateAuthUrlResponse = {
 };
 
 export type AuthTokenDetails = {
+  scopeWarnings?: string[];
   id: string;
   name: string;
   error?: string;
@@ -395,9 +396,17 @@ export interface SocialProvider
   oneTimeToken?: boolean;
   isBetweenSteps: boolean;
   scopes: string[];
+  analyticsAvailable?: boolean;
+  plugsAvailable?: boolean;
   externalUrl?: (
     url: string
   ) => Promise<{ client_id: string; client_secret: string }>;
+  // The customer brings their own OAuth app: the connect form POSTs the
+  // customFields values, this turns them into the app the OAuth flow uses
+  // (or an error message), and the callback hands it to authenticate.
+  ownAppCredentials?: (
+    fields: Record<string, string>
+  ) => ClientInformation | string;
   mention?: (
     token: string,
     data: { query: string },

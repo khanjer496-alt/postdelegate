@@ -74,6 +74,7 @@ export function Forgot() {
                   translationKey="label_email"
                   {...form.register('email')}
                   type="email"
+                  autoComplete="email"
                   placeholder={t('email_address', 'Email Address')}
                 />
               </div>

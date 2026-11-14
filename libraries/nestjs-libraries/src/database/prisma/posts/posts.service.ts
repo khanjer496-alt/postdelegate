@@ -449,6 +449,7 @@ export class PostsService {
         return [];
       }
 
+      if (integrationProvider.analyticsAvailable === false) return [];
       const loadAnalytics = await integrationProvider.postAnalytics(
         getIntegration.internalId,
         getIntegration.token,
@@ -1115,7 +1116,8 @@ export class PostsService {
     providerName: string,
     integrationId: string
   ) {
-    const loadAllPlugs = this._integrationManager.getAllPlugs();
+    // Consent defaults hide new automations; saved automations retain their definitions.
+    const loadAllPlugs = this._integrationManager.getAllPlugs(true);
     const getPlugs = await this._integrationService.getPlugs(
       orgId,
       integrationId
@@ -1273,6 +1275,7 @@ export class PostsService {
       date?: string;
       integration: { id: string };
       value: Array<{
+        id?: string;
         content?: string;
         image?: Array<{ path: string; thumbnail?: string }>;
       }>;
@@ -1362,6 +1365,15 @@ export class PostsService {
           );
         } catch (err: any) {
           errors = err?.message || 'Invalid media';
+        }
+
+        if (provider.plugsAvailable === false && (post.value || []).length > 1) {
+          const ids = post.value.map(entry => entry.id);
+          const savedSequence = ids.every((id): id is string => typeof id === 'string' && !!id) &&
+            await this._postRepository.isExistingPostSequence(orgId, integration.id, ids as string[]);
+          if (!savedSequence) {
+            errors = 'Comment and reply automation needs an approved optional permission. Existing saved entries can be edited; new replies are unavailable.';
+          }
         }
 
         const maximumCharacters = provider.maxLength(
@@ -2215,6 +2227,34 @@ export class PostsService {
     // an agent's change to an approved or waiting post goes back to review
     actor?: ApprovalActor
   ): Promise<{ postId: string; publishDate: string }> {
+    return this.updatePostInPlace(
+      orgId,
+      postId,
+      { settings },
+      creationMethod,
+      actor
+    );
+  }
+
+  // In-place edit of a post that was not published yet (scheduled or draft):
+  // its settings (merged), its text and media (post and comments, the same
+  // number of entries it has now) and its publish date. The post keeps its id
+  // and group, so the calendar and the running workflow stay attached; a new
+  // date restarts the workflow at that time (see createPost, type 'update').
+  async updatePostInPlace(
+    orgId: string,
+    postId: string,
+    changes: {
+      settings?: Record<string, any>;
+      // one entry per stored item (main post first, then its comments);
+      // content or image left out keeps the stored one
+      value?: Array<{ content?: string; image?: any[] }>;
+      // UTC, YYYY-MM-DDTHH:mm:ss
+      date?: string;
+    },
+    creationMethod: CreationMethod,
+    actor?: ApprovalActor
+  ): Promise<{ postId: string; publishDate: string }> {
     // Ordered as post -> comments, root includes integration and tags.
     const ordered = await this.getPostsRecursively(postId, true, orgId, true);
 
@@ -2244,6 +2284,32 @@ export class PostsService {
       );
     }
 
+    if (changes.value && changes.value.length !== ordered.length) {
+      throw new BadRequestException(
+        `This post has ${ordered.length} ${
+          ordered.length === 1 ? 'entry' : 'entries'
+        } (the post${
+          ordered.length > 1 ? ` and ${ordered.length - 1} comment(s)` : ''
+        }), pass exactly ${ordered.length} to change its text or media`
+      );
+    }
+
+    let date = dayjs.utc(root.publishDate).format('YYYY-MM-DDTHH:mm:ss');
+    if (changes.date) {
+      const parsed = dayjs.utc(changes.date);
+      if (!parsed.isValid()) {
+        throw new BadRequestException(
+          'The new date is not a valid date, use UTC like 2026-12-01T09:30:00'
+        );
+      }
+      if (root.state === 'QUEUE' && !parsed.isAfter(dayjs.utc())) {
+        throw new BadRequestException(
+          'The new date of a scheduled post must be in the future'
+        );
+      }
+      date = parsed.format('YYYY-MM-DDTHH:mm:ss');
+    }
+
     const integration = (root as any).integration;
 
     let existingSettings: Record<string, any>;
@@ -2256,22 +2322,30 @@ export class PostsService {
     // Merge: only the passed keys change, everything else stays.
     const mergedSettings = {
       ...existingSettings,
-      ...(settings || {}),
+      ...(changes.settings || {}),
       __type: integration.providerIdentifier,
     };
 
-    // Keep the existing content/ids so the posts are updated in place (the
-    // workflow identity is preserved) - only the settings differ.
-    const value = ordered.map((p) => {
+    // Keep the existing ids so the posts are updated in place (the workflow
+    // identity is preserved)
+    const value = ordered.map((p, index) => {
       let image = [];
       try {
         image = JSON.parse(p.image || '[]');
       } catch (err) {}
+      const change = changes.value?.[index];
       return {
         id: p.id,
-        content: p.content,
+        content:
+          change?.content !== undefined ? change.content : p.content,
         delay: p.delay || 0,
-        image,
+        image:
+          change?.image !== undefined
+            ? change.image.map((media: any) => ({
+                ...media,
+                id: media.id || makeId(10),
+              }))
+            : image,
       };
     });
 
@@ -2281,7 +2355,7 @@ export class PostsService {
       [
         {
           integration: { id: integration.id },
-          date: dayjs.utc(root.publishDate).format('YYYY-MM-DDTHH:mm:ss'),
+          date,
           settings: mergedSettings,
           value: value.map((p) => ({ content: p.content, image: p.image })),
         },
@@ -2317,14 +2391,12 @@ export class PostsService {
       }
     }
 
-    const date = dayjs.utc(root.publishDate).format('YYYY-MM-DDTHH:mm:ss');
-
     const [output] = await this.createPost(
       orgId,
       {
         date,
-        // Settings-only update: keep the current state and leave the running
-        // publish workflow alone.
+        // In-place update: keep the current state; the running publish
+        // workflow is only restarted when the date moved
         type: 'update',
         shortLink: false,
         tags: ((root as any).tags || []).map((t: any) => ({
@@ -2342,7 +2414,7 @@ export class PostsService {
       } as any,
       creationMethod,
       // Keep the group stable: a client may have the calendar open while the
-      // settings are updated out of band, and the calendar links posts by group.
+      // post is updated out of band, and the calendar links posts by group.
       true,
       actor
     );
@@ -2648,7 +2720,11 @@ export class PostsService {
   async generatePostsDraft(orgId: string, body: CreateGeneratedPostsDto) {
     const getAllIntegrations = (
       await this._integrationService.getIntegrationsList(orgId)
-    ).filter((f) => !f.disabled && f.providerIdentifier !== 'reddit');
+    ).filter(
+      (f) =>
+        !f.disabled &&
+        !['reddit', 'reddit-own-key'].includes(f.providerIdentifier)
+    );
 
     // const posts = chunk(body.posts, getAllIntegrations.length);
     const allDates = dayjs()

@@ -21,6 +21,8 @@ import dayjs from 'dayjs';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import {
+  AnalyticsUnavailable,
+  isPartialAnalytics,
   NotEnoughScopes,
   RefreshToken,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -701,6 +703,8 @@ export class IntegrationService {
       getIntegration.providerIdentifier
     );
 
+    if (integrationProvider.analyticsAvailable === false) return [];
+
     if (
       dayjs(getIntegration?.tokenExpiration).isBefore(dayjs()) ||
       forceRefresh
@@ -750,7 +754,7 @@ export class IntegrationService {
         if (bypassCache) {
           const current = await this.getActiveIntegrationById(org.id, integration);
           if (!current || current.token !== getIntegration.token) return [];
-        } else await ioRedis.set(
+        } else if (!isPartialAnalytics(loadAnalytics)) await ioRedis.set(
           `integration:${org.id}:${integration}:${days}`,
           JSON.stringify(loadAnalytics),
           'EX',
@@ -760,6 +764,12 @@ export class IntegrationService {
         );
         return loadAnalytics;
       } catch (e) {
+        if (e instanceof AnalyticsUnavailable) {
+          throw new HttpException(
+            new AnalyticsUnavailable().message,
+            HttpStatus.BAD_GATEWAY
+          );
+        }
         if (e instanceof RefreshToken && allowRefresh === 'soft') {
           // one retry with a fresh token, never a loop
           return forceRefresh
@@ -807,6 +817,8 @@ export class IntegrationService {
       unavailable: true as const,
       posts: [] as RecentPostStat[],
     };
+
+    if (integrationProvider.analyticsAvailable === false) return unavailable;
 
     if (
       dayjs(getIntegration.tokenExpiration).isBefore(dayjs()) ||

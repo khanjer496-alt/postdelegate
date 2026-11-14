@@ -12,6 +12,7 @@ export const AfterActivate = () => {
   const params = useParams();
   const [showLoader, setShowLoader] = useState(true);
   const [reason, setReason] = useState<string>();
+  const [signedInElsewhere, setSignedInElsewhere] = useState(false);
   const run = useRef(false);
   const t = useT();
   const [datafast_visitor_id] = useCookie('datafast_visitor_id');
@@ -38,9 +39,15 @@ export const AfterActivate = () => {
         return;
       }
       // an unreadable answer shows the "not valid" text, never a loader forever
-      const { can, reason } = await response
+      const { can, reason, signedInElsewhere } = await response
         .json()
-        .catch(() => ({ can: false, reason: undefined }));
+        .catch(() => ({ can: false, reason: undefined, signedInElsewhere: false }));
+      if (can && signedInElsewhere) {
+        // activated, but this browser is signed in to a different account
+        setSignedInElsewhere(true);
+        setShowLoader(false);
+        return;
+      }
       if (!can) {
         setReason(reason);
         setShowLoader(false);
@@ -53,7 +60,17 @@ export const AfterActivate = () => {
         <LoadingComponent />
       ) : (
         <>
-          {reason === 'activated' ? (
+          {signedInElsewhere ? (
+            <>
+              {t(
+                'activated_signed_in_elsewhere',
+                'Your account is activated, but this browser is signed in to a different account. Sign out, then sign in with your new account.'
+              )}{' '}
+              <a href="/auth/logout" className="underline">
+                {t('logout', 'Sign out')}
+              </a>
+            </>
+          ) : reason === 'activated' ? (
             t('user_already_activated', 'This user is already activated.')
           ) : reason === 'expired' ? (
             <>
