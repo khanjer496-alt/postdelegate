@@ -31,17 +31,26 @@ assert.equal(untrustedLocation.locationClass, 'other-source');
 assert.equal(untrustedLocation.line, null);
 assert.equal(untrustedLocation.column, null);
 
-const metadata = { inputs: { [canary]: { imports: [
+const metadata = { inputs: { [canary]: { imports: [] } }, outputs: { [canary]: { imports: [
+  { path: 'cloudflare:' + canary, kind: 'import-statement' },
   { path: 'node:' + canary, kind: 'import-statement' }, { path: './' + canary, kind: 'dynamic-import' },
   { path: canary, kind: canary },
-] } }, outputs: { [canary]: { exports: ['default', canary] } } };
+] , exports: ['default', canary] } } };
 const topologyResult = topology(metadata);
+assert.deepEqual(topologyResult.importCounts, { 'import-statement': { 'cloudflare-builtin': 1, 'node-builtin': 1 },
+  'dynamic-import': { relative: 1 }, 'other-kind': { 'bare-package': 1 } });
+assert.equal(topologyResult.importSemantics, 'retained-emitted-output-imports');
 assert.equal(topologyResult.hasDefaultExport, true);
 assert.equal(topologyResult.namedExportCount, 1);
 assert(!JSON.stringify(topologyResult).includes(canary));
-const many = topology({ inputs: { [canary]: { imports: Array(1001).fill({ path: canary, kind: canary }) } }, outputs: {} });
+const many = topology({ inputs: { [canary]: { imports: [] } }, outputs: { [canary]: {
+  imports: Array(1001).fill({ path: canary, kind: canary }), exports: Array(1001).fill(canary),
+} } });
 assert.equal(many.importsTruncated, true);
 assert.equal(many.importCounts['other-kind']['bare-package'], 1000);
+assert.equal(many.exportsTruncated, true);
+assert.equal(many.namedExportCount, 1000);
+assert(!JSON.stringify(many).includes(canary));
 
 let calls = 0;
 const result = await inspectBuild(worker, async (actual) => {

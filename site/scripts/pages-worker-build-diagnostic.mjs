@@ -33,14 +33,15 @@ export function sanitizeMessage(message, worker) {
 }
 
 export function topology(metafile) {
-  const imports = Object.values(metafile.inputs ?? {}).flatMap((input) => input.imports ?? []);
+  const outputs = Object.values(metafile.outputs ?? {});
+  const imports = outputs.flatMap((output) => output.imports ?? []);
   const counts = {};
   for (const item of imports.slice(0, 1000)) {
     const kind = kindClass(item.kind), specifier = specifierClass(item.path);
     counts[kind] ??= {}; counts[kind][specifier] = (counts[kind][specifier] ?? 0) + 1;
   }
-  const exports = Object.values(metafile.outputs ?? {}).flatMap((output) => output.exports ?? []);
-  return { importCounts: counts, importsTruncated: imports.length > 1000,
+  const exports = outputs.flatMap((output) => output.exports ?? []);
+  return { importSemantics: 'retained-emitted-output-imports', importCounts: counts, importsTruncated: imports.length > 1000,
     hasDefaultExport: exports.includes('default'), namedExportCount: Math.min(1000, exports.filter((name) => name !== 'default').length),
     exportsTruncated: exports.length > 1000 };
 }
