@@ -1,3 +1,5 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
+import { MeasurementRepository } from './measurement/measurement.repository';
 import { Global, Module } from '@nestjs/common';
 import { PrismaRepository, PrismaService, PrismaTransaction } from './prisma.service';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
@@ -92,6 +94,8 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
   imports: [],
   controllers: [],
   providers: [
+    MeasurementService,
+    MeasurementRepository,
     PrismaService,
     PrismaRepository,
     PrismaTransaction,

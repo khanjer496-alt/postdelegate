@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import {
   Body,
   Controller,
@@ -25,7 +26,8 @@ export class AdminController {
     private _errorsService: ErrorsService,
     private _adminStatsService: AdminStatsService,
     private _affiliateService: AffiliateService,
-    private _reviewService: ReviewService
+    private _reviewService: ReviewService,
+    private _measurement?: MeasurementService
   ) {}
 
   private assertSuperAdmin(user: User) {
@@ -57,6 +59,29 @@ export class AdminController {
   async listPlatforms(@GetUserFromRequest() user: User) {
     this.assertSuperAdmin(user);
     return this._errorsService.listPlatforms();
+  }
+
+  @Get('/measurement')
+  async measurement(
+    @GetUserFromRequest() user: User,
+    @Query('from') from?: string,
+    @Query('to') to?: string
+  ) {
+    this.assertSuperAdmin(user);
+    const start = new Date(from || '');
+    const end = new Date(to || '');
+    if (
+      !Number.isFinite(start.getTime()) ||
+      !Number.isFinite(end.getTime()) ||
+      start >= end ||
+      end.getTime() > Date.now() + 60000 ||
+      end.getTime() - start.getTime() > 93 * 86400000
+    )
+      throw new HttpException(
+        'Supply [from,to) ISO instants spanning at most 93 days',
+        400
+      );
+    return this._measurement!.export(start, end);
   }
 
   @Get('/stats')

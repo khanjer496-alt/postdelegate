@@ -153,3 +153,10 @@ export const CHANNEL_DISCONNECTED: Prisma.IntegrationWhereInput = {
 
 export const isChannelDisconnected = (channel: ChannelFlags) =>
   !!channel.deletedAt && !!channel.disabled && !!channel.refreshNeeded;
+
+// Public availability deliberately excludes preview-only providers for acquisition metrics.
+export const isPubliclyAvailableProvider = (identifier: string) =>
+  !(process.env.HIDDEN_PROVIDERS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .includes(identifier.toLowerCase());

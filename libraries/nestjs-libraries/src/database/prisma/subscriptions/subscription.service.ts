@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { Injectable } from '@nestjs/common';
 import {
   pricing,
@@ -51,7 +52,8 @@ export class SubscriptionService {
   constructor(
     private readonly _subscriptionRepository: SubscriptionRepository,
     private readonly _integrationService: IntegrationService,
-    private readonly _organizationService: OrganizationService
+    private readonly _organizationService: OrganizationService,
+    private _measurement?: MeasurementService
   ) {}
 
   processPaymentEvent(provider: string, eventId: string, handle: () => Promise<any>) {
@@ -348,6 +350,12 @@ export class SubscriptionService {
         org ? { id: org } : undefined,
         state
       );
+      if (this._measurement) {
+        try {
+          const workspace = org || (await this._organizationService.getOrgByCustomerId(customerId))?.id;
+          if (workspace) await this._measurement.entitlement(workspace, state?.trialStartsAt, state?.measurementSubscriptionId, identifier);
+        } catch { console.error('measurement_write_failed; entitlement applied successfully'); }
+      }
       return undefined;
     } catch (e) {
       console.error('Error storing subscription:', e);
@@ -466,8 +474,6 @@ export class SubscriptionService {
       return { retry: true };
     }
   }
-
-
 
   // Channels that count against the limit right now, the ones a lower limit
   // would disable (modifySubscription)

@@ -25,6 +25,8 @@ const FRAMEWORK =
   'Mastra framework table, Postiz never writes a tenant key to it; untouched';
 
 export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
+  MeasurementEvent: { scope: 'org', note: 'deleted only by the existing explicit permanent workspace erasure flow; no measurement maintenance deletes source events' },
+  MeasurementHandoff: { scope: 'none', note: 'no user/workspace id; OAuth nonce hash and signed source dimensions only; unusable after ten minutes and expired continuations pruned on handoff reads/writes' },
   Organization: {
     scope: 'org',
     note: 'row deleted last; apiKey, paymentId and the affiliate referral fields (referredByAffiliateId, referralCode, referredAt, referralFirstPaidAt) go with it',

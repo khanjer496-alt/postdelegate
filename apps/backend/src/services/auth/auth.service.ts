@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { HttpException, Injectable } from '@nestjs/common';
 import { Provider, User } from '@prisma/client';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -43,7 +44,8 @@ export class AuthService {
     private _emailService: EmailService,
     private _providerManager: AuthProviderManager,
     private _affiliateService: AffiliateService,
-    private _loginLockoutService: LoginLockoutService
+    private _loginLockoutService: LoginLockoutService,
+    private _measurement?: MeasurementService
   ) {}
   async canRegister(provider: string) {
     if (
@@ -82,8 +84,8 @@ export class AuthService {
         }
 
         if (!(await this.canRegister(provider))) {
-          throw new Error('Registration is disabled');
-        }
+      throw new Error('Registration is disabled');
+    }
 
         const create = await this._organizationService.createOrgAndUser(
           body,
@@ -251,6 +253,7 @@ export class AuthService {
         provider,
         providerId: providerUser.id,
         datafast_visitor_id: body.datafast_visitor_id,
+        acquisition: (body as CreateOrgUserDto).acquisition,
       },
       ip,
       userAgent
@@ -422,6 +425,7 @@ export class AuthService {
     }
 
     await this._userService.activateUser(user.id);
+    await this._measurement?.activated(user.id);
     this._track('register', user.email, tracking).catch((err) => {});
     await NewsletterService.register(user.email);
     return { jwt: await this.jwt(user), userId: user.id };

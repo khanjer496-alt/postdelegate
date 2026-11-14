@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { Injectable } from '@nestjs/common';
 import { ActivityAction } from '@prisma/client';
 import {
@@ -9,7 +10,10 @@ const PAGE_SIZE = 30;
 
 @Injectable()
 export class ActivityLogService {
-  constructor(private _activityLogRepository: ActivityLogRepository) {}
+  constructor(
+    private _activityLogRepository: ActivityLogRepository,
+    private _measurement?: MeasurementService
+  ) {}
 
   record(entry: ActivityEntry) {
     return this._activityLogRepository.create(entry);
@@ -19,6 +23,16 @@ export class ActivityLogService {
   async recordSafely(entry: ActivityEntry) {
     try {
       await this._activityLogRepository.create(entry);
+      if (
+        entry.action === 'APPROVED' &&
+        entry.postId &&
+        ['USER', 'CLIENT'].includes(entry.actorType)
+      )
+        await this._measurement?.postAccepted(
+          entry.organizationId,
+          entry.postId,
+          true
+        );
     } catch (err) {}
   }
 
@@ -29,6 +43,7 @@ export class ActivityLogService {
       if (!post) {
         return;
       }
+      await this._measurement?.published(postId);
       await this._activityLogRepository.create({
         organizationId: post.organizationId,
         postId: post.id,

@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import {
   forwardRef,
   HttpException,
@@ -72,7 +73,8 @@ export class IntegrationService {
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
     private _temporalService: TemporalService,
-    private _authorizationLifecycle: IntegrationAuthorizationLifecycleService
+    private _authorizationLifecycle: IntegrationAuthorizationLifecycleService,
+    private _measurement?: MeasurementService
   ) {}
 
   // A plan without AutoPost stops every running feed. Each one is also marked
@@ -236,7 +238,7 @@ export class IntegrationService {
       uploadedPicture = await this.storage.uploadSimple(picture).catch(() => undefined);
     }
 
-    return this._integrationRepository.createOrUpdateIntegration(
+    const saved = await this._integrationRepository.createOrUpdateIntegration(
       additionalSettings,
       oneTimeToken,
       org,
@@ -255,6 +257,8 @@ export class IntegrationService {
       customInstanceDetails,
       !!policy
     );
+    if (saved?.id) await this._measurement?.channelConnected(org, saved.id);
+    return saved;
   }
 
   updateIntegrationGroup(org: string, id: string, group: string) {
@@ -661,6 +665,7 @@ export class IntegrationService {
       token: getIntegrationInformation.access_token,
       profile: getIntegrationInformation.username,
     }, !!provider.authorizationPolicy, !!provider.authorizationPolicy?.useRemoteAvatar);
+    await this._measurement?.channelConnected(org, id);
 
     return { success: true };
   }
