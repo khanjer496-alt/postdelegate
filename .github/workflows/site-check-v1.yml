@@ -35,6 +35,8 @@ jobs:
           run_install: false
       - name: Synthetic acceptance and archive fault checks
         run: PYTHONDONTWRITEBYTECODE=1 python3 site/scripts/test-public-payload.py -v
+      - name: Comparison cost-label regression
+        run: node site/scripts/test-comparison-cost-labels.mjs
       - name: Install standalone site
         working-directory: site
         run: pnpm install --ignore-workspace --frozen-lockfile

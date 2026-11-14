@@ -33,6 +33,40 @@ class PublicPayloadTests(unittest.TestCase):
     def test_expected_page_pass(self):
         acceptance.check_page(page(), '/alternatives/recurpost', SIGNUP)
 
+    def test_hidden_faq_rejected(self):
+        for attribute in ('hidden', 'style="display: none"', 'style="visibility: hidden"',
+                          'style="content-visibility:hidden"', 'style="opacity:0"'):
+            for old, new in (
+                ('<details class="faq-item">', '<details class="faq-item" ' + attribute + '>'),
+                ('<body>', '<body ' + attribute + '>'),
+                ('<div class="faq-answer">', '<div class="faq-answer" ' + attribute + '>'),
+                ('Answer &amp; detail 0', '<span ' + attribute + '>Answer &amp; detail 0</span>'),
+            ):
+                with self.subTest(attribute=attribute, element=old), self.assertRaisesRegex(ValueError, 'hidden FAQ'):
+                    acceptance.check_page(page().replace(old, new), '/alternatives/recurpost', SIGNUP)
+
+    def test_collapsed_expandable_faq_valid(self):
+        self.assertNotIn(' open', page())
+        acceptance.check_page(page(), '/alternatives/recurpost', SIGNUP)
+        html = page().replace('<h1>', '<div hidden>Unrelated hidden text</div><h1>')
+        acceptance.check_page(html, '/alternatives/recurpost', SIGNUP)
+
+    def test_duplicate_title_rejected(self):
+        html = page().replace('<title>', '<title>' + 'X' * 100 + '</title><title>')
+        with self.assertRaisesRegex(ValueError, 'title'):
+            acceptance.check_page(html, '/alternatives/recurpost', SIGNUP)
+
+    def test_empty_title_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'title'):
+            acceptance.check_page(page().replace('A useful comparison', ' '), '/alternatives/recurpost', SIGNUP)
+
+    def test_duplicate_required_metadata_rejected(self):
+        for addition in ('<meta name="description" content="' + 'x' * 140 + '">',
+                         '<link rel="canonical" href="https://postdelegate.com/alternatives/recurpost">'):
+            with self.subTest(addition=addition), self.assertRaises(ValueError):
+                acceptance.check_page(page().replace('</head>', addition + '</head>'),
+                                      '/alternatives/recurpost', SIGNUP)
+
     def test_wrong_canonical(self):
         with self.assertRaisesRegex(ValueError, 'canonical'):
             acceptance.check_page(page('https://wrong.invalid/alternatives/recurpost'),
@@ -131,7 +165,7 @@ class PublicPayloadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'loopback'):
             acceptance.client('https://postdelegate.com')
 
-    def synthetic_preview(self, payload, broken_negotiation=False):
+    def synthetic_preview(self, payload, broken_negotiation=False, weak_csp=False, weak_csp_on=None):
         paths = ['/alternatives', *acceptance.ROUTES]
         links = ''.join('<a href="' + route + '">Related</a>' for route in paths)
         html = {route: (page(acceptance.ORIGIN + route) + links).encode() for route in paths}
@@ -149,17 +183,24 @@ class PublicPayloadTests(unittest.TestCase):
                     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
                     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
                     'Content-Security-Policy': "default-src 'self'"}
+        (payload / '_headers').write_text("/*\n  Content-Security-Policy: default-src 'self'\n")
         for route in ('/docs', '/docs/channels/telegram'):
             file = payload / (route.lstrip('/') + '.md')
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_bytes(b'# Synthetic documentation')
 
         def get(route, accept='text/html', ua='site-acceptance-v1'):
-            headers = {**security, 'Content-Type': 'text/html', 'Vary': 'Accept'}
+            observed = dict(security)
+            kind = ('static' if route.startswith('/_astro/') else 'direct' if route.endswith('.md')
+                    else 'negotiated' if accept == 'text/markdown'
+                    else 'docs-html' if route.startswith('/docs') else 'html')
+            if weak_csp or kind == weak_csp_on:
+                observed['Content-Security-Policy'] = "default-src * 'unsafe-inline' 'unsafe-eval'"
+            headers = {**observed, 'Content-Type': 'text/html', 'Vary': 'Accept'}
             if route in html:
                 return html[route], headers
             if route == '/_astro/test.css':
-                return asset.read_bytes(), {**security, 'Cache-Control': 'public, immutable'}
+                return asset.read_bytes(), {**observed, 'Cache-Control': 'public, immutable'}
             direct = route.endswith('.md')
             canonical = route.removesuffix('.md')
             if direct or accept == 'text/markdown':
@@ -188,6 +229,21 @@ class PublicPayloadTests(unittest.TestCase):
             get = self.synthetic_preview(payload, broken_negotiation=True)
             with patch.object(acceptance, 'client', return_value=get):
                 with self.assertRaisesRegex(ValueError, 'Content-Location'):
+                    acceptance.check_preview(payload, 'http://127.0.0.1:8789', SIGNUP)
+
+    def test_consistently_weakened_csp_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            payload = Path(directory)
+            get = self.synthetic_preview(payload, weak_csp=True)
+            with patch.object(acceptance, 'client', return_value=get), self.assertRaisesRegex(ValueError, 'CSP'):
+                acceptance.check_preview(payload, 'http://127.0.0.1:8789', SIGNUP)
+
+    def test_each_response_csp_anchored_to_payload(self):
+        for kind in ('html', 'docs-html', 'negotiated', 'direct', 'static'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                payload = Path(directory)
+                get = self.synthetic_preview(payload, weak_csp_on=kind)
+                with patch.object(acceptance, 'client', return_value=get), self.assertRaisesRegex(ValueError, 'CSP'):
                     acceptance.check_preview(payload, 'http://127.0.0.1:8789', SIGNUP)
 
 

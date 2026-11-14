@@ -72,11 +72,31 @@ def text(value):
     return ' '.join(unescape(re.sub(r'<[^>]*>', '', value)).split())
 
 
+def inline_hidden(attrs):
+    if 'hidden' in attrs:
+        return True
+    for declaration in (attrs.get('style') or '').split(';'):
+        name, separator, value = declaration.partition(':')
+        if not separator:
+            continue
+        name = name.strip().lower()
+        value = value.split('!')[0].strip().lower()
+        if ((name == 'display' and value == 'none')
+                or (name == 'visibility' and value in ('hidden', 'collapse'))
+                or (name == 'content-visibility' and value == 'hidden')
+                or (name == 'opacity' and re.fullmatch(r'0+(?:\.0+)?%?', value))):
+            return True
+    return False
+
+
 class Page(HTMLParser):
+    VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+            'param', 'source', 'track', 'wbr'}
+
     def __init__(self, html):
         super().__init__(convert_charrefs=True)
         self.h1 = 0
-        self.title = ''
+        self.titles = []
         self.descriptions = []
         self.canonicals = []
         self.links = []
@@ -87,10 +107,15 @@ class Page(HTMLParser):
         self.buffer = ''
         self.faq = None
         self.in_answer = False
+        self.ancestors = []
+        self.hidden_faq = False
         self.feed(html)
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
+        hidden = (bool(self.ancestors) and self.ancestors[-1][1]) or inline_hidden(attrs)
+        if tag not in self.VOID:
+            self.ancestors.append((tag, hidden))
         if tag == 'h1':
             self.h1 += 1
         if tag == 'title' or (tag == 'script' and attrs.get('type') == 'application/ld+json'):
@@ -105,6 +130,8 @@ class Page(HTMLParser):
                 self.ctas.append(attrs.get('href'))
         if tag == 'details' and 'faq-item' in attrs.get('class', '').split():
             self.faq = ['', '']
+        if self.faq is not None and hidden:
+            self.hidden_faq = True
         if self.faq is not None and tag == 'div' and 'faq-answer' in attrs.get('class', '').split():
             self.in_answer = True
 
@@ -117,20 +144,24 @@ class Page(HTMLParser):
     def handle_endtag(self, tag):
         if tag == self.capture:
             if tag == 'title':
-                self.title = text(self.buffer)
+                self.titles.append(text(self.buffer))
             else:
                 self.schemas.append(json.loads(self.buffer))
             self.capture = None
         if tag == 'details' and self.faq is not None:
             self.faqs.append(tuple(text(value) for value in self.faq))
             self.faq, self.in_answer = None, False
+        for index in range(len(self.ancestors) - 1, -1, -1):
+            if self.ancestors[index][0] == tag:
+                del self.ancestors[index:]
+                break
 
 
 def check_page(html, route, signup):
     page = Page(html)
     require(page.canonicals == [ORIGIN + route], route + ': canonical')
     require(page.h1 == 1, route + ': H1 count')
-    require(0 < len(page.title) <= 65, route + ': title length')
+    require(len(page.titles) == 1 and 0 < len(page.titles[0]) <= 65, route + ': title count/length')
     require(len(page.descriptions) == 1 and 130 <= len(page.descriptions[0]) <= 160,
             route + ': description length')
     require(signup in page.ctas, route + ': inherited trial CTA/hook')
@@ -138,6 +169,7 @@ def check_page(html, route, signup):
     require(len(schemas) == 1, route + ': FAQPage count')
     expected = [(text(item['name']), text(item['acceptedAnswer']['text']))
                 for item in schemas[0]['mainEntity']]
+    require(not page.hidden_faq, route + ': hidden FAQ subtree/ancestor')
     require(len(expected) == 3 and page.faqs == expected, route + ': visible/schema FAQ mismatch')
     return page
 
@@ -160,8 +192,26 @@ def client(base):
     return get
 
 
+def global_csp(payload):
+    # main() already byte-compared this payload file with approved source before preview.
+    policies = []
+    global_rule = False
+    for line in (payload / '_headers').read_text().splitlines():
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        if not line[0].isspace():
+            global_rule = line.strip() == '/*'
+        elif global_rule:
+            name, separator, value = line.strip().partition(':')
+            if separator and name.lower() == 'content-security-policy':
+                policies.append(value.strip())
+    require(len(policies) == 1 and policies[0], 'expected exactly one nonempty global CSP')
+    return policies[0]
+
+
 def check_preview(payload, base, signup):
     get = client(base)
+    expected_csp = global_csp(payload)
     deadline = time.monotonic() + 60
     while True:
         try:
@@ -175,6 +225,7 @@ def check_preview(payload, base, signup):
     for route in ['/alternatives', *ROUTES]:
         body, headers = get(route)
         require('text/html' in headers.get('Content-Type', ''), route + ': HTML content type')
+        require(headers.get('Content-Security-Policy') == expected_csp, route + ': CSP preservation')
         page = check_page(body.decode(), route, signup)
         require(ORIGIN + route + '</loc>' in sitemap, route + ': sitemap inclusion')
         pages[route] = page
@@ -209,14 +260,14 @@ def check_preview(payload, base, signup):
         for headers in (html_headers, md_headers, direct_headers):
             for name, value in security.items():
                 require(headers.get(name) == value, route + ': security ' + name)
-            require(headers.get('Content-Security-Policy') == html_headers.get('Content-Security-Policy')
-                    and headers.get('Content-Security-Policy'), route + ': CSP preservation')
+            require(headers.get('Content-Security-Policy') == expected_csp, route + ': CSP preservation')
         docs.append(route)
     asset = next(iter(sorted(payload.glob('_astro/*.css'))), None)
     require(asset is not None, 'no built CSS asset')
     body, headers = get('/' + asset.relative_to(payload).as_posix(), 'text/markdown', 'Googlebot')
     require(body == asset.read_bytes() and headers.get('Content-Location') is None, 'static pass-through')
     require('immutable' in headers.get('Cache-Control', ''), 'static cache headers')
+    require(headers.get('Content-Security-Policy') == expected_csp, 'static CSP preservation')
     for name, value in security.items():
         require(headers.get(name) == value, 'static security ' + name)
     return {'routes': list(pages), 'docs': docs, 'staticAsset': asset.relative_to(payload).as_posix(),
