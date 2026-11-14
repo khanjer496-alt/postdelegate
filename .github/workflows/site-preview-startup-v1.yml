@@ -1,0 +1,62 @@
+name: Synthetic Pages startup diagnostic v1
+
+on:
+  push:
+    branches: [test/site-preview-startup-v1]
+
+permissions:
+  contents: read
+
+jobs:
+  startup-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /site/functions/
+            /site/public/_routes.json
+            /site/public/_headers
+            /site/public/_redirects
+            /site/scripts/preview-runtime-diagnostics.mjs
+            /site/scripts/pages-startup-probe.mjs
+            /site/scripts/test-pages-startup-probe.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.6.1'
+          run_install: false
+      - name: Synthetic classifier/lifecycle checks (fake processes only)
+        run: node site/scripts/test-pages-startup-probe.mjs
+      - name: Prepare isolated pinned CLI (hosted only)
+        run: |
+          mkdir -p "$RUNNER_TEMP/startup-cli"
+          cd "$RUNNER_TEMP/startup-cli"
+          pnpm --ignore-workspace add wrangler@4.162.0 --save-exact
+      - name: Compile same Functions and probe startup only
+        id: probe
+        run: |
+          set -euo pipefail
+          stage="$(mktemp -d "$RUNNER_TEMP/site-startup.XXXXXX")"
+          mkdir "$stage/payload" "$stage/diagnostics"
+          echo "path=$stage/diagnostics/startup.json" >> "$GITHUB_OUTPUT"
+          cp site/public/_routes.json site/public/_headers site/public/_redirects "$stage/payload/"
+          printf '%s\n' '<!doctype html><html><body>DIAGNOSTIC ONLY: synthetic startup fixture, not site acceptance.</body></html>' > "$stage/payload/alternatives.html"
+          "$RUNNER_TEMP/startup-cli/node_modules/.bin/wrangler" pages functions build site/functions --outfile="$stage/payload/_worker.js"
+          node site/scripts/pages-startup-probe.mjs "$RUNNER_TEMP/startup-cli" "$stage" "$GITHUB_WORKSPACE" "$stage/diagnostics/startup.json"
+      - name: Upload synthetic diagnostic only (never a release payload)
+        if: ${{ always() && steps.probe.outputs.path != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-startup-diagnostic-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.probe.outputs.path }}
+          if-no-files-found: error
+          retention-days: 3
