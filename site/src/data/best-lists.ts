@@ -118,7 +118,7 @@ const networkRule = (name: string) => `Every tool in our comparison data (${TOOL
 export const BEST_LISTS: BestList[] = [
   {
     slug: 'social-media-mcp-servers', published: '2026-11-08',
-    title: 'Best Social Media MCP Servers (2026): 13 Tools, Sourced',
+    title: 'Best Social Media MCP Servers (2026): 16 Tools, Sourced',
     description: 'Social media schedulers whose vendors document an MCP server for Claude, ChatGPT and other assistants: which plans include it, free options, trials and price.',
     h1: 'Social media MCP servers for AI assistants',
     shortAnswer: `To try MCP on a free plan, look at Buffer, Metricool or Typefully. If the assistant should draft but never publish, Agorapulse and Planable say their connectors cannot publish. To self-host, Mixpost Pro includes one, and to build posting into your own product, Zernio is an API with an MCP server. Postiz and PostDelegate list MCP on every plan.`,
@@ -132,6 +132,9 @@ export const BEST_LISTS: BestList[] = [
       { label: '10 accounts, per month', key: 'cost.10' },
     ],
     picks: {
+      coschedule: 'you want an assistant to read permitted calendars, tasks and social results; its MCP cannot create or change items.',
+      recurpost: 'you need assistant access to accounts, libraries, posting and history; official MCP is available on every plan.',
+      rella: 'you use Premium or Premium Plus and want workspace drafting, scheduling and tasks; the connector cannot enable auto-posting.',
       agorapulse: 'you want an assistant to read your inbox, listening and analytics data and leave drafts, but never publish. It needs your own paid assistant subscription.',
       blotato: 'you want AI images and video as well as posting, and will pay from day one: the MCP server is on paid plans, not the trial.',
       buffer: 'you want to try MCP for free. It is on every plan, including the Free plan for 3 channels.',
@@ -162,7 +165,7 @@ export const BEST_LISTS: BestList[] = [
   },
   {
     slug: 'social-media-scheduling-apis', published: '2026-11-08',
-    title: 'Best Social Media Scheduling APIs (2026): 10 Tools, Sourced',
+    title: 'Best Social Media Scheduling APIs (2026): 11 Tools, Sourced',
     description: 'Schedulers and APIs whose vendors document a public API you can switch on yourself: which plans include it, free options, MCP and price at 10 accounts.',
     h1: 'Social media scheduling APIs you can switch on yourself',
     shortAnswer: `To build posting into your own product, Zernio is an API first, with the first 2 accounts free. For an API inside a scheduler you can start free, Buffer and Typefully include one on their free plans. Postiz and PostDelegate list a public API on every plan, and Metricool and Planable put theirs on higher plans.`,
@@ -176,6 +179,7 @@ export const BEST_LISTS: BestList[] = [
       { label: '10 accounts, per month', key: 'cost.10' },
     ],
     picks: {
+      recurpost: 'you need a documented API for accounts, workspaces, libraries, posting and history, using a separate API Password Key.',
       blotato: 'you want an API with official n8n and Make nodes and AI-made media, on a paid plan. Creating an API key ends the trial.',
       buffer: 'you want API keys on every plan, Free included, and can work within monthly request limits per channel.',
       metricool: 'you already use Metricool for analytics and are on Advanced or Custom, where the API is.',
@@ -201,7 +205,7 @@ export const BEST_LISTS: BestList[] = [
   {
     slug: 'social-media-schedulers-for-multiple-accounts', published: '2026-11-08',
     title: 'Best Social Media Schedulers for 30 Accounts (2026)',
-    description: 'What 17 social media tools cost a month for 30 accounts, cheapest first, with team seats and approvals, each figure linked to the vendor\'s pricing page.',
+    description: 'What 16 social media tools cost a month for 30 accounts, cheapest first, with team seats and approvals, each figure linked to the vendor\'s pricing page.',
     h1: 'Social media schedulers for 30 accounts, cheapest first',
     shortAnswer: `At 30 accounts the lowest published prices here are Metricool (from $25, if your accounts fit into 5 brands), PostDelegate ($${at30.monthly} on ${at30.name}) and Postiz ($49 on Pro). If you run an agency, read the team row too: on many tools the 30-account price is for a plan without approvals or extra users. PostDelegate makes this page and sits where the price puts it.`,
     requires: 'cost.30',
@@ -226,7 +230,6 @@ export const BEST_LISTS: BestList[] = [
       socialbee: 'you reuse posts by content category: Pro\'s 25 profiles plus a 5-profile add-on is $114, with 3 users.',
       buffer: 'you want to pay per channel: Essentials is $135, and approvals with unlimited members need Team at $195.',
       sendible: 'you run client workspaces with unlimited users: 30 profiles on Plus cost $159, with assignment and approvals.',
-      coschedule: 'you plan social inside a marketing calendar: $174 on Starter for one user, or $184 on Professional for up to 3. X is extra.',
       planable: 'approvals come first: 30 pages on Pro means 3 workspaces for $177, with unlimited users.',
       'vista-social': 'you want 30 profiles, 3 users and multi-stage approval on Advanced, $199 a month. X is $29 more.',
       loomly: 'you want unlimited users and calendars: 30 accounts means Beyond, $332 for up to 60 accounts.',
@@ -259,6 +262,7 @@ export const BEST_LISTS: BestList[] = [
       { label: '10 accounts, per month', key: 'cost.10' },
     ],
     picks: {
+      recurpost: 'you want 14 days on a self-serve plan without a credit card, with recurring and seasonal content libraries.',
       agorapulse: 'you want the longest trial here, 30 days, and a per-user plan from $99 fits your budget.',
       'zoho-social': 'you want 15 days of everything, then a forever free plan for 1 brand with 6 channels.',
       sendible: 'you manage clients in workspaces and want 14 days with no contract.',
@@ -280,7 +284,7 @@ export const BEST_LISTS: BestList[] = [
   },
   {
     slug: 'bluesky-schedulers', published: '2026-11-08', network: 'bluesky',
-    title: 'Best Bluesky Schedulers (2026): 16 Tools, Sourced',
+    title: 'Best Bluesky Schedulers (2026): 18 Tools, Sourced',
     description: 'Social media schedulers whose own network lists name Bluesky, cheapest first at 3 accounts, with free plans and MCP, each fact linked to the vendor page.',
     h1: 'Bluesky schedulers, cheapest first at 3 accounts',
     shortAnswer: `To start free, Buffer, Metricool, Publer, Typefully and Zoho Social all list Bluesky and have free plans. To post to Bluesky from your own code, Zernio is an API. PostDelegate, which makes this page, has Bluesky live for posts and threads. Loomly and Planable do not list Bluesky on the pages we read.`,
@@ -294,6 +298,8 @@ export const BEST_LISTS: BestList[] = [
       { label: 'MCP', key: 'mcp' },
     ],
     picks: {
+      recurpost: 'you need Bluesky alongside recurring, one-time and seasonal libraries, with API and MCP access.',
+      'post-planner': 'you need Bluesky alongside content discovery, post buckets and a reusable queue.',
       buffer: 'you have up to 3 channels and 10 scheduled posts per channel is enough: Buffer Free covers that.',
       metricool: 'you want analytics with your scheduling, and the Free plan\'s 1 brand and 20 posts a month are enough.',
       publer: 'you want a free plan for 3 accounts with 10 scheduled posts each, and bulk scheduling later.',

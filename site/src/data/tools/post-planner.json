@@ -1,0 +1,65 @@
+{
+  "name": "Post Planner",
+  "slug": "post-planner",
+  "site": "https://www.postplanner.com",
+  "pricingUrl": "https://www.postplanner.com/plans-signup",
+  "checked": "2026-11-15",
+  "kind": {
+    "value": "Content discovery and scheduling with reusable post buckets, a smart queue and evergreen recycling",
+    "src": [
+      "https://help.postplanner.com/en/articles/8797516-what-are-the-differences-between-plans",
+      "https://www.postplanner.com/features/social-posting-scheduler"
+    ]
+  },
+  "hosting": {
+    "value": "Hosted web app",
+    "src": "https://www.postplanner.com/plans-signup"
+  },
+  "pricingModel": {
+    "value": "Plan tiers with account, user and queue limits; monthly and annual billing; extra capacity available",
+    "src": "https://www.postplanner.com/plans-signup"
+  },
+  "freeOption": {
+    "value": "Free: 1 account, 1 user, 30 queued posts and 12 daily posts/profile",
+    "src": "https://help.postplanner.com/en/articles/8797516-what-are-the-differences-between-plans"
+  },
+  "trial": {
+    "value": "7-day trial; accounts move to Free if no paid plan is chosen",
+    "src": "https://www.postplanner.com/plans-signup"
+  },
+  "entryPaid": {
+    "value": "Starter $14/month on monthly billing; $9/month billed annually ($108/year), 3 accounts and 1 user",
+    "src": "https://www.postplanner.com/plans-signup"
+  },
+  "plans": {
+    "value": "Monthly: Starter $14, Growth $59, Business $99, Agency $179. Annual monthly equivalents: $9, $39, $69, $119. Included account/user caps: 3/1, 15/2, 25/5, 50/10 respectively",
+    "src": "https://www.postplanner.com/plans-signup"
+  },
+  "networks": {
+    "value": "Facebook Pages, Instagram business/creator, Threads, Google Business Profile, LinkedIn profiles/pages, Pinterest, TikTok, X, YouTube and Bluesky",
+    "note": "X and Pinterest require Growth or higher.",
+    "src": "https://help.postplanner.com/en/articles/8797516-what-are-the-differences-between-plans"
+  },
+  "api": {
+    "value": "Not listed in the checked product and pricing documentation",
+    "src": [
+      "https://www.postplanner.com/plans-signup",
+      "https://www.postplanner.com/features/social-posting-scheduler"
+    ]
+  },
+  "mcp": {
+    "value": "Not listed in the checked product and pricing documentation",
+    "src": [
+      "https://www.postplanner.com/plans-signup",
+      "https://www.postplanner.com/features/social-posting-scheduler"
+    ]
+  },
+  "ai": {
+    "value": "Unlimited AI hashtags, content and captions; AI images have plan-specific monthly limits",
+    "src": "https://www.postplanner.com/plans-signup"
+  },
+  "teams": {
+    "value": "1 user on Free/Starter, 2 on Growth, 5 on Business and 10 on Agency; extra members are available. Approval workflow details are not listed in the checked plan documentation",
+    "src": "https://help.postplanner.com/en/articles/8797516-what-are-the-differences-between-plans"
+  }
+}
