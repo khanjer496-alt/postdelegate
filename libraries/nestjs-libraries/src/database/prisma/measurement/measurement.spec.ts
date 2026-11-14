@@ -251,3 +251,74 @@ it(
     });
   }
 );
+
+
+it.each(['missing customer', 'deleted workspace'])(
+  'retains %s payments once for reconciliation without qualifying revenue',
+  async () => {
+    const saved = new Map<string, MeasurementEvent>();
+    const repository = {
+      organizationForCustomer: jest.fn().mockResolvedValue(null),
+      acquisition: jest.fn().mockResolvedValue(null),
+      save: jest.fn(async (data) => {
+        const prior = saved.get(data.key);
+        if (prior) prior.duplicates++;
+        else saved.set(data.key, row(data.kind, { ...data, receivedAt: data.occurredAt }));
+      }),
+      rows: jest.fn(async () => [...saved.values()]),
+      lifetimeOrgs: jest.fn().mockResolvedValue([]),
+      firstEvent: jest.fn(async () => ({ receivedAt: new Date(now) })),
+    };
+    const service = new MeasurementService(repository as never);
+    for (let replay = 0; replay < 2; replay++)
+      await service.payment('cus_synthetic', 'sub_synthetic', 'in_synthetic', 1500, 'usd', new Date(now));
+    expect(saved.size).toBe(1);
+    expect([...saved.values()][0]).toMatchObject({
+      organizationId: '', matchedTouch: false, source: 'unknown', duplicates: 1,
+      reference: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+    expect(JSON.stringify([...saved.values()])).not.toMatch(/cus_synthetic|sub_synthetic|in_synthetic/);
+    const report = await service.export(new Date(now - 60000), new Date(now + 60000));
+    expect(report).toMatchObject({reconciliation: {
+      total_server_milestones: 1, unmatched_subscription_payments: 1,
+      eligible_server_milestones: 0, duplicated: 1,
+    }});
+    expect(report.rows.reduce((n, r) => n + r.revenue_minor + r.paid_subscription_workspaces, 0)).toBe(0);
+  }
+);
+
+
+it.each([
+  { name: 'missing to mapped', first: null, replay: { id: 'org_synthetic' } },
+  { name: 'mapped to deleted', first: { id: 'org_synthetic' }, replay: null },
+])('keeps invoice identity stable when workspace mapping changes $name', async ({ first, replay }) => {
+  const saved = new Map<string, MeasurementEvent>();
+  const repository = {
+    organizationForCustomer: jest.fn().mockResolvedValueOnce(first).mockResolvedValue(replay),
+    acquisition: jest.fn().mockResolvedValue(null),
+    save: jest.fn(async (data) => {
+      const prior = saved.get(data.key);
+      if (prior) prior.duplicates++;
+      else saved.set(data.key, row(data.kind, { ...data, receivedAt: data.occurredAt }));
+    }),
+    rows: jest.fn(async () => [...saved.values()]),
+    lifetimeOrgs: jest.fn().mockResolvedValue([]),
+    firstEvent: jest.fn(async () => ({ receivedAt: new Date(now) })),
+  };
+  const service = new MeasurementService(repository as never);
+  await service.payment('cus_synthetic', 'sub_synthetic', 'in_synthetic', 1500, 'usd', new Date(now));
+  const originalKey = [...saved.keys()][0];
+  await service.payment('cus_synthetic', 'sub_synthetic', 'in_synthetic', 1500, 'usd', new Date(now));
+  expect(saved.size).toBe(1);
+  expect([...saved.values()][0]).toMatchObject({
+    key: originalKey, organizationId: first?.id || '', duplicates: 1,
+  });
+  const report = await service.export(new Date(now - 60000), new Date(now + 60000));
+  expect(report).toMatchObject({ reconciliation: {
+    total_server_milestones: 1, duplicated: 1,
+    eligible_server_milestones: first ? 1 : 0,
+  }});
+  // A different invoice remains a separate receipt, even for the same customer/subscription.
+  await service.payment('cus_synthetic', 'sub_synthetic', 'in_other', 1500, 'usd', new Date(now));
+  expect(saved.size).toBe(2);
+});

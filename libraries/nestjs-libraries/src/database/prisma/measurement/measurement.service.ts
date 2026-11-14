@@ -40,7 +40,11 @@ export class MeasurementService {
     await this.safe(async () => {
       const touch = await this.repository.acquisition(org);
       await this.repository.save({
-        key: measurementHash(org + '|' + kind + '|' + identity),
+        // Invoice identity survives workspace mapping changes on webhook replay.
+        // Attribution/classification remains on the first receipt via repository upsert.
+        key: measurementHash(
+          (kind === 'nonzero_payment' ? '' : org) + '|' + kind + '|' + identity
+        ),
         organizationId: org,
         kind,
         occurredAt: extra.occurredAt || new Date(),
@@ -251,13 +255,14 @@ export class MeasurementService {
       )
         return;
       const org = await this.repository.organizationForCustomer(customer);
-      if (org)
-        await this.record(org.id, 'nonzero_payment', invoice, {
-          reference: subscription,
-          amountMinor,
-          currency,
-          occurredAt,
-        });
+      // Keep unmapped/deleted-workspace invoices in reconciliation; an empty
+      // workspace is ineligible for commercial revenue and conversions.
+      await this.record(org?.id || '', 'nonzero_payment', invoice, {
+        reference: subscription,
+        amountMinor,
+        currency,
+        occurredAt,
+      });
     });
   }
   async export(from: Date, to: Date) {
