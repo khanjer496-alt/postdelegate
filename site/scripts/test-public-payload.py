@@ -17,6 +17,13 @@ SHA = 'a' * 40
 SIGNUP = 'https://app.postdelegate.com/auth'
 
 
+def worker_format(worker_sha):
+    return {'format': 'raw-es-module-javascript', 'compilerOutputFiles': ['index.js'],
+            'compilerOutputSha256': worker_sha, 'stagedWorkerSha256': worker_sha,
+            'syntaxGate': 'node --input-type=module --check', 'syntaxGatePassed': True,
+            'staging': 'byte-for-byte-copy', 'additionalModulesPolicy': 'reject'}
+
+
 def page(canonical='https://postdelegate.com/alternatives/recurpost'):
     faq = [{'@type': 'Question', 'name': 'Question ' + str(i),
             'acceptedAnswer': {'@type': 'Answer', 'text': 'Answer & detail ' + str(i)}} for i in range(3)]
@@ -37,6 +44,14 @@ class PublicPayloadTests(unittest.TestCase):
 
     def test_expected_page_pass(self):
         acceptance.check_page(page(), '/alternatives/recurpost', SIGNUP)
+
+    def test_raw_worker_evidence_binds_exact_payload_digest(self):
+        record = worker_format('a' * 64)
+        acceptance.check_worker_format(record, 'a' * 64)
+        for key, bad in (('format', 'multipart-upload-bundle'), ('compilerOutputFiles', ['index.js', 'extra.js']),
+                         ('compilerOutputSha256', 'b' * 64), ('syntaxGatePassed', False)):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'worker compilation format/digest'):
+                acceptance.check_worker_format({**record, key: bad}, 'a' * 64)
 
     def test_hidden_faq_rejected(self):
         for attribute in ('hidden', 'style="display: none"', 'style="visibility: hidden"',
@@ -116,7 +131,8 @@ class PublicPayloadTests(unittest.TestCase):
         archive = bundle / 'public-payload.tar.gz'
         acceptance.archive_payload(payload, files, archive)
         manifest = {'repository': acceptance.REPOSITORY, 'sourceSha': SHA, 'files': files,
-                    'archiveSha256': acceptance.digest(archive.read_bytes())}
+                    'archiveSha256': acceptance.digest(archive.read_bytes()),
+                    'workerCompilation': worker_format(files['_worker.js'])}
         (bundle / 'manifest.json').write_text(json.dumps(manifest))
         return payload, bundle, manifest
 
@@ -145,6 +161,7 @@ class PublicPayloadTests(unittest.TestCase):
             root = Path(directory)
             _, bundle, manifest = self.bundle(root)
             manifest['files']['_worker.js'] = '0' * 64
+            manifest['workerCompilation'] = worker_format('0' * 64)
             (bundle / 'manifest.json').write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError, 'file hash mismatch'):
                 acceptance.extract_bundle(bundle, root / 'extracted', SHA)

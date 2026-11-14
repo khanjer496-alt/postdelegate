@@ -24,6 +24,8 @@ REPOSITORY = 'khanjer496-alt/postdelegate'
 ORIGIN = 'https://postdelegate.com'
 ROUTES = ['/alternatives/' + name for name in ('recurpost', 'post-planner', 'coschedule', 'rella')]
 CONTROL = ('_worker.js', '_routes.json', '_headers', '_redirects')
+PREVIEW_COMPATIBILITY = {'configuredDate': '2026-09-08', 'configuredFlags': [],
+                         'reference': 'Release Engineer production control-plane observation'}
 EXTENSIONS = {'.html', '.js', '.css', '.json', '.xml', '.txt', '.md', '.mdc', '.png', '.svg',
               '.ico', '.webp', '.woff2', '.webmanifest', '.zip'}
 DIAGNOSTICS = {'phase': 'setup', 'loopbackRequests': []}
@@ -83,7 +85,9 @@ def finalize_diagnostics(path, process_state, process_exit, acceptance_exit, ver
                  'processExitBeforeCleanup': int(process_exit) if process_exit else None,
                  'acceptanceExit': acceptance_exit,
                  'configuredCommand': ['wrangler', 'pages', 'dev', '<disposable-public-payload>',
-                                       '--no-bundle', '--ip', '127.0.0.1', '--port', '8789'],
+                                       '--no-bundle', '--ip', '127.0.0.1', '--port', '8789',
+                                       '--compatibility-date', PREVIEW_COMPATIBILITY['configuredDate']],
+                 'previewCompatibility': PREVIEW_COMPATIBILITY,
                  'configuredWranglerVersion': '4.162.0'})
     output = (version_dir / 'wrangler-version.txt').read_text()[:4096]
     match = re.search(r'(?<![\d.])(4\.162\.0)(?![\d.])', output)
@@ -93,6 +97,15 @@ def finalize_diagnostics(path, process_state, process_exit, acceptance_exit, ver
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def check_worker_format(record, worker_sha):
+    expected = {'format': 'raw-es-module-javascript', 'compilerOutputFiles': ['index.js'],
+                'compilerOutputSha256': worker_sha, 'stagedWorkerSha256': worker_sha,
+                'syntaxGate': 'node --input-type=module --check', 'syntaxGatePassed': True,
+                'staging': 'byte-for-byte-copy', 'additionalModulesPolicy': 'reject'}
+    require(record == expected, 'worker compilation format/digest evidence mismatch')
+    return record
 
 
 def safe_path(name):
@@ -363,6 +376,7 @@ def extract_bundle(bundle, destination, approved_sha):
     require(not destination.exists(), 'extract destination must not exist')
     files = manifest['files']
     require(isinstance(files, dict) and all(name in files for name in CONTROL), 'missing payload controls')
+    check_worker_format(manifest.get('workerCompilation'), files['_worker.js'])
     for name, value in files.items():
         safe_path(name)
         require(isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value), 'invalid file digest')
@@ -417,6 +431,8 @@ def main():
     require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY, 'noncanonical repository')
     DIAGNOSTICS['phase'] = 'payload-validation'
     files = inventory(args.payload)
+    worker_compilation = check_worker_format(json.loads((args.output / 'worker-format.json').read_text()),
+                                           files['_worker.js'])
     for name in CONTROL[1:]:
         require((args.payload / name).read_bytes() == (args.source / 'site/public' / name).read_bytes(),
                 'source control file changed: ' + name)
@@ -439,6 +455,7 @@ def main():
                 'runAttempt': os.environ['GITHUB_RUN_ATTEMPT'], 'event': os.environ['GITHUB_EVENT_NAME'],
                 'ref': os.environ['GITHUB_REF'], 'configuredVersions': {'node': '22.23.4', 'pnpm': '10.6.1',
                 'wrangler': '4.162.0'}, 'observedVersions': observed,
+                'workerCompilation': worker_compilation, 'previewCompatibility': PREVIEW_COMPATIBILITY,
                 'siteLockfileSha256': digest((args.source / 'site/pnpm-lock.yaml').read_bytes()),
                 'files': files, 'archiveSha256': digest(archive.read_bytes())}
     (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

@@ -10,10 +10,32 @@ is retained; without `PULSE_CRAWL_KEY` its outbound crawler branch is disabled.
 defaults fail the job rather than being patched. Full hosted execution is a gate,
 not something that synthetic verifier tests establish.
 
+Compilation uses `pages functions build site/functions --outdir <isolated-dir>`.
+For pinned Wrangler 4.162.0, `--outfile` serializes a multipart upload bundle;
+renaming those bytes to `_worker.js` does not make JavaScript. `--outdir` emits
+raw `index.js` and any additional modules. The staging gate requires exactly one
+regular `index.js`, parses it without execution using Node's module `--check`,
+then copies those exact bytes to `dist/_worker.js`. Extra modules, metadata,
+directories or symlinks fail closed and need separate review; nothing is dropped
+or decoded. The subsequent Pages no-bundle import/runtime checks remain required.
+No generated routes output is directed into the payload; reviewed source controls
+are still compared byte-for-byte. [Pinned output serialization](https://github.com/cloudflare/workers-sdk/blob/wrangler%404.162.0/packages/wrangler/src/pages/build.ts#L311),
+[multipart helper](https://github.com/cloudflare/workers-sdk/blob/wrangler%404.162.0/packages/wrangler/src/api/pages/create-worker-bundle-contents.ts#L15).
+
+Preview explicitly uses compatibility date `2026-09-08`, flags `[]`, matching
+Release Engineer's production control-plane observation. This is an equivalence
+correction separate from the multipart format cause; it changes no production
+setting. Recheck production compatibility before upload; if it changed, review
+the difference and require equivalent hosted preview evidence.
+
 The successful artifact contains `public-payload.tar.gz`, `manifest.json`,
-`acceptance.json`, and observed tool version text. The manifest binds the actual
+`acceptance.json`, `worker-format.json`, and observed tool version text. The manifest binds the actual
 checkout SHA, canonical repository, workflow/run/attempt, configured and observed
 versions, site lock digest, each regular public file digest, and archive digest.
+Its `workerCompilation` records raw-module format, index-only compiler inventory,
+non-executing syntax gate and equal compiler/staged SHA256s. `previewCompatibility`
+labels the configured date/flags and their RE-reported reference; it does not claim
+an independent production observation by CI.
 The archive is deterministic (sorted entries, fixed permissions/timestamps/gzip
 metadata) and contains no source Functions directory. GitHub's immutable artifact
 ID/digest is external provenance: it cannot be embedded before upload in its own
@@ -47,8 +69,8 @@ before altering platform/flags; these diagnostics do not authorize bypassing it.
    artifact ID/name, expiry, and `sha256:` artifact digest against the downloaded
    GitHub artifact ZIP bytes. Authenticate metadata with the normal GitHub account;
    no token belongs in the payload. Reject ZIP absolute/traversal paths, symlinks,
-   duplicate or unexpected members before extraction. Permit only the six expected
-   files listed above (three version text files make six total). Verify the outer
+   duplicate or unexpected members before extraction. Permit only the seven expected
+   files listed above (including three version text files). Verify the outer
    artifact's digest independently of the inner public archive digest.
 3. Read the downloaded manifest and acceptance record. Require repository
    `khanjer496-alt/postdelegate`, source SHA, workflow/run/attempt, event/ref and
@@ -67,6 +89,10 @@ before altering platform/flags; these diagnostics do not authorize bypassing it.
    The destination must not exist. This validates inner archive hash, safe regular
    paths, exact membership and every file digest before writing; it never uses
    `extractall`. Compare extracted control-file bytes with approved source again.
+   Require `worker-format.json` to equal manifest `workerCompilation`, including
+   both digests matching `_worker.js`, and check preview date/flags against the
+   reviewed production equivalence reference. The extraction verifier also rejects
+   missing or inconsistent raw-module format/digest evidence.
    No local regeneration, editing, worker compilation or built-output patching.
 4. Capture current live deployment ID, source marker, successful state, custom
    domain, Functions status and the immediate prior rollback target. Keep that

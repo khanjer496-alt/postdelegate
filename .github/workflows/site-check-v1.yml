@@ -39,6 +39,8 @@ jobs:
         run: node site/scripts/test-comparison-cost-labels.mjs
       - name: Synthetic runtime diagnostic checks (no native spawn)
         run: node site/scripts/test-preview-runtime-diagnostics.mjs
+      - name: Raw worker staging and non-executing syntax checks
+        run: node site/scripts/test-stage-pages-worker.mjs
       - name: Install standalone site
         working-directory: site
         run: pnpm install --ignore-workspace --frozen-lockfile
@@ -52,7 +54,10 @@ jobs:
           pnpm --ignore-workspace add wrangler@4.162.0 --save-exact
       - name: Compile existing Pages Functions
         run: |
-          "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages functions build site/functions --outfile=site/dist/_worker.js
+          compiled="$(mktemp -d "$RUNNER_TEMP/site-functions.XXXXXX")"
+          # In pinned Wrangler, --outfile serializes multipart upload bytes, not raw Module JS.
+          "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages functions build site/functions --outdir="$compiled"
+          node site/scripts/stage-pages-worker.mjs "$compiled" site/dist/_worker.js "$RUNNER_TEMP/site-worker-format.json"
           # A generated routes default must never overwrite the reviewed public contract.
           for file in _routes.json _headers _redirects; do
             cmp "site/public/$file" "site/dist/$file"
@@ -67,6 +72,7 @@ jobs:
           echo "diagnostics=$stage/diagnostics/*.json" >> "$GITHUB_OUTPUT"
           echo "sha=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           cp -R site/dist/. "$stage/payload/"
+          cp "$RUNNER_TEMP/site-worker-format.json" "$stage/evidence/worker-format.json"
           # No repository/config/functions discovery or production bindings in preview.
           node --version > "$stage/evidence/node-version.txt"
           pnpm --version > "$stage/evidence/pnpm-version.txt"
@@ -74,7 +80,7 @@ jobs:
           node "$GITHUB_WORKSPACE/site/scripts/preview-runtime-diagnostics.mjs" \
             "$RUNNER_TEMP/site-cli" "$stage/diagnostics/runtime-diagnostics.json"
           cd "$stage"
-          setsid "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages dev "$stage/payload" --no-bundle --ip 127.0.0.1 --port 8789 > "$stage/preview.log" 2>&1 &
+          setsid "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages dev "$stage/payload" --no-bundle --ip 127.0.0.1 --port 8789 --compatibility-date 2026-09-08 > "$stage/preview.log" 2>&1 &
           preview_pid=$!
           cleanup() {
             kill -- -"$preview_pid" 2>/dev/null || true
