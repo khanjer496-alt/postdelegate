@@ -84,8 +84,8 @@
     }
   },
   "networks": {
-    "value": "12 listed: Instagram, Facebook, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Google Business Profile, Bluesky, Mastodon and Substack",
-    "src": "https://buffer.com/pricing"
+    "value": "12 listed: Instagram, Facebook, LinkedIn, TikTok, X, YouTube, Threads, Pinterest, Google Business Profile, Bluesky, Mastodon and Substack Notes",
+    "src": ["https://buffer.com/pricing", "https://support.buffer.com/en-us/articles/using-substack-with-buffer-lDbUYyIq4R"]
   },
   "api": {
     "value": "API keys on every plan, with monthly request limits per channel",

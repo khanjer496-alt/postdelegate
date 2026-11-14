@@ -8,7 +8,7 @@ import FactCell from './compare/FactCell.astro';
 import CompareNotes from './compare/CompareNotes.astro';
 import { checkedOn, comparisonJsonLd, formatDate } from '../data/tools';
 import { AVAILABLE_NETWORKS, WAITING_NETWORKS } from '../data/networks';
-import { BEST_LISTS, bestEntries, bestFact, bestHref, bestLeftOut, bestUnranked, orderRule, type BestList } from '../data/best-lists';
+import { BEST_LISTS, bestEntries, bestFact, bestMissingLabel, bestHref, bestLeftOut, bestUnranked, orderRule, type BestList } from '../data/best-lists';
 interface Props { list: BestList }
 const { list } = Astro.props;
 const ranked = list.order.by !== 'name';
@@ -25,6 +25,7 @@ const ours = (slug: string) => slug === 'postdelegate';
 // Where the page's facts do not already show networks, PostDelegate's entry says what cannot be connected yet.
 const networkNote = !list.facts.some((f) => f.key === 'networks');
 const requiresLabel = list.facts.find((f) => f.key === list.requires)?.label ?? list.requires;
+const requiresCost = list.requires.startsWith('cost.');
 // Related: PostDelegate's own page against each tool on the list, the topic's guides, the other lists, the hubs.
 const pages = Object.keys(import.meta.glob('../pages/compare/*.astro')).map((file) => file.split('/').pop()!.replace('.astro', ''));
 const links = [
@@ -47,7 +48,7 @@ const jsonLd = comparisonJsonLd({ path, title: list.h1, description: list.descri
   <h2 id="the-list">The list</h2>
   <p class="best-small">{tools.length} of the {tools.length + leftOut.length} tools in our comparison data meet the rule. {orderRule(list)}</p>
   {groups.map((group) => <>
-  {group.title && <><h3>{group.title}</h3><p class="best-small">These meet the rule but have no figure to rank by, so they are not ranked.</p></>}
+  {group.title && <><h3>{group.title}</h3><p class="best-small">These meet the inclusion rule, but no comparable total has been verified in this comparison. Their vendors may publish prices; these scenarios remain unranked.</p></>}
   <ol class="best-list">
     {group.tools.map((t, i) => (
       <li class="best-item">
@@ -57,7 +58,7 @@ const jsonLd = comparisonJsonLd({ path, title: list.h1, description: list.descri
           {ours(t.slug) && <span class="best-badge">Ours</span>}
         </h3>
         <dl>
-          {list.facts.map((f) => <div><dt>{f.label}</dt><dd><FactCell fact={bestFact(t, f.key)} vendor={t.name} /></dd></div>)}
+          {list.facts.map((f) => <div><dt>{f.label}</dt><dd><FactCell fact={bestFact(t, f.key)} vendor={t.name} missingLabel={bestMissingLabel(f.key)} /></dd></div>)}
           {ours(t.slug) && networkNote && <div><dt>Networks</dt><dd>{AVAILABLE_NETWORKS.length} live today. Waiting on platform approval, so not connectable yet: {WAITING_NETWORKS.map((n) => n.name).join(', ')}. X is not available. <a href="/platforms">Platform status</a></dd></div>}
         </dl>
         <p class="best-pick"><strong>Pick it if</strong> {list.picks[t.slug]}</p>
@@ -67,16 +68,20 @@ const jsonLd = comparisonJsonLd({ path, title: list.h1, description: list.descri
   </ol>
   </>)}
 
+  {list.facts.some((f) => f.key.startsWith('cost.')) && <p class="best-small">Missing cost cells mean no comparable total was verified in this comparison; they do not mean the vendor has no published prices.</p>}
+
   <h2 id="how-we-chose">How we chose</h2>
   <p>{list.rule}</p>
   <p>{orderRule(list)}</p>
   <p>PostDelegate is held to the same rule and goes where the rule puts it. Its prices come from <a href="/pricing">our pricing page</a> and its networks from <a href="/platforms">platform status</a>. Every other fact is read from the vendor's own pages and links to them; the date each tool was checked is on its entry. Nothing here is a rating, a score or a review, and no vendor paid to be listed.</p>
 
   {leftOut.length > 0 && <>
-    <h2>Not on this list</h2>
-    <p>The other tools in our comparison data, with the "{requiresLabel}" fact that kept them off. "Not listed" means the vendor's pages we checked do not say.</p>
+    <h2>{requiresCost ? 'Scenarios not yet compared' : 'Not on this list'}</h2>
+    {requiresCost
+      ? <p>These scenarios are outside the current price ranking because a comparable "{requiresLabel}" total has not been verified in this comparison. Their vendors may publish prices; normalized calculations remain pending. This is a comparison coverage limit, not evidence of missing vendor pricing.</p>
+      : <p>The other tools in our comparison data, with the "{requiresLabel}" fact that kept them off. "Not listed" means the vendor's pages we checked do not say.</p>}
     <ul class="best-out">
-      {leftOut.map((t) => <li><a href={t.site} target="_blank" rel="noopener">{t.name}</a>: <FactCell fact={bestFact(t, list.requires)} vendor={t.name} /></li>)}
+      {leftOut.map((t) => <li><a href={t.site} target="_blank" rel="noopener">{t.name}</a>: <FactCell fact={bestFact(t, list.requires)} vendor={t.name} missingLabel={bestMissingLabel(list.requires)} /></li>)}
     </ul>
   </>}
 

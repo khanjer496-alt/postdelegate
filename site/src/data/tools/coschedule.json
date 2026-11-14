@@ -4,21 +4,59 @@
   "site": "https://coschedule.com",
   "pricingUrl": "https://coschedule.com/pricing",
   "checked": "2026-11-07",
-  "kind": { "value": "Social media management software built on a marketing calendar, with publishing, a social inbox, analytics and campaign and project planning", "src": "https://coschedule.com/pricing" },
-  "hosting": { "value": "Hosted (no self-host option on its pricing page)", "src": "https://coschedule.com/pricing" },
-  "pricingModel": { "value": "A flat tier plus metered extras: each plan includes a number of seats and social profiles, with $5 a month for each extra profile and $29 a month for an extra seat on Professional. X profiles are excluded from the base plans and billed at $16 each a month", "src": "https://coschedule.com/pricing" },
-  "freeOption": { "value": "Free plan: up to 15 posts scheduled at a time on 1 profile", "src": "https://coschedule.com/pricing" },
-  "trial": { "value": "14-day trial on Starter and Professional, but a card is required: you pick a plan and enter a card, are not charged until it ends, and can cancel to the free plan before then. Suite starts with a demo", "src": "https://coschedule.com/pricing" },
-  "entryPaid": { "value": "Starter, $39/month on monthly billing, 1 seat and 3 social profiles", "src": "https://coschedule.com/pricing" },
-  "plans": { "value": "Starter $39 a month (1 seat, 3 profiles) and Professional $59 (2 seats, up to 3 users, 5 profiles) on monthly billing; Suite is custom from $69. Add-ons: $5 a month an extra profile, $29 an extra user on Professional, $16 an X profile", "note": "The page opens on annual billing, where Starter and Professional show $29 and $49.", "src": "https://coschedule.com/pricing" },
-  "cost": {
-    "3": { "value": "$39", "note": "Starter includes 3 profiles. If one of them is X it is not covered and adds $16, making $55.", "src": "https://coschedule.com/pricing" },
-    "10": { "value": "$74 to $84", "note": "Starter is $39 plus 7 extra profiles at $5, which is $74, but it allows only one user. Professional is $59 plus 5 extra at $5, which is $84, with two seats. X is extra either way.", "src": "https://coschedule.com/pricing" },
-    "30": { "value": "$174 to $184", "note": "Starter is $39 plus 27 extra profiles at $5, which is $174 for a single user; Professional is $59 plus 25 extra, which is $184 with a three-user ceiling. Suite is quote-only and the page mentions bulk discounts, so a buyer this size may pay less.", "src": "https://coschedule.com/pricing" }
+  "kind": {
+    "value": "Marketing calendar with social publishing, ReQueue evergreen automation, analytics, an inbox and project coordination",
+    "src": "https://coschedule.com/support/account-and-billing/plans/what-each-plan-includes"
   },
-  "networks": { "value": "Facebook, Instagram including Reels and Stories, LinkedIn, Pinterest, TikTok, Threads, Bluesky, Mastodon, Google Business Profile, YouTube including Shorts, and X. X is a paid add-on and Instagram publishing needs a business or creator account", "src": "https://coschedule.com/pricing" },
-  "api": { "value": "No public API: the support centre answers that question with no, and points to webhooks on Suite, Zapier, and an ICS calendar feed instead", "src": "https://coschedule.com/support/troubleshooting/faqs/does-coschedule-have-a-public-api" },
-  "mcp": { "value": "No MCP server is mentioned on CoSchedule's own site; the integrations named are webhooks, Zapier and calendar sync", "src": ["https://coschedule.com/pricing", "https://coschedule.com/support/troubleshooting/faqs/does-coschedule-have-a-public-api"] },
-  "ai": { "value": "AI assistants for social, campaigns and projects, listed as unlimited on all paid plans, with a prompt library, AI image generation and AI alt tags. For long-form content you can choose the model behind them: OpenAI, Anthropic, or Microsoft Copilot where the organisation licenses it, in beta on Suite. Their other AI responses, including social messages and images, do not use that setting", "src": ["https://coschedule.com/pricing", "https://coschedule.com/support/coschedule-ai/writing-tools-and-settings/choose-your-preferred-llm"] },
-  "teams": { "value": "Starter is a single user with no approvals. Professional includes 2 seats up to 3 users at $29 each beyond that, and adds roles, social message approvals, read-only calendar sharing and internal discussions. Suite adds custom permissions, guest access and SSO", "src": "https://coschedule.com/pricing" }
+  "hosting": {
+    "value": "Hosted web app",
+    "src": "https://coschedule.com/pricing"
+  },
+  "pricingModel": {
+    "value": "Base tiers include seats and profiles; additional profiles $5/month and a third Professional seat $29/month",
+    "src": "https://coschedule.com/pricing"
+  },
+  "freeOption": {
+    "value": "1 profile and 15 scheduled messages at a time, including drafts and failed unsent messages",
+    "src": "https://coschedule.com/support/account-and-billing/plans/what-the-free-plan-includes"
+  },
+  "trial": {
+    "value": "14-day Starter/Professional trial, payment card required; automatically charges unless canceled. Suite starts with a demo",
+    "src": [
+      "https://coschedule.com/pricing",
+      "https://coschedule.com/support/account-and-billing/plans/how-trials-work"
+    ]
+  },
+  "entryPaid": {
+    "value": "Starter $39/month billed monthly; $29/month billed annually; 1 seat and 3 profiles",
+    "src": "https://coschedule.com/pricing"
+  },
+  "plans": {
+    "value": "Starter $39 and Professional $59/month on monthly billing ($29/$49 annual monthly equivalents). Professional includes 2 seats and 5 profiles, maximum 3 users. Suite is custom, advertised from $69/month",
+    "src": "https://coschedule.com/pricing"
+  },
+  "networks": {
+    "value": "Facebook, Instagram, LinkedIn, Pinterest, TikTok, Threads, Bluesky, Mastodon, Google Business Profile, YouTube and X",
+    "note": "Official pages conflict on X billing: pricing says included; plan support still says separate paid add-on. Confirm the applicable quote before budgeting X.",
+    "src": [
+      "https://coschedule.com/pricing",
+      "https://coschedule.com/support/account-and-billing/plans/what-each-plan-includes"
+    ]
+  },
+  "api": {
+    "value": "No public API, explicitly stated in support. Alternatives include Suite-dependent webhooks, Zapier and an ICS calendar feed",
+    "src": "https://coschedule.com/support/integrations/other-tools/use-webhooks"
+  },
+  "mcp": {
+    "value": "Official read-only MCP for Claude and ChatGPT, available on Free, Starter, Professional and Suite",
+    "note": "Reads permitted calendars, tasks and social results; cannot create, move, complete or delete items.",
+    "src": [
+      "https://coschedule.com/support/integrations/ai-chat-apps/use-claude-and-chatgpt-with-coschedule",
+      "https://coschedule.com/support/integrations/ai-chat-apps/connect-claude-to-coschedule"
+    ]
+  },
+  "teams": {
+    "value": "Starter is solo. Professional adds social approvals, user roles and read-only client calendars; Suite adds task approvals, guest access, custom permissions and SSO",
+    "src": "https://coschedule.com/support/account-and-billing/plans/what-each-plan-includes"
+  }
 }

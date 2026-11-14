@@ -1,0 +1,54 @@
+{
+  "name": "RecurPost",
+  "slug": "recurpost",
+  "site": "https://recurpost.com",
+  "pricingUrl": "https://recurpost.com/plans-and-pricing/",
+  "checked": "2026-11-15",
+  "kind": {
+    "value": "Social scheduler built around recurring, one-time and seasonal content libraries, with bulk scheduling and automation integrations",
+    "src": "https://recurpost.com/features/schedule/"
+  },
+  "hosting": {
+    "value": "Hosted web app",
+    "src": "https://recurpost.com/plans-and-pricing/"
+  },
+  "pricingModel": {
+    "value": "Plan tiers with included accounts and users; extra accounts $4/month and teammates $20/month",
+    "src": "https://recurpost.com/plans-and-pricing/"
+  },
+  "freeOption": {
+    "value": "No permanent free plan",
+    "src": "https://recurpost.com/plans-and-pricing/"
+  },
+  "trial": {
+    "value": "14 days on self-serve plans; no credit card required",
+    "src": "https://recurpost.com/plans-and-pricing/"
+  },
+  "entryPaid": {
+    "value": "Starter $9/month, billed monthly: 2 accounts, 1 user",
+    "src": "https://recurpost.com/plans-and-pricing/"
+  },
+  "plans": {
+    "value": "Monthly: Starter $9 (2 accounts, 1 user, 10 daily posts/account); Personal $25 (5, 1, 20); Agency $79 (20, 3, 80). Enterprise custom for 100+ accounts. Annual billing gives two months free; taxes extra",
+    "note": "The pricing page also lists a $0.20 charge per X post containing a link, funded through an X Wallet.",
+    "src": "https://recurpost.com/plans-and-pricing/"
+  },
+  "networks": {
+    "value": "Facebook, Instagram, LinkedIn, X, Google Business Profile, Pinterest, TikTok, YouTube, Threads and Bluesky",
+    "note": "Facebook Groups, Facebook personal profiles and Instagram personal profiles use push notifications with mobile confirmation.",
+    "src": "https://recurpost.com/supported-platforms/"
+  },
+  "api": {
+    "value": "Public API documented for accounts, workspaces, libraries, posting, scheduling, history and AI generation; authenticates with a separate API Password Key",
+    "src": "https://developers.recurpost.com/"
+  },
+  "mcp": {
+    "value": "Official recurpost-mcp server, available on every plan; tools cover accounts, workspaces, posting, libraries, history and AI",
+    "note": "Its MIT license applies to the connector, not a self-hosted RecurPost application.",
+    "src": "https://recurpost.com/features/schedule/mcp/"
+  },
+  "teams": {
+    "value": "Per-client workspaces, shareable no-login calendars, editable roles and permissions; configurable post approval stages are on Agency",
+    "src": "https://recurpost.com/features/collaborate/"
+  }
+}
