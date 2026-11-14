@@ -79,29 +79,71 @@ export async function runCase(command, flags, cwd, dependencies = {}) {
   } catch (error) {
     probeErrorClass = errorClass(error);
   } finally {
-    const beforeCleanup = { alive: !exited && !spawnErrorClass, exitCode, signal };
+    const wrapperBeforeCleanup = { exitObserved: exited, exitCode, signal, spawnErrorClass };
     const cleanupErrors = [];
-    const send = (name) => {
-      try { if (child.pid) kill(-child.pid, name); } catch (error) {
-        if (error.code !== 'ESRCH') cleanupErrors.push(errorClass(error));
+    const groupState = () => {
+      if (!child.pid) return { state: 'unknown', errorClass: 'missing-pid' };
+      try { kill(-child.pid, 0); return { state: 'present', errorClass: null }; } catch (error) {
+        if (error.code === 'ESRCH') return { state: 'absent', errorClass: null };
+        return { state: 'unknown', errorClass: errorClass(error) };
       }
     };
-    // Even an exited wrapper may have surviving children in its process group.
-    send('SIGTERM');
-    await Promise.race([wait(cleanupMs), exit]);
-    send('SIGKILL');
-    if (!exited && !spawnErrorClass) await Promise.race([wait(cleanupMs), exit]);
+    const send = (name) => {
+      try { kill(-child.pid, name); return null; } catch (error) {
+        if (error.code === 'ESRCH') return null;
+        const category = errorClass(error);
+        cleanupErrors.push(category);
+        return category;
+      }
+    };
+    const waitForGroup = async () => {
+      const deadline = now() + cleanupMs;
+      let state = groupState();
+      while (state.state === 'present' && now() < deadline) {
+        await wait(Math.min(50, deadline - now()));
+        state = groupState();
+      }
+      return state;
+    };
+    // Wrapper exit is not evidence that its process group or descendants disappeared.
+    const processGroupBeforeCleanup = groupState();
+    let processGroupAfterCleanup = processGroupBeforeCleanup;
+    for (const name of ['SIGTERM', 'SIGKILL']) {
+      if (processGroupAfterCleanup.state !== 'present') break;
+      const failure = send(name);
+      processGroupAfterCleanup = failure ? { state: 'unknown', errorClass: failure } : await waitForGroup();
+      // A permission/unknown result is unresolved: do not escalate past that refusal.
+    }
     const scan = classify(output);
     scan.outputTruncated = receivedBytes > LIMIT;
     return { synthetic: true, diagnosticOnly: true, releasable: false,
       configuredFlags: flags.map((value) => value === join(cwd, 'payload') ? '<synthetic-payload>' : value),
-      pid: child.pid ?? null, beforeCleanup, aliveAfterCleanup: !exited && !spawnErrorClass,
+      pid: child.pid ?? null, wrapperBeforeCleanup,
+      wrapperAfterCleanup: { exitObserved: exited, exitCode, signal, spawnErrorClass },
+      processGroupBeforeCleanup, processGroupAfterCleanup,
       finalExitCode: exitCode, finalSignal: signal, probeErrorClass,
       spawnErrorClass, exitAfterMs: exitAt, durationMs: Math.round(now() - start),
       outcome: listening ? 'synthetic-route-responded' : spawnErrorClass ? 'spawn-error'
-        : probeErrorClass ? 'probe-error' : beforeCleanup.alive ? 'readiness-timeout' : 'process-exited',
+        : probeErrorClass ? 'probe-error' : wrapperBeforeCleanup.exitObserved ? 'process-exited' : 'readiness-timeout',
       loopbackRequestOutcomes: outcomes, cleanupErrorClasses: [...new Set(cleanupErrors)], ...scan };
   }
+}
+
+export async function runCases(definitions, execute, persist) {
+  const partial = { cases: [], suppressedCases: [] };
+  for (let index = 0; index < definitions.length; index++) {
+    const [name, flags] = definitions[index];
+    const current = { name, ...await execute(flags) };
+    partial.cases.push(current);
+    if (current.processGroupAfterCleanup.state !== 'absent' || current.cleanupErrorClasses.length) {
+      partial.suppressedCases = definitions.slice(index + 1).map(([remaining]) =>
+        ({ name: remaining, reason: 'prior-process-group-not-confirmed-absent' }));
+      persist(partial);
+      break;
+    }
+    persist(partial);
+  }
+  return partial;
 }
 
 async function main() {
@@ -138,13 +180,12 @@ async function main() {
   const command = join(cliDir, 'node_modules/.bin/wrangler');
   const original = ['pages', 'dev', join(stage, 'payload'), '--no-bundle', '--ip', '127.0.0.1', '--port', '8789'];
   // Default first; the second changes only compatibility date to observed production equivalence.
-  for (const [name, flags] of [['original-default', original],
-    ['production-date-equivalence', [...original, '--compatibility-date', '2026-09-08']]]) {
-    const current = { name, ...await runCase(command, flags, stage) };
+  await runCases([['original-default', original],
+    ['production-date-equivalence', [...original, '--compatibility-date', '2026-09-08']]], async (flags) => {
+    const current = await runCase(command, flags, stage);
     current.sourceControlsUnchanged = ['_routes.json', '_headers', '_redirects'].every((control) =>
       sha256(readFileSync(join(stage, 'payload', control))) === identities['site/public/' + control]);
-    result.cases.push(current);
-    writeFileSync(output, JSON.stringify(result, null, 2) + '\n');
-  }
+    return current;
+  }, (partial) => writeFileSync(output, JSON.stringify({ ...result, ...partial }, null, 2) + '\n'));
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
