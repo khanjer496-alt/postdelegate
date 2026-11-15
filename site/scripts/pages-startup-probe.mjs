@@ -45,9 +45,12 @@ const SIGNATURES = [
   ['native-worker-start-error', 'Failed to start Worker:'],
   ['native-invalid-config', 'config is invalid'],
 ];
+// Candidate signatures are static public error literals from the pinned native-source tag.
+// Export only fixed IDs, never the matching log text, source filename, line or following values.
+const nativeSignatures = JSON.parse(readFileSync(new URL('./native-runtime-signatures.json', import.meta.url))).entries;
 export function classify(bytes) {
   const prefix = bytes.subarray(0, LIMIT);
-  const categories = SIGNATURES.filter(([, literal]) => prefix.includes(Buffer.from(literal))).map(([label]) => label);
+  const categories = [...SIGNATURES, ...nativeSignatures.map((entry) => [entry.id, entry.literal])].filter(([, literal]) => prefix.includes(Buffer.from(literal))).map(([label]) => label);
   return { scannedBytes: prefix.length, outputTruncated: bytes.length > LIMIT,
     categories: categories.length ? categories : ['unclassified-output'] };
 }

@@ -1,0 +1,594 @@
+{
+  "upstream_tag": "v1.20261113.1",
+  "upstream_commit": "6cd7d1ae63824aa532ab855ff7c5719c8aab9c29",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/server/run.rs",
+      "sha256": "3876facd5b308d3576d642fb24eafc3e4b1834e10455cb2dc77869eb50cb8d1c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/server/config.rs",
+      "sha256": "19d2936e9a116b6cd7c2311a4494d4050975ba99a2a5f695ffd1fd1993c28a44"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/server/worker.rs",
+      "sha256": "876c024ef472e3207cb03016833a968a5330f74a48c29a0b419f518888baeedc"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/server/entry.rs",
+      "sha256": "0a097d57a9acaaf413fe70c28d8dd4712e08d79cb2a006223b4c3f849555b9b0"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/server/listen/mod.rs",
+      "sha256": "a90db8492e771e2c3f2e58d7575de51538d53797b373e5b38d97955ef893f270"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/cli/lib.rs",
+      "sha256": "ecf51c41fc6af06184f950ed4cd5d8094f9848f885ff39873c1e5e89a17dfa1d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/cli/config.rs",
+      "sha256": "b8d045ccb8d5a164d05a4af24b2021fa085614dad9ac61f19c04d64670b8bc0b"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/server/workerd-api.c++",
+      "sha256": "23aeb727db35112bce42e63f61c3bbfa1afba4dae7f163f79a2c710a4d5ec829"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/io/worker.c++",
+      "sha256": "9148fc4800e63f27daa390423c3bf61c632b07bf7b774d140477b19af17180b3"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/jsg/modules.c++",
+      "sha256": "84272aea1b9638b582c686cc2d1e7240f27122cd550a30242b5d185995c4be4b"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/jsg/exception.c++",
+      "sha256": "ea6b1a33d0dfa2954b832f7dceb6439a40bc9e6e8c97cf2a3c80eee1a00eda2a"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/io/io-context.c++",
+      "sha256": "a70707ca31ad54cff75a44e8e278c1dd194c9c955b5910f29181dbeb66b4ec8c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/cloudflare/workerd/v1.20261113.1/src/workerd/jsg/setup.c++",
+      "sha256": "45b4f6bd260d8b3b23d8c4348136981925c6716d422cc30201bbccb7ee47f36a"
+    }
+  ],
+  "entries": [
+    {
+      "id": "native-source-001",
+      "literal": "Encountered unknown tlsMode in",
+      "source_index": 0,
+      "line": 323
+    },
+    {
+      "id": "native-source-002",
+      "literal": "Encountered unknown socket type in",
+      "source_index": 0,
+      "line": 350
+    },
+    {
+      "id": "native-source-003",
+      "literal": "jsg.Error: Service cannot handle requests because its config is invalid.",
+      "source_index": 1,
+      "line": 452
+    },
+    {
+      "id": "native-source-004",
+      "literal": "a service with an invalid config has no channel token",
+      "source_index": 1,
+      "line": 463
+    },
+    {
+      "id": "native-source-005",
+      "literal": "jsg.Error: Cannot instantiate Durable Object class because its config is invalid.",
+      "source_index": 1,
+      "line": 475
+    },
+    {
+      "id": "native-source-006",
+      "literal": "an actor of an invalid config's class cannot exist",
+      "source_index": 1,
+      "line": 486
+    },
+    {
+      "id": "native-source-007",
+      "literal": "an invalid config's class cannot be transferred",
+      "source_index": 1,
+      "line": 504
+    },
+    {
+      "id": "native-source-008",
+      "literal": "an invalid config's class has no channel token",
+      "source_index": 1,
+      "line": 510
+    },
+    {
+      "id": "native-source-009",
+      "literal": "Encountered unknown DurableObjectNamespace type in service",
+      "source_index": 1,
+      "line": 764
+    },
+    {
+      "id": "native-source-010",
+      "literal": "Encountered unknown durableObjectStorage type in service",
+      "source_index": 1,
+      "line": 797
+    },
+    {
+      "id": "native-source-011",
+      "literal": "could not initialize its workflowsEngine.",
+      "source_index": 1,
+      "line": 984
+    },
+    {
+      "id": "native-source-012",
+      "literal": "is not a Worker, so cannot accept `props`",
+      "source_index": 1,
+      "line": 1280
+    },
+    {
+      "id": "native-source-013",
+      "literal": "is not a Worker, so cannot be used as a class.",
+      "source_index": 1,
+      "line": 1358
+    },
+    {
+      "id": "native-source-014",
+      "literal": "jsg.Error: Worker does not support named entrypoints",
+      "source_index": 1,
+      "line": 1889
+    },
+    {
+      "id": "native-source-015",
+      "literal": "jsg.Error: Worker does not export an entrypoint named",
+      "source_index": 1,
+      "line": 1906
+    },
+    {
+      "id": "native-source-016",
+      "literal": "jsg.Error: Worker does not support Durable Objects",
+      "source_index": 1,
+      "line": 1922
+    },
+    {
+      "id": "native-source-017",
+      "literal": "jsg.Error: Worker does not export a Durable Object class named",
+      "source_index": 1,
+      "line": 1925
+    },
+    {
+      "id": "native-source-018",
+      "literal": "jsg.Error: Stub refers to a service that doesn't exist:",
+      "source_index": 1,
+      "line": 1947
+    },
+    {
+      "id": "native-source-019",
+      "literal": "jsg.Error: Stub refers to a service that is not a Worker:",
+      "source_index": 1,
+      "line": 1950
+    },
+    {
+      "id": "native-source-020",
+      "literal": "jsg.Error: Failed to start Worker:",
+      "source_index": 2,
+      "line": 304
+    },
+    {
+      "id": "native-source-021",
+      "literal": "invalid subrequest channel number",
+      "source_index": 2,
+      "line": 1040
+    },
+    {
+      "id": "native-source-022",
+      "literal": "invalid actor channel number",
+      "source_index": 2,
+      "line": 1046
+    },
+    {
+      "id": "native-source-023",
+      "literal": "jsg.Error: Actor namespace configuration was invalid.",
+      "source_index": 2,
+      "line": 1048
+    },
+    {
+      "id": "native-source-024",
+      "literal": "expected a durable namespace on this actor channel",
+      "source_index": 2,
+      "line": 1077
+    },
+    {
+      "id": "native-source-025",
+      "literal": "expected an ephemeral namespace on this actor channel",
+      "source_index": 2,
+      "line": 1091
+    },
+    {
+      "id": "native-source-026",
+      "literal": "invalid actor class channel number",
+      "source_index": 2,
+      "line": 1106
+    },
+    {
+      "id": "native-source-027",
+      "literal": "jsg.Error: No Cache was configured",
+      "source_index": 2,
+      "line": 1116
+    },
+    {
+      "id": "native-source-028",
+      "literal": "invalid worker loader channel number",
+      "source_index": 2,
+      "line": 1170
+    },
+    {
+      "id": "native-source-029",
+      "literal": "*** Uncaught exception ***",
+      "source_index": 3,
+      "line": 145
+    },
+    {
+      "id": "native-source-030",
+      "literal": "Benchmarks failed!",
+      "source_index": 3,
+      "line": 349
+    },
+    {
+      "id": "native-source-031",
+      "literal": "Uncaught exception:",
+      "source_index": 4,
+      "line": 373
+    },
+    {
+      "id": "native-source-032",
+      "literal": "HTTP connection failed",
+      "source_index": 4,
+      "line": 475
+    },
+    {
+      "id": "native-source-033",
+      "literal": "debug port connection failed",
+      "source_index": 4,
+      "line": 676
+    },
+    {
+      "id": "native-source-034",
+      "literal": "the config compiled into this executable:",
+      "source_index": 5,
+      "line": 97
+    },
+    {
+      "id": "native-source-035",
+      "literal": "unrecognized subcommand 'fuzzilli'",
+      "source_index": 5,
+      "line": 158
+    },
+    {
+      "id": "native-source-036",
+      "literal": "writing to stdout:",
+      "source_index": 5,
+      "line": 303
+    },
+    {
+      "id": "native-source-037",
+      "literal": "Can't start server due to config errors, waiting for config files to change...",
+      "source_index": 5,
+      "line": 541
+    },
+    {
+      "id": "native-source-038",
+      "literal": "--perfetto-trace: perfetto tracing is not supported by this build",
+      "source_index": 5,
+      "line": 586
+    },
+    {
+      "id": "native-source-039",
+      "literal": "Modules list cannot be empty.",
+      "source_index": 7,
+      "line": 299
+    },
+    {
+      "id": "native-source-040",
+      "literal": "Encountered unknown Worker code type. Was the",
+      "source_index": 7,
+      "line": 341
+    },
+    {
+      "id": "native-source-041",
+      "literal": "Worker bundle specified an unsupported module type",
+      "source_index": 7,
+      "line": 442
+    },
+    {
+      "id": "native-source-042",
+      "literal": "Encountered unknown Worker.Module type. Was the",
+      "source_index": 7,
+      "line": 447
+    },
+    {
+      "id": "native-source-043",
+      "literal": "unknown module type",
+      "source_index": 7,
+      "line": 451
+    },
+    {
+      "id": "native-source-044",
+      "literal": "a binding that cannot transfer through a startup snapshot reached the zygote",
+      "source_index": 7,
+      "line": 563
+    },
+    {
+      "id": "native-source-045",
+      "literal": "unknown Global type",
+      "source_index": 7,
+      "line": 752
+    },
+    {
+      "id": "native-source-046",
+      "literal": "Python workers are not supported with the new module registry",
+      "source_index": 7,
+      "line": 813
+    },
+    {
+      "id": "native-source-047",
+      "literal": "Invalid extension module name",
+      "source_index": 7,
+      "line": 922
+    },
+    {
+      "id": "native-source-048",
+      "literal": "Fallback service returned an invalid id",
+      "source_index": 7,
+      "line": 1072
+    },
+    {
+      "id": "native-source-049",
+      "literal": "Should always be possible to unwrap error interface from an object.",
+      "source_index": 8,
+      "line": 205
+    },
+    {
+      "id": "native-source-050",
+      "literal": "Failed to load dynamic module.",
+      "source_index": 8,
+      "line": 1004
+    },
+    {
+      "id": "native-source-051",
+      "literal": "uncaught exception",
+      "source_index": 8,
+      "line": 1280
+    },
+    {
+      "id": "native-source-052",
+      "literal": "Setting promise cross context follower failed unexpectedly",
+      "source_index": 8,
+      "line": 1380
+    },
+    {
+      "id": "native-source-053",
+      "literal": "START_FROM_SNAPSHOT: the snapshot has top-level listeners this Api cannot restore",
+      "source_index": 8,
+      "line": 1616
+    },
+    {
+      "id": "native-source-054",
+      "literal": "Python Workers Internal Error: CpuLimitNearlyExceededCallback already set",
+      "source_index": 8,
+      "line": 1897
+    },
+    {
+      "id": "native-source-055",
+      "literal": "registerTrackedWasmInstance: expected",
+      "source_index": 8,
+      "line": 1959
+    },
+    {
+      "id": "native-source-056",
+      "literal": "Failed to initialize",
+      "source_index": 8,
+      "line": 2336
+    },
+    {
+      "id": "native-source-057",
+      "literal": "Failed to initialize node:buffer module",
+      "source_index": 8,
+      "line": 2339
+    },
+    {
+      "id": "native-source-058",
+      "literal": "Failed to initialize node-internal:internal_timers_global_override module",
+      "source_index": 8,
+      "line": 2347
+    },
+    {
+      "id": "native-source-059",
+      "literal": "the bindings scope was pinned at an unexpected index",
+      "source_index": 8,
+      "line": 2547
+    },
+    {
+      "id": "native-source-060",
+      "literal": "the main module namespace was pinned at an unexpected index",
+      "source_index": 8,
+      "line": 2566
+    },
+    {
+      "id": "native-source-061",
+      "literal": "Expected EntrypointClass",
+      "source_index": 8,
+      "line": 2604
+    },
+    {
+      "id": "native-source-062",
+      "literal": "startup snapshot: this Worker::Api cannot restore top-level event listeners",
+      "source_index": 8,
+      "line": 2701
+    },
+    {
+      "id": "native-source-063",
+      "literal": "the zygote's top level failed; no startup snapshot was created",
+      "source_index": 8,
+      "line": 2741
+    },
+    {
+      "id": "native-source-064",
+      "literal": "was not found in this worker. Ensure the worker exports an entrypoint with that name.",
+      "source_index": 8,
+      "line": 2962
+    },
+    {
+      "id": "native-source-065",
+      "literal": "did not produce a startup-time error.",
+      "source_index": 8,
+      "line": 3234
+    },
+    {
+      "id": "native-source-066",
+      "literal": "uncaught exception in ~Script() and the C++ standard is broken",
+      "source_index": 8,
+      "line": 3449
+    },
+    {
+      "id": "native-source-067",
+      "literal": "Network.getResponseBody is not supported in this fork",
+      "source_index": 8,
+      "line": 3485
+    },
+    {
+      "id": "native-source-068",
+      "literal": "broken.outputGateBroken; jsg.Error: Durable Object storage operation exceeded",
+      "source_index": 8,
+      "line": 4238
+    },
+    {
+      "id": "native-source-069",
+      "literal": "broken.constructorFailed",
+      "source_index": 8,
+      "line": 4593
+    },
+    {
+      "id": "native-source-070",
+      "literal": "Unrecognized import attributes specified",
+      "source_index": 9,
+      "line": 46
+    },
+    {
+      "id": "native-source-071",
+      "literal": "Invalid module specifier",
+      "source_index": 9,
+      "line": 96
+    },
+    {
+      "id": "native-source-072",
+      "literal": "failed to invoke drain() on IncomingRequest before destroying it",
+      "source_index": 11,
+      "line": 459
+    },
+    {
+      "id": "native-source-073",
+      "literal": "logUncaughtExceptionAsync() threw an exception?",
+      "source_index": 11,
+      "line": 1719
+    },
+    {
+      "id": "native-source-074",
+      "literal": "IoContext cannot switch threads",
+      "source_index": 11,
+      "line": 1750
+    },
+    {
+      "id": "native-source-075",
+      "literal": "script terminated for unknown reasons",
+      "source_index": 11,
+      "line": 1926
+    },
+    {
+      "id": "native-source-076",
+      "literal": "https://developers.cloudflare.com/workers/observability/errors/",
+      "source_index": 11,
+      "line": 2051
+    },
+    {
+      "id": "native-source-077",
+      "literal": "Cannot perform I/O on behalf of a different Durable Object. I/O objects",
+      "source_index": 11,
+      "line": 2086
+    },
+    {
+      "id": "native-source-078",
+      "literal": "Durable Object cannot be accessed from a different Durable Object in the same isolate.",
+      "source_index": 11,
+      "line": 2088
+    },
+    {
+      "id": "native-source-079",
+      "literal": "Cannot perform I/O on behalf of a different request. I/O objects (such as",
+      "source_index": 11,
+      "line": 2095
+    },
+    {
+      "id": "native-source-080",
+      "literal": "handler cannot be accessed from a different request's handler. This is a limitation",
+      "source_index": 11,
+      "line": 2097
+    },
+    {
+      "id": "native-source-081",
+      "literal": "unrecognized V8 flag",
+      "source_index": 12,
+      "line": 154
+    },
+    {
+      "id": "native-source-082",
+      "literal": "Unknown external reference",
+      "source_index": 12,
+      "line": 187
+    },
+    {
+      "id": "native-source-083",
+      "literal": "cannot be used while preparing a startup snapshot",
+      "source_index": 12,
+      "line": 1035
+    },
+    {
+      "id": "native-source-084",
+      "literal": "restored, and went on after the error",
+      "source_index": 12,
+      "line": 1083
+    },
+    {
+      "id": "native-source-085",
+      "literal": "snapshot clone failed to clone again",
+      "source_index": 12,
+      "line": 1194
+    },
+    {
+      "id": "native-source-086",
+      "literal": ": allocation failed: JavaScript heap out of memory",
+      "source_index": 12,
+      "line": 1302
+    },
+    {
+      "id": "native-source-087",
+      "literal": ": allocation failed: process out of memory",
+      "source_index": 12,
+      "line": 1303
+    },
+    {
+      "id": "native-source-088",
+      "literal": "CODE_MOVED for unknown code block?",
+      "source_index": 12,
+      "line": 1441
+    },
+    {
+      "id": "native-source-089",
+      "literal": "CODE_REMOVED for unknown code block?",
+      "source_index": 12,
+      "line": 1447
+    }
+  ]
+}

@@ -27,6 +27,7 @@ jobs:
             /site/scripts/pages-worker-build-diagnostic.mjs
             /site/scripts/test-pages-worker-build-diagnostic.mjs
             /site/scripts/stage-pages-worker.mjs
+            /site/scripts/native-runtime-signatures.json
             /site/scripts/pages-startup-probe.mjs
             /site/scripts/test-pages-startup-probe.mjs
             /site/scripts/preview-runtime-diagnostics.mjs
