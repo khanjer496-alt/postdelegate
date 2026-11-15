@@ -47,7 +47,7 @@ describe('LoadToolsService agent model', () => {
     aiCredentialService = {
       getOpenAiKey: jest.fn(async (orgId: string) => `sk-key-for-${orgId}`),
     };
-    service = new LoadToolsService({} as any, aiCredentialService as any);
+    service = new LoadToolsService({} as any, { wrapTool: (_name: string, tool: any) => tool } as any, aiCredentialService as any);
   });
 
   it('is named postdelegate, so MCP clients see ask_postdelegate', async () => {
@@ -122,4 +122,13 @@ describe('LoadToolsService agent model', () => {
     expect(aiCredentialService.getOpenAiKey).not.toHaveBeenCalled();
     expect(createOpenAI).not.toHaveBeenCalled();
   });
+});
+
+it('server-authenticated org wins over a nested caller context for model billing', async () => {
+  const getOpenAiKey = jest.fn(async () => 'fixture');
+  const service = new LoadToolsService({} as any, { wrapTool: (_name: string, tool: any) => tool } as any, { getOpenAiKey } as any);
+  await service.agent();
+  const model = agentConfigs[agentConfigs.length - 1].model;
+  await runWithContext({ requestId: 'nested', auth: { id: 'org-server' } }, () => model({ requestContext: { get: () => JSON.stringify({ id: 'org-caller' }) } }));
+  expect(getOpenAiKey).toHaveBeenCalledWith('org-server');
 });
