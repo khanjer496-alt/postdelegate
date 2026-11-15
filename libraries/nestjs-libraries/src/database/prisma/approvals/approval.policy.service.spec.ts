@@ -1,3 +1,4 @@
+import { runWithContext } from '../../../chat/async.storage';
 import { BadRequestException } from '@nestjs/common';
 
 // the notification service pulls in temporal and every provider
@@ -481,5 +482,13 @@ describe('ApprovalPolicyService.afterSave', () => {
       'Your post was approved',
       expect.any(String)
     );
+  });
+});
+
+describe('agent credential approval revision', () => {
+  it.each(['APPROVED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'])('keeps an edited %s draft held even with workspace approval switched off', async approvalStatus => {
+    const { service } = makeService();
+    const result = await runWithContext({ requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key', agentPrincipal: { id: 'key', organizationId: 'org', role: 'DRAFT_ONLY', channelIds: null } }, () => service.decide('org', agent, 'update', { id: 'post', state: 'DRAFT', approvalStatus } as any));
+    expect(result).toMatchObject({ hold: true, approvalStatus: 'IN_REVIEW' });
   });
 });

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import { createHash } from 'crypto';
+import { assertAgentPostWrite, agentDraftOnly } from '../../../chat/agent-credential.policy';
 import {
   BadRequestException,
   Injectable,
@@ -1649,6 +1650,7 @@ export class PostsService {
     // callers (auto post, clipping, settings updates) pass nothing.
     actor?: ApprovalActor
   ): Promise<any[]> {
+    for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
     return actor?.type === 'agent'
       ? this.withAgentAdmission(orgId, () => this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor))
       : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor);

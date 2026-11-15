@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AgentCredentialService } from './agent-credential.service';
 import { INestApplication } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
@@ -84,6 +85,7 @@ const oauthScopes = [
 ];
 
 export const startMcp = async (app: INestApplication) => {
+  const agentCredentials = app.get(AgentCredentialService, { strict: false });
   const mastraService = app.get(MastraService, { strict: false });
   const organizationService = app.get(OrganizationService, { strict: false });
   const oauthService = app.get(OAuthService, { strict: false });
@@ -93,12 +95,17 @@ export const startMcp = async (app: INestApplication) => {
   // the organization of a token, and the MCP client it belongs to (the
   // OAuth app name, or "API key"), which marks the posts the agent creates
   const resolveAuthWithSource = async (token: string) => {
+    if (token.startsWith('mca_')) {
+      const resolved = await agentCredentials.resolve(token);
+      return { auth: resolved?.organization || null, source: 'MCP agent', scopes: ['mcp:read', 'mcp:write'], agentCredentialId: resolved?.credentialId };
+    }
     if (token.startsWith('pos_')) {
       const authorization = await oauthService.getOrgByOAuthToken(token);
       if (!authorization) return { auth: null, source: undefined };
       return {
         auth: authorization.organization,
         scopes: authorization.scope?.split(/\s+/) || [],
+        agentCredentialId: undefined,
         source: authorization.oauthApp?.name
           ? `${authorization.oauthApp.name} (MCP)`
           : 'MCP client',
@@ -106,7 +113,7 @@ export const startMcp = async (app: INestApplication) => {
     }
     return {
       auth: await organizationService.getOrgByApiKey(token),
-      source: 'MCP (API key)',
+      source: 'MCP (API key)', agentCredentialId: undefined,
       scopes: ['mcp:read', 'mcp:write'],
     };
   };
@@ -129,7 +136,7 @@ export const startMcp = async (app: INestApplication) => {
   // the API key server (/mcp, /mcp/:id, /sse/:id) also offers the agent itself
   const apiKeyTools = scopeMcpTools({
     ...tools,
-    [ASK_AGENT_TOOL_NAME]: askAgentTool(agent),
+    [ASK_AGENT_TOOL_NAME]: agentCredentials.wrapTool(ASK_AGENT_TOOL_NAME, askAgentTool(agent)),
   });
 
   // The Claude connector directory does not accept AI media generation tools,
@@ -564,8 +571,8 @@ export const startMcp = async (app: INestApplication) => {
     // a self-hosted connection has no organization here
     const selfHosted = token!.startsWith('psh_');
     const relay = selfHosted ? await resolveSelfHosted(token!) : undefined;
-    const { auth, source } = selfHosted
-      ? { auth: undefined, source: undefined }
+    const { auth, source, agentCredentialId } = selfHosted
+      ? { auth: undefined, source: undefined, agentCredentialId: undefined }
       : await resolveAuthWithSource(token!);
     if (!auth && !(relay && selfHostedServer)) {
       res.status(401).json({ error: 'invalid_token', error_description: 'Could not resolve organization' });
@@ -582,7 +589,7 @@ export const startMcp = async (app: INestApplication) => {
 
     endListenStream(req, res);
     fixAcceptHeader(req);
-    await runWithContext({ requestId: randomUUID(), auth, relay: relay || undefined, source, scopes: result.tokenValidation?.scopes || [] }, async () => {
+    await runWithContext({ requestId: randomUUID(), auth, relay: relay || undefined, source, agentCredentialId, scopes: result.tokenValidation?.scopes || [] }, async () => {
       await (relay ? selfHostedServer! : mcpServer).startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -619,7 +626,7 @@ export const startMcp = async (app: INestApplication) => {
     // older /mcp-oauth resources. Relay credentials never become cloud auth.
     const relay = token.startsWith('psh_') ? await resolveSelfHosted(token) : undefined;
     const resolved = token.startsWith('psh_')
-      ? { auth: undefined, source: undefined, scopes: relay ? ['mcp:read', 'mcp:write'] : [] }
+      ? { auth: undefined, source: undefined, agentCredentialId: undefined, scopes: relay ? ['mcp:read', 'mcp:write'] : [] }
       : await resolveAuthWithSource(token);
     // @ts-ignore
     req.auth = resolved.auth;
@@ -652,7 +659,7 @@ export const startMcp = async (app: INestApplication) => {
     endListenStream(req, res);
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: randomUUID(), auth: req.auth, relay: relay || undefined, source: resolved.source, scopes: resolved.scopes }, async () => {
+    await runWithContext({ requestId: randomUUID(), auth: req.auth, relay: relay || undefined, source: resolved.source, agentCredentialId: resolved.agentCredentialId, scopes: resolved.scopes }, async () => {
       await (relay ? selfHostedServer! : server).startHTTP({
         url,
         httpPath: url.pathname,
@@ -694,7 +701,7 @@ export const startMcp = async (app: INestApplication) => {
     fixAcceptHeader(req);
     await runWithContext(
       // @ts-ignore
-      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', agentCredentialId: undefined, scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await server.startHTTP({
           url,
@@ -733,7 +740,7 @@ export const startMcp = async (app: INestApplication) => {
 
     await runWithContext(
       // @ts-ignore
-      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', scopes: ['mcp:read', 'mcp:write'] },
+      { requestId: randomUUID(), auth: req.auth, source: 'MCP (API key)', agentCredentialId: undefined, scopes: ['mcp:read', 'mcp:write'] },
       async () => {
         await new MCPServer(serverConfig).startSSE({
           url,
