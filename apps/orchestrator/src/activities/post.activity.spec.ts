@@ -374,7 +374,8 @@ describe('PostActivity state writes for postWorkflowV113', () => {
     const signalWithStart = jest.fn().mockResolvedValue(undefined);
     const activity = make(
       {
-        searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
+        recoverMissingMcpJob: jest.fn().mockResolvedValue(false),
+      searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
           {
             id: 'p-1',
             organizationId: 'org-1',
@@ -396,5 +397,26 @@ describe('PostActivity state writes for postWorkflowV113', () => {
         workflowIdConflictPolicy: 'USE_EXISTING',
       })
     );
+  });
+});
+
+describe('MCP final transformed payload validation', () => {
+  const activity = (provider: any) => new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any, { getSocialIntegration: () => provider } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const channel = { id: 'c', organizationId: 'o', providerIdentifier: 'fixture', additionalSettings: '[]' } as any;
+  it('rejects a link/mention expansion over the limit before any provider publication', async () => {
+    const publish = jest.fn();
+    const worker = activity({ maxLength: () => 5, checkValidity: jest.fn().mockResolvedValue(true), post: publish });
+    await expect((worker as any).assertMcpFinalPayload(channel, [{ message: 'expanded-long-url', media: [], settings: {} }])).rejects.toThrow('limit');
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('checks provider rules using the exact final messages and resolved media paths', async () => {
+    const checkValidity = jest.fn().mockResolvedValue(true);
+    const worker = activity({ maxLength: () => 100, checkValidity });
+    await (worker as any).assertMcpFinalPayload(channel, [{ message: 'ready', media: [{ path: '/local/file', url: 'https://media.test/file.png' }], settings: {} }]);
+    expect(checkValidity).toHaveBeenCalledWith([[expect.objectContaining({ path: 'https://media.test/file.png' })]], {}, [], ['ready']);
   });
 });

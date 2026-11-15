@@ -1229,7 +1229,7 @@ export class PostsService {
       const result = await provider.reconcileMcpAttempt(root.integration, { attemptId: attempt.id, payloadHash: attempt.revisionHash, segmentId: attempt.segmentPostId });
       if (!result || !result.terminal) return { status: 'OUTCOME_UNKNOWN' };
       if (result.outcome === 'UNPUBLISHED') await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'FAILED');
-      else if (result.outcome === 'PUBLISHED' && result.receipt?.postId) await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'CONFIRMED', [result.receipt]);
+      else if (result.outcome === 'PUBLISHED' && result.receipt?.postId && result.receipt.id === attempt.segmentPostId) await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'CONFIRMED', [result.receipt]);
       else return { status: 'OUTCOME_UNKNOWN' };
     }
     const result = await this._postRepository.resumeMcp(orgId, postId, this.mcpRevision(rows));
@@ -1254,7 +1254,7 @@ export class PostsService {
     return rows;
   }
 
-  async runMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, expectedRevision: string, send: (integration: Integration, post: Post) => Promise<any>) {
+  async runMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, expectedRevision: string, send: (integration: Integration, post: Post, predecessors: { parent?: string; previous?: string }) => Promise<any>) {
     const rows = await this.mcpThread(orgId, rootId);
     const root = rows[0];
     const segment = rows.find(p => p.id === segmentId);
@@ -1265,6 +1265,18 @@ export class PostsService {
     if (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus) ||
         (policy.requireAgentApproval && root.approvalStatus !== 'APPROVED')) throw new BadRequestException('Current revision requires human approval.');
     if (!['QUEUE', 'PUBLISHED', 'ERROR'].includes(root.state) || !['QUEUE', 'PUBLISHED', 'ERROR'].includes(segment.state)) throw new BadRequestException('Post is not queued.');
+    const predecessors: { parent?: string; previous?: string } = {};
+    const priorSegments = rows.slice(0, rows.findIndex(p => p.id === segmentId));
+    if (priorSegments.length) {
+      const attempts = await this._postRepository.mcpAttempts(orgId, rootId);
+      for (const previous of priorSegments) {
+        const attempt = attempts.find(a => a.segmentPostId === previous.id && a.status === 'CONFIRMED' && a.revisionHash === expectedRevision);
+        const receipt = (attempt?.receipt as any)?.[0];
+        if (!receipt?.postId) throw new BadRequestException('A confirmed predecessor receipt is required.');
+        predecessors.parent ||= receipt.postId;
+        predecessors.previous = receipt.postId;
+      }
+    }
     const problem = await this.getStoredPostProblem(orgId, rootId);
     if (problem) throw new BadRequestException(problem);
         const revision = this.mcpRevision(rows);
@@ -1272,12 +1284,13 @@ export class PostsService {
     const admission = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, revision, generation);
     if (admission.replay) return admission.receipt;
     try {
-      const result = await send(root.integration, segment);
+      const result = await send(root.integration, segment, predecessors);
       if (!Array.isArray(result) || result.length !== 1 || !result[0]?.postId || result[0].id !== segmentId || result[0].status === 'pending') throw new BadRequestException('OUTCOME_UNKNOWN: provider did not return a final receipt.');
       // Persist before reporting success. A failure here keeps the durable
       // STARTED/UNKNOWN marker and may never be converted into a fresh send.
-      await this._postRepository.finishMcpSegment(orgId, admission.id, result);
-      return result;
+      const receipt = result.map(r => ({ id: r.id, postId: String(r.postId), releaseURL: String(r.releaseURL || ''), status: String(r.status || 'published') }));
+      await this._postRepository.finishMcpSegment(orgId, admission.id, receipt);
+      return receipt;
     } catch (err) {
       await this._postRepository.markMcpUnknown(orgId, admission.id).catch(() => undefined);
       throw new BadRequestException('OUTCOME_UNKNOWN: publication was admitted; reconcile before retrying.');
@@ -1303,6 +1316,7 @@ export class PostsService {
       await this._temporalService.client.getRawClient().workflow.start('postWorkflowV114', {
         workflowId: `post_${postId}_mcp_${fence.generation}`, taskQueue: 'main', workflowIdConflictPolicy: 'USE_EXISTING',
         args: [{ taskQueue, postId, organizationId: orgId, generation: fence.generation, revisionHash: fence.revisionHash }],
+        typedSearchAttributes: new TypedSearchAttributes([{ key: postIdSearchParam, value: postId }, { key: organizationId, value: orgId }]),
       });
       return;
     }
@@ -1337,15 +1351,11 @@ export class PostsService {
     }
 
     if (state === 'DRAFT') { return; }
-    if (await this._postRepository.mcpWorkflowVersion(orgId, postId) === 114) {
-      const rows = await this.mcpThread(orgId, postId);
-      await this._postRepository.registerMcpFence(orgId, postId, rows[0].integrationId, this.mcpRevision(rows));
-    }
 
     try {
       await this._temporalService.client
         .getRawClient()
-        ?.workflow.start(await this.mcpWorkflowName(orgId, postId), {
+        ?.workflow.start('postWorkflowV113', {
           workflowId: `post_${postId}`,
           taskQueue: 'main',
           workflowIdConflictPolicy: 'TERMINATE_EXISTING',
@@ -1401,11 +1411,12 @@ export class PostsService {
     operation: CreatePostDto['type'] = 'schedule',
     allowPerPostOperation = false,
     // when the post goes out, for the settings that must be checked against it
-    date?: string
+    date?: string,
+    snapshots?: Map<string, Integration>
   ) {
     return Promise.all(
       (posts || []).map(async (post) => {
-        const integration = await this._integrationService.getIntegrationById(
+        const integration = snapshots?.get(post?.integration?.id) || await this._integrationService.getIntegrationById(
           orgId,
           post?.integration?.id
         );
@@ -1537,8 +1548,8 @@ export class PostsService {
   ) {
     const output = [];
     for (const [index, post] of posts.entries()) {
-      const [validation] = await this.validatePosts(orgId, [post], operation, false, date);
       const integration = await this._integrationService.getIntegrationById(orgId, post.integration.id);
+      const [validation] = await this.validatePosts(orgId, [post], operation, false, date, new Map([[post.integration.id, integration]]));
       const checks: Array<{ field: string; status: 'VALID' | 'INVALID' | 'UNKNOWN'; message: string; fix?: string }> = [];
       const add = (field: string, valid: boolean, message: string, fix: string) =>
         checks.push({ field, status: valid ? 'VALID' : 'INVALID', message, ...(valid ? {} : { fix }) });

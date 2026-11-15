@@ -1,3 +1,4 @@
+import { countLength } from '@gitroom/helpers/utils/count.length';
 import { Injectable } from '@nestjs/common';
 import {
   Activity,
@@ -118,10 +119,11 @@ export class PostActivity {
 
   @ActivityMethod()
   async mcpPublishSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, parent?: string, previous?: string) {
-    return this._postService.runMcpSegment(orgId, rootId, segmentId, generation, revisionHash, async (integration, post) => {
-      if (segmentId === rootId) return this.postSocial(integration, [post]);
+    return this._postService.runMcpSegment(orgId, rootId, segmentId, generation, revisionHash, async (integration, post, predecessors) => {
+      parent = predecessors.parent; previous = predecessors.previous;
+      if (segmentId === rootId) return this.postSocialInternal(integration, [post], false, true);
       if (!parent) throw new Error('A confirmed predecessor receipt is required.');
-      return this.postComment(parent, previous === parent ? undefined : previous, integration, [post]);
+      return this.postCommentInternal(parent, previous === parent ? undefined : previous, integration, [post], true);
     });
   }
 
@@ -268,6 +270,10 @@ export class PostActivity {
     integration: Integration,
     posts: Post[]
   ) {
+    return this.postCommentInternal(postId, lastPostId, integration, posts, false);
+  }
+
+  private async postCommentInternal(postId: string, lastPostId: string | undefined, integration: Integration, posts: Post[], verifyFinal: boolean) {
     // kept only for in-flight postWorkflowV108 runs, which set a
     // heartbeatTimeout on this activity - removing the sender would kill
     // them. Under V109+ (no heartbeatTimeout) this is a no-op and can be
@@ -304,6 +310,7 @@ export class PostActivity {
             ),
           }))
         );
+        if (verifyFinal) await this.assertMcpFinalPayload(integration, mappedPosts);
         integration = await this.activeIntegration(integration, posts);
         const result = await getIntegration.comment(
           integration.internalId,
@@ -409,10 +416,23 @@ export class PostActivity {
     }
   }
 
+  private async assertMcpFinalPayload(integration: Integration, payload: Array<any>) {
+    const provider = this._integrationManager.getSocialIntegration(integration.providerIdentifier);
+    const additional = JSON.parse(integration.additionalSettings || '[]');
+    const settings = payload[0]?.settings || {};
+    const limit = provider.maxLength(additional, settings) || 1000000;
+    if (!payload.length || payload.some(p => countLength(integration.providerIdentifier, p.message || '') > limit || (!p.message && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
+    const valid = await provider.checkValidity(payload.map(p => p.media.map((m: any) => ({ ...m, path: m.url || m.path }))), settings, additional, payload.map(p => p.message));
+    if (valid !== true) throw new Error('Final transformed media or provider settings are invalid.');
+    const [validation] = await this._postService.validatePosts(integration.organizationId, [{ integration: { id: integration.id }, settings, value: payload.map(p => ({ content: p.message, image: p.media.map((m: any) => ({ ...m, path: m.url || m.path })) })) }], 'schedule');
+    if (!validation.valid || validation.errors !== true || validation.disabled) throw new Error('Final provider settings are invalid.');
+  }
+
   private async postSocialInternal(
     integration: Integration,
     posts: Post[],
-    allowPending: boolean
+    allowPending: boolean,
+    verifyFinal = false
   ) {
     integration = await this.activeIntegration(integration, posts);
     // kept only for in-flight postWorkflowV108 runs, which set a
@@ -421,7 +441,7 @@ export class PostActivity {
     // dropped once all V108 executions have drained
     return withHeartbeat(() =>
       this.handleDisconnect(integration, () =>
-        this.postSocialBody(integration, posts, allowPending)
+        this.postSocialBody(integration, posts, allowPending, verifyFinal)
       )
     );
   }
@@ -429,7 +449,8 @@ export class PostActivity {
   private async postSocialBody(
     integration: Integration,
     posts: Post[],
-    allowPending: boolean
+    allowPending: boolean,
+    verifyFinal = false
   ) {
     // Stage markers: whatever ran last is what a timed-out activity reports.
     // Providers that go through this.fetch overwrite these with the exact URL;
@@ -515,6 +536,7 @@ export class PostActivity {
       }))
     );
 
+    if (verifyFinal) await this.assertMcpFinalPayload(integration, mappedPosts);
     setHeartbeatDetails(`${integration.providerIdentifier}: publish`);
     integration = await this.activeIntegration(integration, posts);
     const postNow =

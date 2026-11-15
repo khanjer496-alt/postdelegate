@@ -1,0 +1,11 @@
+# MCP upgrade migration, validation and rollback
+
+Candidate only; no deployment or customer/provider mutations authorized. Apply additive migrations `20261115160000_agent_credentials` and `20261115160000_mcp_publication_fence` before new code. No key backfill/rotation. Retain tables, verifier/revocation metadata, attempt receipts and fences on rollback.
+
+New MCP jobs persist `Post.mcpWorkflowVersion=114` before enqueueing. Creation, approval, edit restart and missing-post sweep route through that stamp; original workflow definitions/signatures remain unchanged. Worker admission and API cancellation share the database fence. Workflow authority includes generation and payload hash, so a stale sleeping worker cannot publish a later revision. STARTED without durable receipt remains UNKNOWN. No shipped provider claims terminal reconciliation support; unsupported recovery stays blocked. Test adapters must prove terminal unpublished results, not merely absent receipts.
+
+Roll back exposure and new admissions first. Retain a worker image capable of V114 and its activities until tracked jobs drain or are safely fenced/reconciled. Old-image-only rollback is unsafe. Do not restore an old database backup over current revoked credentials or publication receipts. Do not drop additive schema while any new-code worker or tracked job remains.
+
+Organization agent saves hold a durable no-expiry admission across quota checks and writes, including a multi-channel tool batch. A process crash leaves admission held conservatively. Operator recovery must establish that the owning process/request is dead and all partial post writes are accounted for before removing only that owner's row. No automatic lease expiry or bulk lock deletion is safe.
+
+Hosted CI uses disposable PostgreSQL schemas only: `agent_credentials` for credential lifecycle and `mcp_publication` for durable admission/fence races. No test falls back to the application DATABASE_URL. Full suites/builds run in hosted CI; local focused checks are serialized. Staging requires RE egress containment for app and worker, exact-head QA and a deterministic test worker adapter without production fixture controls. No candidate deployment/migration until independent gates and CEO go.

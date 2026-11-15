@@ -78,6 +78,7 @@ const socialPost = (type = 'draft') => ({
 describe('createPostForReviewTool', () => {
   const build = () => {
     const postsService = {
+      withAgentAdmission: (_org: string, action: () => unknown) => action(),
       validatePosts: jest.fn().mockResolvedValue([
         { name: 'QA LinkedIn', valid: true, errors: true, tooLong: false },
       ]),
@@ -250,6 +251,7 @@ describe('sendPostForReviewTool', () => {
 describe('postUpdateTool', () => {
   const build = () => {
     const postsService = {
+      withAgentAdmission: (_org: string, action: () => unknown) => action(),
       updatePostInPlace: jest.fn().mockResolvedValue({
         postId: 'post-1',
         publishDate: '2030-01-02T10:00:00',

@@ -21,10 +21,23 @@ export class ResultsToReviewedDraftsTool implements AgentToolInterface {
   run() {
     return createTool({
       id: this.name,
-      description: 'Get the evidence-to-reviewed-drafts workflow: bounded analytics, sparse/missing-data qualifications, channel-specific next-week experiments, no-write preflight, then human-review draft IDs and IN_REVIEW receipts. Guidance only; does not read metrics, save or publish.',
-      mcp: { annotations: { title: 'Results to Reviewed Drafts', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-      inputSchema: z.object({}), outputSchema: z.object({ output: z.array(z.string()) }),
-      execute: async (input, context) => { checkAuth(input, context); return { output: RESULTS_TO_REVIEWED_DRAFTS }; },
+      description:
+        'Get the evidence-to-reviewed-drafts workflow: bounded analytics, sparse/missing-data qualifications, channel-specific next-week experiments, no-write preflight, then human-review draft IDs and IN_REVIEW receipts. Guidance only; does not read metrics, save or publish.',
+      mcp: {
+        annotations: {
+          title: 'Results to Reviewed Drafts',
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      inputSchema: z.object({}),
+      outputSchema: z.object({ output: z.array(z.string()) }),
+      execute: async (input, context) => {
+        checkAuth(input, context);
+        return { output: RESULTS_TO_REVIEWED_DRAFTS };
+      },
     });
   }
 }

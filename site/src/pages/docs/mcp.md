@@ -77,3 +77,11 @@ The API key and MCP setup live in **Settings > Agents / Dev**, which appears whe
 - **The browser sign-in window never opens.** Your client may not support OAuth for remote servers. Use the API key address instead.
 - **"redirect_uri host is not a verified domain".** A web client is trying to register a callback outside the allowed list. Use a local client or the API key address.
 - **A tool is missing.** The server lists only the tools your connection address offers. See [MCP tools](/docs/mcp/tools).
+
+## Give each assistant its own access
+
+Workspace admins can issue a named credential in Settings. New credentials default to **Draft-only** and **30 days**. Choose Analyst for permitted reads and checks, Draft-only for draft creation/editing and review submission, or Publisher for permitted scheduling and recovery. Publisher still follows workspace review rules, channel restrictions and daily limits; it cannot approve a post. Channel restrictions apply to reads as well as writes. Unfilterable workspace totals are unavailable to channel-restricted credentials.
+
+Copy the new secret once and send it only in the Authorization header on the canonical MCP endpoint. It cannot be read back and is not a REST API key or a secret-in-URL credential. Existing workspace keys and OAuth clients keep their current connection behavior. Expiry or revocation blocks subsequent calls, including nested agent actions. Already accepted approved schedules remain workspace jobs; changing credentials does not unschedule them or release review holds.
+
+For an evidence-based weekly draft plan, ask the assistant to use `resultsToReviewedDraftsTool`: inspect a bounded recent period, cite real posts and dated metrics, qualify sparse/missing history, propose channel-specific experiments, check with `postPreflightTool`, then create reviewed drafts and return draft IDs plus IN_REVIEW receipts. Media generation is optional. Reviewed or queued does not mean publicly published.

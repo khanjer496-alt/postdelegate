@@ -14,20 +14,48 @@ export class PostPreflightTool implements AgentToolInterface {
   run() {
     return createTool({
       id: this.name,
-      description: 'Check proposed channel posts without saving, minting short links, refreshing credentials, importing media or publishing. Same input as integrationSchedulePostTool. Each check is VALID, INVALID or UNKNOWN and bound to input/config hashes and checkedAt. UNKNOWN is not ready; this snapshot is not authorization. Pending short links have no invented length bound. Saving validates materialized text again.',
-      mcp: { annotations: { title: 'Check Proposed Posts', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-      inputSchema: schedulePostInputSchema,
+      description:
+        'Check proposed channel posts without saving, minting short links, refreshing credentials, importing media or publishing. Same input as integrationSchedulePostTool. Each check is VALID, INVALID or UNKNOWN and bound to input/config hashes and checkedAt. UNKNOWN is not ready; this snapshot is not authorization. Pending short links have no invented length bound. Saving validates materialized text again.',
+      mcp: {
+        annotations: {
+          title: 'Check Proposed Posts',
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      inputSchema: schedulePostInputSchema.extend({
+        socialPost: schedulePostInputSchema.shape.socialPost.min(1).max(100),
+      }),
       outputSchema: z.object({ output: z.array(z.any()) }),
       execute: async (input, context) => {
         checkAuth(input, context);
-        const orgId = JSON.parse((context?.requestContext as any)?.get('organization')).id;
+        const orgId = JSON.parse(
+          (context?.requestContext as any)?.get('organization')
+        ).id;
         const output = [];
-        for (const channel of input.socialPost) {
-          output.push(...await this.posts.preflightPosts(orgId, [{
-            integration: { id: channel.integrationId }, date: channel.date,
-            settings: Object.fromEntries(channel.settings.map(s => [s.key, s.value])),
-            value: channel.postsAndComments.map(p => ({ content: p.content, image: p.attachments.map(toMedia) })),
-          }], channel.type, channel.date, channel.shortLink));
+        for (const [index, channel] of input.socialPost.entries()) {
+          const checks = await this.posts.preflightPosts(
+            orgId,
+            [
+              {
+                integration: { id: channel.integrationId },
+                date: channel.date,
+                settings: Object.fromEntries(
+                  channel.settings.map((s) => [s.key, s.value])
+                ),
+                value: channel.postsAndComments.map((p) => ({
+                  content: p.content,
+                  image: p.attachments.map(toMedia),
+                })),
+              },
+            ],
+            channel.type,
+            channel.date,
+            channel.shortLink
+          );
+          output.push(...checks.map((result) => ({ ...result, index })));
         }
         return { output };
       },
