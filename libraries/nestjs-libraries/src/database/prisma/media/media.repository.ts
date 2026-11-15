@@ -98,6 +98,10 @@ export class MediaRepository {
     });
   }
 
+  getOrgMediaByPaths(orgId: string, paths: string[]) {
+    return this._media.model.media.findMany({ where: { organizationId: orgId, path: { in: paths }, deletedAt: null }, select: { id: true, path: true, status: true } });
+  }
+
   getOrgMediaById(org: string, id: string) {
     return this._media.model.media.findFirst({
       where: {

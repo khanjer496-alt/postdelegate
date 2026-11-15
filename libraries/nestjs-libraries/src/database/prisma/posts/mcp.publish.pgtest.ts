@@ -1,3 +1,4 @@
+import { agentAdmissionContext } from './agent-admission.context';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PostsRepository } from './posts.repository';
@@ -230,4 +231,37 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
       count: 1,
     });
   });
+  it('a crashed owner can be fenced and reconciled without expiry or deleting saved posts', async () => {
+    await repo.acquireAgentAdmission(org, 'crashed-owner', { instanceId: 'instance', host: 'fixture', processId: 7 });
+    const draft = { integration: { id: integration }, settings: { __type: 'fixture' }, value: [{ content: 'saved before crash', image: [] }] } as any;
+    const save = () => agentAdmissionContext.run({ orgId: org, owner: 'crashed-owner', persistedIds: [] }, () => repo.createOrUpdatePost('draft', org, '2030-01-01T00:00:00Z', draft, [], 'MCP'));
+    const saved = await save();
+    const before = await db.post.count({ where: { organizationId: org } });
+    const recovered = await repo.recoverAgentAdmission(org, 'crashed-owner', 'admin-fixture');
+    expect(recovered.persistedPosts).toContainEqual(expect.objectContaining({ id: saved.posts[0].id }));
+    await expect(save()).rejects.toThrow('recovered');
+    expect(await db.post.count({ where: { organizationId: org } })).toBe(before);
+    expect(await db.mcpAgentAdmissionRecovery.count({ where: { organizationId: org, owner: 'crashed-owner' } })).toBe(1);
+    await repo.acquireAgentAdmission(org, 'replacement-owner');
+    await repo.releaseAgentAdmission(org, 'replacement-owner');
+  });
+
+  it('receipt and published state are one transaction; cancel cannot claim to undo that segment', async () => {
+    const admission = await repo.claimMcpSegment(org, root, root, revision, 0);
+    const receipt = [{ id: root, postId: 'remote-confirmed', releaseURL: 'https://fixture/confirmed', status: 'published' }];
+    await repo.finishMcpSegment(org, admission.id, receipt);
+    const result = await repo.unscheduleMcp(org, root);
+    expect(result).toMatchObject({ status: 'PARTIALLY_UNSCHEDULED', publishedSegmentIds: [root] });
+    expect(await db.post.findUniqueOrThrow({ where: { id: root } })).toMatchObject({ state: 'PUBLISHED', releaseId: 'remote-confirmed' });
+    expect(await db.post.findUniqueOrThrow({ where: { id: child } })).toMatchObject({ state: 'DRAFT' });
+  });
+
+  it('new queued MCP source and its version/fence commit atomically before a sweep can observe it', async () => {
+    const saved = await repo.createOrUpdatePost('schedule', org, '2030-01-01T00:00:00Z', { integration: { id: integration }, settings: { __type: 'fixture' }, value: [{ content: 'new MCP source', image: [] }] } as any, [], 'MCP');
+    const post = await db.post.findUniqueOrThrow({ where: { id: saved.posts[0].id } });
+    expect(post).toMatchObject({ state: 'QUEUE', mcpWorkflowVersion: 114 });
+    expect(await repo.mcpFence(org, post.id)).toMatchObject({ revisionHash: expect.any(String), state: 'ACTIVE' });
+    // Simulated process death before the service's redundant registration does not erase either record.
+  });
+
 });

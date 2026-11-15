@@ -69,6 +69,7 @@ function AdminCredentials() {
       aria-label={t('agent_access', 'Agent access')}
     >
       <h4>{t('agent_access', 'Agent access')}</h4>
+      <AgentSaveRecovery />
       <p className="text-sm">
         {t(
           'agent_access_description',
@@ -251,4 +252,34 @@ function AdminCredentials() {
       </ul>
     </section>
   );
+}
+
+function AgentSaveRecovery() {
+  const fetch = useFetch();
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const { data, mutate } = useSWR<null | { owner: string; host: string; processId: number; instanceId: string; createdAt: string; writtenPostIds: string[] }>('agent-save-admission', async () => {
+    const response = await fetch('/settings/agent-admission');
+    if (!response.ok) throw new Error('Could not read the active agent save.');
+    return response.json();
+  });
+  if (!data) return message ? <p role="status">{message}</p> : null;
+  return <div className="border border-fifth rounded p-3 flex flex-col gap-2">
+    <h5>{t('agent_save_active', 'Agent save in progress')}</h5>
+    <p className="text-sm">{new Date(data.createdAt).toLocaleString()} · {data.host} · {data.processId}</p>
+    <p className="text-sm">{t('agent_save_recovery_description', 'Stop remaining post saves from this request. Saved or scheduled posts stay active; link preparation already in progress may finish.')}</p>
+    <p className="text-sm">{t('agent_saved_posts', 'Saved post IDs')}: {data.writtenPostIds.join(', ') || t('none', 'None')}</p>
+    <Button secondary disabled={busy} onClick={async () => {
+      setBusy(true); setMessage('');
+      try {
+        const response = await fetch(`/settings/agent-admission/${encodeURIComponent(data.owner)}/recover`, { method: 'POST' });
+        if (!response.ok) throw new Error(t('agent_recovery_changed', 'The active save changed. Refresh and try again.'));
+        const result = await response.json();
+        setMessage(`${t('agent_save_recovered', 'Remaining post saves stopped. Saved post IDs')}: ${result.persistedPosts.map((p: { id: string }) => p.id).join(', ') || t('none', 'None')}`);
+        await mutate();
+      } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }
+    }}>{t('agent_recover_save', 'Stop remaining post saves and recover')}</Button>
+    {message && <p role="status">{message}</p>}
+  </div>;
 }

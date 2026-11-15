@@ -124,11 +124,11 @@ export class PostActivity {
 
   @ActivityMethod()
   async mcpPublishSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, parent?: string, previous?: string) {
-    return this._postService.runMcpSegment(orgId, rootId, segmentId, generation, revisionHash, async (integration, post, predecessors) => {
+    return this._postService.runMcpSegment(orgId, rootId, segmentId, generation, revisionHash, async (integration, post, predecessors, attemptId) => {
       parent = predecessors.parent; previous = predecessors.previous;
-      if (segmentId === rootId) return this.postSocialInternal(integration, [post], false, true);
+      if (segmentId === rootId) return this.postSocialInternal(integration, [post], false, { attemptId });
       if (!parent) throw new Error('A confirmed predecessor receipt is required.');
-      return this.postCommentInternal(parent, previous === parent ? undefined : previous, integration, [post], true);
+      return this.postCommentInternal(parent, previous === parent ? undefined : previous, integration, [post], { attemptId });
     });
   }
 
@@ -278,7 +278,7 @@ export class PostActivity {
     return this.postCommentInternal(postId, lastPostId, integration, posts, false);
   }
 
-  private async postCommentInternal(postId: string, lastPostId: string | undefined, integration: Integration, posts: Post[], verifyFinal: boolean) {
+  private async postCommentInternal(postId: string, lastPostId: string | undefined, integration: Integration, posts: Post[], verifyFinal: boolean | { attemptId: string }) {
     // kept only for in-flight postWorkflowV108 runs, which set a
     // heartbeatTimeout on this activity - removing the sender would kill
     // them. Under V109+ (no heartbeatTimeout) this is a no-op and can be
@@ -311,11 +311,18 @@ export class PostActivity {
               p.id,
               p.organizationId,
               JSON.parse(p.image || '[]'),
-              getIntegration?.convertToJPEG || false
+              getIntegration?.convertToJPEG || false,
+              !verifyFinal
             ),
           }))
         );
-        if (verifyFinal) await this.assertMcpFinalPayload(integration, mappedPosts);
+        if (verifyFinal) {
+          await this.assertMcpFinalPayload(integration, mappedPosts);
+          if (typeof verifyFinal === 'object') {
+            mappedPosts.forEach(p => Object.assign(p, { clientReference: { attemptId: verifyFinal.attemptId } }));
+            await this._postService.bindMcpProviderPayload(integration.organizationId, verifyFinal.attemptId, mappedPosts);
+          }
+        }
         integration = await this.activeIntegration(integration, posts);
         const result = await getIntegration.comment(
           integration.internalId,
@@ -437,7 +444,7 @@ export class PostActivity {
     integration: Integration,
     posts: Post[],
     allowPending: boolean,
-    verifyFinal = false
+    verifyFinal: boolean | { attemptId: string } = false
   ) {
     integration = await this.activeIntegration(integration, posts);
     // kept only for in-flight postWorkflowV108 runs, which set a
@@ -455,7 +462,7 @@ export class PostActivity {
     integration: Integration,
     posts: Post[],
     allowPending: boolean,
-    verifyFinal = false
+    verifyFinal: boolean | { attemptId: string } = false
   ) {
     // Stage markers: whatever ran last is what a timed-out activity reports.
     // Providers that go through this.fetch overwrite these with the exact URL;
@@ -536,12 +543,19 @@ export class PostActivity {
           p.id,
           p.organizationId,
           JSON.parse(p.image || '[]'),
-          getIntegration?.convertToJPEG || false
+          getIntegration?.convertToJPEG || false,
+          !verifyFinal
         ),
       }))
     );
 
-    if (verifyFinal) await this.assertMcpFinalPayload(integration, mappedPosts);
+    if (verifyFinal) {
+          await this.assertMcpFinalPayload(integration, mappedPosts);
+          if (typeof verifyFinal === 'object') {
+            mappedPosts.forEach(p => Object.assign(p, { clientReference: { attemptId: verifyFinal.attemptId } }));
+            await this._postService.bindMcpProviderPayload(integration.organizationId, verifyFinal.attemptId, mappedPosts);
+          }
+        }
     setHeartbeatDetails(`${integration.providerIdentifier}: publish`);
     integration = await this.activeIntegration(integration, posts);
     const postNow =

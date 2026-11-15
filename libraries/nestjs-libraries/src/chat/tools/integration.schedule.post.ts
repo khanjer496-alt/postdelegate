@@ -365,7 +365,8 @@ If validation fails, or the workspace limits what agents can do (allowed channel
           body as any,
           'MCP',
           false,
-          actor
+          actor,
+          ...((options.forReview ? [undefined, 'review'] : []) as [undefined?, 'review'?])
         );
       } catch (err) {
         // a plan limit (402) carries the message written for the customer
@@ -373,7 +374,7 @@ If validation fails, or the workspace limits what agents can do (allowed channel
           err instanceof BadRequestException ||
           (err instanceof HttpException && err.getStatus() === 402)
         ) {
-          return { output: { errors: err.message } };
+          return { output: { errors: err.message + (finalOutput.length ? ` Already created post IDs (do not recreate): ${finalOutput.map(p => p.postId).join(', ')}. Remaining channels were not created.` : '') } };
         }
         throw err;
       }

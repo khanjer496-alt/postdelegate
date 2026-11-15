@@ -1,4 +1,5 @@
-import { AsyncLocalStorage } from 'async_hooks';
+import { hostname } from 'os';
+import { agentAdmissionContext as agentAdmission } from './agent-admission.context';
 import { createHash } from 'crypto';
 import { assertAgentPostWrite, agentDraftOnly } from '../../../chat/agent-credential.policy';
 import {
@@ -8,7 +9,7 @@ import {
   NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
-import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { PostsRepository, mcpPayloadRevision } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import dayjs from 'dayjs';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
@@ -96,7 +97,7 @@ import {
   PUBLIC_PREVIEW,
 } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 
-const agentAdmission = new AsyncLocalStorage<{ orgId: string }>();
+const agentInstanceId = uuidv4();
 
 type PostWithConditionals = Post & {
   integration?: Integration;
@@ -748,7 +749,8 @@ export class PostsService {
     id: string,
     orgId: string,
     imagesList: any[],
-    convertToJPEG = false
+    convertToJPEG = false,
+    persistImages = true
   ) {
     try {
       let imageUpdateNeeded = false;
@@ -853,7 +855,7 @@ export class PostsService {
           })
       );
 
-      if (imageUpdateNeeded) {
+      if (imageUpdateNeeded && persistImages) {
         await this._postRepository.updateImages(
           id,
           JSON.stringify(getImageList)
@@ -862,6 +864,7 @@ export class PostsService {
 
       return getImageList;
     } catch (err: any) {
+      if (!persistImages) throw new BadRequestException('Media preparation failed; no provider payload was sent.');
       return (imagesList || []).filter((m) =>
         this.isAllowedMediaPath(m?.path)
       );
@@ -1188,13 +1191,7 @@ export class PostsService {
     return this._postRepository.getPostByForWebhookId(id, integrationId);
   }
 
-  private mcpRevision(posts: Array<any>) {
-    return createHash('sha256').update(JSON.stringify(posts.map(p => ({
-      id: p.id, integrationId: p.integrationId, content: p.content,
-      settings: p.settings, image: p.image, delay: p.delay,
-      publishDate: new Date(p.publishDate).toISOString(), parentPostId: p.parentPostId,
-    })))).digest('hex');
-  }
+  private mcpRevision(posts: Array<any>) { return mcpPayloadRevision(posts); }
 
   async recoverMissingMcpJob(orgId: string, rootId: string) {
     if (await this._postRepository.mcpWorkflowVersion(orgId, rootId) !== 114) return false;
@@ -1212,7 +1209,22 @@ export class PostsService {
     await this._approvalPolicyService.assertAgentGuardrails(orgId, { type: 'agent', source: 'MCP' }, [root.integrationId], { countsTowardLimit: false });
     // The fence makes sleeping/racing workers harmless; Temporal termination is
     // deliberately not used as publication proof.
-    return this._postRepository.unscheduleMcp(orgId, postId);
+    const policy = await this._approvalPolicyService.getSettings(orgId);
+    return this._postRepository.unscheduleMcp(orgId, postId, false, policy.requireAgentApproval);
+  }
+
+  async mcpExecutionState(orgId: string, postId: string) {
+    const fence = await this._postRepository.mcpFence(orgId, postId);
+    if (!fence) return { generation: -1, closed: undefined as boolean | undefined };
+    try {
+      const handle = this._temporalService.client.getRawClient().workflow.getHandle(`post_${postId}_mcp_${fence.generation}`);
+      const execution = await handle.describe();
+      if (execution.status.name === 'RUNNING') return { generation: fence.generation, closed: false };
+      if (['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED', 'TERMINATED', 'TIMED_OUT'].includes(execution.status.name)) return { generation: fence.generation, closed: true };
+    } catch (error) {
+      if ((error as Error)?.name === 'WorkflowNotFoundError') return { generation: fence.generation, closed: true };
+    }
+    return { generation: fence.generation, closed: undefined as boolean | undefined };
   }
 
   async resumeMcp(orgId: string, postId: string) {
@@ -1221,19 +1233,30 @@ export class PostsService {
     if (root.mcpWorkflowVersion !== 114 || !root.integration) return { status: 'BLOCKED', reason: 'Legacy execution has no durable attempt proof.' };
     await this._approvalPolicyService.assertAgentGuardrails(orgId, { type: 'agent', source: 'MCP' }, [root.integrationId], { countsTowardLimit: false });
     const policy = await this._approvalPolicyService.getSettings(orgId);
-    if (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus) || (policy.requireAgentApproval && root.approvalStatus !== 'APPROVED')) return { status: 'BLOCKED', reason: 'Current revision requires human approval.' };
+    if (rows.some(p => p.state !== 'PUBLISHED' && (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(p.approvalStatus) || (policy.requireAgentApproval && p.approvalStatus !== 'APPROVED'))) || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) return { status: 'BLOCKED', reason: 'Current revision requires human approval.' };
     const provider = this._integrationManager.getSocialIntegration(root.integration.providerIdentifier);
     const attempts = await this._postRepository.mcpAttempts(orgId, postId);
     for (const attempt of attempts.filter(a => ['STARTED', 'UNKNOWN'].includes(a.status))) {
       if (!provider.reconcileMcpAttempt) return { status: 'OUTCOME_UNKNOWN', reason: 'This provider cannot prove a terminal publication outcome; retry is blocked.' };
-      const result = await provider.reconcileMcpAttempt(root.integration, { attemptId: attempt.id, payloadHash: attempt.revisionHash, segmentId: attempt.segmentPostId });
+      const result = await provider.reconcileMcpAttempt(root.integration, { attemptId: attempt.id, payloadHash: attempt.providerPayloadHash || attempt.revisionHash, segmentId: attempt.segmentPostId });
       if (!result || !result.terminal) return { status: 'OUTCOME_UNKNOWN' };
       if (result.outcome === 'UNPUBLISHED') await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'FAILED');
       else if (result.outcome === 'PUBLISHED' && result.receipt?.postId && result.receipt.id === attempt.segmentPostId) await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'CONFIRMED', [result.receipt]);
       else return { status: 'OUTCOME_UNKNOWN' };
     }
-    const result = await this._postRepository.resumeMcp(orgId, postId, this.mcpRevision(rows));
+    const execution = await this.mcpExecutionState(orgId, postId);
+    if (execution.closed === undefined) return { status: 'OUTCOME_UNKNOWN', reason: 'Current workflow execution could not be confirmed.' };
+    const result = await this._postRepository.resumeMcp(orgId, postId, this.mcpRevision(rows), execution.closed ? execution.generation : undefined);
     if (result.status === 'RESUMED') await this.startWorkflow(root.integration.providerIdentifier.split('-')[0].toLowerCase(), postId, orgId, 'QUEUE');
+    return result;
+  }
+
+  holdRemainingMcp(orgId: string, rootId: string, status: 'CHANGES_REQUESTED' | 'REJECTED', updatedAt: Date) { return this._postRepository.holdRemainingMcp(orgId, rootId, status, updatedAt); }
+
+  async approveRemainingMcp(orgId: string, postId: string, updatedAt: Date) {
+    const result = await this._postRepository.approveRemainingMcp(orgId, postId, updatedAt);
+    const rows = await this.mcpThread(orgId, postId);
+    await this.startWorkflow(rows[0].integration!.providerIdentifier.split('-')[0].toLowerCase(), postId, orgId, 'QUEUE');
     return result;
   }
 
@@ -1258,7 +1281,7 @@ export class PostsService {
     return rows;
   }
 
-  async runMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, expectedRevision: string, send: (integration: Integration, post: Post, predecessors: { parent?: string; previous?: string }) => Promise<any>) {
+  async runMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, expectedRevision: string, send: (integration: Integration, post: Post, predecessors: { parent?: string; previous?: string }, attemptId: string) => Promise<any>) {
     const rows = await this.mcpThread(orgId, rootId);
     const root = rows[0];
     const segment = rows.find(p => p.id === segmentId);
@@ -1266,9 +1289,16 @@ export class PostsService {
     const actor = { type: 'agent' as const, source: root.agentSource || 'MCP' };
     await this._approvalPolicyService.assertAgentGuardrails(orgId, actor, [root.integrationId], { countsTowardLimit: false });
     const policy = await this._approvalPolicyService.getSettings(orgId);
-    if (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus) ||
-        (policy.requireAgentApproval && root.approvalStatus !== 'APPROVED')) throw new BadRequestException('Current revision requires human approval.');
+    if (rows.some(p => p.state !== 'PUBLISHED' && (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(p.approvalStatus) || (policy.requireAgentApproval && p.approvalStatus !== 'APPROVED'))) || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) throw new BadRequestException('Current revision requires human approval.');
     if (!['QUEUE', 'PUBLISHED', 'ERROR'].includes(root.state) || !['QUEUE', 'PUBLISHED', 'ERROR'].includes(segment.state)) throw new BadRequestException('Post is not queued.');
+    const actualRevision = this.mcpRevision(rows);
+    if (actualRevision !== expectedRevision) throw new BadRequestException('Workflow payload revision changed.');
+    const storedAttempts = await this._postRepository.mcpAttempts(orgId, rootId) || [];
+    if (storedAttempts.some(a => a.segmentPostId === segmentId && a.status === 'CONFIRMED' && a.revisionHash === actualRevision)) {
+      const replay = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, actualRevision, generation);
+      if (!replay.replay) throw new BadRequestException('Confirmed receipt changed unexpectedly.');
+      return replay.receipt;
+    }
     const predecessors: { parent?: string; previous?: string } = {};
     const priorSegments = rows.slice(0, rows.findIndex(p => p.id === segmentId));
     if (priorSegments.length) {
@@ -1281,6 +1311,7 @@ export class PostsService {
         predecessors.previous = receipt.postId;
       }
     }
+    if (!await this.ownedMcpMedia(orgId, rows.filter(p => p.state !== 'PUBLISHED').flatMap(p => JSON.parse(p.image || '[]')), true)) throw new BadRequestException('Media is not confirmed ready in this workspace.');
     const problem = await this.getStoredPostProblem(orgId, rootId);
     if (problem) throw new BadRequestException(problem);
         const revision = this.mcpRevision(rows);
@@ -1288,7 +1319,7 @@ export class PostsService {
     const admission = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, revision, generation);
     if (admission.replay) return admission.receipt;
     try {
-      const result = await send(root.integration, segment, predecessors);
+      const result = await send(root.integration, segment, predecessors, admission.id);
       if (!Array.isArray(result) || result.length !== 1 || !result[0]?.postId || result[0].id !== segmentId || result[0].status === 'pending') throw new BadRequestException('OUTCOME_UNKNOWN: provider did not return a final receipt.');
       // Persist before reporting success. A failure here keeps the durable
       // STARTED/UNKNOWN marker and may never be converted into a fresh send.
@@ -1318,8 +1349,8 @@ export class PostsService {
       const fence = await this._postRepository.mcpFence(orgId, postId);
       if (!fence || fence.state !== 'ACTIVE') return;
       await this._temporalService.client.getRawClient().workflow.start('postWorkflowV114', {
-        workflowId: `post_${postId}_mcp_${fence.generation}`, taskQueue: 'main', workflowIdConflictPolicy: 'USE_EXISTING',
-        args: [{ taskQueue, postId, organizationId: orgId, generation: fence.generation, revisionHash: fence.revisionHash }],
+        workflowId: `post_${postId}_mcp_${fence.generation}`, taskQueue: 'mcp-publish-v114', workflowIdConflictPolicy: 'USE_EXISTING',
+        args: [{ taskQueue: 'mcp-publish-v114', postId, organizationId: orgId, generation: fence.generation, revisionHash: fence.revisionHash }],
         typedSearchAttributes: new TypedSearchAttributes([{ key: postIdSearchParam, value: postId }, { key: organizationId, value: orgId }]),
       });
       return;
@@ -1542,6 +1573,29 @@ export class PostsService {
     );
   }
 
+  private async bindOwnedMcpMedia(orgId: string, media: Array<any>) {
+    const paths = [...new Set(media.flatMap(m => [m.path, ...(m.thumbnail ? [m.thumbnail] : [])]))];
+    if (!paths.length) return media;
+    const records = await this._mediaService.getOrgMediaByPaths(orgId, paths);
+    if (!paths.every(path => records.some(r => r.path === path && r.status === 'ready'))) throw new BadRequestException('Media is not confirmed ready in this workspace. Reuse a ready library path.');
+    return media.map(m => ({ ...m, id: records.find(r => r.path === m.path)!.id }));
+  }
+
+  bindMcpProviderPayload(orgId: string, attemptId: string, payload: any) { return this._postRepository.bindMcpProviderPayload(orgId, attemptId, payload); }
+
+  async ownedMcpMedia(orgId: string, media: Array<{ id?: string; path: string; thumbnail?: string }>, serverBoundIds = false) {
+    const unresolved = [];
+    for (const item of media) {
+      const record = serverBoundIds && item.id ? await this._mediaService.getOrgMediaById(orgId, item.id) : null;
+      if (!record || record.deletedAt || record.status !== 'ready') unresolved.push({ path: item.path, thumbnail: item.thumbnail });
+      else if (item.thumbnail) unresolved.push({ path: item.thumbnail });
+    }
+    const paths = [...new Set(unresolved.flatMap(m => [m.path, ...(m.thumbnail ? [m.thumbnail] : [])]))];
+    if (!paths.length) return true;
+    const owned = await this._mediaService.getOrgMediaByPaths(orgId, paths);
+    return paths.every(path => owned.some(m => m.path === path && m.status === 'ready'));
+  }
+
   /** A snapshot, never an authorization or a durable promise to publish. */
   async preflightPosts(
     orgId: string,
@@ -1552,6 +1606,10 @@ export class PostsService {
   ) {
     const output = [];
     for (const [index, post] of posts.entries()) {
+      if (!await this.ownedMcpMedia(orgId, (post.value || []).flatMap(p => p.image || []))) {
+        output.push({ index, channel: post.integration.id, checkedAt: new Date().toISOString(), status: 'UNKNOWN', checks: [{ field: 'mediaIdentity', status: 'UNKNOWN', message: 'The attachment or thumbnail is not confirmed ready in this workspace media library.', fix: 'Upload it to this workspace or wait for mediaStatusTool; reuse the exact library path.' }] });
+        continue;
+      }
       const integration = await this._integrationService.getIntegrationById(orgId, post.integration.id);
       const [validation] = await this.validatePosts(orgId, [post], operation, false, date, new Map([[post.integration.id, integration]]));
       const checks: Array<{ field: string; status: 'VALID' | 'INVALID' | 'UNKNOWN'; message: string; fix?: string }> = [];
@@ -1665,26 +1723,37 @@ export class PostsService {
     // callers (auto post, clipping, settings updates) pass nothing.
     actor?: ApprovalActor,
     // Server-captured revision from the in-place draft editor, never authority.
-    expectedDraftUpdatedAt?: Date
+    expectedDraftUpdatedAt?: Date,
+    validationIntent?: 'review'
   ): Promise<any[]> {
     for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
     return actor?.type === 'agent'
-      ? this.withAgentAdmission(orgId, () => this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt))
-      : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt);
+      ? this.withAgentAdmission(orgId, async () => {
+          try { return await this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent); }
+          catch (error) {
+            const ids = agentAdmission.getStore()?.persistedIds || [];
+            if (ids.length) throw new BadRequestException(`Save incomplete. Already saved post IDs (do not recreate): ${ids.join(', ')}. Inspect these posts before retrying remaining work.`);
+            throw error;
+          }
+        })
+      : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent);
   }
+
+  agentAdmissionStatus(orgId: string) { return this._postRepository.agentAdmissionStatus(orgId); }
+  recoverAgentAdmission(orgId: string, owner: string, actorId: string) { return this._postRepository.recoverAgentAdmission(orgId, owner, actorId); }
 
   async withAgentAdmission<T>(orgId: string, action: () => Promise<T>): Promise<T> {
     if (agentAdmission.getStore()?.orgId === orgId) return action();
     const owner = uuidv4();
-    try { await this._postRepository.acquireAgentAdmission(orgId, owner); }
+    try { await this._postRepository.acquireAgentAdmission(orgId, owner, { instanceId: agentInstanceId, host: hostname(), processId: process.pid }); }
     catch { throw new BadRequestException('Another agent save is active or needs recovery. Retry only after it is resolved.'); }
-    try { return await agentAdmission.run({ orgId }, action); }
+    try { return await agentAdmission.run({ orgId, owner, persistedIds: [] }, action); }
     finally { await this._postRepository.releaseAgentAdmission(orgId, owner); }
   }
 
   private async createPostAdmitted(
     orgId: string, body: CreatePostDto, creationMethod: CreationMethod,
-    keepGroup = false, actor?: ApprovalActor, expectedDraftUpdatedAt?: Date
+    keepGroup = false, actor?: ApprovalActor, expectedDraftUpdatedAt?: Date, validationIntent?: 'review'
   ): Promise<any[]> {
     if (actor?.type === 'agent') {
       // an agent's in-place update must point at posts that exist, it can't
@@ -1744,6 +1813,7 @@ export class PostsService {
       );
       const removeLinks = !!provider?.stripLinks?.();
 
+      if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) post.value = await Promise.all(post.value.map(async p => ({ ...p, image: await this.bindOwnedMcpMedia(orgId, p.image || []) })));
       const messages = (post.value || []).map((p) => p.content);
       // No point shortlinking links on platforms that strip them out anyway
       const updateContent =
@@ -1762,7 +1832,7 @@ export class PostsService {
       // Materialized links can grow. Validate the exact transformed text before
       // enqueueing; a preflight snapshot never authorizes this payload.
       const [finalValidation] = await this.validatePosts(orgId, [post], body.type, false, post.date || body.date);
-      if (finalValidation.emptyContent || (body.type !== 'draft' &&
+      if (finalValidation.emptyContent || ((body.type !== 'draft' || validationIntent === 'review') &&
         (!finalValidation.valid || finalValidation.errors !== true || finalValidation.tooLong || finalValidation.disabled))) {
         throw new BadRequestException(finalValidation.settingsError ||
           (finalValidation.errors !== true ? String(finalValidation.errors) :
@@ -1802,10 +1872,7 @@ export class PostsService {
         return [] as any[];
       }
 
-      if ((creationMethod === 'MCP' && !existing) || existing?.mcpWorkflowVersion === 114) {
-        const rows = await this.mcpThread(orgId, posts[0].id);
-        await this._postRepository.registerMcpFence(orgId, posts[0].id, post.integration.id, this.mcpRevision(rows));
-      }
+      if (agentAdmission.getStore()?.orgId === orgId && posts[0]?.id) agentAdmission.getStore()!.persistedIds.push(posts[0].id);
 
       const existingIds = (post.value || []).map((p) => p.id).filter(Boolean);
       await this.detachStaleAnchors(
@@ -1823,7 +1890,7 @@ export class PostsService {
           dayjs(posts[0].publishDate).valueOf();
 
       // an update held for review must stop the workflow already waiting
-      if (body.type !== 'update' || decision?.hold || movedQueued) {
+      if (body.type !== 'update' || decision?.hold || movedQueued || (existing?.mcpWorkflowVersion === 114 && posts[0].state === 'QUEUE')) {
         this.startWorkflow(
           post.settings.__type.split('-')[0].toLowerCase(),
           posts[0].id,
@@ -2809,6 +2876,7 @@ export class PostsService {
     if (!validation) {
       return null;
     }
+    if (validation.disabled) return 'its channel is disabled';
     if (validation.emptyContent) {
       return 'it needs at least one character or one image';
     }

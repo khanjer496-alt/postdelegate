@@ -37,6 +37,7 @@ const makeService = (integrationManager: any = {}) => {
   const mediaService = {
     getOrgMediaById: jest.fn(),
     getMediaById: jest.fn(),
+    getOrgMediaByPaths: jest.fn().mockResolvedValue([]),
   };
   const service = new PostsService(
     postRepository as any,
@@ -2187,7 +2188,7 @@ describe('no-write post preflight and final preparation', () => {
   it('marks unfinished media UNKNOWN and supplies a practical fix', async () => {
     const { service, post } = fixture();
     const [result] = await service.preflightPosts('org', [{ ...post, value: [{ content: 'ok', image: [{ path: 'https://media.test/a.mp4' }] }] }], 'schedule');
-    expect(result.checks.find((c: any) => c.field === 'value.0.image').status).toBe('UNKNOWN');
+    expect(result.checks.find((c: any) => c.field === 'mediaIdentity').status).toBe('UNKNOWN');
   });
 });
 
@@ -2197,6 +2198,7 @@ describe('tracked MCP publication admission', () => {
     const root: any = { id: 'root', organizationId: 'org', integrationId: 'channel', parentPostId: null, mcpWorkflowVersion: 114, state: 'QUEUE', approvalStatus: 'APPROVED', content: 'text', settings: '{}', image: '[]', publishDate: new Date('2026-12-01T12:00:00Z'), integration: { id: 'channel', organizationId: 'org', providerIdentifier: 'test' } };
     jest.spyOn(service, 'mcpThread').mockResolvedValue([root]);
     jest.spyOn(service, 'getStoredPostProblem').mockResolvedValue(null);
+    jest.spyOn(service, 'mcpExecutionState').mockResolvedValue({ generation: 0, closed: true });
     const repo = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), finishMcpSegment: jest.fn().mockResolvedValue({}), markMcpUnknown: jest.fn().mockResolvedValue({}), mcpAttempts: jest.fn(), reconcileMcpAttempt: jest.fn(), resumeMcp: jest.fn() };
     (service as any)._postRepository = repo;
     (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: true }) };

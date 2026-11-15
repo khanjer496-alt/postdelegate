@@ -1,7 +1,7 @@
 import { proxyActivities, sleep } from '@temporalio/workflow';
 import type { PostActivity } from '../../activities/post.activity';
 
-const { mcpThreadPlan, updatePost, mcpFailSegment } =
+const { mcpThreadPlan, mcpFailSegment } =
   proxyActivities<PostActivity>({
     startToCloseTimeout: '30 minute',
     retry: { maximumAttempts: 1 },
@@ -49,9 +49,8 @@ export async function postWorkflowV114({
       );
       parent ||= receipt.postId;
       previous = receipt.postId;
-      // An interrupted persistence activity can be retried without resending:
-      // a new workflow reuses the ledger's durable receipt.
-      await updatePost(item.id, receipt.postId, receipt.releaseURL);
+      // The segment activity commits receipt + PUBLISHED state atomically.
+
     } catch {
       await mcpFailSegment(organizationId, postId, item.id, generation, revisionHash);
       return;

@@ -31,6 +31,7 @@ model AgentCredential {
 
 model Organization {
   mcpAdmissions McpAgentAdmission[]
+  mcpAdmissionRecoveries McpAgentAdmissionRecovery[]
   mcpFences McpPublishFence[]
   mcpAttempts McpPublishAttempt[]
   agentCredentials AgentCredential[]
@@ -2451,7 +2452,22 @@ model McpAgentAdmission {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String @id
   owner String
+  instanceId String @default("unknown")
+  host String @default("unknown")
+  processId Int @default(0)
+  writtenPostIds Json @default("[]")
   createdAt DateTime @default(now())
+}
+
+model McpAgentAdmissionRecovery {
+  id String @id @default(uuid())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  owner String
+  auditId String
+  writtenPostIds Json
+  createdAt DateTime @default(now())
+  @@index([organizationId])
 }
 
 model McpPublishFence {
@@ -2477,6 +2493,8 @@ model McpPublishAttempt {
   generation Int
   status String
   receipt Json?
+  providerPayload Json?
+  providerPayloadHash String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([rootPostId, segmentPostId, revisionHash, generation])

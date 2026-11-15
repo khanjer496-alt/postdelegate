@@ -105,6 +105,7 @@ export class ApprovalsRepository {
       },
       select: {
         id: true,
+        mcpWorkflowVersion: true,
         group: true,
         state: true,
         approvalStatus: true,
@@ -184,6 +185,8 @@ export class ApprovalsRepository {
       take: 200,
       select: {
         id: true,
+        state: true,
+        mcpWorkflowVersion: true,
         group: true,
         content: true,
         image: true,

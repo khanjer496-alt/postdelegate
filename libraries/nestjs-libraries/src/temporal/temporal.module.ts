@@ -39,6 +39,10 @@ export const getTemporalModule = (
     ...(isWorkers
       ? {
           workers: [
+            ...(excludeQueues.includes('mcp-publish-v114') ? [] : [{
+              taskQueue: 'mcp-publish-v114', workflowsPath: path!, activityClasses: activityClasses!, autoStart: true,
+              workerOptions: { maxConcurrentActivityTaskExecutions: 4 },
+            }]),
             ...[
               { identifier: 'main', maxConcurrentJob: undefined },
               ...socialIntegrationList,

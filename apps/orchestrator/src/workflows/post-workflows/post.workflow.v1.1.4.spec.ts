@@ -51,7 +51,7 @@ describe('tracked MCP workflow', () => {
       'remote-root',
       'remote-root'
     );
-    expect(activity.updatePost).toHaveBeenCalledTimes(2);
+    expect(activity.updatePost).not.toHaveBeenCalled();
   });
   it('unknown publication outcome never loops into another provider call', async () => {
     activity.mcpPublishSegment.mockRejectedValue(new Error('OUTCOME_UNKNOWN'));
@@ -60,12 +60,9 @@ describe('tracked MCP workflow', () => {
     expect(activity.updatePost).not.toHaveBeenCalled();
     expect(activity.mcpFailSegment).toHaveBeenCalledWith('o', 'root', 'root', 2, 'hash');
   });
-  it('receipt-persistence failure after admission never resends or continues the thread', async () => {
-    activity.mcpPublishSegment.mockResolvedValue([
-      { postId: 'published', releaseURL: 'https://fixture/published' },
-    ]);
-    activity.updatePost.mockRejectedValue(new Error('storage unavailable'));
+  it('does not invoke the legacy unfenced receipt application activity', async () => {
+    activity.mcpPublishSegment.mockResolvedValue([{ postId: 'published', releaseURL: 'https://fixture/published' }]);
     await postWorkflowV114(input);
-    expect(activity.mcpPublishSegment).toHaveBeenCalledTimes(1);
+    expect(activity.updatePost).not.toHaveBeenCalled();
   });
 });

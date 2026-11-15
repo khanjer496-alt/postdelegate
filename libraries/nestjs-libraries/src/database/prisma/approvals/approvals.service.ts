@@ -194,8 +194,10 @@ export class ApprovalsService {
       const items = history.filter((p) => p.postId === post.id);
       const submitted = items.find((p) => p.action === 'SUBMITTED');
       const changes = items.find((p) => p.action === 'CHANGES_REQUESTED');
+      const { state, mcpWorkflowVersion, ...visible } = post;
       return {
-        ...post,
+        ...visible,
+        remainingThreadReview: state === 'PUBLISHED' && mcpWorkflowVersion === 114,
         submittedBy: submitted?.actorName || post.agentSource || null,
         submittedAt: submitted?.createdAt || post.createdAt,
         changesRequested:
@@ -355,6 +357,8 @@ export class ApprovalsService {
       [post.integration.id],
       { countsTowardLimit: false }
     );
+    const problem = await this._postsService.getStoredPostProblem(organizationId, postId);
+    if (problem) throw new BadRequestException(`This draft cannot be submitted for review yet: ${problem}.`);
     const sent = await this.hold(organizationId, post, {
       actorType: 'AGENT',
       actorName: actor.source,
@@ -389,7 +393,7 @@ export class ApprovalsService {
     if (post.state === 'QUEUE' && post.approvalStatus === 'APPROVED') {
       return already;
     }
-    if (post.state === 'PUBLISHED') {
+    if (post.state === 'PUBLISHED' && post.mcpWorkflowVersion !== 114) {
       throw new BadRequestException('This post was already published.');
     }
     if (!approvable.includes(post.approvalStatus)) {
@@ -438,6 +442,12 @@ export class ApprovalsService {
       post,
       publishDate
     );
+
+    if (post.state === 'PUBLISHED' && post.mcpWorkflowVersion === 114) {
+      const result = await this._postsService.approveRemainingMcp(organizationId, post.id, post.updatedAt);
+      await this._activityLogService.recordSafely({ organizationId, postId: post.id, action: 'APPROVED', comment: 'Approved remaining unpublished thread segments.', ...by });
+      return result;
+    }
 
     const moved = await this.moveTo(
       organizationId,
@@ -524,6 +534,11 @@ export class ApprovalsService {
     comment: string | undefined,
     expected: Prisma.PostWhereInput = {}
   ) {
+    if (post.state === 'PUBLISHED' && post.mcpWorkflowVersion === 114) {
+      const result = await this._postsService.holdRemainingMcp(organizationId, post.id, status, post.updatedAt);
+      await this._activityLogService.recordSafely({ organizationId, postId: post.id, action: status, comment: comment?.trim() || null, ...by });
+      return result;
+    }
     this.assertNotPublished(post);
     const text = comment?.trim() || null;
     const moved = await this.moveTo(

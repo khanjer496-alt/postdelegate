@@ -102,6 +102,8 @@ export class MediaService {
     return this._mediaRepository.getMediaById(id);
   }
 
+  getOrgMediaByPaths(orgId: string, paths: string[]) { return this._mediaRepository.getOrgMediaByPaths(orgId, paths); }
+
   getOrgMediaById(org: string, id: string) {
     return this._mediaRepository.getOrgMediaById(org, id);
   }

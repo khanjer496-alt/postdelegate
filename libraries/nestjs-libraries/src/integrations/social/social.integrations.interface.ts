@@ -268,6 +268,8 @@ export type PendingCheckResponse =
   | { status: 'completed'; postId: string; releaseURL: string };
 
 export type PostDetails<T = any> = {
+  // Server-owned identity for adapters that explicitly support safe reconciliation.
+  clientReference?: { attemptId: string };
   id: string;
   message: string;
   settings: T;
