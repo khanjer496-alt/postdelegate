@@ -5,6 +5,7 @@ import type { SelfHostedInstance } from '@gitroom/nestjs-libraries/chat/mcp.rela
 import type { AgentPrincipal } from './agent-credential.policy';
 
 type Ctx = {
+  authKind?: 'agent' | 'legacy';
   agentCredentialId?: string;
   agentPrincipal?: AgentPrincipal;
   requestId: string;

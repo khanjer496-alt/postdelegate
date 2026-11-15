@@ -1,3 +1,4 @@
+jest.mock('@gitroom/nestjs-libraries/database/prisma/approvals/approval.policy.service', () => ({ ApprovalPolicyService: class {} }));
 const mockServers: any[] = [];
 const mockRequestIds: unknown[] = [];
 const mockRelays: unknown[] = [];

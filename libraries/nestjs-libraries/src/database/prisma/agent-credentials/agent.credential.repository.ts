@@ -55,7 +55,7 @@ export class AgentCredentialRepository {
         deletedAt: null,
         integration: { deletedAt: null },
       },
-      select: { id: true, integrationId: true, state: true, releaseId: true },
+      select: { id: true, integrationId: true, state: true, releaseId: true, parentPostId: true },
     });
   }
 }

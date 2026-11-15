@@ -1,3 +1,6 @@
+jest.mock('../database/prisma/approvals/approval.policy.service', () => ({
+  ApprovalPolicyService: class {},
+}));
 import { AgentCredentialService } from './agent-credential.service';
 import { runWithContext, getContext } from './async.storage';
 import { checkAuth } from './auth.context';
@@ -41,7 +44,9 @@ describe('MCP per-agent credentials', () => {
       list: jest.fn(),
       revoke: jest.fn(),
     };
-    service = new AgentCredentialService(repo);
+    service = new AgentCredentialService(repo, {
+      assertAgentGuardrails: jest.fn(async () => undefined),
+    } as any);
   });
   it('enforces server defaults and stores a digest, never the secret', async () => {
     const result = await service.create('org', { name: 'Assistant' });
@@ -290,7 +295,10 @@ describe('Draft-only published analytics read', () => {
       }),
       channels: async () => [{ id: 'allowed' }],
     };
-    const service = new AgentCredentialService(repo as any);
+    const service = new AgentCredentialService(
+      repo as any,
+      { assertAgentGuardrails: jest.fn(async () => undefined) } as any
+    );
     await runWithContext(
       { requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key' },
       async () => {
@@ -302,5 +310,73 @@ describe('Draft-only published analytics read', () => {
         ).rejects.toThrow();
       }
     );
+  });
+});
+
+describe('workspace mutation-channel policy', () => {
+  it.each(['deletePostTool', 'postUnscheduleTool', 'postResumeTool'])(
+    'denies %s when key allows a channel the workspace disallows',
+    async (name) => {
+      const policy = {
+        assertAgentGuardrails: jest.fn(async () => {
+          throw new Error('workspace denied');
+        }),
+      };
+      const repo = {
+        byId: async () => ({
+          id: 'key',
+          organizationId: 'org',
+          role: 'PUBLISHER',
+          channelIds: ['B'],
+        }),
+        post: async () => ({
+          state: 'DRAFT',
+          integrationId: 'B',
+          parentPostId: null,
+        }),
+        channels: async () => [{ id: 'B' }],
+      };
+      const execute = jest.fn();
+      const tool = new AgentCredentialService(
+        repo as any,
+        policy as any
+      ).wrapTool(name, { execute });
+      await expect(
+        runWithContext(
+          { requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key' },
+          () => tool.execute({ id: 'post' }, {})
+        )
+      ).rejects.toThrow('workspace denied');
+      expect(execute).not.toHaveBeenCalled();
+      expect(policy.assertAgentGuardrails).toHaveBeenCalledWith(
+        'org',
+        { type: 'agent', source: 'MCP agent' },
+        ['B'],
+        { countsTowardLimit: false }
+      );
+    }
+  );
+});
+
+describe('restricted principal lost-context rejection', () => {
+  it('does not downgrade an agent-kind request missing its credential id to legacy', async () => {
+    const service = new AgentCredentialService({} as any, {} as any);
+    await expect(
+      runWithContext(
+        { requestId: 'missing-id', auth: { id: 'org' }, authKind: 'agent' },
+        () => service.authorizeTool('postUpdateTool', {})
+      )
+    ).rejects.toThrow();
+  });
+  it('rejects a nested call carrying the server deny marker after ALS loss', async () => {
+    const execute = jest.fn();
+    const tool = new AgentCredentialService({} as any, {} as any).wrapTool(
+      'postUpdateTool',
+      { execute }
+    );
+    await expect(
+      tool.execute({}, { requestContext: { get: () => true } })
+    ).rejects.toThrow();
+    expect(execute).not.toHaveBeenCalled();
   });
 });

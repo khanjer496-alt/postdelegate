@@ -7,6 +7,7 @@ import { createHash, randomBytes } from 'crypto';
 import { AgentCredentialRepository } from '../database/prisma/agent-credentials/agent.credential.repository';
 import { CreateAgentCredentialDto } from '../dtos/settings/agent.credential.dto';
 import { getContext } from './async.storage';
+import { ApprovalPolicyService } from '../database/prisma/approvals/approval.policy.service';
 import { AgentPrincipal } from './agent-credential.policy';
 
 const digest = (secret: string) =>
@@ -41,7 +42,10 @@ const publisher = new Set([
 ]);
 @Injectable()
 export class AgentCredentialService {
-  constructor(private repo: AgentCredentialRepository) {}
+  constructor(
+    private repo: AgentCredentialRepository,
+    private policy: ApprovalPolicyService
+  ) {}
   list(orgId: string) {
     return this.repo.list(orgId);
   }
@@ -107,6 +111,7 @@ export class AgentCredentialService {
   }
   async principal(): Promise<AgentPrincipal | undefined> {
     const ctx = getContext();
+    if (ctx?.authKind === 'agent' && !ctx.agentCredentialId) throw denied();
     if (!ctx?.agentCredentialId) return undefined;
     const row = await this.repo.byId(ctx.agentCredentialId);
     if (
@@ -170,6 +175,7 @@ export class AgentCredentialService {
       );
       if (
         !post ||
+        (!reads.has(name) && post.parentPostId) ||
         (p.role === 'DRAFT_ONLY' &&
           drafts.has(name) &&
           (post.state !== 'DRAFT' || post.releaseId))
@@ -186,6 +192,14 @@ export class AgentCredentialService {
       throw denied();
     if (p.channelIds !== null && ids.some((id) => !p.channelIds!.includes(id)))
       throw denied();
+    if (!reads.has(name)) {
+      await this.policy.assertAgentGuardrails(
+        p.organizationId,
+        { type: 'agent', source: 'MCP agent' },
+        ids,
+        { countsTowardLimit: false }
+      );
+    }
     if (p.channelIds !== null) {
       // Workspace totals cannot be faithfully filtered after aggregation.
       if (name === 'analyticsMetricsTool') throw denied();
@@ -204,6 +218,14 @@ export class AgentCredentialService {
   wrapTool(name: string, tool: any) {
     const execute = tool.execute.bind(tool);
     tool.execute = async (input: any, context: any) => {
+      const ctx = getContext();
+      if (
+        !ctx &&
+        (context?.mcp || context?.requestContext?.get('mcpAgentCredential'))
+      )
+        throw denied();
+      if (ctx?.agentCredentialId)
+        context?.requestContext?.set('mcpAgentCredential', true);
       const checked = await this.authorizeTool(name, input);
       const result = await execute(checked, context);
       const p = getContext()?.agentPrincipal;

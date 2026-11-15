@@ -25,6 +25,7 @@ const FRAMEWORK =
   'Mastra framework table, Postiz never writes a tenant key to it; untouched';
 
 export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
+  AgentCredential: { scope: 'org', note: 'hash verifier and metadata deleted by organization foreign-key cascade; no recoverable secret' },
   Organization: {
     scope: 'org',
     note: 'row deleted last; apiKey, paymentId and the affiliate referral fields (referredByAffiliateId, referralCode, referredAt, referralFirstPaidAt) go with it',

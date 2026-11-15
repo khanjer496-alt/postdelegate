@@ -1494,7 +1494,9 @@ export class PostsService {
     keepGroup = false,
     // who saves the post, decides whether it waits for an approver. Internal
     // callers (auto post, clipping, settings updates) pass nothing.
-    actor?: ApprovalActor
+    actor?: ApprovalActor,
+    // Server-captured revision from the in-place draft editor, never authority.
+    expectedDraftUpdatedAt?: Date
   ): Promise<any[]> {
     for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
     if (actor?.type === 'agent') {
@@ -1593,6 +1595,8 @@ export class PostsService {
         keepGroup,
         batchId,
         {
+          requireExistingDraft: agentDraftOnly() && body.type === 'update',
+          expectedDraftUpdatedAt,
           approvalStatus: decision?.approvalStatus,
           agentSource: actor?.type === 'agent' ? actor.source : undefined,
         }
@@ -2415,7 +2419,8 @@ export class PostsService {
       // Keep the group stable: a client may have the calendar open while the
       // post is updated out of band, and the calendar links posts by group.
       true,
-      actor
+      actor,
+      agentDraftOnly() ? root.updatedAt : undefined
     );
 
     if (!output) {

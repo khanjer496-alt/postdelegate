@@ -1,3 +1,4 @@
+import { getContext } from '../../../chat/async.storage';
 import { Injectable } from '@nestjs/common';
 import { Organization, State } from '@prisma/client';
 import dayjs from 'dayjs';
@@ -939,10 +940,13 @@ export class AnalyticsService {
       offset?: number;
     }
   ) {
-    const [channels, posts] = await Promise.all([
+    const [allChannels, allPosts] = await Promise.all([
       this._analyticsRepository.getOverviewChannels(orgId),
       this._analyticsRepository.getAnalyticsPosts(orgId, from, to),
     ]);
+    const permitted = getContext()?.agentPrincipal?.channelIds;
+    const channels = permitted ? allChannels.filter(channel => permitted.includes(channel.id)) : allChannels;
+    const posts = permitted ? allPosts.filter(post => permitted.includes(post.integrationId)) : allPosts;
     const rows = this.buildTopPosts(channels, posts, options);
     const offset = Math.max(0, options.offset || 0);
     const limit = Math.max(1, options.limit || 50);
