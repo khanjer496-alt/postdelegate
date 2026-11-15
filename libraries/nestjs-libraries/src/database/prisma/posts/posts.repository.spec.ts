@@ -708,3 +708,13 @@ describe('saved sequence permission compatibility boundary', () => {
     await expect((repo as any).isExistingPostSequence('org-A', 'int-1', ['p-1', 'new-entry'])).resolves.toBe(false);
   });
 });
+
+describe('MCP version stamp before enqueue', () => {
+  it('stores the new workflow version atomically with new MCP rows, leaving existing update data unstamped', async () => {
+    const { repo, post } = makeRepo();
+    await repo.createOrUpdatePost('schedule', 'org', '2030-01-01T00:00:00Z', body(), [], 'MCP');
+    const args = post.upsert.mock.calls[0][0];
+    expect(args.create).toMatchObject({ creationMethod: 'MCP', mcpWorkflowVersion: 114 });
+    expect(args.update).not.toHaveProperty('mcpWorkflowVersion');
+  });
+});

@@ -1802,7 +1802,7 @@ export class PostsService {
         return [] as any[];
       }
 
-      if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) {
+      if ((creationMethod === 'MCP' && !existing) || existing?.mcpWorkflowVersion === 114) {
         const rows = await this.mcpThread(orgId, posts[0].id);
         await this._postRepository.registerMcpFence(orgId, posts[0].id, post.integration.id, this.mcpRevision(rows));
       }

@@ -1075,7 +1075,7 @@ export class PostsRepository {
         batchId: existingBatchId || batchId,
         intervalInDays: inter ? +inter : null,
         approvedSubmitForOrder: APPROVED_SUBMIT_FOR_ORDER.NO,
-        ...(type === 'create' ? { creationMethod } : {}),
+        ...(type === 'create' ? { creationMethod, ...(creationMethod === 'MCP' ? { mcpWorkflowVersion: 114 } : {}) } : {}),
         ...(approval.approvalStatus
           ? { approvalStatus: approval.approvalStatus }
           : {}),

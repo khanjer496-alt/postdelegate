@@ -4,6 +4,7 @@ import { runWithContext } from './async.storage';
 describe('MCP scope execution boundary', () => {
   const execute = jest.fn(async () => 'ok');
   const tools = scopeMcpTools({
+    postPreflightTool: { execute }, resultsToReviewedDraftsTool: { execute },
     integrationList: { execute }, deletePostTool: { execute },
     ask_postdelegate: { execute }, futureTool: { execute },
   });
@@ -12,6 +13,9 @@ describe('MCP scope execution boundary', () => {
     await expect(runWithContext({ requestId: 'r', auth: {}, scopes: ['mcp:read'] },
       () => tools[name].execute())).rejects.toThrow('mcp:write required');
     expect(execute).not.toHaveBeenCalled();
+  });
+  it.each(['postPreflightTool', 'resultsToReviewedDraftsTool'])('permits new read guidance/checks under an unchanged read-only OAuth grant: %s', async name => {
+    await expect(runWithContext({ requestId: 'r', auth: {}, scopes: ['mcp:read'] }, () => tools[name].execute())).resolves.toBe('ok');
   });
   it('requires read scope for reads', async () => {
     await expect(runWithContext({ requestId: 'r', auth: {}, scopes: ['mcp:write'] },
