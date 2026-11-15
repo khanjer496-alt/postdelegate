@@ -170,7 +170,9 @@ export class AgentCredentialService {
       );
       if (
         !post ||
-        (p.role === 'DRAFT_ONLY' && (post.state !== 'DRAFT' || post.releaseId))
+        (p.role === 'DRAFT_ONLY' &&
+          drafts.has(name) &&
+          (post.state !== 'DRAFT' || post.releaseId))
       )
         throw denied();
       ids.push(post.integrationId);
