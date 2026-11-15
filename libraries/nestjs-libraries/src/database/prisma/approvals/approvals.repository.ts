@@ -108,6 +108,7 @@ export class ApprovalsRepository {
         mcpWorkflowVersion: true,
         group: true,
         state: true,
+        releaseId: true,
         approvalStatus: true,
         publishDate: true,
         content: true,
