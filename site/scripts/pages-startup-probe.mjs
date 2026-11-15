@@ -209,11 +209,20 @@ async function main() {
   const command = join(cliDir, 'node_modules/.bin/wrangler');
   const original = ['pages', 'dev', join(stage, 'payload'), '--no-bundle', '--ip', '127.0.0.1', '--port', '8789'];
   // One corrected-raw case only; the older default-date comparison is not repeated.
-  await runCases([['corrected-raw-production-equivalence', [...original, '--compatibility-date', '2026-09-08']]], async (flags) => {
+  const partial = await runCases([['corrected-raw-production-equivalence', [...original, '--compatibility-date', '2026-09-08']]], async (flags) => {
     const current = await runCase(command, flags, stage);
     current.sourceControlsUnchanged = ['_routes.json', '_headers', '_redirects'].every((control) =>
       sha256(readFileSync(join(stage, 'payload', control))) === identities['site/public/' + control]);
     return current;
   }, (partial) => writeFileSync(output, JSON.stringify({ ...result, ...partial }, null, 2) + '\n'));
+  const first = partial.cases[0];
+  if (first?.outcome !== 'synthetic-route-responded' && first?.processGroupAfterCleanup?.state === 'absent'
+      && first.cleanupErrorClasses.length === 0) {
+    const native = await runCase(process.execPath,
+      [join(source,'site/scripts/minimal-native-control.mjs'),cliDir,join(stage,'diagnostics/minimal-native.json')],stage);
+    native.configuredFlags = ['<minimal-native-control>','<isolated-cli>','<allowlisted-output>'];
+    writeFileSync(output,JSON.stringify({...result,...partial,minimalNativeControl:native},null,2)+'\n');
+  }
+
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

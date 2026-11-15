@@ -27,6 +27,8 @@ jobs:
             /site/scripts/pages-worker-build-diagnostic.mjs
             /site/scripts/test-pages-worker-build-diagnostic.mjs
             /site/scripts/stage-pages-worker.mjs
+            /site/scripts/minimal-native-control.mjs
+            /site/scripts/test-minimal-native-control.mjs
             /site/scripts/native-runtime-signatures.json
             /site/scripts/pages-startup-probe.mjs
             /site/scripts/test-pages-startup-probe.mjs
@@ -42,6 +44,7 @@ jobs:
         run: |
           node site/scripts/test-pages-worker-build-diagnostic.mjs
           node site/scripts/test-pages-startup-probe.mjs
+          node site/scripts/test-minimal-native-control.mjs
       - name: Prepare isolated pinned CLI (hosted only)
         run: |
           mkdir -p "$RUNNER_TEMP/startup-cli"
@@ -74,7 +77,7 @@ jobs:
           set -euo pipefail
           # Synthetic response only: no full site assets/OG/Astro build or real-site acceptance.
           printf '%s' '<!doctype html><title>Synthetic startup diagnostic</title><p>Not a release payload.</p>' > "$PROBE_STAGE/payload/alternatives.html"
-          timeout --signal=TERM --kill-after=2s 45s node site/scripts/pages-startup-probe.mjs \
+          timeout --signal=TERM --kill-after=2s 75s node site/scripts/pages-startup-probe.mjs \
             "$RUNNER_TEMP/startup-cli" "$PROBE_STAGE" "$GITHUB_WORKSPACE" "$PROBE_STAGE/diagnostics/startup.json"
       - name: Upload synthetic diagnostic only (never a release payload)
         if: ${{ always() && steps.probe.outputs.path != '' }}
