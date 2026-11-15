@@ -151,6 +151,12 @@ async function main() {
   const [cliDir, stage, source, output] = process.argv.slice(2);
   const checkoutSha = execFileSync('git', ['-C', source, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   if (!/^[0-9a-f]{40}$/.test(checkoutSha) || checkoutSha !== process.env.GITHUB_SHA) throw new Error('Source identity mismatch');
+  const prior = JSON.parse(readFileSync(join(stage, 'diagnostics/worker-build.json')));
+  const workerHash = sha256(readFileSync(join(stage, 'payload/_worker.js')));
+  if (prior.sourceSha !== checkoutSha || prior.workerUnchanged !== true || prior.compiledWorkerSha256 !== workerHash
+      || prior.checkRawWorkerEquivalent?.status !== 'succeeded' || prior.metadataAnalysis?.status !== 'succeeded') {
+    throw new Error('Typed check failed or changed input; no startup authorized');
+  }
   const root = createRequire(join(cliDir, 'package.json'));
   const wranglerPackage = root.resolve('wrangler/package.json');
   const observedWranglerVersion = JSON.parse(readFileSync(wranglerPackage, 'utf8')).version;
@@ -179,9 +185,8 @@ async function main() {
     nativeDiagnostics: inspectRuntime(cliDir), cases: [] };
   const command = join(cliDir, 'node_modules/.bin/wrangler');
   const original = ['pages', 'dev', join(stage, 'payload'), '--no-bundle', '--ip', '127.0.0.1', '--port', '8789'];
-  // Default first; the second changes only compatibility date to observed production equivalence.
-  await runCases([['original-default', original],
-    ['production-date-equivalence', [...original, '--compatibility-date', '2026-09-08']]], async (flags) => {
+  // One corrected-raw case only; the older default-date comparison is not repeated.
+  await runCases([['corrected-raw-production-equivalence', [...original, '--compatibility-date', '2026-09-08']]], async (flags) => {
     const current = await runCase(command, flags, stage);
     current.sourceControlsUnchanged = ['_routes.json', '_headers', '_redirects'].every((control) =>
       sha256(readFileSync(join(stage, 'payload', control))) === identities['site/public/' + control]);
