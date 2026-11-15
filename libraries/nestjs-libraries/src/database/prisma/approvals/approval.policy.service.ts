@@ -178,7 +178,11 @@ export class ApprovalPolicyService {
         actorName: actor.source,
         comment: message,
       });
-      throw new BadRequestException(message);
+      // A key may be restricted to fewer channels than this workspace policy.
+      // Keep detailed channel names in the admin audit, never in its denial.
+      throw new BadRequestException(getContext()?.agentPrincipal
+        ? 'This agent action is blocked by workspace posting policy. Ask an administrator to check channel access and posting limits.'
+        : message);
     };
 
     if (settings.agentIntegrationIds.length) {
