@@ -108,6 +108,11 @@ function AdminCredentials() {
             });
             setSecret(result.secret);
             setName('');
+            setRole('DRAFT_ONLY');
+            setExpiry('DEFAULT');
+            setExpiresAt('');
+            setAllChannels(true);
+            setChannelIds([]);
           });
         }}
       >
