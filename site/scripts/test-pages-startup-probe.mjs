@@ -7,6 +7,17 @@ const { classify, runCase } = startup;
 const marker = Buffer.from('private token=hidden Failed to build _worker.js. private trailer');
 assert.deepEqual(classify(marker).categories, ['worker-build-failed']);
 assert(!JSON.stringify(classify(marker)).includes('private'));
+for (const [literal, category] of [
+  ['Runtime stderr:', 'runtime-stderr-present'], ['*** Uncaught exception ***', 'native-uncaught-exception'],
+  ['Permission denied', 'permission-denied'], ['Operation not permitted', 'operation-not-permitted'],
+  ['Cannot assign requested address', 'address-not-available'], ['bind():', 'native-bind-error'],
+  ['ReferenceError:', 'js-reference-error'], ['TypeError:', 'js-type-error'],
+  ['unexpected argument', 'cli-unexpected-argument'], ['Failed to start Worker:', 'native-worker-start-error'],
+]) {
+  const classified = classify(Buffer.from(literal+' PRIVATE_runtime_value_token=/secret/path'));
+  assert.deepEqual(classified.categories, [category]);
+  assert(!JSON.stringify(classified).includes('PRIVATE'));
+}
 const overflow = Buffer.concat([Buffer.alloc(65536, 'x'), marker]);
 assert.equal(classify(overflow).scannedBytes, 65536);
 assert.equal(classify(overflow).outputTruncated, true);

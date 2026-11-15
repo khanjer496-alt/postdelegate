@@ -24,6 +24,26 @@ const SIGNATURES = [
   ['address-in-use', 'Address already in use'],
   ['default-date-warning', 'No compatibility_date was specified.'],
   ['worker-compiled-marker', 'Compiled Worker successfully'],
+  // Pinned Miniflare runtime/index.ts and runtime/structured-logs.ts failure boundaries.
+  ['runtime-stderr-present', 'Runtime stderr:'],
+  ['native-uncaught-exception', '*** Uncaught exception'],
+  ['native-fatal-uncaught', '*** Fatal uncaught'],
+  ['native-terminate', '*** std::terminate()'],
+  ['native-signal-banner', '*** Received signal'],
+  ['native-bind-error', 'bind():'],
+  ['native-access-violation', 'access violation;'],
+  // Fixed standard OS/ECMAScript/CLI class labels only, never following values/paths.
+  ['permission-denied', 'Permission denied'],
+  ['operation-not-permitted', 'Operation not permitted'],
+  ['address-not-available', 'Cannot assign requested address'],
+  ['address-family-unsupported', 'Address family not supported'],
+  ['missing-native-library', 'error while loading shared libraries'],
+  ['js-reference-error', 'ReferenceError:'],
+  ['js-type-error', 'TypeError:'],
+  ['js-syntax-error', 'SyntaxError:'],
+  ['cli-unexpected-argument', 'unexpected argument'],
+  ['native-worker-start-error', 'Failed to start Worker:'],
+  ['native-invalid-config', 'config is invalid'],
 ];
 export function classify(bytes) {
   const prefix = bytes.subarray(0, LIMIT);
