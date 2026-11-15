@@ -9,6 +9,24 @@ import { runWithContext } from './async.storage';
 // Dedicated CI database/schema only. Never falls back to DATABASE_URL.
 const url = process.env.AGENT_CREDENTIAL_TEST_DATABASE_URL;
 const pg = url ? describe : describe.skip;
+// Keep the real Prisma transaction and every additive model delegate. Only
+// the selected post update is intercepted by deterministic fault/barrier tests.
+const withPostUpdate = (tx: any, update: (args: any) => Promise<any>) =>
+  new Proxy(tx, {
+    get(target, key) {
+      if (key === 'post')
+        return new Proxy(target.post, {
+          get(post, operation) {
+            if (operation === 'update') return update;
+            const value = Reflect.get(post, operation);
+            return typeof value === 'function' ? value.bind(post) : value;
+          },
+        });
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+
 pg('agent credentials PostgreSQL lifecycle', () => {
   let db: PrismaClient;
   let service: AgentCredentialService;
@@ -236,20 +254,16 @@ pg('Draft-only PostgreSQL whole-thread claims', () => {
       $transaction: (fn: any, options: any) =>
         db.$transaction(
           async (tx) =>
-            fn({
-              post: {
-                findFirst: tx.post.findFirst.bind(tx.post),
-                findMany: tx.post.findMany.bind(tx.post),
-                update: async (args: any) => {
-                  if (args.where.id === posts[1].id)
-                    await tx.post.update({
-                      where: { id: posts[1].id },
-                      data: { state: 'PUBLISHED' },
-                    });
-                  return tx.post.update(args);
-                },
-              },
-            }),
+            fn(
+              withPostUpdate(tx, async (args: any) => {
+                if (args.where.id === posts[1].id)
+                  await tx.post.update({
+                    where: { id: posts[1].id },
+                    data: { state: 'PUBLISHED' },
+                  });
+                return tx.post.update(args);
+              })
+            ),
           options
         ),
     };
@@ -300,25 +314,26 @@ pg('Draft-only PostgreSQL whole-thread claims', () => {
       $transaction: (fn: any, options: any) =>
         db.$transaction(
           async (tx) =>
-            fn({
-              post: {
-                findFirst: tx.post.findFirst.bind(tx.post),
-                findMany: tx.post.findMany.bind(tx.post),
-                update: async (args: any) => {
-                  const updated = await tx.post.update(args);
-                  if (args.where.id === posts[0].id) {
-                    claimed();
-                    await continueEdit;
-                  }
-                  return updated;
-                },
-              },
-            }),
+            fn(
+              withPostUpdate(tx, async (args: any) => {
+                const updated = await tx.post.update(args);
+                if (args.where.id === posts[0].id) {
+                  claimed();
+                  await continueEdit;
+                }
+                return updated;
+              })
+            ),
           options
         ),
     };
     const editing = edit(posts, transactionModel);
-    await rootClaimed;
+    await Promise.race([
+      rootClaimed,
+      editing.then(() => {
+        throw new Error('The edit completed before the root barrier.');
+      }),
+    ]);
     const staleApproval = db.post.updateMany({
       where: { id: posts[0].id, updatedAt: posts[0].updatedAt, state: 'DRAFT' },
       data: { state: 'QUEUE', approvalStatus: 'APPROVED' },
