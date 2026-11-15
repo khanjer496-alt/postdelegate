@@ -528,3 +528,19 @@ describe('AnalyticsService.bestTimesFor per network (MCP bestTimeToPostTool)', (
     expect((await service.bestTimesFor("org-1", new Date(0), new Date(), 'UTC')).posts).toBe(3);
   });
 });
+
+jest.mock('../approvals/approval.policy.service', () => ({ ApprovalPolicyService: class {} }));
+import { AgentCredentialService } from '../../../chat/agent-credential.service';
+import { runWithContext } from '../../../chat/async.storage';
+describe('credential-scoped top-post results', () => {
+  it.each([undefined, ['a']])('filters excluded channel metadata and posts for filter %j', async integrationIds => {
+    const { service, repository } = makeService();
+    repository.getOverviewChannels.mockResolvedValue([channel('a'), channel('FORBIDDEN_B')]);
+    repository.getAnalyticsPosts.mockResolvedValue([post({ integrationId: 'a' }), post({ integrationId: 'FORBIDDEN_B', title: 'secret B' })]);
+    const credentials = new AgentCredentialService({ byId: async () => ({ id: 'key', organizationId: 'org', role: 'ANALYST', channelIds: ['a'] }), channels: async () => [{ id: 'a' }] } as any, {} as any);
+    const tool = credentials.wrapTool('analyticsTopPostsTool', { execute: async (input: any) => ({ output: await service.topPostsFor('org', new Date(0), new Date(), { integrations: input.integrationIds }) }) });
+    const result = await runWithContext({ requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key' }, () => tool.execute({ integrationIds }, {}));
+    expect(result.output.channels.map((item: any) => item.id)).toEqual(['a']);
+    expect(JSON.stringify(result)).not.toContain('FORBIDDEN_B'); expect(JSON.stringify(result)).not.toContain('secret B');
+  });
+});

@@ -920,6 +920,46 @@ export class PostsRepository {
     });
   }
 
+  // Existing draft threads never use upsert: a missed conditional update
+  // must conflict, rather than create a new default-QUEUE replacement.
+  private async updateAgentDraftThread(tx: Prisma.TransactionClient, orgId: string, date: string, body: PostBody, approvalStatus?: ApprovalStatus, expectedDraftUpdatedAt?: Date) {
+      const root = await tx.post.findFirst({ where: {
+        id: body.value[0]?.id || '', organizationId: orgId, integrationId: body.integration.id,
+        parentPostId: null, deletedAt: null, state: 'DRAFT', releaseId: null,
+        ...(expectedDraftUpdatedAt ? { updatedAt: expectedDraftUpdatedAt } : {}),
+      } });
+      if (!root) throw new BadRequestException('The draft changed. Refresh before editing.');
+      const thread = await tx.post.findMany({ where: { organizationId: orgId, integrationId: body.integration.id, group: root.group, deletedAt: null } });
+      const ids = body.value.map(value => value.id);
+      if (new Set(ids).size !== ids.length || thread.length !== ids.length ||
+          thread.some(post => !ids.includes(post.id) || post.state !== 'DRAFT' || post.releaseId)) {
+        throw new BadRequestException('The draft thread changed. Refresh before editing.');
+      }
+      const posts: Post[] = [];
+      for (const [index, value] of body.value.entries()) {
+        const stored = thread.find(post => post.id === value.id);
+        if (!stored || stored.parentPostId !== (index ? body.value[index - 1].id : null)) {
+          throw new BadRequestException('The draft thread changed. Refresh before editing.');
+        }
+        // Updating the root first claims its version and locks it until the
+        // entire thread commits. A concurrent approval/schedule cannot cover
+        // a partially edited payload; any child failure rolls everything back.
+        posts.push(await tx.post.update({ where: {
+          id: stored.id, organizationId: orgId, integrationId: body.integration.id,
+          deletedAt: null, state: 'DRAFT', releaseId: null, updatedAt: stored.updatedAt,
+          parentPostId: stored.parentPostId,
+        }, data: {
+          publishDate: dayjs(date).toDate(), content: value.content, delay: value.delay || 0,
+          image: JSON.stringify(value.image), settings: JSON.stringify(body.settings),
+          approvalStatus: ['APPROVED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'].includes(root.approvalStatus)
+            ? 'IN_REVIEW' : approvalStatus || root.approvalStatus,
+        } }));
+      }
+      // In-place edits retain the exact stored thread membership and tags.
+      // There is no group sweep that could delete an independently scheduled row.
+      return { previousPost: root.id, posts };
+  }
+
   async createOrUpdatePost(
     state: 'draft' | 'schedule' | 'now' | 'update',
     orgId: string,
@@ -937,7 +977,7 @@ export class PostsRepository {
     batchId?: string,
     // the review state to store (undefined keeps it) and, on create, the
     // agent that created the post
-    approval: { approvalStatus?: ApprovalStatus; agentSource?: string } = {}
+    approval: { approvalStatus?: ApprovalStatus; agentSource?: string; requireExistingDraft?: boolean; expectedDraftUpdatedAt?: Date } = {}
   ) {
     assertAgentPostWrite(orgId, body.integration.id, state);
     return this._transaction.model.$transaction(async tx => {
@@ -952,6 +992,9 @@ export class PostsRepository {
           if (await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId } })) throw new BadRequestException('A publication attempt exists. Preserve this revision and prepare a new reviewed draft instead.');
         }
       }
+    if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft)) {
+      return this.updateAgentDraftThread(tx, orgId, date, body, approval.approvalStatus, approval.expectedDraftUpdatedAt);
+    }
     const posts: Post[] = [];
     const uuid = uuidv4();
     // keepGroup reuses the client-supplied group only when it already belongs
@@ -1058,7 +1101,6 @@ export class PostsRepository {
         await tx.post.upsert({
           where: {
             id: value.id || uuidv4(),
-            ...(agentDraftOnly() ? { state: 'DRAFT' as const, releaseId: null } : {}),
             organizationId: orgId,
             integrationId: body.integration.id,
           },

@@ -1659,12 +1659,14 @@ export class PostsService {
     keepGroup = false,
     // who saves the post, decides whether it waits for an approver. Internal
     // callers (auto post, clipping, settings updates) pass nothing.
-    actor?: ApprovalActor
+    actor?: ApprovalActor,
+    // Server-captured revision from the in-place draft editor, never authority.
+    expectedDraftUpdatedAt?: Date
   ): Promise<any[]> {
     for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
     return actor?.type === 'agent'
-      ? this.withAgentAdmission(orgId, () => this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor))
-      : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor);
+      ? this.withAgentAdmission(orgId, () => this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt))
+      : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt);
   }
 
   async withAgentAdmission<T>(orgId: string, action: () => Promise<T>): Promise<T> {
@@ -1678,7 +1680,7 @@ export class PostsService {
 
   private async createPostAdmitted(
     orgId: string, body: CreatePostDto, creationMethod: CreationMethod,
-    keepGroup = false, actor?: ApprovalActor
+    keepGroup = false, actor?: ApprovalActor, expectedDraftUpdatedAt?: Date
   ): Promise<any[]> {
     if (actor?.type === 'agent') {
       // an agent's in-place update must point at posts that exist, it can't
@@ -1786,6 +1788,8 @@ export class PostsService {
         keepGroup,
         batchId,
         {
+          requireExistingDraft: agentDraftOnly() && body.type === 'update',
+          expectedDraftUpdatedAt,
           approvalStatus: decision?.approvalStatus,
           agentSource: actor?.type === 'agent' ? actor.source : undefined,
         }
@@ -2613,7 +2617,8 @@ export class PostsService {
       // Keep the group stable: a client may have the calendar open while the
       // post is updated out of band, and the calendar links posts by group.
       true,
-      actor
+      actor,
+      agentDraftOnly() ? root.updatedAt : undefined
     );
 
     if (!output) {
