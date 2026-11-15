@@ -380,3 +380,69 @@ describe('restricted principal lost-context rejection', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 });
+
+describe('credential reads never invoke mutation-capable live analytics', () => {
+  it.each(['ANALYST', 'DRAFT_ONLY', 'PUBLISHER'])(
+    'returns UNKNOWN without executing the live path for %s, direct and nested',
+    async (role) => {
+      const effects = {
+        refresh: jest.fn(),
+        persist: jest.fn(),
+        disconnect: jest.fn(),
+      };
+      const execute = jest.fn(async () => {
+        effects.refresh();
+        effects.persist();
+        effects.disconnect();
+        return { output: [{ secret: 'forbidden B' }] };
+      });
+      const repo = {
+        byId: async () => ({
+          id: 'key',
+          organizationId: 'org',
+          role,
+          channelIds: ['A'],
+        }),
+        channels: async (_org: string, ids: string[]) =>
+          ids.map((id) => ({ id })),
+        post: async () => ({ integrationId: 'A', state: 'PUBLISHED' }),
+      };
+      const service = new AgentCredentialService(repo as any, {} as any);
+      const live = service.wrapTool('channelAnalyticsTool', { execute });
+      const ask = service.wrapTool('ask_postdelegate', {
+        execute: async () => live.execute({ postId: 'post' }, {}),
+      });
+      await runWithContext(
+        { requestId: 'read', auth: { id: 'org' }, agentCredentialId: 'key' },
+        async () => {
+          expect(
+            (await live.execute({ integrationId: 'A' }, {})).output.status
+          ).toBe('UNKNOWN');
+          expect((await ask.execute({}, {})).output.status).toBe('UNKNOWN');
+          await expect(
+            live.execute({ integrationId: 'B' }, {})
+          ).rejects.toThrow();
+        }
+      );
+      expect(execute).not.toHaveBeenCalled();
+      expect(effects.refresh).not.toHaveBeenCalled();
+      expect(effects.persist).not.toHaveBeenCalled();
+      expect(effects.disconnect).not.toHaveBeenCalled();
+    }
+  );
+  it('preserves the legacy live analytics result and execution', async () => {
+    const result = { output: [{ value: 42 }] };
+    const execute = jest.fn(async () => result);
+    const tool = new AgentCredentialService({} as any, {} as any).wrapTool(
+      'channelAnalyticsTool',
+      { execute }
+    );
+    expect(
+      await runWithContext(
+        { requestId: 'legacy', auth: { id: 'org' }, authKind: 'legacy' },
+        () => tool.execute({ integrationId: 'A' }, {})
+      )
+    ).toBe(result);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+});
