@@ -492,3 +492,13 @@ describe('agent credential approval revision', () => {
     expect(result).toMatchObject({ hold: true, approvalStatus: 'IN_REVIEW' });
   });
 });
+
+describe('credential policy denial metadata', () => {
+  it('does not disclose other workspace channel names through guardrail errors', async () => {
+    const { service } = makeService(settings({ agentIntegrationIds: ['excluded-A'] }), { getIntegrationNames: jest.fn(async () => [{ id: 'excluded-A', name: 'PRIVATE EXCLUDED CHANNEL' }, { id: 'key-B', name: 'Key channel' }]) });
+    await runWithContext({ requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key', agentPrincipal: { id: 'key', organizationId: 'org', role: 'PUBLISHER', channelIds: ['key-B'] } }, async () => {
+      try { await service.assertAgentGuardrails('org', agent, ['key-B'], { countsTowardLimit: false }); throw new Error('Expected denial'); }
+      catch (err) { expect((err as Error).message).toContain('workspace posting policy'); expect((err as Error).message).not.toContain('PRIVATE EXCLUDED CHANNEL'); }
+    });
+  });
+});
