@@ -1,6 +1,7 @@
 // Small fake lifecycle checks: no native runtime, CLI, network, install or process signals.
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { readFileSync } from 'node:fs';
 import * as startup from './pages-startup-probe.mjs';
 const { classify, runCase } = startup;
 
@@ -17,6 +18,15 @@ for (const [literal, category] of [
   const classified = classify(Buffer.from(literal+' PRIVATE_runtime_value_token=/secret/path'));
   assert.deepEqual(classified.categories, [category]);
   assert(!JSON.stringify(classified).includes('PRIVATE'));
+}
+const sourceSignatures = JSON.parse(readFileSync(new URL('./native-runtime-signatures.json', import.meta.url))).entries;
+assert(sourceSignatures.length <= 100);
+for (const entry of sourceSignatures) {
+  assert.match(entry.id, /^native-source-\d{3}$/);
+  const result = classify(Buffer.from(entry.literal+' PRIVATE_CANARY_token=secret/customer/path'));
+  assert(result.categories.includes(entry.id));
+  assert(!JSON.stringify(result).includes('PRIVATE_CANARY'));
+  assert(!JSON.stringify(result).includes('secret/customer/path'));
 }
 const overflow = Buffer.concat([Buffer.alloc(65536, 'x'), marker]);
 assert.equal(classify(overflow).scannedBytes, 65536);
