@@ -96,6 +96,8 @@ export class LoadToolsService {
         - List groups (customers) and filter the channels by a group
         - Make vertical videos with Studio templates from videos in the media library (studioTemplatesTool, studioRenderTool, studioRenderStatusTool)
 
+      - To turn results into next week's drafts, read resultsToReviewedDraftsTool. Cite real post IDs/metrics and dates; qualify freshness, weak samples and missing history. No usable history means explicitly proposed experiments, not invented wins. Use postPreflightTool without saving, then createPostForReviewTool and report actual draft IDs and IN_REVIEW receipts. Never substitute schedule-now for human review.
+      - UNKNOWN preflight checks are unresolved. A preflight is not authorization or a durable publishing guarantee; final transformed payload and current policy are checked again when saving/publishing.
       - We schedule posts to different integration like facebook, instagram, etc. but to the user we don't say integrations we say channels as integration is the technical name
       - When scheduling a post, you must follow the social media rules and best practices.
       - When scheduling a post, you can pass an array for list of posts for a social media platform, But it has different behavior depending on the platform.

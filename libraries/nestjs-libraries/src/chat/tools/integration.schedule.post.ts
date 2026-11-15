@@ -204,6 +204,12 @@ If validation fails, or the workspace limits what agents can do (allowed channel
     const organizationId = JSON.parse(
       (context?.requestContext as any)?.get('organization') as string
     ).id;
+    return this._postsService.withAgentAdmission(organizationId, () => this.scheduleAdmitted(inputData, context, options, organizationId));
+  }
+
+  private async scheduleAdmitted(inputData: any, context: any, options: { forReview?: boolean; tool?: string }, organizationId: string): Promise<{ output: any }> {
+    const toolName = options.tool || 'integrationSchedulePostTool';
+    const checkedType = (type: 'draft' | 'schedule' | 'now') => options.forReview && type === 'draft' ? 'schedule' : type;
     const finalOutput = [];
     // the in-app agent runs with ui on, MCP clients carry their own name
     const actor: ApprovalActor = {

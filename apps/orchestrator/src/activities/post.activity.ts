@@ -111,6 +111,20 @@ export class PostActivity {
     private _subscriptionService: SubscriptionService
   ) {}
 
+  @ActivityMethod()
+  async mcpThreadPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
+    return this._postService.mcpPlan(orgId, rootId, generation, revisionHash);
+  }
+
+  @ActivityMethod()
+  async mcpPublishSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, parent?: string, previous?: string) {
+    return this._postService.runMcpSegment(orgId, rootId, segmentId, generation, revisionHash, async (integration, post) => {
+      if (segmentId === rootId) return this.postSocial(integration, [post]);
+      if (!parent) throw new Error('A confirmed predecessor receipt is required.');
+      return this.postComment(parent, previous === parent ? undefined : previous, integration, [post]);
+    });
+  }
+
   private async activeIntegration(
     integration: Integration,
     posts?: Post[],
@@ -153,6 +167,7 @@ export class PostActivity {
   async searchForMissingThreeHoursPosts() {
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
+      if (await this._postService.recoverMissingMcpJob(post.organizationId, post.id)) continue;
       await this._temporalService.client
         .getRawClient()
         .workflow.signalWithStart('postWorkflowV113', {

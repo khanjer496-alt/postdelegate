@@ -273,6 +273,7 @@ export class ApprovalsService {
       return false;
     }
 
+    if (state === 'QUEUE' && approvalStatus === 'APPROVED') await this._postsService.activateApprovedMcp(organizationId, post.id);
     await this._postsService.startWorkflow(
       post.integration.providerIdentifier.split('-')[0].toLowerCase(),
       post.id,
@@ -440,7 +441,7 @@ export class ApprovalsService {
         approvalStatus: { in: approvable },
         state: { not: 'PUBLISHED' },
         // bound to the version that was checked above, not one saved since
-        ...(expectedUpdatedAt ? { updatedAt: post.updatedAt } : {}),
+        updatedAt: post.updatedAt,
       },
       'QUEUE',
       'APPROVED',

@@ -26,6 +26,9 @@ const safeUrl = isSafePublicHttpsUrl as jest.Mock;
 
 const makeService = (integrationManager: any = {}) => {
   const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
     getPost: jest.fn(),
     getPosts: jest.fn(),
     createComment: jest.fn().mockResolvedValue({ id: 'c-1' }),
@@ -193,6 +196,11 @@ describe('PostsService.getPostsMinified published label', () => {
 describe('PostsService approvals on save', () => {
   const makeApprovalService = (decision: any) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
+      getPost: jest.fn().mockResolvedValue({ id: 'p-1', integrationId: 'i-1', content: 'hi', publishDate: new Date('2026-12-01T12:00:00Z'), childrenPost: [] }),
+      registerMcpFence: jest.fn().mockResolvedValue({}),
       getPostById: jest.fn().mockResolvedValue(null),
       createOrUpdatePost: jest.fn().mockResolvedValue({
         posts: [{ id: 'p-1', state: decision?.hold ? 'DRAFT' : 'QUEUE', content: 'hi' }],
@@ -222,6 +230,7 @@ describe('PostsService approvals on save', () => {
       { recordPublished: jest.fn() } as any,
       { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
     );
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
     return { service, postRepository, policy };
@@ -393,6 +402,9 @@ describe('PostsService status and date changes', () => {
 
   const makeStateService = (decision: any = { hold: false }) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
       getPostById: jest.fn().mockResolvedValue(stored()),
       changeGroupState: jest.fn().mockResolvedValue({ count: 2 }),
       changeState: jest.fn().mockResolvedValue({}),
@@ -419,6 +431,7 @@ describe('PostsService status and date changes', () => {
       { recordPublished: jest.fn() } as any,
       { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
     );
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
     return { service, postRepository, policy };
@@ -693,7 +706,7 @@ describe('PostsService status and date changes', () => {
       },
     };
     const service = new PostsService(
-      {} as any,
+      { mcpWorkflowVersion: jest.fn().mockResolvedValue(null) } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -728,6 +741,9 @@ describe('PostsService monthly cap on one network', () => {
     stored: any[] = []
   ) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
       countProviderUsage: jest.fn().mockResolvedValue(usage),
       countQueuedProviderPosts: jest.fn().mockResolvedValue(queued),
       getPostsState: jest.fn().mockResolvedValue(stored),
@@ -775,6 +791,7 @@ describe('PostsService monthly cap on one network', () => {
       subscriptionService as any,
       paymentService as any
     );
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     return { service, postRepository, subscriptionService, paymentService };
   };
@@ -1605,6 +1622,9 @@ describe('PostsService posting limits', () => {
 
   const make = (dates: Date[] = [], stored: any[] = []) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
       getAccountPostingDates: jest.fn().mockResolvedValue(dates),
       getPostsState: jest.fn().mockResolvedValue(stored),
       getPostById: jest.fn().mockResolvedValue({
@@ -2123,5 +2143,119 @@ describe('saved composition optional-reply compatibility', () => {
     const { service } = make(false);
     const [result] = await service.validatePosts('org-1', [payload()], 'schedule');
     expect(result.errors).toMatch(/optional permission/);
+  });
+});
+
+describe('no-write post preflight and final preparation', () => {
+  const fixture = () => {
+    const provider = { editor: 'normal', maxLength: () => 5, checkValidity: jest.fn().mockResolvedValue(true) };
+    const { service, postRepository } = makeService({ getSocialIntegration: () => provider });
+    const integration = { id: 'channel', name: 'Channel', providerIdentifier: 'test', additionalSettings: '[]', disabled: false };
+    (service as any)._integrationService = { getIntegrationById: jest.fn().mockResolvedValue(integration) };
+    const writes = { convertTextToShortLinks: jest.fn(), askShortLinkedin: jest.fn().mockReturnValue(true) };
+    (service as any)._shortLinkService = writes;
+    const post = { date: '2026-12-01T12:00:00Z', integration: { id: 'channel' }, settings: {}, value: [{ content: '<p>hello</p>', image: [] }] };
+    return { service, post, provider, postRepository, writes };
+  };
+  it('reports input/config identity and per-entry limits without creating links or posts', async () => {
+    const { service, post, writes, postRepository } = fixture();
+    const [result] = await service.preflightPosts('org', [post], 'schedule');
+    expect(result.inputHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.configHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.checks.find((c: any) => c.field === 'value.0.content.length').status).toBe('VALID');
+    expect(result.status).toBe('UNKNOWN'); // provider authorization/final media readiness is not refreshed
+    expect(writes.convertTextToShortLinks).not.toHaveBeenCalled();
+    expect(postRepository.createComment).not.toHaveBeenCalled();
+  });
+  it('short-link transformation is UNKNOWN without an invented length bound', async () => {
+    const { service, post, writes } = fixture();
+    const [result] = await service.preflightPosts('org', [post], 'schedule', undefined, true);
+    expect(result.checks.find((c: any) => c.field === 'shortLink').status).toBe('UNKNOWN');
+    expect(writes.convertTextToShortLinks).not.toHaveBeenCalled();
+  });
+  it('rejects an empty thread, rather than vacuously passing every check', async () => {
+    const { service, post } = fixture();
+    const [result] = await service.preflightPosts('org', [{ ...post, value: [] }], 'schedule');
+    expect(result.status).toBe('INVALID');
+  });
+  it('uses the actual provider-formatted text for character limits', async () => {
+    const { service, post, provider } = fixture();
+    const [result] = await service.preflightPosts('org', [{ ...post, value: [{ content: '<p>toolong</p>', image: [] }] }], 'schedule');
+    expect(result.status).toBe('INVALID');
+    expect(provider.checkValidity).toHaveBeenCalledWith([[]], expect.anything(), [], ['toolong']);
+  });
+  it('marks unfinished media UNKNOWN and supplies a practical fix', async () => {
+    const { service, post } = fixture();
+    const [result] = await service.preflightPosts('org', [{ ...post, value: [{ content: 'ok', image: [{ path: 'https://media.test/a.mp4' }] }] }], 'schedule');
+    expect(result.checks.find((c: any) => c.field === 'value.0.image').status).toBe('UNKNOWN');
+  });
+});
+
+describe('tracked MCP publication admission', () => {
+  const fixture = () => {
+    const { service } = makeService({ getSocialIntegration: () => ({}) });
+    const root: any = { id: 'root', organizationId: 'org', integrationId: 'channel', parentPostId: null, mcpWorkflowVersion: 114, state: 'QUEUE', approvalStatus: 'APPROVED', content: 'text', settings: '{}', image: '[]', publishDate: new Date('2026-12-01T12:00:00Z'), integration: { id: 'channel', organizationId: 'org', providerIdentifier: 'test' } };
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([root]);
+    jest.spyOn(service, 'getStoredPostProblem').mockResolvedValue(null);
+    const repo = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), finishMcpSegment: jest.fn().mockResolvedValue({}), markMcpUnknown: jest.fn().mockResolvedValue({}), mcpAttempts: jest.fn(), reconcileMcpAttempt: jest.fn(), resumeMcp: jest.fn() };
+    (service as any)._postRepository = repo;
+    (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: true }) };
+    const hash = (service as any).mcpRevision([root]);
+    const receipt = [{ id: 'root', postId: 'remote', releaseURL: 'https://test/remote', status: 'published' }];
+    return { service, root, repo, hash, receipt };
+  };
+  it('persists STARTED admission before sending and stores the receipt before returning', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    const send = jest.fn(async () => { expect(repo.claimMcpSegment).toHaveBeenCalled(); return receipt; });
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).resolves.toEqual(receipt);
+    expect(repo.finishMcpSegment).toHaveBeenCalledWith('org', 'attempt', receipt);
+  });
+  it('acceptance followed by receipt-persistence failure is UNKNOWN, never confirmed failure', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    repo.finishMcpSegment.mockRejectedValue(new Error('database unavailable'));
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, jest.fn().mockResolvedValue(receipt))).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(repo.markMcpUnknown).toHaveBeenCalledWith('org', 'attempt');
+  });
+  it('a durable published receipt is returned without a provider call', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt });
+    const send = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).resolves.toEqual(receipt);
+    expect(send).not.toHaveBeenCalled();
+  });
+  it('never sends after uncertain admission, changed revision or revoked approval', async () => {
+    const { service, repo, hash, root } = fixture();
+    const send = jest.fn();
+    repo.claimMcpSegment.mockRejectedValue(new Error('OUTCOME_UNKNOWN'));
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('OUTCOME_UNKNOWN');
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, 'changed', send)).rejects.toThrow('revision');
+    root.approvalStatus = 'IN_REVIEW';
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('approval');
+    expect(send).not.toHaveBeenCalled();
+  });
+  it('unsupported reconciliation blocks recovery without updating or retrying', async () => {
+    const { service, repo } = fixture();
+    repo.mcpAttempts.mockResolvedValue([{ id: 'uncertain', status: 'STARTED' }]);
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'OUTCOME_UNKNOWN' });
+    expect(repo.reconcileMcpAttempt).not.toHaveBeenCalled();
+    expect(repo.resumeMcp).not.toHaveBeenCalled();
+  });
+  it('only explicit terminal unpublished adapter evidence can unlock the failed segment', async () => {
+    const { service, repo } = fixture();
+    const reconcile = jest.fn().mockResolvedValue({ terminal: true, outcome: 'UNPUBLISHED' });
+    (service as any)._integrationManager = { getSocialIntegration: () => ({ reconcileMcpAttempt: reconcile }) };
+    repo.mcpAttempts.mockResolvedValue([{ id: 'child-attempt', segmentPostId: 'child', revisionHash: 'hash', status: 'UNKNOWN' }, { id: 'parent-attempt', status: 'CONFIRMED' }]);
+    repo.resumeMcp.mockResolvedValue({ status: 'RESUMED' });
+    jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'RESUMED' });
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(repo.reconcileMcpAttempt).toHaveBeenCalledWith('org', 'child-attempt', 'FAILED');
+  });
+  it('nonterminal reconciliation never creates a new attempt', async () => {
+    const { service, repo } = fixture();
+    (service as any)._integrationManager = { getSocialIntegration: () => ({ reconcileMcpAttempt: async () => ({ terminal: false, outcome: 'UNKNOWN' }) }) };
+    repo.mcpAttempts.mockResolvedValue([{ id: 'a', status: 'UNKNOWN' }]);
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'OUTCOME_UNKNOWN' });
+    expect(repo.resumeMcp).not.toHaveBeenCalled();
   });
 });

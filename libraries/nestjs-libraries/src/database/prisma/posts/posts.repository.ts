@@ -110,6 +110,108 @@ export class PostsRepository {
     });
   }
 
+  async acquireAgentAdmission(orgId: string, owner: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.create({ data: { organizationId: orgId, owner } }));
+  }
+  async releaseAgentAdmission(orgId: string, owner: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.deleteMany({ where: { organizationId: orgId, owner } }));
+  }
+  async activateApprovedMcp(orgId: string, postId: string) {
+    return this._transaction.model.$transaction(async tx => {
+      const root = await tx.post.findFirst({ where: { id: postId, organizationId: orgId, state: 'QUEUE', approvalStatus: 'APPROVED', deletedAt: null } });
+      if (!root) throw new BadRequestException('Approved revision is no longer queued.');
+      await tx.mcpPublishFence.updateMany({ where: { postId, organizationId: orgId, state: 'CANCELLED' }, data: { state: 'ACTIVE', generation: { increment: 1 } } });
+    }, { isolationLevel: 'Serializable' });
+  }
+  async mcpFence(orgId: string, rootId: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findFirst({ where: { postId: rootId, organizationId: orgId } }));
+  }
+  async mcpAttempts(orgId: string, rootId: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.findMany({ where: { organizationId: orgId, rootPostId: rootId }, orderBy: { generation: 'asc' } }));
+  }
+  async reconcileMcpAttempt(orgId: string, id: string, outcome: 'FAILED' | 'CONFIRMED', receipt?: any) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: { in: ['STARTED', 'UNKNOWN'] } }, data: { status: outcome, ...(receipt ? { receipt } : {}) } }));
+  }
+  async resumeMcp(orgId: string, rootId: string, revisionHash: string) {
+    return this._transaction.model.$transaction(async tx => {
+      const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootId } });
+      if (!fence || fence.organizationId !== orgId || fence.revisionHash !== revisionHash) throw new BadRequestException('Legacy or changed revision cannot resume.');
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { updatedAt: new Date() } });
+      const attempts = await tx.mcpPublishAttempt.findMany({ where: { rootPostId: rootId } });
+      if (attempts.some(a => !['FAILED', 'CONFIRMED'].includes(a.status))) return { status: 'OUTCOME_UNKNOWN' };
+      if (fence.state === 'ACTIVE' && !attempts.some(a => a.status === 'FAILED')) return { status: 'ALREADY_ACTIVE' };
+      const root = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId, deletedAt: null } });
+      if (!root || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) return { status: 'BLOCKED', reason: 'Human review is required.' };
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { generation: { increment: 1 }, state: 'ACTIVE' } });
+      await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, releaseId: null, releaseURL: null, state: { not: 'PUBLISHED' } }, data: { state: 'QUEUE' } });
+      return { status: 'RESUMED' };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async mcpWorkflowVersion(orgId: string, postId: string) {
+    return (await this._post.model.post.findFirst({ where: { id: postId, organizationId: orgId }, select: { mcpWorkflowVersion: true } }))?.mcpWorkflowVersion;
+  }
+
+  // The transaction locks the same fence for API transitions and worker admission.
+  // STARTED is durable before external I/O; an interrupted caller cannot infer failure.
+  async registerMcpFence(orgId: string, postId: string, integrationId: string, revisionHash: string) {
+    return this._transaction.model.$transaction(async tx => {
+      const existing = await tx.mcpPublishFence.findUnique({ where: { postId } });
+      if (existing && (existing.organizationId !== orgId || existing.revisionHash !== revisionHash)) {
+        const attempts = await tx.mcpPublishAttempt.count({ where: { rootPostId: postId } });
+        if (attempts) throw new BadRequestException('Publication attempts exist; changing their payload is blocked.');
+      }
+      await tx.mcpPublishFence.upsert({ where: { postId }, create: { postId, organizationId: orgId, integrationId, revisionHash }, update: { revisionHash, ...(existing?.revisionHash !== revisionHash ? { generation: { increment: 1 } } : {}), ...(existing?.state === 'EDITING' ? { state: 'ACTIVE' } : {}) } });
+      await tx.post.update({ where: { id: postId, organizationId: orgId }, data: { mcpWorkflowVersion: 114 } });
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async claimMcpSegment(orgId: string, rootPostId: string, segmentPostId: string, revisionHash: string, generation: number) {
+    return this._transaction.model.$transaction(async tx => {
+      const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootPostId } });
+      if (!fence || fence.organizationId !== orgId || fence.revisionHash !== revisionHash || fence.generation !== generation || fence.state !== 'ACTIVE') throw new BadRequestException('Publication fence is not active for this revision.');
+      // A write takes the shared lock, so a simultaneous cancellation cannot pass.
+      const locked = await tx.mcpPublishFence.updateMany({ where: { postId: rootPostId, organizationId: orgId, state: 'ACTIVE', revisionHash, generation: fence.generation }, data: { updatedAt: new Date() } });
+      if (!locked.count) throw new BadRequestException('Publication fence changed.');
+      const prior = await tx.mcpPublishAttempt.findMany({ where: { rootPostId, segmentPostId }, orderBy: { generation: 'desc' } });
+      if (prior.some(a => a.revisionHash !== revisionHash)) throw new BadRequestException('Attempt identity has a different payload.');
+      const confirmed = prior.find(a => a.status === 'CONFIRMED');
+      if (confirmed) return { replay: true as const, receipt: confirmed.receipt, id: confirmed.id };
+      if (prior.some(a => a.status !== 'FAILED')) throw new BadRequestException('OUTCOME_UNKNOWN: reconcile the earlier attempt before retry.');
+      const segment = await tx.post.findFirst({ where: { id: segmentPostId, organizationId: orgId, state: 'QUEUE', deletedAt: null, releaseId: null, releaseURL: null, integration: { deletedAt: null, disabled: false } } });
+      if (!segment) throw new BadRequestException('Segment is not eligible for a new publication.');
+      const row = await tx.mcpPublishAttempt.create({ data: { rootPostId, segmentPostId, organizationId: orgId, revisionHash, generation: fence.generation, status: 'STARTED' } });
+      return { replay: false as const, receipt: null, id: row.id };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async finishMcpSegment(orgId: string, id: string, receipt: any) {
+    return this._transaction.model.$transaction(async tx => {
+      const row = await tx.mcpPublishAttempt.findFirst({ where: { id, organizationId: orgId, status: 'STARTED' } });
+      if (!row) throw new BadRequestException('OUTCOME_UNKNOWN: attempt ownership lost.');
+      await tx.mcpPublishAttempt.update({ where: { id }, data: { status: 'CONFIRMED', receipt } });
+    });
+  }
+
+  async markMcpUnknown(orgId: string, id: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED' }, data: { status: 'UNKNOWN' } }));
+  }
+
+  async unscheduleMcp(orgId: string, rootPostId: string, preserveApproval = false) {
+    return this._transaction.model.$transaction(async tx => {
+      const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootPostId } });
+      if (!fence || fence.organizationId !== orgId) return { status: 'BLOCKED', reason: 'Legacy job has no shared publication fence.' };
+      await tx.mcpPublishFence.update({ where: { postId: rootPostId }, data: { updatedAt: new Date() } });
+      const attempts = await tx.mcpPublishAttempt.findMany({ where: { rootPostId } });
+      if (attempts.some(a => ['STARTED', 'UNKNOWN', 'PENDING'].includes(a.status))) return { status: 'OUTCOME_UNKNOWN', reason: 'An admitted attempt must be reconciled before cancellation.' };
+      const root = await tx.post.findFirst({ where: { id: rootPostId, organizationId: orgId, deletedAt: null, parentPostId: null } });
+      if (!root) throw new BadRequestException('Post not found.');
+      await tx.mcpPublishFence.update({ where: { postId: rootPostId }, data: { state: 'CANCELLED' } });
+      await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { in: ['QUEUE', 'DRAFT', 'ERROR'] }, deletedAt: null, releaseId: null, releaseURL: null }, data: { state: 'DRAFT', ...(preserveApproval ? {} : { approvalStatus: ['APPROVED', 'IN_REVIEW'].includes(root.approvalStatus) ? 'IN_REVIEW' : 'NONE' }) } });
+      return { status: 'UNSCHEDULED', postId: rootPostId };
+    }, { isolationLevel: 'Serializable' });
+  }
+
   searchForMissingThreeHoursPosts() {
     return this._post.model.post.findMany({
       where: {
@@ -836,13 +938,25 @@ export class PostsRepository {
     // agent that created the post
     approval: { approvalStatus?: ApprovalStatus; agentSource?: string } = {}
   ) {
+    return this._transaction.model.$transaction(async tx => {
+      const rootId = body.value?.[0]?.id;
+      if (rootId) {
+        const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootId } });
+        if (fence) {
+          if (fence.organizationId !== orgId) throw new BadRequestException('Post not found.');
+          const current = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId }, select: { state: true } });
+          if (current?.state !== 'DRAFT') throw new BadRequestException('Unschedule this tracked MCP job before editing it.');
+          await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'EDITING' } });
+          if (await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId } })) throw new BadRequestException('A publication attempt exists. Preserve this revision and prepare a new reviewed draft instead.');
+        }
+      }
     const posts: Post[] = [];
     const uuid = uuidv4();
     // keepGroup reuses the client-supplied group only when it already belongs
     // to this organization, so a foreign group id can never be adopted
     const ownsGroup =
       keepGroup && body.group
-        ? !!(await this._post.model.post.findFirst({
+        ? !!(await tx.post.findFirst({
             where: {
               group: body.group,
               organizationId: orgId,
@@ -860,7 +974,7 @@ export class PostsRepository {
     const existingBatchId =
       body.group || ids.length
         ? (
-            await this._post.model.post.findFirst({
+            await tx.post.findFirst({
               where: {
                 organizationId: orgId,
                 deletedAt: null,
@@ -939,7 +1053,7 @@ export class PostsRepository {
       });
 
       posts.push(
-        await this._post.model.post.upsert({
+        await tx.post.upsert({
           where: {
             id: value.id || uuidv4(),
             organizationId: orgId,
@@ -959,7 +1073,7 @@ export class PostsRepository {
       );
 
       if (posts.length === 1) {
-        await this._tagsPosts.model.tagsPosts.deleteMany({
+        await tx.tagsPosts.deleteMany({
           where: {
             post: {
               id: posts[0].id,
@@ -968,7 +1082,7 @@ export class PostsRepository {
         });
 
         if (tags.length) {
-          const tagsList = await this._tags.model.tags.findMany({
+          const tagsList = await tx.tags.findMany({
             where: {
               orgId: orgId,
               deletedAt: null,
@@ -979,7 +1093,7 @@ export class PostsRepository {
           });
 
           if (tagsList.length) {
-            await this._post.model.post.update({
+            await tx.post.update({
               where: {
                 id: posts[posts.length - 1].id,
               },
@@ -1000,7 +1114,7 @@ export class PostsRepository {
 
     const previousPost = body.group
       ? (
-          await this._post.model.post.findFirst({
+          await tx.post.findFirst({
             where: {
               group: body.group,
               organizationId: orgId,
@@ -1015,7 +1129,7 @@ export class PostsRepository {
       : undefined;
 
     if (body.group && !keepGroup) {
-      await this._post.model.post.updateMany({
+      await tx.post.updateMany({
         where: {
           group: body.group,
           organizationId: orgId,
@@ -1031,7 +1145,7 @@ export class PostsRepository {
     // keepGroup: the updated rows still carry the old group, so sweep only the
     // rows dropped from it (removed comments) by id instead of by group.
     if (body.group && keepGroup) {
-      await this._post.model.post.updateMany({
+      await tx.post.updateMany({
         where: {
           group: body.group,
           organizationId: orgId,
@@ -1048,8 +1162,8 @@ export class PostsRepository {
     }
 
     return { previousPost, posts };
+    }, { isolationLevel: 'Serializable' });
   }
-
   // Keeps a post and its comments as a draft until an approver approves it.
   // A failed post held this way is no longer failed, its old error goes.
   holdForReview(orgId: string, group: string) {

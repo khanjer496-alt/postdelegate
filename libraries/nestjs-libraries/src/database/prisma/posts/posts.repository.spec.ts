@@ -17,7 +17,7 @@ const makeRepo = () => {
     { model: { tags } } as any,
     { model: { tagsPosts: { deleteMany: jest.fn() } } } as any,
     {} as any,
-    {} as any
+    { model: { $transaction: (action: any) => action({ post, tags, tagsPosts: { deleteMany: jest.fn() }, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) } }) } } as any
   );
   return { repo, post, tags };
 };
@@ -545,7 +545,7 @@ describe('PostsRepository state and date of a thread', () => {
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
     };
     const transaction = {
-      model: { $transaction: jest.fn((run: any) => run({ post })) },
+      model: { $transaction: jest.fn((run: any) => run({ post, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) }, tagsPosts: { deleteMany: jest.fn() }, tags: { findMany: jest.fn() } })) },
     };
     const repo = new PostsRepository(
       { model: { post } } as any,

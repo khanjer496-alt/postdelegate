@@ -299,6 +299,12 @@ export type FetchPageInformationResult = {
 export interface SocialProvider
   extends IAuthenticator,
     ISocialMediaIntegration {
+  /** Read-only terminal reconciliation; UNPUBLISHED proves no in-flight request can later land. */
+  reconcileMcpAttempt?(integration: Integration, attempt: { attemptId: string; payloadHash: string; segmentId: string }): Promise<
+    { terminal: true; outcome: 'UNPUBLISHED' } |
+    { terminal: true; outcome: 'PUBLISHED'; receipt: PostResponse } |
+    { terminal: false; outcome: 'UNKNOWN' }
+  >;
   identifier: string;
   authorizationPolicy?: ProviderAuthorizationPolicy;
   checkAuthorization?(
