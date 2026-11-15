@@ -199,7 +199,12 @@ pg('Draft-only PostgreSQL whole-thread claims', () => {
           [],
           'MCP',
           undefined,
-          true
+          true,
+          undefined,
+          {
+            requireExistingDraft: true,
+            expectedDraftUpdatedAt: posts[0].updatedAt,
+          }
         )
     );
   };
@@ -260,7 +265,7 @@ pg('Draft-only PostgreSQL whole-thread claims', () => {
   });
   it('edits the complete eligible thread in one commit and invalidates prior approval', async () => {
     const posts = await fixture();
-    await db.post.update({
+    posts[0] = await db.post.update({
       where: { id: posts[0].id },
       data: { approvalStatus: 'APPROVED' },
     });
@@ -276,5 +281,103 @@ pg('Draft-only PostgreSQL whole-thread claims', () => {
           post.content.startsWith('edited')
       )
     ).toBe(true);
+  });
+  it('serializes a stale approval behind the root claim until the whole payload commits', async () => {
+    const posts = await fixture();
+    posts[0] = await db.post.update({
+      where: { id: posts[0].id },
+      data: { updatedAt: new Date('2000-01-01') },
+    });
+    let claimed!: () => void;
+    let release!: () => void;
+    const rootClaimed = new Promise<void>((resolve) => {
+      claimed = resolve;
+    });
+    const continueEdit = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const transactionModel = {
+      $transaction: (fn: any, options: any) =>
+        db.$transaction(
+          async (tx) =>
+            fn({
+              post: {
+                findFirst: tx.post.findFirst.bind(tx.post),
+                findMany: tx.post.findMany.bind(tx.post),
+                update: async (args: any) => {
+                  const updated = await tx.post.update(args);
+                  if (args.where.id === posts[0].id) {
+                    claimed();
+                    await continueEdit;
+                  }
+                  return updated;
+                },
+              },
+            }),
+          options
+        ),
+    };
+    const editing = edit(posts, transactionModel);
+    await rootClaimed;
+    const staleApproval = db.post.updateMany({
+      where: { id: posts[0].id, updatedAt: posts[0].updatedAt, state: 'DRAFT' },
+      data: { state: 'QUEUE', approvalStatus: 'APPROVED' },
+    });
+    // Start the competing query while the edit owns the root row lock.
+    const approval = staleApproval.then((result) => result);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    release();
+    await editing;
+    expect((await approval).count).toBe(0);
+    const saved = await db.post.findMany({ where: { group: posts[0].group } });
+    expect(
+      saved.every(
+        (post) => post.state === 'DRAFT' && post.content.startsWith('edited')
+      )
+    ).toBe(true);
+  });
+  it('still creates a new DRAFT through the positive creation path', async () => {
+    const { PostsRepository } = await import(
+      '../database/prisma/posts/posts.repository'
+    );
+    const model = { model: db } as any;
+    const repo = new PostsRepository(
+      model,
+      model,
+      model,
+      model,
+      model,
+      model,
+      model,
+      model
+    );
+    const result = await runWithContext(
+      {
+        requestId: 'pg-new',
+        auth: { id: orgId },
+        agentCredentialId: 'fixture',
+        agentPrincipal: {
+          id: 'fixture',
+          organizationId: orgId,
+          role: 'DRAFT_ONLY',
+          channelIds: [channelId],
+        },
+      },
+      () =>
+        repo.createOrUpdatePost(
+          'draft',
+          orgId,
+          '2026-12-01T11:00:00Z',
+          {
+            integration: { id: channelId },
+            settings: {},
+            value: [{ content: 'new fixture draft', image: [] }],
+          } as any,
+          [],
+          'MCP'
+        )
+    );
+    expect(result.posts).toHaveLength(1);
+    expect(result.posts[0].state).toBe('DRAFT');
   });
 });
