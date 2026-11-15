@@ -201,6 +201,12 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
       repo.claimMcpSegment(org, root, root, revision, 0)
     ).rejects.toThrow();
   });
+  it('an old generation cannot overwrite the state of a later revision', async () => {
+    await db.mcpPublishFence.update({ where: { postId: root }, data: { generation: 1 } });
+    await repo.failMcpSegment(org, root, root, 0, revision);
+    expect((await db.post.findUniqueOrThrow({ where: { id: root } })).state).toBe('QUEUE');
+  });
+
   it('legacy job cannot gain cancellation success without a fence', async () => {
     expect(await repo.unscheduleMcp(org, randomUUID())).toMatchObject({
       status: 'BLOCKED',

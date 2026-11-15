@@ -113,6 +113,11 @@ export class PostActivity {
   ) {}
 
   @ActivityMethod()
+  async mcpFailSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string) {
+    await this._postService.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash);
+  }
+
+  @ActivityMethod()
   async mcpThreadPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
     return this._postService.mcpPlan(orgId, rootId, generation, revisionHash);
   }

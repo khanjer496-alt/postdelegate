@@ -1241,6 +1241,10 @@ export class PostsService {
     if (await this._postRepository.mcpWorkflowVersion(orgId, postId) === 114) await this._postRepository.activateApprovedMcp(orgId, postId);
   }
 
+  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string) {
+    return this._postRepository.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash);
+  }
+
   async mcpPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
     const rows = await this.mcpThread(orgId, rootId);
     const fence = await this._postRepository.mcpFence(orgId, rootId);

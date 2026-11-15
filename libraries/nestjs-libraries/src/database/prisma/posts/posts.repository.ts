@@ -127,6 +127,13 @@ export class PostsRepository {
   async mcpFence(orgId: string, rootId: string) {
     return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findFirst({ where: { postId: rootId, organizationId: orgId } }));
   }
+  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string) {
+    return this._transaction.model.$transaction(async tx => {
+      const current = await tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId, generation, revisionHash, state: 'ACTIVE' }, data: { updatedAt: new Date() } });
+      if (!current.count) return;
+      await tx.post.updateMany({ where: { id: segmentId, organizationId: orgId, state: 'QUEUE', deletedAt: null }, data: { state: 'ERROR', error: 'Publication outcome needs reconciliation before retry.' } });
+    }, { isolationLevel: 'Serializable' });
+  }
   async mcpAttempts(orgId: string, rootId: string) {
     return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.findMany({ where: { organizationId: orgId, rootPostId: rootId }, orderBy: { generation: 'asc' } }));
   }
@@ -140,7 +147,7 @@ export class PostsRepository {
       await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { updatedAt: new Date() } });
       const attempts = await tx.mcpPublishAttempt.findMany({ where: { rootPostId: rootId } });
       if (attempts.some(a => !['FAILED', 'CONFIRMED'].includes(a.status))) return { status: 'OUTCOME_UNKNOWN' };
-      if (fence.state === 'ACTIVE' && !attempts.some(a => a.status === 'FAILED')) return { status: 'ALREADY_ACTIVE' };
+      if (fence.state === 'ACTIVE' && !attempts.some(a => a.status === 'FAILED' && a.generation === fence.generation)) return { status: 'ALREADY_ACTIVE' };
       const root = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId, deletedAt: null } });
       if (!root || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) return { status: 'BLOCKED', reason: 'Human review is required.' };
       await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { generation: { increment: 1 }, state: 'ACTIVE' } });

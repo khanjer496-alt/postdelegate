@@ -2,7 +2,7 @@ const activity = {
   mcpThreadPlan: jest.fn(),
   mcpPublishSegment: jest.fn(),
   updatePost: jest.fn(),
-  changeStateIf: jest.fn(),
+  mcpFailSegment: jest.fn(),
 };
 jest.mock('@temporalio/workflow', () => ({
   proxyActivities: () => activity,
@@ -28,7 +28,7 @@ describe('tracked MCP workflow', () => {
       ],
     });
     activity.updatePost.mockResolvedValue(undefined);
-    activity.changeStateIf.mockResolvedValue({});
+    activity.mcpFailSegment.mockResolvedValue({});
   });
   it('carries the same durable generation/revision through each segment and keeps predecessor receipts', async () => {
     activity.mcpPublishSegment.mockImplementation(
@@ -58,12 +58,7 @@ describe('tracked MCP workflow', () => {
     await postWorkflowV114(input);
     expect(activity.mcpPublishSegment).toHaveBeenCalledTimes(1);
     expect(activity.updatePost).not.toHaveBeenCalled();
-    expect(activity.changeStateIf).toHaveBeenCalledWith(
-      'root',
-      ['QUEUE'],
-      'ERROR',
-      expect.stringContaining('reconciliation')
-    );
+    expect(activity.mcpFailSegment).toHaveBeenCalledWith('o', 'root', 'root', 2, 'hash');
   });
   it('receipt-persistence failure after admission never resends or continues the thread', async () => {
     activity.mcpPublishSegment.mockResolvedValue([
