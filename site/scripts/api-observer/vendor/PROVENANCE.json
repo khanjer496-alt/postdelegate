@@ -1,0 +1,22 @@
+[
+  {
+    "path": "LICENSE-APACHE",
+    "source": "https://raw.githubusercontent.com/cloudflare/workers-sdk/wrangler@4.162.0/LICENSE-APACHE",
+    "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+  },
+  {
+    "path": "LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/cloudflare/workers-sdk/wrangler@4.162.0/LICENSE-MIT",
+    "sha256": "9bb3b077cc8628334bab25961223dd8207252c8a56aa054195be38f1c042aaf4"
+  },
+  {
+    "path": "constants.ts",
+    "source": "https://raw.githubusercontent.com/cloudflare/workers-sdk/wrangler@4.162.0/packages/pages-functions/src/routing/constants.ts",
+    "sha256": "be1c637fca0d7f0dca7a397954f9f03c76da4dc595970759db155d8f18f147b3"
+  },
+  {
+    "path": "routes-validation.ts",
+    "source": "https://raw.githubusercontent.com/cloudflare/workers-sdk/wrangler@4.162.0/packages/pages-functions/src/routing/routes-validation.ts",
+    "sha256": "2ddc9af5a0d1bcaa69c8eac881410cf69a07f246cb573c8a880f18ceec75b7f5"
+  }
+]

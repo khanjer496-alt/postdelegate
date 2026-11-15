@@ -27,6 +27,7 @@ jobs:
             /site/scripts/pages-worker-build-diagnostic.mjs
             /site/scripts/test-pages-worker-build-diagnostic.mjs
             /site/scripts/stage-pages-worker.mjs
+            /site/scripts/api-observer/
             /site/scripts/minimal-native-control.mjs
             /site/scripts/test-minimal-native-control.mjs
             /site/scripts/native-runtime-signatures.json
@@ -44,7 +45,10 @@ jobs:
         run: |
           node site/scripts/test-pages-worker-build-diagnostic.mjs
           node site/scripts/test-pages-startup-probe.mjs
-          node site/scripts/test-minimal-native-control.mjs
+          node site/scripts/api-observer/test-observe.mjs
+          node site/scripts/api-observer/test-executor.mjs
+          node site/scripts/api-observer/test-input.mjs
+          node site/scripts/api-observer/test-terminal.mjs
       - name: Prepare isolated pinned CLI (hosted only)
         run: |
           mkdir -p "$RUNNER_TEMP/startup-cli"
@@ -69,16 +73,16 @@ jobs:
           const r = JSON.parse(readFileSync(process.argv[2]));
           console.log('startup=' + (r.workerUnchanged === true && r.checkRawWorkerEquivalent?.status === 'succeeded' && r.metadataAnalysis?.status === 'succeeded'));
           JS
-      - name: One corrected-raw startup only after typed checks pass
+      - name: One reviewed Pages-equivalent typed API observation
         if: ${{ steps.probe.outputs.startup == 'true' }}
         env:
           PROBE_STAGE: ${{ steps.probe.outputs.stage }}
+          API_OBSERVATION_AUTHORIZED: REVIEWED_ONE_SHOT
         run: |
           set -euo pipefail
-          # Synthetic response only: no full site assets/OG/Astro build or real-site acceptance.
-          printf '%s' '<!doctype html><title>Synthetic startup diagnostic</title><p>Not a release payload.</p>' > "$PROBE_STAGE/payload/alternatives.html"
-          timeout --signal=TERM --kill-after=2s 75s node site/scripts/pages-startup-probe.mjs \
-            "$RUNNER_TEMP/startup-cli" "$PROBE_STAGE" "$GITHUB_WORKSPACE" "$PROBE_STAGE/diagnostics/startup.json"
+          printf '%s' '<!doctype html><title>Synthetic API observation</title>' > "$PROBE_STAGE/payload/alternatives.html"
+          timeout --signal=TERM --kill-after=2s 75s node site/scripts/api-observer/parent.mjs \
+            "$RUNNER_TEMP/startup-cli" "$PROBE_STAGE" "$GITHUB_WORKSPACE"
       - name: Upload synthetic diagnostic only (never a release payload)
         if: ${{ always() && steps.probe.outputs.path != '' }}
         uses: actions/upload-artifact@v4
