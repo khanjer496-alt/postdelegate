@@ -273,3 +273,34 @@ describe('MCP per-agent credentials', () => {
     expect(await service.resolve('mca_' + 'a'.repeat(64))).toBeNull();
   });
 });
+
+describe('Draft-only published analytics read', () => {
+  it('permits a published post read without permitting its mutation', async () => {
+    const repo = {
+      byId: async () => ({
+        id: 'key',
+        organizationId: 'org',
+        role: 'DRAFT_ONLY',
+        channelIds: ['allowed'],
+      }),
+      post: async () => ({
+        state: 'PUBLISHED',
+        integrationId: 'allowed',
+        releaseId: 'receipt',
+      }),
+      channels: async () => [{ id: 'allowed' }],
+    };
+    const service = new AgentCredentialService(repo as any);
+    await runWithContext(
+      { requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key' },
+      async () => {
+        await expect(
+          service.authorizeTool('channelAnalyticsTool', { postId: 'post' })
+        ).resolves.toEqual({ postId: 'post' });
+        await expect(
+          service.authorizeTool('postUpdateTool', { id: 'post' })
+        ).rejects.toThrow();
+      }
+    );
+  });
+});
