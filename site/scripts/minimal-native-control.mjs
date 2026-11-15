@@ -12,9 +12,12 @@ export async function control(Miniflare, log, persist) {
     compatibilityFlags: [], phase: 'constructing' };
   persist(result);
   try {
-    runtime = new Miniflare({ modules: true, host: '127.0.0.1', port: 8789,
-      compatibilityDate: '2026-09-08', compatibilityFlags: [], log,
-      script: 'export default { fetch() { return new Response("Synthetic native control only"); } };' });
+    // Pinned4.162 Miniflare config/schema.ts requires the normalized workers/config/manifest API.
+    runtime = new Miniflare({ host: '127.0.0.1', port: 8789, log,
+      workers: [{ config: { name: 'synthetic-native-control',
+        compatibilityDate: '2026-09-08', compatibilityFlags: [],
+        manifest: { mainModule: 'control.mjs', modules: { 'control.mjs': { type: 'esm',
+          contents: 'export default { fetch() { return new Response("Synthetic native control only"); } };' } } } } }] });
     await runtime.ready;
     result.phase = 'ready';
   } catch (error) {

@@ -10,9 +10,12 @@ await control(Good,{},(r)=>{ report = {...r}; });
 assert.equal(report.phase,'ready');
 assert.equal(observed.port,8789);
 assert.equal(observed.host,'127.0.0.1');
-assert.deepEqual(observed.compatibilityFlags,[]);
-assert.equal(observed.compatibilityDate,'2026-09-08');
-assert.deepEqual(Object.keys(observed).sort(),['modules','host','port','compatibilityDate','compatibilityFlags','log','script'].sort());
+assert.equal(observed.workers.length,1);
+assert.equal(observed.workers[0].config.manifest.mainModule,'control.mjs');
+assert.equal(observed.workers[0].config.manifest.modules['control.mjs'].type,'esm');
+assert.deepEqual(observed.workers[0].config.compatibilityFlags,[]);
+assert.equal(observed.workers[0].config.compatibilityDate,'2026-09-08');
+assert.deepEqual(Object.keys(observed).sort(),['host','port','log','workers'].sort());
 class Bad {
   constructor() { this.ready = Promise.reject(Object.assign(new Error('PRIVATE_CANARY account/path/token'),{code:'PRIVATE_CODE'})); }
 }
