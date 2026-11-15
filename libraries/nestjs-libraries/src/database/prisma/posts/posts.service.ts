@@ -1,3 +1,4 @@
+import { assertAgentPostWrite, agentDraftOnly } from '../../../chat/agent-credential.policy';
 import {
   BadRequestException,
   Injectable,
@@ -1495,6 +1496,7 @@ export class PostsService {
     // callers (auto post, clipping, settings updates) pass nothing.
     actor?: ApprovalActor
   ): Promise<any[]> {
+    for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
     if (actor?.type === 'agent') {
       // an agent's in-place update must point at posts that exist, it can't
       // be used to create posts around the guardrails

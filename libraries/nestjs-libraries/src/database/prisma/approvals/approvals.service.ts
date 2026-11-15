@@ -1,3 +1,4 @@
+import { agentDraftOnly, assertAgentPostWrite } from '../../../chat/agent-credential.policy';
 import {
   BadRequestException,
   ConflictException,
@@ -301,6 +302,7 @@ export class ApprovalsService {
       {
         AND: [
           notPublishing(),
+          ...(agentDraftOnly() ? [{ state: 'DRAFT' as const, releaseId: null }] : []),
           { NOT: [{ state: 'DRAFT', approvalStatus: 'IN_REVIEW' }] },
         ],
       },
@@ -308,6 +310,7 @@ export class ApprovalsService {
       'IN_REVIEW'
     );
     if (!moved) {
+      if (agentDraftOnly()) throw new ConflictException('The draft changed. Refresh before submitting for review.');
       return false;
     }
     if (shared) {
@@ -343,6 +346,8 @@ export class ApprovalsService {
     actor: Extract<ApprovalActor, { type: 'agent' }>
   ) {
     const post = await this.getPost(organizationId, postId);
+    assertAgentPostWrite(organizationId, post.integration.id, 'draft');
+    if (agentDraftOnly() && (post.state !== 'DRAFT' || post.releaseId)) throw new ForbiddenException('Draft-only credentials can submit drafts only.');
     await this._approvalPolicyService.assertAgentGuardrails(
       organizationId,
       actor,

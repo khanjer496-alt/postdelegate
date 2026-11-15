@@ -1,3 +1,4 @@
+import { agentDraftOnly, assertAgentPostWrite } from '../../../chat/agent-credential.policy';
 import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Post as PostBody } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
@@ -836,6 +837,7 @@ export class PostsRepository {
     // agent that created the post
     approval: { approvalStatus?: ApprovalStatus; agentSource?: string } = {}
   ) {
+    assertAgentPostWrite(orgId, body.integration.id, state);
     const posts: Post[] = [];
     const uuid = uuidv4();
     // keepGroup reuses the client-supplied group only when it already belongs
@@ -942,6 +944,7 @@ export class PostsRepository {
         await this._post.model.post.upsert({
           where: {
             id: value.id || uuidv4(),
+            ...(agentDraftOnly() ? { state: 'DRAFT' as const, releaseId: null } : {}),
             organizationId: orgId,
             integrationId: body.integration.id,
           },

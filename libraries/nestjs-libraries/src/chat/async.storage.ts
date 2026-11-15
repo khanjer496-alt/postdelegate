@@ -2,7 +2,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { SelfHostedInstance } from '@gitroom/nestjs-libraries/chat/mcp.relay.service';
 
+import type { AgentPrincipal } from './agent-credential.policy';
+
 type Ctx = {
+  agentCredentialId?: string;
+  agentPrincipal?: AgentPrincipal;
   requestId: string;
   auth: any; // replace with your org type if you have it, e.g. Organization
   // a self-hosted connection: where its tool calls are relayed to

@@ -1,3 +1,5 @@
+import { AgentCredentialService } from '../../chat/agent-credential.service';
+import { AgentCredentialRepository } from './agent-credentials/agent.credential.repository';
 import { Global, Module } from '@nestjs/common';
 import { PrismaRepository, PrismaService, PrismaTransaction } from './prisma.service';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
@@ -93,6 +95,8 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
   controllers: [],
   providers: [
     PrismaService,
+    AgentCredentialService,
+    AgentCredentialRepository,
     PrismaRepository,
     PrismaTransaction,
     UsersService,

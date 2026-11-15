@@ -76,6 +76,7 @@ import express from 'express';
 import { runWithContext } from './async.storage';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { AgentCredentialService } from './agent-credential.service';
 import { startMcp } from '@gitroom/nestjs-libraries/chat/start.mcp';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { LoadToolsService } from '@gitroom/nestjs-libraries/chat/load.tools.service';
@@ -120,6 +121,7 @@ const agent = {
 
 const services = new Map<unknown, unknown>([
   [MastraService, { mastra: async () => ({ getAgent: () => agent }) }],
+  [AgentCredentialService, { wrapTool: (_name: string, tool: any) => tool, resolve: async (token: string) => token === 'mca_' + 'a'.repeat(64) ? { organization: { id: 'org-agent' }, credentialId: 'agent-id' } : null }],
   [LoadToolsService, { loadTools: async () => ({}) }],
   [
     OrganizationService,
@@ -594,5 +596,18 @@ describe('canonical /mcp relay-disabled boundary', () => {
     const response = await mcpPost('/mcp', { Authorization: 'Bearer psh_valid' });
     expect(response.status).toBe(401);
     expect(mockHttpServers).toHaveLength(calls);
+  });
+});
+
+describe('agent credential transport audience', () => {
+  beforeEach(async () => boot());
+  afterEach(async () => { await new Promise<void>(resolve => server.close(() => resolve())); });
+  it('authenticates a new credential via the canonical header', async () => {
+    const response = await fetch(base + '/mcp', { method: 'POST', headers: { Authorization: 'Bearer mca_' + 'a'.repeat(64), 'Content-Type': 'application/json' }, body: '{}' });
+    expect(response.status).toBe(200);
+  });
+  it.each(['/mcp/', '/sse/', '/message/'])('rejects credential secrets in URL %s', async path => {
+    const response = await fetch(base + path + 'mca_' + 'a'.repeat(64), { method: 'POST' });
+    expect(response.status).toBe(400);
   });
 });
