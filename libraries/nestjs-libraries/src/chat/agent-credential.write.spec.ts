@@ -4,6 +4,7 @@ import { runWithContext } from './async.storage';
 describe('Draft-only conditional storage guard', () => {
   it('rejects a lost root claim without any upsert/create or cleanup fallback', async () => {
     const tx = {
+      mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) },
       post: {
         findFirst: jest.fn(async () => null),
         upsert: jest.fn(),

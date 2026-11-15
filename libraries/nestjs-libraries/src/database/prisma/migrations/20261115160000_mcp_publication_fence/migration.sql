@@ -49,3 +49,12 @@ CREATE INDEX "McpPublishAttempt_organizationId_rootPostId_idx" ON "McpPublishAtt
 -- CreateIndex
 CREATE UNIQUE INDEX "McpPublishAttempt_rootPostId_segmentPostId_revisionHash_gen_key" ON "McpPublishAttempt"("rootPostId", "segmentPostId", "revisionHash", "generation");
 
+-- AddForeignKey
+ALTER TABLE "McpAgentAdmission" ADD CONSTRAINT "McpAgentAdmission_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "McpPublishFence" ADD CONSTRAINT "McpPublishFence_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "McpPublishAttempt" ADD CONSTRAINT "McpPublishAttempt_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

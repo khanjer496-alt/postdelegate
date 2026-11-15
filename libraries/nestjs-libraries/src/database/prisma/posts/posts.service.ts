@@ -1788,8 +1788,7 @@ export class PostsService {
         keepGroup,
         batchId,
         {
-          requireExistingDraft: agentDraftOnly() && body.type === 'update',
-          expectedDraftUpdatedAt,
+          ...(agentDraftOnly() && body.type === 'update' ? { requireExistingDraft: true, expectedDraftUpdatedAt } : {}),
           approvalStatus: decision?.approvalStatus,
           agentSource: actor?.type === 'agent' ? actor.source : undefined,
         }

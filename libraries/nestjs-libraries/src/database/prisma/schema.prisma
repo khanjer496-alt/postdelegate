@@ -30,6 +30,9 @@ model AgentCredential {
 }
 
 model Organization {
+  mcpAdmissions McpAgentAdmission[]
+  mcpFences McpPublishFence[]
+  mcpAttempts McpPublishAttempt[]
   agentCredentials AgentCredential[]
   id                  String               @id @default(uuid())
   name                String
@@ -2445,12 +2448,14 @@ model SmartLinkStat {
 
 // New MCP jobs only. No lease timeout: abandoned admission is held for explicit recovery.
 model McpAgentAdmission {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String @id
   owner String
   createdAt DateTime @default(now())
 }
 
 model McpPublishFence {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   postId String @id
   organizationId String
   integrationId String
@@ -2463,6 +2468,7 @@ model McpPublishFence {
 }
 
 model McpPublishAttempt {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id String @id @default(uuid())
   rootPostId String
   segmentPostId String

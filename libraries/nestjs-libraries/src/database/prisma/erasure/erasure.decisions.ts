@@ -25,6 +25,9 @@ const FRAMEWORK =
   'Mastra framework table, Postiz never writes a tenant key to it; untouched';
 
 export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
+  McpAgentAdmission: { scope: 'org', note: 'durable admission metadata deleted by organization cascade' },
+  McpPublishFence: { scope: 'org', note: 'publication fence metadata deleted by organization cascade' },
+  McpPublishAttempt: { scope: 'org', note: 'provider receipt and attempt metadata deleted by organization cascade' },
   AgentCredential: { scope: 'org', note: 'hash verifier and metadata deleted by organization foreign-key cascade; no recoverable secret' },
   Organization: {
     scope: 'org',
