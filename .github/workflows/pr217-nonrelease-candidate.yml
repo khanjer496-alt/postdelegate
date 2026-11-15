@@ -1,0 +1,56 @@
+name: PR217 NON_RELEASE LOCAL_PREVIEW_FAILED NOT_ACCEPTED candidate
+on:
+  push:
+    branches: [test/pr217-nonrelease-candidate-7c84]
+permissions:
+  contents: read
+concurrency:
+  group: pr217-nonrelease-candidate-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/test/pr217-nonrelease-candidate-7c84' && github.run_attempt == 1 && github.event.created == true && github.event.deleted == false && github.event.forced == false && github.event.before == '0000000000000000000000000000000000000000' && github.repository == 'khanjer496-alt/postdelegate' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+      CANDIDATE_BUILD_AUTHORIZED: REVIEWED_NON_RELEASE_ONLY
+      PRODUCER_WORKFLOW_SHA: ${{ github.workflow_sha }}
+      REVIEWED_PRODUCER_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: producer
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 7c84b1ebffbccb731a972c2ff55e6bc0accea663
+          path: candidate-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.6.1'
+          run_install: false
+      - name: Tiny fake contract checks only
+        run: python3 -I producer/site/scripts/pr217-candidate/test-candidate.py candidate-source
+      - name: Full frozen source build and raw compilation into NON_RELEASE bundle only
+        id: seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="$RUNNER_TEMP/pr217-NON_RELEASE-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          bash producer/site/scripts/pr217-candidate/producer.sh "$GITHUB_WORKSPACE/candidate-source" "$GITHUB_WORKSPACE/producer" "$destination"
+          echo "path=$destination/NON_RELEASE-bundle" >> "$GITHUB_OUTPUT"
+      - name: Store explicitly NOT_ACCEPTED candidate (never site-public release upload)
+        uses: actions/upload-artifact@v4
+        with:
+          name: NON_RELEASE-LOCAL_PREVIEW_FAILED-NOT_ACCEPTED-pr217-7c84b1ebffbccb731a972c2ff55e6bc0accea663-producer-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.seal.outputs.path }}/
+          if-no-files-found: error
+          retention-days: 3
