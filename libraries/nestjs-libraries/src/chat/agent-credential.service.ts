@@ -227,6 +227,17 @@ export class AgentCredentialService {
       if (ctx?.agentCredentialId)
         context?.requestContext?.set('mcpAgentCredential', true);
       const checked = await this.authorizeTool(name, input);
+      if (getContext()?.agentPrincipal && name === 'channelAnalyticsTool') {
+        // Legacy live analytics may refresh/persist credentials or provider
+        // results. A credential READ must never enter that mutation path.
+        return {
+          output: {
+            status: 'UNKNOWN',
+            reason:
+              'Live network analytics are unavailable for agent credentials because this path may refresh credentials or persist provider data. Use analyticsMetricsTool, analyticsTopPostsTool or bestTimeToPostTool for stored history.',
+          },
+        };
+      }
       const result = await execute(checked, context);
       const p = getContext()?.agentPrincipal;
       if (

@@ -15,7 +15,7 @@ Interface: AgentCredentialService.resolve(secret) -> { organization, credentialI
 
 | Operation | Analyst | Draft-only | Publisher |
 | --- | --- | --- | --- |
-| Channel schemas/list, post list, analytics, preflight, workflow guidance | yes | yes | yes |
+| Channel schemas/list, post list, stored analytics, preflight, workflow guidance | yes | yes | yes |
 | Create draft, edit stored DRAFT, submit stored DRAFT for review | no | yes | yes |
 | Schedule/now, edit QUEUE, review QUEUE (unschedule), delete/cancel/resume | no | no | yes |
 | Dynamic provider lookup, import media from URL | no | no | yes |
@@ -31,3 +31,5 @@ Bindings from early review: each nested call reloads expiry/revocation; accepted
 Apply 20261115160000_agent_credentials before new application code, alongside Builder's separately reviewed additive ledger migration. No live migration or key issuance performed here. This migration adds a table/type/index and org foreign key only; no credential backfill/rotation. Existing binaries ignore the table. Roll back app exposure first; retain the table, hashes and revoked markers (never restore an old backup to re-enable revoked keys). If removing schema later, export/retain credential metadata as approved and confirm no new-code process remains before dropping the table/type. Builder's workflow versions additionally require compatibility-aware worker retention/drain; old-image-only rollback is not sufficient for newly accepted jobs. No customer data is deleted by this PR.
 
 Review corrections: Draft-only existing-thread writes use a serializable root/version/state claim and conditional updates with no upsert fallback or group cleanup. Every child must belong to that root chain and remain DRAFT/unpublished; any failure rolls back the whole thread. The editor carries its captured root revision to the transaction. Top-post analytics restricts both metadata and posts before constructing the result. All credential mutations intersect current workspace agent-channel policy without spending creation quota. Server principal-kind and deny-only request-context markers prevent a missing agent ID/context from silently falling back to legacy within an identified restricted request. AgentCredential erasure follows the organization FK cascade. These changes supersede the earlier upsert-predicate design/test assumption.
+
+Live channel/post analytics for new agent credentials returns explicit UNKNOWN without invoking provider, token refresh, disconnect or persistence. Stored history remains readable under channel policy. Legacy live analytics is unchanged. This applies to direct and nested calls for all three presets.
