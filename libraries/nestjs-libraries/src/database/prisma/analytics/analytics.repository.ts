@@ -474,6 +474,9 @@ export class AnalyticsRepository {
       recipients: string[];
       brandName: string | null;
       logoUrl: string | null;
+      brandColor?: string | null;
+      accentColor?: string | null;
+      template?: string | null;
       lastSentAt?: Date;
     }
   ) {

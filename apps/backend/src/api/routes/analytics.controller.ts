@@ -3,10 +3,12 @@ import {
   Controller,
   Get,
   Header,
+  NotFoundException,
   Param,
   Post,
   Put,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -209,6 +211,34 @@ export class AnalyticsController {
       query.to,
       query.timezone
     );
+  }
+
+  // the same report as a PowerPoint deck (PD_FF_REPORT_TEMPLATES)
+  @Get('/reports/pptx')
+  @CheckPolicies([AuthorizationActions.Read, Sections.ANALYTICS_REPORTS])
+  @Header('Cache-Control', 'no-store')
+  async getReportPptx(
+    @GetOrgFromRequest() org: Organization,
+    @Query() query: AnalyticsReportDataDto
+  ) {
+    if (
+      !['on', 'optin'].includes(
+        (process.env.PD_FF_REPORT_TEMPLATES || '').trim().toLowerCase()
+      )
+    ) {
+      throw new NotFoundException();
+    }
+    const { file, filename } = await this._analyticsReportService.getReportPptx(
+      org.id,
+      query.from,
+      query.to,
+      query.timezone
+    );
+    return new StreamableFile(file, {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      disposition: `attachment; filename="${filename}"`,
+      length: file.length,
+    });
   }
 
   @Get('/:integration')

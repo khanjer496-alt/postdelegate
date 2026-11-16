@@ -2350,6 +2350,11 @@ model AnalyticsReportSettings {
   // shown on the report instead of the workspace name and the PostDelegate logo
   brandName      String?
   logoUrl        String?
+  // report template (PD_FF_REPORT_TEMPLATES): #RRGGBB colors and the layout
+  // of the PDF and PowerPoint report; null keeps the default look
+  brandColor     String?
+  accentColor    String?
+  template       String?
   lastSentAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
