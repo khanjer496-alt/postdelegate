@@ -210,7 +210,10 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                 {t('skip_to_content', 'Skip to content')}
               </a>
               <div>{user?.admin ? <Impersonate /> : <div />}</div>
-              {user.tier === 'FREE' && isGeneral && billingEnabled ? (
+              {user.tier === 'FREE' &&
+              !user.freePlan &&
+              isGeneral &&
+              billingEnabled ? (
                 <FirstBillingComponent />
               ) : (
                 <>
