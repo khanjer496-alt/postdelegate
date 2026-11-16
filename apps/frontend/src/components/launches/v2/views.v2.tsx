@@ -20,6 +20,10 @@ import { isUSCitizen } from '@gitroom/frontend/components/launches/helpers/isusc
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { ChannelAvatarV2, IconButton, Pill, PdStatus, statusPill } from './ui.v2';
+import {
+  BestTimeBadge,
+  useBestTimes,
+} from '@gitroom/frontend/components/features/best-times/use.best.times';
 
 const HOUR = 66;
 
@@ -75,6 +79,7 @@ export const WeekViewV2: FC = () => {
   const now = useNow();
   const scroller = useRef<HTMLDivElement>(null);
   const { slots, taken } = useSlotHours();
+  const bestTimes = useBestTimes();
 
   const days = useMemo(() => {
     dayjs.locale(i18next.resolvedLanguage || 'en');
@@ -149,6 +154,9 @@ export const WeekViewV2: FC = () => {
                   slotMinute !== undefined &&
                   cellDate.add(slotMinute, 'minute').isAfter(now) &&
                   !taken.has(cellDate.format('YYYY-MM-DD-HH'));
+                const bestSlot = cellDate.add(59, 'minute').isAfter(now)
+                  ? bestTimes.at(day.day(), hour)
+                  : undefined;
                 return (
                   <div
                     key={`${startDate}-${cellDate.format('YYYY-MM-DD-HH')}`}
@@ -167,6 +175,9 @@ export const WeekViewV2: FC = () => {
                         {t('open_slot', 'Open slot')}{' '}
                         {cellDate.minute(slotMinute).format('HH:mm')}
                       </div>
+                    )}
+                    {bestSlot && (
+                      <BestTimeBadge slot={bestSlot} time={cellDate.format('ddd HH:mm')} />
                     )}
                     <CalendarColumn getDate={cellDate} />
                     {isNowCell && (
