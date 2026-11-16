@@ -99,6 +99,14 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm exec jest --ci --forceExit
 
+      - name: Authenticated QA synthetic helpers and filesystem
+        # Explicit scope: never bootstraps AppModule or opens HTTP/DB/services.
+        run: |
+          export PD_QA_FS_TEST_ROOT="$(mktemp -d "$HOME/pd-mcp-qa-fs.XXXXXX")"
+          chmod 700 "$PD_QA_FS_TEST_ROOT"
+          pnpm exec jest --runInBand --testMatch '**/test/fixtures/mcp-authenticated-qa/*.spec.ts' --runTestsByPath test/fixtures/mcp-authenticated-qa/contract.spec.ts test/fixtures/mcp-authenticated-qa/issuance.spec.ts test/fixtures/mcp-authenticated-qa/protected-store.spec.ts --json --outputFile=/tmp/mcp-qa-fixture-results.json
+          node -e 'const r=require("/tmp/mcp-qa-fixture-results.json"); if(!r.success || r.numPendingTests || r.numTotalTests < 76) process.exit(1)'
+
       - name: Payment webhook PostgreSQL concurrency
         env:
           PAYMENT_LEDGER_TEST_DATABASE_URL: postgresql://postgres:ci-only@localhost:5432/pd_security_ledger_test
@@ -141,7 +149,7 @@ jobs:
           const fs = require('fs');
           const cp = require('child_process');
           const result = { testedCommit: cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim(), testedTree: cp.execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {encoding:'utf8'}).trim(), suites: {} };
-          for (const [name, file] of [['credential','/tmp/mcp-credential-results.json'], ['publication','/tmp/mcp-publication-results.json']]) {
+          for (const [name, file] of [['credential','/tmp/mcp-credential-results.json'], ['publication','/tmp/mcp-publication-results.json'], ['fixture','/tmp/mcp-qa-fixture-results.json']]) {
             if (!fs.existsSync(file)) { result.suites[name] = {status:'NO_RESULT'}; continue; }
             const data = JSON.parse(fs.readFileSync(file, 'utf8'));
             result.suites[name] = { success: data.success, passed: data.numPassedTests, failed: data.numFailedTests, assertions: (data.testResults||[]).flatMap(suite => (suite.assertionResults||[]).map(test => ({name:test.fullName,status:test.status,codes:(test.failureDetails||[]).map(error=>error?.code).filter(code=>typeof code==='number'||(typeof code==='string'&&/^[A-Z0-9_-]{1,40}$/.test(code)))}))) };
