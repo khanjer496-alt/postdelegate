@@ -374,6 +374,7 @@ pg(
     let failNextReceipt = false;
     let failInitialFence = false;
     let failEnqueue = false;
+    let loseStartReply = false;
     let legacyDispatches = 0;
     let projectionGate:
       | {
@@ -598,6 +599,7 @@ pg(
       const temporalService = {
         client: {
           getRawClient: () => ({
+            connection: clientConnection,
             workflow: {
               getHandle: client.workflow.getHandle.bind(client.workflow),
               signalWithStart: async () => {
@@ -612,10 +614,12 @@ pg(
                   failEnqueue = false;
                   throw new Error('Owned pre-RPC enqueue fault.');
                 }
-                return client.workflow.start(name, {
+                const started = await client.workflow.start(name, {
                   ...options,
                   workflowExecutionTimeout: '2 minutes',
                 });
+                if (loseStartReply) { loseStartReply = false; throw new Error('Owned accepted-start response-loss fault.'); }
+                return started;
               },
             },
           }),
@@ -919,8 +923,11 @@ pg(
         expect(await posts.resumeMcp(org, id)).toMatchObject({
           status: 'BLOCKED',
         });
-        await approvals.approve(org, id, actor);
+        failEnqueue = true;
+        await expect(approvals.approve(org, id, actor)).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED', savedPostIds: [id] });
         const generation = (await repo.mcpFence(org, id))!.generation;
+        await db.mcpPublishFence.update({ where: { postId: id }, data: { dispatchNotBefore: new Date(0) } });
+        expect(await posts.recoverPendingMcpDispatches()).toMatchObject({ confirmed: 1 });
         await waitForRun(id, generation);
         expect(
           (await db.post.findUniqueOrThrow({ where: { id } })).releaseId
@@ -1137,7 +1144,7 @@ pg(
           .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id!)
       ).toHaveLength(1);
     }, 60000);
-    it('an initial fence fault rolls back QUEUE visibility and an enqueue fault is recovered only by the actual V114 sweep route', async () => {
+    it('an initial fence fault rolls back QUEUE visibility and a failed start returns saved IDs then recovers from the durable dispatch record', async () => {
       const before = await db.post.count({ where: { organizationId: org } });
       failInitialFence = true;
       await expect(create(1)).rejects.toThrow();
@@ -1145,7 +1152,10 @@ pg(
         before
       );
       failEnqueue = true;
-      const id = await create(1);
+      let failure: any;
+      try { await create(1); } catch (error) { failure = error; }
+      expect(failure?.code).toBe('DISPATCH_UNCONFIRMED');
+      const id = failure.savedPostIds[0];
       expect(await db.post.findUniqueOrThrow({ where: { id } })).toMatchObject({
         state: 'QUEUE',
         mcpWorkflowVersion: 114,
@@ -1159,7 +1169,8 @@ pg(
           .events()
           .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id)
       ).toHaveLength(0);
-      await activity.searchForMissingThreeHoursPosts();
+      await db.mcpPublishFence.update({ where: { postId: id }, data: { dispatchNotBefore: new Date(0) } });
+      expect(await posts.recoverPendingMcpDispatches()).toMatchObject({ confirmed: 1 });
       await waitForRun(id, 0);
       expect(legacyDispatches).toBe(0);
       expect(
@@ -1167,6 +1178,49 @@ pg(
           .events()
           .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id)
       ).toHaveLength(1);
+    }, 60000);
+    it('an accepted execution that completes before a lost start response is reconciled without another run or provider acceptance', async () => {
+      loseStartReply = true;
+      let failure: any;
+      try { await create(1); } catch (error) { failure = error; }
+      expect(failure?.code).toBe('DISPATCH_UNCONFIRMED');
+      const id = failure.savedPostIds[0];
+      await waitForRun(id, 0);
+      const completed = await client.workflow.getHandle(`post_${id}_mcp_0`).describe();
+      await db.mcpPublishFence.update({ where: { postId: id }, data: { dispatchNotBefore: new Date(0) } });
+      expect(await posts.recoverPendingMcpDispatches()).toMatchObject({ confirmed: 1 });
+      expect((await client.workflow.getHandle(`post_${id}_mcp_0`).describe()).runId).toBe(completed.runId);
+      expect((await client.workflow.getHandle(`post_${id}_mcp_0`).describe()).status.name).toBe('COMPLETED');
+      expect(adapter.events().filter(event => event.kind === 'ACCEPT' && event.segmentId === id)).toHaveLength(1);
+      expect((await repo.mcpFence(org, id))!.generation).toBe(0);
+      expect((await repo.mcpFence(org, id))!.dispatchState).toBe('CONFIRMED');
+    }, 60000);
+    it('concurrent dispatchers converge on the same real Temporal generation with one provider acceptance', async () => {
+      failEnqueue = true;
+      let failure: any;
+      try { await create(1); } catch (error) { failure = error; }
+      expect(failure?.code).toBe('DISPATCH_UNCONFIRMED');
+      const id = failure.savedPostIds[0];
+      await db.mcpPublishFence.update({ where: { postId: id }, data: { dispatchNotBefore: new Date(0) } });
+      await Promise.all([posts.recoverPendingMcpDispatches(), posts.recoverPendingMcpDispatches()]);
+      await waitForRun(id, 0);
+      expect(adapter.events().filter(event => event.kind === 'ACCEPT' && event.segmentId === id)).toHaveLength(1);
+      expect((await repo.mcpFence(org, id))!.generation).toBe(0);
+      expect((await repo.mcpFence(org, id))!.dispatchState).toBe('CONFIRMED');
+    }, 60000);
+    it('future dispatch records recover promptly without waiting for the due-date sweep', async () => {
+      failEnqueue = true;
+      let failure: any;
+      try { await create(1, [], new Date(Date.now() + 60000).toISOString()); } catch (error) { failure = error; }
+      expect(failure?.code).toBe('DISPATCH_UNCONFIRMED');
+      const id = failure.savedPostIds[0];
+      await db.mcpPublishFence.update({ where: { postId: id }, data: { dispatchNotBefore: new Date(0) } });
+      expect(await posts.recoverPendingMcpDispatches()).toMatchObject({ confirmed: 1 });
+      expect((await client.workflow.getHandle(`post_${id}_mcp_0`).describe()).status.name).toBe('RUNNING');
+      expect(await posts.unscheduleMcp(org, id)).toMatchObject({ status: 'UNSCHEDULED' });
+      // Retire only this fixture-owned cancelled sleeping execution.
+      await client.workflow.getHandle(`post_${id}_mcp_0`).terminate('Fixture cancelled before due date.');
+      expect(adapter.events().filter(event => event.kind === 'ACCEPT' && event.segmentId === id)).toHaveLength(0);
     }, 60000);
     it('an unchanged-date edit immediately dispatches the correct new generation while the old real workflow is sleeping', async () => {
       const future = new Date(Date.now() + 5000);

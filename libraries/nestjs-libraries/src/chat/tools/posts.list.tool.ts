@@ -68,6 +68,7 @@ Each item has an "id", its publish date, state, error (for errored posts), conte
                   'Curated failure message for errored posts, null otherwise'
                 ),
               warning: z.string().optional().describe('Ancillary follow-up warning; a PUBLISHED post remains published'),
+              dispatch: z.object({ generation: z.number(), status: z.string(), code: z.string().nullable() }).optional().describe('Tracked workflow dispatch only; CONFIRMED is not proof of provider publication'),
               content: z.string(),
               settings: z
                 .any()
@@ -92,6 +93,8 @@ Each item has an "id", its publish date, state, error (for errored posts), conte
           customer: inputData.customer,
         } as any);
 
+        const dispatches = await this._postsService.getMcpDispatchStatuses(organizationId, (posts || []).map(p => p.id));
+        const dispatchByPost = new Map(dispatches.map(row => [row.postId, { generation: row.generation, status: row.dispatchState, code: row.dispatchErrorCode }]));
         const warnings = await this._postsService.getMcpWarnings(organizationId, (posts || []).map(p => p.id));
         const warningByPost = new Map(warnings.map(warning => [warning.segmentPostId, warning.followUpWarning]));
         return {
@@ -104,6 +107,7 @@ Each item has an "id", its publish date, state, error (for errored posts), conte
               state: p.state,
               error: p.error ?? null,
               ...(warningByPost.has(p.id) ? { warning: warningByPost.get(p.id) } : {}),
+              ...(dispatchByPost.has(p.id) ? { dispatch: dispatchByPost.get(p.id) } : {}),
               content: p.content || '',
               settings: parseSettings(p.settings),
               group: p.group,

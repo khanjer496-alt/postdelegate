@@ -1,3 +1,4 @@
+import { McpDispatchUnconfirmed } from '../../database/prisma/posts/mcp.dispatch.status';
 import { AgentSaveRecovered } from '../../database/prisma/posts/agent-admission.context';
 import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import { createTool } from '@mastra/core/tools';
@@ -140,7 +141,7 @@ export const schedulePostOutputSchema = z.object({
           ),
       })
     )
-    .or(z.object({ errors: z.string() })),
+    .or(z.object({ errors: z.string(), code: z.literal('DISPATCH_UNCONFIRMED').optional(), savedPostIds: z.array(z.string()).optional() })),
 });
 
 @Injectable()
@@ -370,6 +371,7 @@ If validation fails, or the workspace limits what agents can do (allowed channel
           ...((options.forReview ? [undefined, 'review'] : []) as [undefined?, 'review'?])
         );
       } catch (err) {
+        if (err instanceof McpDispatchUnconfirmed) return { output: { errors: err.message, code: err.code, savedPostIds: [...new Set([...finalOutput.map(post => post.postId), ...err.savedPostIds])] } };
         // a plan limit (402) carries the message written for the customer
         if (
           err instanceof BadRequestException ||

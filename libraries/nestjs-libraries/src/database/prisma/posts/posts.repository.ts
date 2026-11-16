@@ -182,7 +182,7 @@ export class PostsRepository {
       if (!locked.count || await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } })) throw new BadRequestException('The remaining thread is publishing or uncertain.');
       const root = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId, state: 'PUBLISHED', mcpWorkflowVersion: 114, updatedAt, deletedAt: null } });
       if (!root) throw new BadRequestException('The remaining thread changed. Refresh before reviewing.');
-      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'CANCELLED' } });
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
       await tx.post.update({ where: { id: rootId }, data: { approvalStatus: status } });
       await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { not: 'PUBLISHED' }, deletedAt: null, releaseId: null, releaseURL: null }, data: { state: 'DRAFT', approvalStatus: status } });
       return { id: rootId, state: 'PUBLISHED', approvalStatus: status, remainingHeld: true };
@@ -198,7 +198,7 @@ export class PostsRepository {
       if (!root || await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } })) throw new BadRequestException('The remaining thread changed or has an uncertain attempt.');
       await tx.post.update({ where: { id: rootId }, data: { approvalStatus: 'APPROVED' } });
       await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, state: 'DRAFT', releaseId: null, releaseURL: null }, data: { state: 'QUEUE', approvalStatus: 'APPROVED' } });
-      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'ACTIVE', generation: { increment: 1 } } });
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'ACTIVE', generation: { increment: 1 }, dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } });
       return { id: rootId, state: 'PUBLISHED', approvalStatus: 'APPROVED', remainingScheduled: true };
     }, { isolationLevel: 'Serializable' });
   }
@@ -208,7 +208,7 @@ export class PostsRepository {
       await this.assertSaveAdmission(tx, orgId);
       const root = await tx.post.findFirst({ where: { id: postId, organizationId: orgId, state: 'QUEUE', approvalStatus: 'APPROVED', deletedAt: null } });
       if (!root) throw new BadRequestException('Approved revision is no longer queued.');
-      await tx.mcpPublishFence.updateMany({ where: { postId, organizationId: orgId, state: 'CANCELLED' }, data: { state: 'ACTIVE', generation: { increment: 1 } } });
+      await tx.mcpPublishFence.updateMany({ where: { postId, organizationId: orgId, state: 'CANCELLED' }, data: { state: 'ACTIVE', generation: { increment: 1 }, dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } });
     }, { isolationLevel: 'Serializable' });
   }
   async mcpFence(orgId: string, rootId: string) {
@@ -224,6 +224,11 @@ export class PostsRepository {
   async mcpWarnings(orgId: string, postIds: string[]) {
     if (!postIds.length) return [];
     return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.findMany({ where: { organizationId: orgId, segmentPostId: { in: postIds }, status: 'CONFIRMED', followUpWarning: { not: null } }, select: { segmentPostId: true, followUpWarning: true } }));
+  }
+
+  async mcpDispatchStatuses(orgId: string, postIds: string[]) {
+    if (!postIds.length) return [];
+    return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findMany({ where: { organizationId: orgId, postId: { in: postIds } }, select: { postId: true, generation: true, dispatchState: true, dispatchErrorCode: true } }));
   }
 
   async mcpAttempts(orgId: string, rootId: string) {
@@ -256,10 +261,21 @@ export class PostsRepository {
       if (!root || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) return { status: 'BLOCKED', reason: 'Human review is required.' };
       const remaining = await tx.post.count({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, state: { not: 'PUBLISHED' } } });
       if (!remaining) return { status: 'ALREADY_PUBLISHED' };
-      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { generation: { increment: 1 }, state: 'ACTIVE' } });
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { generation: { increment: 1 }, state: 'ACTIVE', dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } });
       await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, releaseId: null, releaseURL: null, state: { not: 'PUBLISHED' } }, data: { state: 'QUEUE' } });
       return { status: 'RESUMED' };
     }, { isolationLevel: 'Serializable' }).catch(error => { if (error instanceof AgentSaveRecovered) throw error; return ({ status: error instanceof BadRequestException || (error as any)?.code === 'P2034' ? 'BLOCKED' : 'OUTCOME_UNKNOWN', reason: 'The publication state changed or could not be confirmed. Inspect the post before retrying.' }); });
+  }
+
+  async pendingMcpDispatches(limit = 16) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findMany({ where: { state: 'ACTIVE', dispatchState: { in: ['PENDING', 'UNKNOWN'] }, dispatchNotBefore: { lte: new Date() } }, orderBy: [{ dispatchNotBefore: 'asc' }, { createdAt: 'asc' }], take: Math.max(1, Math.min(limit, 16)) }));
+  }
+
+  async recordMcpDispatch(orgId: string, rootId: string, generation: number, revisionHash: string, status: 'CONFIRMED' | 'UNKNOWN' | 'HELD' | 'NONE', code: string | null = null, sent = false) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      return tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId, state: 'ACTIVE', generation, revisionHash }, data: { dispatchState: status, dispatchErrorCode: code, dispatchNotBefore: new Date(Date.now() + 30000), ...(sent ? { dispatchAttempts: { increment: 1 } } : {}), ...(status === 'CONFIRMED' ? { dispatchConfirmedAt: new Date() } : {}) } });
+    });
   }
 
   async mcpWorkflowVersion(orgId: string, postId: string) {
@@ -273,8 +289,9 @@ export class PostsRepository {
     if (!root || root.mcpWorkflowVersion !== 114) return;
     const revisionHash = mcpPayloadRevision(posts);
     const previous = await tx.mcpPublishFence.findUnique({ where: { postId: root.id } });
-    await tx.mcpPublishFence.upsert({ where: { postId: root.id }, create: { postId: root.id, organizationId: orgId, integrationId: root.integrationId, revisionHash }, update: {
-      revisionHash, ...(previous && previous.revisionHash !== revisionHash ? { generation: { increment: 1 } } : {}),
+    await tx.mcpPublishFence.upsert({ where: { postId: root.id }, create: { postId: root.id, organizationId: orgId, integrationId: root.integrationId, revisionHash, dispatchState: root.state === 'QUEUE' ? 'PENDING' : 'NONE' }, update: {
+      revisionHash, dispatchState: root.state === 'QUEUE' ? 'PENDING' : 'NONE', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null,
+      ...(previous && previous.revisionHash !== revisionHash ? { generation: { increment: 1 } } : {}),
       ...(previous?.state === 'EDITING' ? { state: 'ACTIVE' } : {}),
     } });
   }
@@ -287,7 +304,7 @@ export class PostsRepository {
         const attempts = await tx.mcpPublishAttempt.count({ where: { rootPostId: postId } });
         if (attempts) throw new BadRequestException('Publication attempts exist; changing their payload is blocked.');
       }
-      await tx.mcpPublishFence.upsert({ where: { postId }, create: { postId, organizationId: orgId, integrationId, revisionHash }, update: { revisionHash, ...(existing?.revisionHash !== revisionHash ? { generation: { increment: 1 } } : {}), ...(existing?.state === 'EDITING' ? { state: 'ACTIVE' } : {}) } });
+      await tx.mcpPublishFence.upsert({ where: { postId }, create: { postId, organizationId: orgId, integrationId, revisionHash }, update: { revisionHash, ...(existing?.revisionHash !== revisionHash ? { generation: { increment: 1 }, dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } : {}), ...(existing?.state === 'EDITING' ? { state: 'ACTIVE' } : {}) } });
       await tx.post.update({ where: { id: postId, organizationId: orgId }, data: { mcpWorkflowVersion: 114 } });
     }, { isolationLevel: 'Serializable' });
   }
@@ -347,7 +364,7 @@ export class PostsRepository {
       if (attempts.some(a => ['STARTED', 'UNKNOWN', 'PENDING'].includes(a.status))) return { status: 'OUTCOME_UNKNOWN', reason: 'An admitted attempt must be reconciled before cancellation.' };
       const root = await tx.post.findFirst({ where: { id: rootPostId, organizationId: orgId, deletedAt: null, parentPostId: null } });
       if (!root) throw new BadRequestException('Post not found.');
-      await tx.mcpPublishFence.update({ where: { postId: rootPostId }, data: { state: 'CANCELLED' } });
+      await tx.mcpPublishFence.update({ where: { postId: rootPostId }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
       const remaining = await tx.post.count({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { not: 'PUBLISHED' }, deletedAt: null } });
       if (remaining && root.state === 'PUBLISHED' && (requireReview || ['APPROVED', 'IN_REVIEW'].includes(root.approvalStatus))) await tx.post.update({ where: { id: rootPostId }, data: { approvalStatus: 'IN_REVIEW' } });
       await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { in: ['QUEUE', 'DRAFT', 'ERROR'] }, deletedAt: null, releaseId: null, releaseURL: null }, data: { state: 'DRAFT', ...(preserveApproval ? {} : { approvalStatus: (requireReview || ['APPROVED', 'IN_REVIEW'].includes(root.approvalStatus)) ? 'IN_REVIEW' : 'NONE' }) } });
@@ -675,7 +692,7 @@ export class PostsRepository {
       for (const root of [...tracked].sort((a, b) => a.id.localeCompare(b.id))) {
         const fence = await tx.mcpPublishFence.updateMany({ where: { postId: root.id, organizationId: orgId }, data: { updatedAt: new Date() } });
         if (!fence.count || await tx.mcpPublishAttempt.count({ where: { rootPostId: root.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } })) throw new BadRequestException('This publication is active or uncertain. Reconcile it before deleting; deletion cannot prove it was cancelled.');
-        await tx.mcpPublishFence.update({ where: { postId: root.id }, data: { state: 'CANCELLED' } });
+        await tx.mcpPublishFence.update({ where: { postId: root.id }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
       }
       await tx.post.updateMany({ where: { organizationId: orgId, group, deletedAt: null }, data: { deletedAt: new Date() } });
       return { id: tracked[0].id };

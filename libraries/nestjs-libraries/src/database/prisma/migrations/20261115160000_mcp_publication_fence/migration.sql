@@ -34,6 +34,11 @@ CREATE TABLE "McpPublishFence" (
     "revisionHash" TEXT NOT NULL,
     "state" TEXT NOT NULL DEFAULT 'ACTIVE',
     "generation" INTEGER NOT NULL DEFAULT 0,
+    "dispatchState" TEXT NOT NULL DEFAULT 'PENDING',
+    "dispatchAttempts" INTEGER NOT NULL DEFAULT 0,
+    "dispatchNotBefore" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "dispatchConfirmedAt" TIMESTAMP(3),
+    "dispatchErrorCode" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -66,6 +71,9 @@ CREATE INDEX "McpAgentAdmissionRecovery_organizationId_idx" ON "McpAgentAdmissio
 CREATE INDEX "McpPublishFence_organizationId_idx" ON "McpPublishFence"("organizationId");
 
 -- CreateIndex
+CREATE INDEX "McpPublishFence_state_dispatchState_dispatchNotBefore_idx" ON "McpPublishFence"("state", "dispatchState", "dispatchNotBefore");
+
+-- CreateIndex
 CREATE INDEX "McpPublishAttempt_organizationId_rootPostId_idx" ON "McpPublishAttempt"("organizationId", "rootPostId");
 
 -- CreateIndex
@@ -82,4 +90,3 @@ ALTER TABLE "McpPublishFence" ADD CONSTRAINT "McpPublishFence_organizationId_fke
 
 -- AddForeignKey
 ALTER TABLE "McpPublishAttempt" ADD CONSTRAINT "McpPublishAttempt_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

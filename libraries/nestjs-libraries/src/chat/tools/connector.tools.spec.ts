@@ -24,6 +24,8 @@ jest.mock(
 );
 
 import 'reflect-metadata';
+import { McpDispatchUnconfirmed } from '../../database/prisma/posts/mcp.dispatch.status';
+import { PostsListTool } from './posts.list.tool';
 import { BadRequestException } from '@nestjs/common';
 import { runWithContext } from '@gitroom/nestjs-libraries/chat/async.storage';
 import { IntegrationSchedulePostTool } from '@gitroom/nestjs-libraries/chat/tools/integration.schedule.post';
@@ -146,6 +148,16 @@ describe('createPostForReviewTool', () => {
     const result = await call(tool, input);
     expect(result.output.errors).toContain('saved-one');
     expect(result.output.errors).toContain('do not recreate');
+  });
+
+  it('returns dispatch uncertainty and all saved IDs without recreating a later failed batch item', async () => {
+    const { schedule, postsService } = build();
+    postsService.createPost.mockResolvedValueOnce([{ postId: 'saved-first', integration: 'int-1' }]).mockRejectedValueOnce(new McpDispatchUnconfirmed('saved-second', 2));
+    const input = socialPost('schedule');
+    input.socialPost.push({ ...input.socialPost[0] });
+    const result = await call(schedule, input);
+    expect(result.output).toMatchObject({ code: 'DISPATCH_UNCONFIRMED', savedPostIds: ['saved-first', 'saved-second'] });
+    expect(postsService.createPost).toHaveBeenCalledTimes(2);
   });
 
   it('never publishes "now" posts directly', async () => {
@@ -498,5 +510,19 @@ describe('analytics tools', () => {
     ]) {
       expect(requiredMcpScope(name)).toBe('mcp:write');
     }
+  });
+});
+
+
+describe('tracked dispatch read receipt', () => {
+  it('looks up only returned post IDs and adds no dispatch object to legacy rows', async () => {
+    const posts = { getPosts: jest.fn().mockResolvedValue([
+      { id: 'tracked', state: 'QUEUE', group: 'group', publishDate: new Date(), integration: { id: 'channel', providerIdentifier: 'fixture', name: 'Fixture' } },
+      { id: 'legacy', state: 'DRAFT', group: 'group', publishDate: new Date(), integration: { id: 'channel', providerIdentifier: 'fixture', name: 'Fixture' } },
+    ]), getMcpWarnings: jest.fn().mockResolvedValue([]), getMcpDispatchStatuses: jest.fn().mockResolvedValue([{ postId: 'tracked', generation: 2, dispatchState: 'UNKNOWN', dispatchErrorCode: 'START_UNCONFIRMED' }]) };
+    const result = await call(new PostsListTool(posts as any), { startDate: '2026-01-01', endDate: '2027-01-01' });
+    expect(posts.getMcpDispatchStatuses).toHaveBeenCalledWith('org-1', ['tracked', 'legacy']);
+    expect(result.output.posts[0].dispatch).toEqual({ generation: 2, status: 'UNKNOWN', code: 'START_UNCONFIRMED' });
+    expect(result.output.posts[1]).not.toHaveProperty('dispatch');
   });
 });

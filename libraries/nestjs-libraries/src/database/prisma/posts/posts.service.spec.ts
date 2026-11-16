@@ -2355,7 +2355,7 @@ describe('exact-generation execution liveness and remainder policy', () => {
     (postRepository as any).mcpFence = jest.fn().mockResolvedValue({ generation: 3 });
     const describe = jest.fn().mockResolvedValue({ status: { name: 'RUNNING' } });
     const getHandle = jest.fn(() => ({ describe }));
-    (service as any)._temporalService = { client: { getRawClient: () => ({ workflow: { getHandle } }) } };
+    (service as any)._temporalService = { client: { getRawClient: () => ({ connection: { withDeadline: (_deadline: number, fn: any) => fn() }, workflow: { getHandle } }) } };
     expect(await service.mcpExecutionState('org', 'root')).toEqual({ generation: 3, closed: false });
     expect(getHandle).toHaveBeenCalledWith('post_root_mcp_3');
     describe.mockResolvedValue({ status: { name: 'COMPLETED' } });
@@ -2389,5 +2389,105 @@ describe('MCP producer rollout gate', () => {
       await expect(service.createPost('org', { type: 'draft', posts: [{ integration: { id: 'channel' } }] } as any, 'MCP', false, { type: 'agent', source: 'test' })).rejects.toThrow('temporarily unavailable');
       expect(postRepository.acquireAgentAdmission).not.toHaveBeenCalled();
     } finally { process.env.MCP_V114_ADMISSION_ENABLED = before; }
+  });
+});
+
+
+describe('durable exact-generation MCP dispatch', () => {
+  const setup = () => {
+    const { service, postRepository } = makeService();
+    const rows: any[] = [{ id: 'root', integrationId: 'channel', state: 'QUEUE', integration: { providerIdentifier: 'fixture' } }];
+    jest.spyOn(service, 'mcpThread').mockResolvedValue(rows);
+    jest.spyOn(service, 'mcpRevision').mockReturnValue('revision');
+    const fence = { organizationId: 'org', postId: 'root', state: 'ACTIVE', generation: 4, revisionHash: 'revision' };
+    Object.assign(postRepository, {
+      mcpFence: jest.fn().mockResolvedValue(fence),
+      mcpAttempts: jest.fn().mockResolvedValue([]),
+      recordMcpDispatch: jest.fn().mockResolvedValue({ count: 1 }),
+      pendingMcpDispatches: jest.fn().mockResolvedValue([fence]),
+    });
+    const missing = Object.assign(new Error('missing'), { name: 'WorkflowNotFoundError' });
+    const describe = jest.fn().mockRejectedValue(missing);
+    const start = jest.fn().mockResolvedValue({});
+    const getHandle = jest.fn(() => ({ describe }));
+    const withDeadline = jest.fn((_deadline: number, fn: any) => fn());
+    (service as any)._temporalService = { client: { getRawClient: () => ({ connection: { withDeadline }, workflow: { getHandle, start } }) } };
+    return { service, repo: postRepository as any, rows, fence, missing, describe, start, getHandle, withDeadline };
+  };
+
+  it('returns saved identity on a pre-start failure and recovers the same generation after a scheduler restart', async () => {
+    const { service, repo, start, getHandle, withDeadline } = setup();
+    start.mockRejectedValueOnce(new Error('before RPC'));
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED', savedPostIds: ['root'] });
+    expect(repo.recordMcpDispatch).toHaveBeenLastCalledWith('org', 'root', 4, 'revision', 'UNKNOWN', 'START_UNCONFIRMED');
+    expect(await service.recoverPendingMcpDispatches()).toEqual({ examined: 1, confirmed: 1, unconfirmed: 0 });
+    expect(start.mock.calls.map(call => call[1])).toEqual([expect.objectContaining({ workflowId: 'post_root_mcp_4', workflowIdReusePolicy: 'REJECT_DUPLICATE', workflowIdConflictPolicy: 'USE_EXISTING' }), expect.objectContaining({ workflowId: 'post_root_mcp_4' })]);
+    expect(getHandle).toHaveBeenCalledWith('post_root_mcp_4');
+    expect(withDeadline).toHaveBeenCalledWith(expect.any(Number), expect.any(Function));
+  });
+
+  it.each(['RUNNING', 'COMPLETED', 'FAILED', 'TERMINATED'])('acknowledges an accepted %s execution after a lost start response without starting again', async status => {
+    const { service, start, describe } = setup();
+    start.mockRejectedValueOnce(new Error('response lost'));
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    describe.mockResolvedValue({ status: { name: status } });
+    await service.recoverPendingMcpDispatches();
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['network', 'invalid-status'])('keeps %s inspection uncertain without another start or a new generation', async mode => {
+    const { service, start, describe, repo } = setup();
+    if (mode === 'network') describe.mockRejectedValue(new Error('timeout'));
+    else describe.mockResolvedValue({ status: { name: 'unrecognized' } });
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    expect(start).not.toHaveBeenCalled();
+    expect(repo.recordMcpDispatch).toHaveBeenLastCalledWith('org', 'root', 4, 'revision', 'UNKNOWN', 'STATUS_UNCONFIRMED');
+  });
+
+  it('recognizes a duplicate closed execution rejected at start without replaying it', async () => {
+    const { service, start, describe } = setup();
+    start.mockRejectedValue(Object.assign(new Error('duplicate'), { name: 'WorkflowExecutionAlreadyStartedError' }));
+    describe.mockRejectedValueOnce(Object.assign(new Error('not retained yet'), { name: 'WorkflowNotFoundError' })).mockResolvedValue({ status: { name: 'COMPLETED' } });
+    await service.reconcileMcpDispatch('org', 'root', 4, 'revision');
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start.mock.calls[0][1].workflowIdReusePolicy).toBe('REJECT_DUPLICATE');
+  });
+
+  it('does not start when retention has lost a workflow that already has a provider attempt', async () => {
+    const { service, repo, start } = setup();
+    repo.mcpAttempts.mockResolvedValue([{ generation: 4, status: 'CONFIRMED' }]);
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    expect(start).not.toHaveBeenCalled();
+    expect(repo.recordMcpDispatch).toHaveBeenLastCalledWith('org', 'root', 4, 'revision', 'HELD', 'PROVIDER_RECONCILIATION_REQUIRED');
+  });
+
+  it.each(['future', 'old', 'published-root'])('dispatches an outbox record for %s without the due-root sweep', async kind => {
+    const { service, rows, start } = setup();
+    rows[0].publishDate = new Date(kind === 'old' ? '2000-01-01' : '2100-01-01');
+    if (kind === 'published-root') { rows[0].state = 'PUBLISHED'; rows.push({ id: 'reply', state: 'QUEUE' }); }
+    expect(await service.recoverPendingMcpDispatches()).toMatchObject({ confirmed: 1 });
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['cancel', 'edit'])('refuses stale dispatch admission after a concurrent %s', async () => {
+    const { service, repo, start } = setup();
+    repo.recordMcpDispatch.mockResolvedValue({ count: 0 });
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('lets concurrent dispatchers use one stable Temporal identity with closed-run reuse forbidden', async () => {
+    const { service, start } = setup();
+    await Promise.all([service.reconcileMcpDispatch('org', 'root', 4, 'revision'), service.reconcileMcpDispatch('org', 'root', 4, 'revision')]);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start.mock.calls.every(call => call[1].workflowId === 'post_root_mcp_4' && call[1].workflowIdReusePolicy === 'REJECT_DUPLICATE')).toBe(true);
+    // One actual execution is asserted by the native Temporal fixture, not this mock.
+  });
+
+  it('does not starve another pending generation when one row is unavailable', async () => {
+    const { service, repo, fence } = setup();
+    repo.pendingMcpDispatches.mockResolvedValue([fence, { ...fence, postId: 'next' }]);
+    jest.spyOn(service, 'reconcileMcpDispatch').mockRejectedValueOnce(new Error('DB unavailable')).mockResolvedValueOnce(undefined);
+    expect(await service.recoverPendingMcpDispatches()).toEqual({ examined: 2, confirmed: 1, unconfirmed: 1 });
   });
 });

@@ -64,6 +64,7 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     ).id;
   });
   beforeEach(async () => {
+    await db.mcpPublishFence.updateMany({ where: { organizationId: org }, data: { dispatchState: 'CONFIRMED' } });
     root = randomUUID();
     child = randomUUID();
     await db.post.create({
@@ -340,8 +341,40 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     expect(await repo.mcpFence(org, post.id)).toMatchObject({
       revisionHash: expect.any(String),
       state: 'ACTIVE',
+      dispatchState: 'PENDING',
     });
+    expect((await repo.pendingMcpDispatches()).some(row => row.postId === post.id)).toBe(true);
     // Simulated process death before the service's redundant registration does not erase either record.
+  });
+
+  it('dispatch markers survive process loss and select future, old and published-parent remainder jobs', async () => {
+    await db.post.update({ where: { id: root }, data: { state: 'PUBLISHED' } });
+    await db.post.update({ where: { id: child }, data: { publishDate: new Date('2000-01-01') } });
+    const pending = await repo.pendingMcpDispatches();
+    expect(pending.some(row => row.postId === root)).toBe(true);
+    await repo.recordMcpDispatch(org, root, 0, revision, 'UNKNOWN', 'START_UNCONFIRMED', true);
+    expect(await repo.mcpFence(org, root)).toMatchObject({ dispatchState: 'UNKNOWN', dispatchAttempts: 1 });
+    expect((await repo.pendingMcpDispatches()).some(row => row.postId === root)).toBe(false);
+    await db.mcpPublishFence.update({ where: { postId: root }, data: { dispatchNotBefore: new Date(0) } });
+    expect((await repo.pendingMcpDispatches()).some(row => row.postId === root)).toBe(true);
+    await repo.unscheduleMcp(org, root);
+    expect((await repo.recordMcpDispatch(org, root, 0, revision, 'CONFIRMED')).count).toBe(0);
+    expect((await repo.pendingMcpDispatches()).some(row => row.postId === root)).toBe(false);
+  });
+
+  it('concurrent cancellation cannot be undone by a late dispatch acknowledgement', async () => {
+    const results = await Promise.allSettled([
+      repo.recordMcpDispatch(org, root, 0, revision, 'CONFIRMED'),
+      repo.unscheduleMcp(org, root),
+    ]);
+    const cancellation = results[1];
+    if (cancellation.status === 'fulfilled' && cancellation.value.status === 'UNSCHEDULED') {
+      expect(await repo.mcpFence(org, root)).toMatchObject({ state: 'CANCELLED', dispatchState: 'CANCELLED' });
+      expect((await repo.recordMcpDispatch(org, root, 0, revision, 'CONFIRMED')).count).toBe(0);
+    } else {
+      // A serialization conflict is a refused cancellation, never success.
+      expect(cancellation.status === 'rejected' || cancellation.value.status !== 'UNSCHEDULED').toBe(true);
+    }
   });
 
   it('a terminal generation with no admitted attempts can recover, while stale closure proof cannot restart its successor', async () => {

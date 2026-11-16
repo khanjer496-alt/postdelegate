@@ -2478,9 +2478,15 @@ model McpPublishFence {
   revisionHash String
   state String @default("ACTIVE")
   generation Int @default(0)
+  dispatchState String @default("PENDING")
+  dispatchAttempts Int @default(0)
+  dispatchNotBefore DateTime @default(now())
+  dispatchConfirmedAt DateTime?
+  dispatchErrorCode String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([organizationId])
+  @@index([state, dispatchState, dispatchNotBefore])
 }
 
 model McpPublishAttempt {

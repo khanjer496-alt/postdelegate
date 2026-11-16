@@ -188,7 +188,7 @@ export class ApprovalsRepository {
         const entries = await tx.post.findMany({ where: { organizationId, group: post.group, deletedAt: null }, select: { id: true } });
         await tx.mcpAgentAdmission.update({ where: { organizationId, owner: admission.owner }, data: { writtenPostIds: [...new Set([...(current.writtenPostIds as string[]), ...entries.map(entry => entry.id)])] } });
       }
-      if (previousFenceState !== undefined) await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED', ...(data.state === 'QUEUE' && previousFenceState === 'CANCELLED' ? { generation: { increment: 1 } } : {}) } });
+      if (previousFenceState !== undefined) await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED', dispatchState: data.state === 'QUEUE' ? 'PENDING' : 'CANCELLED', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null, ...(data.state === 'QUEUE' && previousFenceState === 'CANCELLED' ? { generation: { increment: 1 } } : {}) } });
       return true;
     });
   }

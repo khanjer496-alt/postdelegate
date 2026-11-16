@@ -89,3 +89,8 @@ New MCP jobs use a versioned workflow and durable per-segment admission/receipt 
 For new per-agent credentials, `channelAnalyticsTool` returns UNKNOWN before any provider call or credential refresh. Use the cached history tools within your permitted channels. Legacy workspace keys/OAuth keep their existing live-read behavior. Partial cancellation returns the preserved published segment IDs; ALREADY_PUBLISHED means there was no unpublished remainder to cancel. A held remainder needs human approval of that current revision, without republishing its parent.
 
 A confirmed publication can have an ancillary warning, such as a video that is live but whose thumbnail change failed. `postsListTool` returns an optional `warning` while keeping state PUBLISHED. This does not authorize a resend.
+
+
+### Saved post with unconfirmed dispatch
+
+A tracked schedule/edit can return `DISPATCH_UNCONFIRMED` with `savedPostIds` if the workflow start cannot be confirmed. Those posts already exist: do not recreate them. PostDelegate keeps the exact generation in its durable dispatch queue and reconciles it automatically when Temporal is reachable. `postsListTool` adds an optional `dispatch` object with its generation, status and curated code for tracked roots. Dispatch `CONFIRMED` means the workflow exists or was accepted; the post state and publication receipt determine whether it actually published. An unknown provider outcome still blocks a fresh send.

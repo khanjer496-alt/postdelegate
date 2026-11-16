@@ -1,3 +1,4 @@
+import { McpDispatchUnconfirmed } from './mcp.dispatch.status';
 import { getContext } from '../../../chat/async.storage';
 import { hostname } from 'os';
 import { readFile } from 'fs/promises';
@@ -1229,12 +1230,92 @@ export class PostsService {
     return this._postRepository.unscheduleMcp(orgId, postId, false, policy.requireAgentApproval);
   }
 
+  private async mcpRpc<T>(operation: (workflow: any) => Promise<T>): Promise<T> {
+    const raw = this._temporalService.client?.getRawClient();
+    if (!raw?.workflow || typeof raw.connection?.withDeadline !== 'function') throw new Error('Temporal deadline client unavailable.');
+    return raw.connection.withDeadline(Date.now() + 10000, () => operation(raw.workflow));
+  }
+
+  async reconcileMcpDispatch(orgId: string, rootId: string, generation: number, revisionHash: string) {
+    const fence = await this._postRepository.mcpFence(orgId, rootId);
+    if (!fence || fence.state !== 'ACTIVE' || fence.generation !== generation || fence.revisionHash !== revisionHash) throw new McpDispatchUnconfirmed(rootId, generation);
+    let rows: Awaited<ReturnType<PostsService['mcpThread']>>;
+    try { rows = await this.mcpThread(orgId, rootId); }
+    catch (error) {
+      if (error instanceof BadRequestException) {
+        await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'HELD', 'POST_NOT_DISPATCHABLE');
+        throw new McpDispatchUnconfirmed(rootId, generation);
+      }
+      throw error;
+    }
+
+    const workflowId = `post_${rootId}_mcp_${generation}`;
+    const acknowledge = async () => {
+      const marked = await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'CONFIRMED');
+      if (!marked.count) throw new McpDispatchUnconfirmed(rootId, generation);
+    };
+    const describe = async () => {
+      const execution: any = await this.mcpRpc(workflow => workflow.getHandle(workflowId).describe());
+      if (!['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED', 'TERMINATED', 'TIMED_OUT', 'CONTINUED_AS_NEW'].includes(execution?.status?.name)) throw new Error('Unrecognized workflow execution status.');
+    };
+    try {
+      await describe();
+      await acknowledge();
+      return;
+    } catch (error) {
+      if (error instanceof AgentSaveRecovered || error instanceof McpDispatchUnconfirmed) throw error;
+      if ((error as Error)?.name !== 'WorkflowNotFoundError') {
+        await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'UNKNOWN', 'STATUS_UNCONFIRMED');
+        throw new McpDispatchUnconfirmed(rootId, generation);
+      }
+    }
+    if (this.mcpRevision(rows) !== revisionHash || !rows.some(post => post.state === 'QUEUE') || rows.some(post => ['ERROR', 'DRAFT'].includes(post.state))) {
+      await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'HELD', 'POST_NOT_DISPATCHABLE');
+      throw new McpDispatchUnconfirmed(rootId, generation);
+    }
+    // Missing execution is not permission to replay a provider attempt. Only
+    // an unattempted exact generation may enter the deterministic start path.
+    const attempts = await this._postRepository.mcpAttempts(orgId, rootId);
+    if (attempts.some(attempt => attempt.generation === generation)) {
+      await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'HELD', 'PROVIDER_RECONCILIATION_REQUIRED');
+      throw new McpDispatchUnconfirmed(rootId, generation);
+    }
+    const admitted = await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'UNKNOWN', 'START_UNCONFIRMED', true);
+    if (!admitted.count) throw new McpDispatchUnconfirmed(rootId, generation);
+    try {
+      const providerQueue = rows[0].integration!.providerIdentifier.split('-')[0].toLowerCase();
+      await this.mcpRpc(workflow => workflow.start('postWorkflowV114', {
+        workflowId, taskQueue: 'mcp-publish-v114', workflowIdConflictPolicy: 'USE_EXISTING', workflowIdReusePolicy: 'REJECT_DUPLICATE',
+        args: [{ taskQueue: `mcp-v114-${providerQueue}`, postId: rootId, organizationId: orgId, generation, revisionHash }],
+        typedSearchAttributes: new TypedSearchAttributes([{ key: postIdSearchParam, value: rootId }, { key: organizationId, value: orgId }]),
+      }));
+    } catch (error) {
+      if ((error as Error)?.name === 'WorkflowExecutionAlreadyStartedError') {
+        try { await describe(); await acknowledge(); return; }
+        catch (inspection) { if (inspection instanceof AgentSaveRecovered) throw inspection; }
+      }
+      await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'UNKNOWN', 'START_UNCONFIRMED');
+      throw new McpDispatchUnconfirmed(rootId, generation);
+    }
+    await acknowledge();
+  }
+
+  async recoverPendingMcpDispatches(limit = 16) {
+    const pending = await this._postRepository.pendingMcpDispatches(limit);
+    let confirmed = 0;
+    let unconfirmed = 0;
+    for (const fence of pending) {
+      try { await this.reconcileMcpDispatch(fence.organizationId, fence.postId, fence.generation, fence.revisionHash); confirmed++; }
+      catch { unconfirmed++; } // One unavailable/changed row must not starve the rest.
+    }
+    return { examined: pending.length, confirmed, unconfirmed };
+  }
+
   async mcpExecutionState(orgId: string, postId: string) {
     const fence = await this._postRepository.mcpFence(orgId, postId);
     if (!fence) return { generation: -1, closed: undefined as boolean | undefined };
     try {
-      const handle = this._temporalService.client.getRawClient().workflow.getHandle(`post_${postId}_mcp_${fence.generation}`);
-      const execution = await handle.describe();
+      const execution: any = await this.mcpRpc(workflow => workflow.getHandle(`post_${postId}_mcp_${fence.generation}`).describe());
       if (execution.status.name === 'RUNNING') return { generation: fence.generation, closed: false };
       if (['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED', 'TERMINATED', 'TIMED_OUT'].includes(execution.status.name)) return { generation: fence.generation, closed: true };
     } catch (error) {
@@ -1294,6 +1375,8 @@ export class PostsService {
     if (!fence || fence.state !== 'ACTIVE' || fence.generation !== generation || fence.revisionHash !== revisionHash || this.mcpRevision(rows) !== revisionHash) throw new BadRequestException('Workflow fence or revision changed.');
     return { publishAt: new Date(rows[0].publishDate).getTime(), segments: rows.map(p => ({ id: p.id, delay: p.delay })) };
   }
+
+  getMcpDispatchStatuses(orgId: string, postIds: string[]) { return this._postRepository.mcpDispatchStatuses(orgId, postIds); }
 
   getMcpWarnings(orgId: string, postIds: string[]) { return this._postRepository.mcpWarnings(orgId, postIds); }
 
@@ -1371,11 +1454,7 @@ export class PostsService {
       await this._postRepository.registerMcpFence(orgId, postId, rows[0].integrationId, this.mcpRevision(rows));
       const fence = await this._postRepository.mcpFence(orgId, postId);
       if (!fence || fence.state !== 'ACTIVE') return;
-      await this._temporalService.client.getRawClient().workflow.start('postWorkflowV114', {
-        workflowId: `post_${postId}_mcp_${fence.generation}`, taskQueue: 'mcp-publish-v114', workflowIdConflictPolicy: 'USE_EXISTING',
-        args: [{ taskQueue: `mcp-v114-${taskQueue}`, postId, organizationId: orgId, generation: fence.generation, revisionHash: fence.revisionHash }],
-        typedSearchAttributes: new TypedSearchAttributes([{ key: postIdSearchParam, value: postId }, { key: organizationId, value: orgId }]),
-      });
+      await this.reconcileMcpDispatch(orgId, postId, fence.generation, fence.revisionHash);
       return;
     }
     try {
@@ -1760,6 +1839,7 @@ export class PostsService {
       ? this.withAgentAdmission(orgId, async () => {
           try { return await this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent); }
           catch (error) {
+            if (error instanceof McpDispatchUnconfirmed) throw error;
             const ids = agentAdmission.getStore()?.persistedIds || [];
             if (ids.length) throw new BadRequestException(`Save incomplete. Already saved post IDs (do not recreate): ${ids.join(', ')}. Inspect these posts before retrying remaining work.`);
             throw error;
@@ -1792,6 +1872,7 @@ export class PostsService {
       throw new BadRequestException(`Save cleanup is unconfirmed. ${persistedIds.length ? `Already saved post IDs: ${persistedIds.join(', ')}. ` : ''}Do not recreate blindly; a workspace admin can inspect Settings > Agent access.`);
     }
     if (failed) {
+      if (failure instanceof McpDispatchUnconfirmed) throw new McpDispatchUnconfirmed(failure.rootId, failure.generation, [...new Set([...failure.savedPostIds, ...persistedIds])]);
       if (persistedIds.length) throw new BadRequestException(`Save incomplete. Already saved post IDs (do not recreate): ${persistedIds.join(', ')}. Inspect these posts before retrying remaining work.`);
       if (failure instanceof HttpException) throw failure;
       throw new BadRequestException('The save could not be completed. Inspect the workspace before retrying.');
@@ -1950,7 +2031,7 @@ export class PostsService {
         );
         // A tracked producer must finish its guarded dispatch before its save
         // admission is settled. Legacy fire-and-forget behavior stays intact.
-        if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) await dispatched.catch(error => { if (error instanceof AgentSaveRecovered) throw error; });
+        if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) await dispatched;
         else dispatched.catch(() => undefined);
       }
 
