@@ -16,10 +16,14 @@ jest.mock(
   '@gitroom/frontend/components/new-layout/v2/layout.v2.component',
   () => ({ LayoutComponentV2: () => null })
 );
+jest.mock('@gitroom/frontend/components/features/feature.flags.server', () => ({
+  readFeatureFlags: async () => ({ smartlinks: true }),
+}));
 
 import { switchToNewLayout, TryNewLayoutButton } from './try.new.layout';
 import { LayoutComponent } from '@gitroom/frontend/components/new-layout/layout.component';
 import { LayoutComponentV2 } from '@gitroom/frontend/components/new-layout/v2/layout.v2.component';
+import { FeatureFlagsProvider } from '@gitroom/frontend/components/features/feature.flags.client';
 import Layout from '../../../app/(app)/(site)/layout';
 
 describe('TryNewLayoutButton', () => {
@@ -73,7 +77,11 @@ describe('site layout passes canTryNewLayout to the classic layout', () => {
     process.env.PD_UI_V2 = 'on';
     mockIsUiV2Request.mockResolvedValue(true);
     const el = (await Layout({ children: 'x' })) as React.ReactElement<any>;
-    expect(el.type).toBe(LayoutComponentV2);
-    expect(el.props).toEqual({ children: 'x' });
+    // the parity feature flags wrap the new layout only
+    expect(el.type).toBe(FeatureFlagsProvider);
+    expect(el.props.flags).toEqual({ smartlinks: true });
+    const shell = el.props.children as React.ReactElement<any>;
+    expect(shell.type).toBe(LayoutComponentV2);
+    expect(shell.props).toEqual({ children: 'x' });
   });
 });
