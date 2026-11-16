@@ -1,5 +1,6 @@
 import { TemporalModule } from 'nestjs-temporal-core';
 import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { providerActivityOptions } from './provider.activity.slots';
 import { emailQueues } from '@gitroom/nestjs-libraries/temporal/email.queues';
 
 export const getTemporalModule = (
@@ -17,12 +18,26 @@ export const getTemporalModule = (
     .filter(Boolean);
 
   // How many worker servers share each (non-excluded) queue. Per-server
-  // concurrency is divided by this so the GLOBAL concurrency stays correct.
+  // allocation is divided by this ONCE and shared across both queues. RE must
+  // verify the number of eligible processes/pinning; this is not membership discovery.
   // 1 server => 1 (full), 2 servers => 2 (half each), 3 servers => 3, etc.
-  const divider = Math.max(
-    1,
-    Number(process.env.WORKER_CONCURRENCY_DIVIDER) || 1
-  );
+  const divider = process.env.WORKER_CONCURRENCY_DIVIDER ? Number(process.env.WORKER_CONCURRENCY_DIVIDER) : 1;
+  const providerWorkers = isWorkers ? socialIntegrationList
+    .filter(provider => !provider.identifier.includes('-') && !excludeQueues.includes(provider.identifier))
+    .flatMap(provider => {
+      // Allocate this process's provider share ONCE, not once per queue.
+      const capacity = providerActivityOptions(provider.identifier, provider.maxConcurrentJob, divider);
+      return [
+        ...(!excludeQueues.includes(`mcp-v114-${provider.identifier}`) ? [{
+          taskQueue: `mcp-v114-${provider.identifier}`, activityClasses: activityClasses!, autoStart: true,
+          workerOptions: { ...capacity },
+        }] : []),
+        {
+          taskQueue: provider.identifier, activityClasses: activityClasses!, autoStart: true,
+          workerOptions: { ...capacity, maxHeartbeatThrottleInterval: '15s' as const },
+        },
+      ];
+    }) : [];
 
   return TemporalModule.register({
     isGlobal: true,
@@ -43,53 +58,11 @@ export const getTemporalModule = (
               taskQueue: 'mcp-publish-v114', workflowsPath: path!, activityClasses: activityClasses!, autoStart: true,
               workerOptions: { maxConcurrentActivityTaskExecutions: 4 },
             }]),
-            ...socialIntegrationList.filter(provider => !provider.identifier.includes('-'))
-              .filter(provider => !excludeQueues.includes(provider.identifier) && !excludeQueues.includes(`mcp-v114-${provider.identifier}`))
-              .map(provider => ({
-                taskQueue: `mcp-v114-${provider.identifier}`, activityClasses: activityClasses!, autoStart: true,
-                workerOptions: { maxConcurrentActivityTaskExecutions: provider.maxConcurrentJob ? Math.max(1, Math.floor(provider.maxConcurrentJob / divider)) : 1000000 },
-              })),
-            ...[
-              { identifier: 'main', maxConcurrentJob: undefined },
-              ...socialIntegrationList,
-            ]
-              .filter((f) => f.identifier.indexOf('-') === -1)
-              .map((integration) => ({
-                integration,
-                taskQueue: integration.identifier.split('-')[0],
-              }))
-              .filter(({ taskQueue }) => !excludeQueues.includes(taskQueue))
-              .map(({ integration, taskQueue }) => {
-                // Split the per-provider cap across the servers sharing this
-                // queue. Floor (never below 1) so the global total never exceeds
-                // the provider's limit. Providers whose limit is smaller than the
-                // server count must be pinned via EXCLUDE_QUEUE instead.
-                const concurrency = integration.maxConcurrentJob
-                  ? Math.max(
-                      1,
-                      Math.floor(integration.maxConcurrentJob / divider)
-                    )
-                  : undefined;
-
-                // Workflows only ever run on the `main` queue; the other Workers
-                // are activity-only, so skip the workflow bundle (webpack build,
-                // workflow thread + V8 isolate, sticky cache) on them.
-                return {
-                  taskQueue,
-                  ...(taskQueue === 'main' ? { workflowsPath: path! } : {}),
-                  activityClasses: activityClasses!,
-                  autoStart: true,
-                  workerOptions: {
-                    maxConcurrentActivityTaskExecutions: concurrency || 1000000,
-                    // By default the SDK throttles heartbeat sends to 60s, so
-                    // against the workflow's heartbeatTimeout one dropped send
-                    // or a minute of event-loop lag eats most of the margin.
-                    // Sending every 15s keeps the recorded heartbeat fresh even
-                    // when individual sends fail or fire late.
-                    maxHeartbeatThrottleInterval: '15s',
-                  },
-                };
-              }),
+            ...providerWorkers,
+            ...(!excludeQueues.includes('main') ? [{
+              taskQueue: 'main', workflowsPath: path!, activityClasses: activityClasses!, autoStart: true,
+              workerOptions: { maxConcurrentActivityTaskExecutions: 1000000, maxHeartbeatThrottleInterval: '15s' as const },
+            }] : []),
             // Activity-only Workers for emails, rate limited server side
             // across all workers to stay under the Resend limit
             ...Object.values(emailQueues)

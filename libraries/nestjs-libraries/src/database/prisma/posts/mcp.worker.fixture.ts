@@ -789,6 +789,82 @@ pg(
     };
     const waitForRun = async (id: string, generation: number) =>
       client.workflow.getHandle(`post_${id}_mcp_${generation}`).result();
+    it('shares one actual provider slot between legacy and V114 queues without cross-polling', async () => {
+      if (stop) { await stop(); stop = undefined; }
+      const { providerActivityOptions } = require('../../../temporal/provider.activity.slots');
+      const capacity = providerActivityOptions('fixture', 1, 1);
+      const pool = capacity.tuner.activityTaskSlotSupplier;
+      const running: Array<[Worker, Promise<void>]> = [];
+      const launch = async (options: any) => {
+        const current = await Worker.create({ connection: native, namespace, ...options });
+        const promise = current.run(); running.push([current, promise]); activeWorkers.set(current, promise);
+        return current;
+      };
+      const until = async (check: () => boolean | Promise<boolean>, label: string) => {
+        const limit = Date.now() + 20000;
+        while (!await check()) {
+          if (Date.now() >= limit) throw new Error(`Provider-cap fixture boundary not reached: ${label}`);
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+      };
+      let release!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      let legacyEntered = false, trackedEntered = false, active = 0, maximum = 0;
+      const originalPost = adapter.post;
+      let legacyId: string | undefined;
+      adapter.post = async (id: string, token: string, values: any[], integration: any) => {
+        const legacy = values[0]?.id === legacyId;
+        active++; maximum = Math.max(maximum, active);
+        try {
+          if (legacy) { legacyEntered = true; await held; }
+          else trackedEntered = true;
+          // Legacy has no MCP attempt. Bind an explicitly owned fixture-only
+          // transport identity, never grant this fallback to another segment.
+          const payload = legacy ? values.map(value => ({ ...value, clientReference: { attemptId: `legacy_${legacyId}` } })) : values;
+          return await originalPost.call(adapter, id, token, payload, integration);
+        } finally { active--; }
+      };
+      try {
+        await launch({ taskQueue: 'mcp-publish-v114', maxConcurrentActivityTaskExecutions: 2,
+          workflowsPath: require.resolve('../../../../../../test/fixtures/mcp-provider-cap.workflows'),
+          activities: { mcpThreadPlan: activity.mcpThreadPlan.bind(activity), mcpFailSegment: activity.mcpFailSegment.bind(activity) },
+        });
+        const legacy = await repo.createOrUpdatePost('schedule', org, new Date(Date.now() - 1000).toISOString(), {
+          integration: { id: channel }, settings: { __type: 'fixture' }, value: [{ content: 'Owned legacy cap fixture', image: [] }],
+        }, [], 'API');
+        const legacyPost = legacy.posts[0]; legacyId = legacyPost.id;
+        const integration = (await posts.mcpThread(org, legacyId))[0].integration;
+        const legacyHandle = await client.workflow.start('legacyProviderCapFixture', {
+          taskQueue: 'mcp-publish-v114', workflowId: `legacy_cap_${legacyId}`,
+          args: [{ queue: 'fixture', integration, post: legacyPost }], workflowExecutionTimeout: '2 minutes',
+        });
+        const trackedId = await create(1);
+        const trackedHandle = client.workflow.getHandle(`post_${trackedId}_mcp_0`);
+        await until(async () => [await legacyHandle.fetchHistory(), await trackedHandle.fetchHistory()].every(history =>
+          history.events?.some(event => event.activityTaskScheduledEventAttributes &&
+            ['fixture', 'mcp-v114-fixture'].includes(event.activityTaskScheduledEventAttributes.taskQueue?.name || ''))), 'both provider queues scheduled');
+        await launch({ taskQueue: 'fixture', ...capacity,
+          activities: { postSocial: activity.postSocial.bind(activity), updatePost: activity.updatePost.bind(activity) },
+        });
+        await until(() => legacyEntered, 'legacy provider held');
+        await launch({ taskQueue: 'mcp-v114-fixture', ...capacity, activities: { mcpPublishSegment: publishActivity } });
+        await until(() => pool.pendingFor('mcp-v114-fixture') > 0, 'V114 SDK reservation waiting on shared budget');
+        expect(trackedEntered).toBe(false); expect(active).toBe(1); expect(maximum).toBe(1);
+        release();
+        await Promise.all([legacyHandle.result(), trackedHandle.result()]);
+        expect(trackedEntered).toBe(true); expect(maximum).toBe(1);
+        expect(await db.post.findUniqueOrThrow({ where: { id: legacyId } })).toMatchObject({ state: 'PUBLISHED', mcpWorkflowVersion: null });
+        expect(adapter.events().filter(event => event.kind === 'ACCEPT' && [legacyId, trackedId].includes(event.segmentId))).toHaveLength(2);
+      } finally {
+        release();
+        for (const [current] of running) if (current.getState() === 'RUNNING') current.shutdown();
+        await Promise.all(running.map(([, promise]) => promise));
+        for (const [current] of running) activeWorkers.delete(current);
+        adapter.post = originalPost;
+        expect(pool.reserved).toBe(0);
+        stop = await startWorker();
+      }
+    }, 90000);
     it('runs two real segments, reconciles a terminal-unpublished child through resumeMcp and never replays the parent', async () => {
       adapter.denyNextComment = true;
       const id = await create(2);
