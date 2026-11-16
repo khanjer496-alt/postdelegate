@@ -132,6 +132,22 @@ describe('createPostForReviewTool', () => {
     });
   });
 
+  it('keeps review validation intent separate from draft storage', async () => {
+    const { tool, postsService } = build();
+    await call(tool, socialPost('draft'));
+    expect(postsService.createPost.mock.calls[0][6]).toBe('review');
+  });
+
+  it('returns actual already-created IDs if a later channel fails final preparation', async () => {
+    const { tool, postsService } = build();
+    postsService.createPost.mockResolvedValueOnce([{ postId: 'saved-one', integration: 'int-1' }]).mockRejectedValueOnce(new BadRequestException('Final transformed payload too long'));
+    const input = socialPost('draft');
+    input.socialPost.push({ ...input.socialPost[0] });
+    const result = await call(tool, input);
+    expect(result.output.errors).toContain('saved-one');
+    expect(result.output.errors).toContain('do not recreate');
+  });
+
   it('never publishes "now" posts directly', async () => {
     const { tool, postsService } = build();
     await call(tool, socialPost('now'));

@@ -43,6 +43,12 @@ export const getTemporalModule = (
               taskQueue: 'mcp-publish-v114', workflowsPath: path!, activityClasses: activityClasses!, autoStart: true,
               workerOptions: { maxConcurrentActivityTaskExecutions: 4 },
             }]),
+            ...socialIntegrationList.filter(provider => !provider.identifier.includes('-'))
+              .filter(provider => !excludeQueues.includes(provider.identifier) && !excludeQueues.includes(`mcp-v114-${provider.identifier}`))
+              .map(provider => ({
+                taskQueue: `mcp-v114-${provider.identifier}`, activityClasses: activityClasses!, autoStart: true,
+                workerOptions: { maxConcurrentActivityTaskExecutions: provider.maxConcurrentJob ? Math.max(1, Math.floor(provider.maxConcurrentJob / divider)) : 1000000 },
+              })),
             ...[
               { identifier: 'main', maxConcurrentJob: undefined },
               ...socialIntegrationList,

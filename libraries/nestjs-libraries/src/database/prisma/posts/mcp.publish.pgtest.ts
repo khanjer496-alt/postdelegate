@@ -20,6 +20,17 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
   let root: string;
   let child: string;
   const revision = 'a'.repeat(64);
+  const finish = async (organizationId: string, id: string, receipt: any) => {
+    await repo.bindMcpProviderPayload(
+      organizationId,
+      id,
+      receipt.map((r: any) => ({
+        id: r.id,
+        message: 'controlled fixture payload',
+      }))
+    );
+    await repo.finishMcpSegment(organizationId, id, receipt);
+  };
   beforeAll(async () => {
     db = new PrismaClient({ datasources: { db: { url } } });
     repo = new PostsRepository(
@@ -140,7 +151,7 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
         status: 'published',
       },
     ];
-    await repo.finishMcpSegment(org, parent.id, receipt);
+    await finish(org, parent.id, receipt);
     await db.post.update({
       where: { id: root },
       data: {
@@ -203,9 +214,14 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     ).rejects.toThrow();
   });
   it('an old generation cannot overwrite the state of a later revision', async () => {
-    await db.mcpPublishFence.update({ where: { postId: root }, data: { generation: 1 } });
+    await db.mcpPublishFence.update({
+      where: { postId: root },
+      data: { generation: 1 },
+    });
     await repo.failMcpSegment(org, root, root, 0, revision);
-    expect((await db.post.findUniqueOrThrow({ where: { id: root } })).state).toBe('QUEUE');
+    expect(
+      (await db.post.findUniqueOrThrow({ where: { id: root } })).state
+    ).toBe('QUEUE');
   });
 
   it('legacy job cannot gain cancellation success without a fence', async () => {
@@ -232,36 +248,255 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     });
   });
   it('a crashed owner can be fenced and reconciled without expiry or deleting saved posts', async () => {
-    await repo.acquireAgentAdmission(org, 'crashed-owner', { instanceId: 'instance', host: 'fixture', processId: 7 });
-    const draft = { integration: { id: integration }, settings: { __type: 'fixture' }, value: [{ content: 'saved before crash', image: [] }] } as any;
-    const save = () => agentAdmissionContext.run({ orgId: org, owner: 'crashed-owner', persistedIds: [] }, () => repo.createOrUpdatePost('draft', org, '2030-01-01T00:00:00Z', draft, [], 'MCP'));
+    await repo.acquireAgentAdmission(org, 'crashed-owner', {
+      instanceId: 'instance',
+      host: 'fixture',
+      processId: 7,
+    });
+    const draft = {
+      integration: { id: integration },
+      settings: { __type: 'fixture' },
+      value: [{ content: 'saved before crash', image: [] }],
+    } as any;
+    const save = () =>
+      agentAdmissionContext.run(
+        { orgId: org, owner: 'crashed-owner', persistedIds: [] },
+        () =>
+          repo.createOrUpdatePost(
+            'draft',
+            org,
+            '2030-01-01T00:00:00Z',
+            draft,
+            [],
+            'MCP'
+          )
+      );
     const saved = await save();
     const before = await db.post.count({ where: { organizationId: org } });
-    const recovered = await repo.recoverAgentAdmission(org, 'crashed-owner', 'admin-fixture');
-    expect(recovered.persistedPosts).toContainEqual(expect.objectContaining({ id: saved.posts[0].id }));
+    const recovered = await repo.recoverAgentAdmission(
+      org,
+      'crashed-owner',
+      'admin-fixture'
+    );
+    expect(recovered.persistedPosts).toContainEqual(
+      expect.objectContaining({ id: saved.posts[0].id })
+    );
     await expect(save()).rejects.toThrow('recovered');
-    expect(await db.post.count({ where: { organizationId: org } })).toBe(before);
-    expect(await db.mcpAgentAdmissionRecovery.count({ where: { organizationId: org, owner: 'crashed-owner' } })).toBe(1);
+    expect(await db.post.count({ where: { organizationId: org } })).toBe(
+      before
+    );
+    expect(
+      await db.mcpAgentAdmissionRecovery.count({
+        where: { organizationId: org, owner: 'crashed-owner' },
+      })
+    ).toBe(1);
     await repo.acquireAgentAdmission(org, 'replacement-owner');
     await repo.releaseAgentAdmission(org, 'replacement-owner');
   });
 
   it('receipt and published state are one transaction; cancel cannot claim to undo that segment', async () => {
     const admission = await repo.claimMcpSegment(org, root, root, revision, 0);
-    const receipt = [{ id: root, postId: 'remote-confirmed', releaseURL: 'https://fixture/confirmed', status: 'published' }];
-    await repo.finishMcpSegment(org, admission.id, receipt);
+    const receipt = [
+      {
+        id: root,
+        postId: 'remote-confirmed',
+        releaseURL: 'https://fixture/confirmed',
+        status: 'published',
+      },
+    ];
+    await finish(org, admission.id, receipt);
     const result = await repo.unscheduleMcp(org, root);
-    expect(result).toMatchObject({ status: 'PARTIALLY_UNSCHEDULED', publishedSegmentIds: [root] });
-    expect(await db.post.findUniqueOrThrow({ where: { id: root } })).toMatchObject({ state: 'PUBLISHED', releaseId: 'remote-confirmed' });
-    expect(await db.post.findUniqueOrThrow({ where: { id: child } })).toMatchObject({ state: 'DRAFT' });
+    expect(result).toMatchObject({
+      status: 'PARTIALLY_UNSCHEDULED',
+      publishedSegmentIds: [root],
+    });
+    expect(
+      await db.post.findUniqueOrThrow({ where: { id: root } })
+    ).toMatchObject({ state: 'PUBLISHED', releaseId: 'remote-confirmed' });
+    expect(
+      await db.post.findUniqueOrThrow({ where: { id: child } })
+    ).toMatchObject({ state: 'DRAFT' });
   });
 
   it('new queued MCP source and its version/fence commit atomically before a sweep can observe it', async () => {
-    const saved = await repo.createOrUpdatePost('schedule', org, '2030-01-01T00:00:00Z', { integration: { id: integration }, settings: { __type: 'fixture' }, value: [{ content: 'new MCP source', image: [] }] } as any, [], 'MCP');
-    const post = await db.post.findUniqueOrThrow({ where: { id: saved.posts[0].id } });
+    const saved = await repo.createOrUpdatePost(
+      'schedule',
+      org,
+      '2030-01-01T00:00:00Z',
+      {
+        integration: { id: integration },
+        settings: { __type: 'fixture' },
+        value: [{ content: 'new MCP source', image: [] }],
+      } as any,
+      [],
+      'MCP'
+    );
+    const post = await db.post.findUniqueOrThrow({
+      where: { id: saved.posts[0].id },
+    });
     expect(post).toMatchObject({ state: 'QUEUE', mcpWorkflowVersion: 114 });
-    expect(await repo.mcpFence(org, post.id)).toMatchObject({ revisionHash: expect.any(String), state: 'ACTIVE' });
+    expect(await repo.mcpFence(org, post.id)).toMatchObject({
+      revisionHash: expect.any(String),
+      state: 'ACTIVE',
+    });
     // Simulated process death before the service's redundant registration does not erase either record.
   });
 
+  it('a terminal generation with no admitted attempts can recover, while stale closure proof cannot restart its successor', async () => {
+    await db.post.update({ where: { id: root }, data: { state: 'ERROR' } });
+    expect(await repo.resumeMcp(org, root, revision, 0)).toMatchObject({
+      status: 'RESUMED',
+    });
+    expect(await repo.resumeMcp(org, root, revision, 0)).toMatchObject({
+      status: 'ALREADY_ACTIVE',
+    });
+    expect((await repo.mcpFence(org, root))!.generation).toBe(1);
+  });
+
+  it('partial cancel holds the remaining revision until a human-approved transaction and keeps the published parent', async () => {
+    const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
+    await finish(org, attempt.id, [
+      {
+        id: root,
+        postId: 'parent-receipt',
+        releaseURL: 'https://fixture/parent',
+        status: 'published',
+      },
+    ]);
+    expect(await repo.unscheduleMcp(org, root)).toMatchObject({
+      status: 'PARTIALLY_UNSCHEDULED',
+    });
+    const held = await db.post.findUniqueOrThrow({ where: { id: root } });
+    expect(held).toMatchObject({
+      state: 'PUBLISHED',
+      approvalStatus: 'IN_REVIEW',
+      releaseId: 'parent-receipt',
+    });
+    expect(await repo.resumeMcp(org, root, revision, 0)).toMatchObject({
+      status: 'BLOCKED',
+    });
+    await repo.approveRemainingMcp(org, root, held.updatedAt);
+    expect(
+      await db.post.findUniqueOrThrow({ where: { id: child } })
+    ).toMatchObject({ state: 'QUEUE', approvalStatus: 'APPROVED' });
+    expect(
+      await repo.claimMcpSegment(org, root, root, revision, 1)
+    ).toMatchObject({ replay: true });
+    expect(
+      await repo.claimMcpSegment(org, root, child, revision, 1)
+    ).toMatchObject({ replay: false });
+  });
+
+  it('deletion cannot bypass an uncertain publication fence and retains confirmed receipt history', async () => {
+    const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
+    await expect(repo.deletePost(org, root)).rejects.toThrow(
+      'active or uncertain'
+    );
+    expect(
+      (await db.post.findUniqueOrThrow({ where: { id: root } })).deletedAt
+    ).toBeNull();
+    await finish(org, attempt.id, [
+      {
+        id: root,
+        postId: 'confirmed-before-local-delete',
+        releaseURL: 'https://fixture/confirmed',
+        status: 'published',
+      },
+    ]);
+    await repo.deletePost(org, root);
+    expect(
+      (await db.post.findUniqueOrThrow({ where: { id: root } })).deletedAt
+    ).not.toBeNull();
+    expect((await repo.mcpAttempts(org, root))[0]).toMatchObject({
+      status: 'CONFIRMED',
+    });
+    expect((await repo.mcpFence(org, root))!.state).toBe('CANCELLED');
+  });
+
+  it('a failed release keeps exact-owner write outcomes recoverable instead of permitting stale writes', async () => {
+    await repo.acquireAgentAdmission(org, 'release-fault-owner');
+    const draft = {
+      integration: { id: integration },
+      settings: { __type: 'fixture' },
+      value: [{ content: 'release fault draft', image: [] }],
+    } as any;
+    const saved = await agentAdmissionContext.run(
+      { orgId: org, owner: 'release-fault-owner', persistedIds: [] },
+      () =>
+        repo.createOrUpdatePost(
+          'draft',
+          org,
+          '2030-01-01T00:00:00Z',
+          draft,
+          [],
+          'MCP'
+        )
+    );
+    const transaction = {
+      model: {
+        $transaction: (fn: any, options: any) =>
+          db.$transaction(
+            (tx) =>
+              fn(
+                new Proxy(tx, {
+                  get: (target: any, key) =>
+                    key === 'mcpAgentAdmission'
+                      ? new Proxy(target[key], {
+                          get: (model: any, method) =>
+                            method === 'deleteMany'
+                              ? async () => {
+                                  throw new Error('owned release fault');
+                                }
+                              : typeof model[method] === 'function'
+                              ? model[method].bind(model)
+                              : model[method],
+                        })
+                      : typeof target[key] === 'function'
+                      ? target[key].bind(target)
+                      : target[key],
+                })
+              ),
+            options
+          ),
+      },
+    };
+    const faultRepo = new PostsRepository(
+      { model: db } as any,
+      {} as any,
+      {} as any,
+      { model: db } as any,
+      { model: db } as any,
+      {} as any,
+      transaction as any,
+      {} as any
+    );
+    await expect(
+      faultRepo.releaseAgentAdmission(org, 'release-fault-owner')
+    ).rejects.toThrow('owned release fault');
+    expect(await repo.agentAdmissionStatus(org)).toMatchObject({
+      owner: 'release-fault-owner',
+      writtenPostIds: expect.arrayContaining([saved.posts[0].id]),
+    });
+    expect(
+      await repo.recoverAgentAdmission(
+        org,
+        'release-fault-owner',
+        'fixture-admin'
+      )
+    ).toMatchObject({ status: 'RECOVERED' });
+    await expect(
+      agentAdmissionContext.run(
+        { orgId: org, owner: 'release-fault-owner', persistedIds: [] },
+        () =>
+          repo.createOrUpdatePost(
+            'draft',
+            org,
+            '2030-01-01T00:00:00Z',
+            draft,
+            [],
+            'MCP'
+          )
+      )
+    ).rejects.toThrow('recovered');
+  });
 });

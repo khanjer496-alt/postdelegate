@@ -19,7 +19,7 @@ CREATE TABLE "McpAgentAdmissionRecovery" (
     "id" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "owner" TEXT NOT NULL,
-    "actorId" TEXT NOT NULL,
+    "auditId" TEXT NOT NULL,
     "writtenPostIds" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -50,6 +50,8 @@ CREATE TABLE "McpPublishAttempt" (
     "generation" INTEGER NOT NULL,
     "status" TEXT NOT NULL,
     "receipt" JSONB,
+    "providerPayload" JSONB,
+    "providerPayloadHash" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

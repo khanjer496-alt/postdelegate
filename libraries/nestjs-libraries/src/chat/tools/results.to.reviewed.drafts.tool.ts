@@ -5,6 +5,7 @@ import { AgentToolInterface } from '../agent.tool.interface';
 import { checkAuth } from '../auth.context';
 
 export const RESULTS_TO_REVIEWED_DRAFTS = [
+  'Use only the assigned credential permissions. An Analyst stops at evidence and proposed copy without saving; never claim IN_REVIEW without a real receipt or switch credentials/endpoints to bypass a denied action.',
   'Choose a bounded recent period (at most 90 days), explicit timezone and UTC start/end. List only permitted channels with integrationList. Record the observation time and source period for every metric.',
   'Use analyticsMetricsTool, analyticsTopPostsTool, bestTimeToPostTool and channelAnalyticsTool only where permitted. Cite real post IDs, channel IDs, metric names/values and source dates. Never invent absent metrics. Observed engagement does not prove causal growth or revenue.',
   'Qualify freshness, missing data and weak samples. With sparse history label recommendations tentative. With no usable history say so and propose explicitly labeled experiments, without invented winners or baseline numbers.',

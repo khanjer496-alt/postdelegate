@@ -137,7 +137,7 @@ export class ApprovalsRepository {
   // are one transaction: comments never stay behind in the old state.
   async transitionGroup(
     organizationId: string,
-    post: { id: string; group: string },
+    post: { id: string; group: string; mcpWorkflowVersion?: number | null },
     expected: Prisma.PostWhereInput,
     data: { state: State; approvalStatus: ApprovalStatus; publishDate?: Date }
   ) {
@@ -150,6 +150,14 @@ export class ApprovalsRepository {
         : {}),
     };
     return this._transaction.model.$transaction(async (tx) => {
+      let previousFenceState: string | undefined;
+      if (post.mcpWorkflowVersion === 114) {
+        const fence = await tx.mcpPublishFence.findFirst({ where: { postId: post.id, organizationId } });
+        if (!fence) return false;
+        await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { updatedAt: new Date() } });
+        if (await tx.mcpPublishAttempt.count({ where: { rootPostId: post.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING', 'CONFIRMED'] } } })) return false;
+        previousFenceState = fence.state;
+      }
       const claimed = await tx.post.updateMany({
         where: {
           AND: [expected, { id: post.id, organizationId, deletedAt: null }],
@@ -168,6 +176,7 @@ export class ApprovalsRepository {
         },
         data: write,
       });
+      if (previousFenceState !== undefined) await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED', ...(data.state === 'QUEUE' && previousFenceState === 'CANCELLED' ? { generation: { increment: 1 } } : {}) } });
       return true;
     });
   }

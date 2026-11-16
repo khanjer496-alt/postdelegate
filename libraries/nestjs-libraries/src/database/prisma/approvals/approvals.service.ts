@@ -197,7 +197,7 @@ export class ApprovalsService {
       const { state, mcpWorkflowVersion, ...visible } = post;
       return {
         ...visible,
-        remainingThreadReview: state === 'PUBLISHED' && mcpWorkflowVersion === 114,
+        ...(state === 'PUBLISHED' && mcpWorkflowVersion === 114 ? { remainingThreadReview: true } : {}),
         submittedBy: submitted?.actorName || post.agentSource || null,
         submittedAt: submitted?.createdAt || post.createdAt,
         changesRequested:
@@ -383,6 +383,7 @@ export class ApprovalsService {
     // the version the approver saw: an edit since then needs a new look
     expectedUpdatedAt?: Date
   ) {
+    if (post.mcpWorkflowVersion === 114) this._postsService.assertMcpAdmissionReady();
     const already = {
       id: post.id,
       approvalStatus: 'APPROVED',

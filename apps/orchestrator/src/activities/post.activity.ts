@@ -436,7 +436,7 @@ export class PostActivity {
     if (!payload.length || payload.some(p => countLength(integration.providerIdentifier, p.message || '') > limit || (!p.message && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
     const valid = await provider.checkValidity(payload.map(p => p.media.map((m: any) => ({ ...m, path: m.url || m.path }))), settings, additional, payload.map(p => p.message));
     if (valid !== true) throw new Error('Final transformed media or provider settings are invalid.');
-    const [validation] = await this._postService.validatePosts(integration.organizationId, [{ integration: { id: integration.id }, settings, value: payload.map(p => ({ content: p.message, image: p.media.map((m: any) => ({ ...m, path: m.url || m.path })) })) }], 'schedule');
+    const [validation] = await this._postService.validatePosts(integration.organizationId, [{ integration: { id: integration.id }, settings, value: payload.map(p => ({ content: p.message, image: p.media.map((m: any) => ({ ...m, path: m.url || m.path })) })) }], 'now');
     if (!validation.valid || validation.errors !== true || validation.disabled) throw new Error('Final provider settings are invalid.');
   }
 
