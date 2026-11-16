@@ -130,10 +130,11 @@ describe('atomic tracked approval revision and dispatch', () => {
       if (generation?.increment) stored.generation += generation.increment;
       return { ...stored };
     }) };
-    const tx = { post, mcpPublishFence: fence, mcpPublishAttempt: { count: jest.fn().mockResolvedValue(0) } };
+    const attempts = { count: jest.fn().mockResolvedValue(0) };
+    const tx = { post, mcpPublishFence: fence, mcpPublishAttempt: attempts };
     const transaction = { model: { $transaction: jest.fn((run: any) => run(tx)) } };
     const repo = new ApprovalsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, transaction as any);
-    return { repo, rows, stored, post, fence, transaction };
+    return { repo, rows, stored, post, fence, attempts, transaction };
   };
   it('commits the final ordered date/hash/generation with QUEUE before any dispatch registration', async () => {
     const { repo, rows, stored, fence, transaction } = build();
@@ -169,6 +170,15 @@ describe('atomic tracked approval revision and dispatch', () => {
     const { repo, rows, post } = build(); rows[1].parentPostId = 'foreign-parent';
     await expect(repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED' })).rejects.toThrow('revision');
     expect(post.updateMany).not.toHaveBeenCalled();
+  });
+  it('preserves immutable attempt identity even for terminal-unpublished history', async () => {
+    const { repo, stored, attempts, fence } = build();
+    const previous = stored.revisionHash;
+    attempts.count.mockImplementation(async (args: any) => args.where.status ? 0 : 1);
+    await expect(repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: new Date('2030-01-01') })).rejects.toThrow('attempts exist');
+    expect(stored.revisionHash).toBe(previous);
+    expect(fence.update.mock.calls.every(([args]) => !args.data.revisionHash)).toBe(true);
+    // Actual rollback of post changes is covered by the SQL transaction fixture.
   });
   it('does not repair an arbitrary stored-content/fence mismatch during approval', async () => {
     const { repo, post, stored } = build(true);

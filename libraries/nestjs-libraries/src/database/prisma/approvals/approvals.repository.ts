@@ -219,6 +219,9 @@ export class ApprovalsRepository {
         // ordered rows under this same fence transaction, never a later registration.
         const finalRows = await this.orderedTrackedThread(tx, organizationId, post, previousFence.integrationId);
         const revisionHash = mcpPayloadRevision(finalRows);
+        // Preserve registerMcpFence's existing immutable-attempt rule even for
+        // terminal-unpublished attempts: approval must not silently rebind them.
+        if (revisionHash !== previousFence.revisionHash && await tx.mcpPublishAttempt.count({ where: { rootPostId: post.id } })) throw new BadRequestException('Publication attempts exist; changing their revision is blocked.');
         await tx.mcpPublishFence.update({ where: { postId: post.id }, data: {
           revisionHash,
           state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED',

@@ -426,6 +426,17 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     expect(await repo.mcpFence(org, root)).toMatchObject({ revisionHash: revision, generation: 0 });
   });
 
+  it('approval cannot silently rebind terminal-unpublished attempt history to a changed date', async () => {
+    const attempted = await repo.claimMcpSegment(org, root, root, revision, 0);
+    await repo.reconcileMcpAttempt(org, attempted.id, 'FAILED'); // controlled repository fixture; not provider proof
+    await db.post.updateMany({ where: { organizationId: org, group: root }, data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' } });
+    const before = await db.post.findUniqueOrThrow({ where: { id: root } });
+    const approvalRepo = new ApprovalsRepository({ model: db } as any, {} as any, { model: db } as any, {} as any, {} as any, {} as any, { model: db } as any);
+    await expect(approvalRepo.transitionGroup(org, { id: root, group: root, mcpWorkflowVersion: 114 }, { updatedAt: before.updatedAt }, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: new Date('2031-01-01') })).rejects.toThrow('attempts exist');
+    expect(await db.post.findUniqueOrThrow({ where: { id: root } })).toMatchObject({ state: 'DRAFT', publishDate: before.publishDate, updatedAt: before.updatedAt });
+    expect(await repo.mcpFence(org, root)).toMatchObject({ revisionHash: revision, generation: 0 });
+  });
+
   it('a terminal generation with no admitted attempts can recover, while stale closure proof cannot restart its successor', async () => {
     await db.post.update({ where: { id: root }, data: { state: 'ERROR' } });
     expect(await repo.resumeMcp(org, root, revision, 0)).toMatchObject({
