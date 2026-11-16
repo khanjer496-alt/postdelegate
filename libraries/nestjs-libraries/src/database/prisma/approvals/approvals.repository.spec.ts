@@ -1,3 +1,4 @@
+import { agentAdmissionContext, AgentSaveRecovered } from '../posts/agent-admission.context';
 import { ApprovalsRepository } from './approvals.repository';
 
 const makeRepo = (claimed = 1) => {
@@ -79,5 +80,29 @@ describe('ApprovalsRepository.transitionGroup', () => {
         releaseURL: null,
       });
     }
+  });
+});
+
+
+describe('save admission before review transition', () => {
+  const build = (owned: number) => {
+    const post = { updateMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn().mockResolvedValue([{ id: 'post' }]) };
+    const fence = { findFirst: jest.fn(), update: jest.fn() };
+    const admission = { updateMany: jest.fn().mockResolvedValue({ count: owned }), findUniqueOrThrow: jest.fn().mockResolvedValue({ writtenPostIds: ['post'] }), update: jest.fn() };
+    const repo = new ApprovalsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction: (fn: any) => fn({ post, mcpPublishFence: fence, mcpAgentAdmission: admission }) } } as any);
+    return { repo, post, fence, admission };
+  };
+  it.each([{ orgId: 'org', owner: 'recovered' }, { orgId: 'foreign', owner: 'old' }, { orgId: 'org', owner: undefined }])('throws before fence/post writes for a recovered or mismatched context: %j', async scope => {
+    const { repo, post, fence } = build(0);
+    await expect(agentAdmissionContext.run({ ...scope, persistedIds: [] } as any, () => repo.transitionGroup('org', { id: 'post', group: 'group', mcpWorkflowVersion: 114 }, {}, { state: 'DRAFT', approvalStatus: 'IN_REVIEW' }))).rejects.toBeInstanceOf(AgentSaveRecovered);
+    expect(post.updateMany).not.toHaveBeenCalled(); expect(fence.findFirst).not.toHaveBeenCalled(); expect(fence.update).not.toHaveBeenCalled();
+  });
+  it('keeps a valid new owner and standalone authorized human transition on the normal path', async () => {
+    const { repo, post, admission } = build(1);
+    expect(await agentAdmissionContext.run({ orgId: 'org', owner: 'new', persistedIds: [] }, () => repo.transitionGroup('org', { id: 'post', group: 'group' }, {}, { state: 'DRAFT', approvalStatus: 'IN_REVIEW' }))).toBe(true);
+    expect(admission.updateMany).toHaveBeenCalledWith({ where: { organizationId: 'org', owner: 'new' }, data: { owner: 'new' } });
+    admission.updateMany.mockClear();
+    expect(await repo.transitionGroup('org', { id: 'post', group: 'group' }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED' })).toBe(true);
+    expect(admission.updateMany).not.toHaveBeenCalled(); expect(post.updateMany).toHaveBeenCalledTimes(4);
   });
 });

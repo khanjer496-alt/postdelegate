@@ -335,7 +335,7 @@ export class PostActivity {
         await this.recordPublished(integration, posts);
         await this.activeIntegration(integration, posts, false);
         return result;
-      });
+      }, !!verifyFinal);
     });
   }
 
@@ -374,11 +374,19 @@ export class PostActivity {
   // a terminal error without needing a new workflow.
   private async handleDisconnect<T>(
     integration: Integration,
-    func: () => Promise<T>
+    func: () => Promise<T>,
+    preservePublishedReceipt = false
   ): Promise<T> {
     try {
       return await func();
     } catch (err) {
+      if (preservePublishedReceipt && err instanceof PublishedWithError) {
+        // This exception is raised only after the provider confirmed publication.
+        // V114 returns the receipt to its atomic projection, never the legacy
+        // out-of-fence release writer or the unknown-outcome retry path.
+        return [{ id: err.postDbId, postId: err.releaseId, releaseURL: err.releaseURL,
+          status: 'published', publicationAccountingPending: true, warning: 'Published successfully, but a follow-up change failed. Inspect the post in the provider.' }] as unknown as T;
+      }
       // Do not serialize a late provider error after its connection was
       // removed. The replacement failure contains no provider payload.
       await this.activeIntegration(integration, undefined, false);
@@ -453,7 +461,7 @@ export class PostActivity {
     // dropped once all V108 executions have drained
     return withHeartbeat(() =>
       this.handleDisconnect(integration, () =>
-        this.postSocialBody(integration, posts, allowPending, verifyFinal)
+        this.postSocialBody(integration, posts, allowPending, verifyFinal), !!verifyFinal
       )
     );
   }

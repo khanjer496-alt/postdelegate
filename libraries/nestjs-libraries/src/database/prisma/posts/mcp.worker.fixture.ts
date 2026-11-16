@@ -18,12 +18,80 @@ import { join } from 'path';
 
 import { describe, it as nodeIt, before, after, afterEach } from 'node:test';
 import { expect } from 'expect';
-const it = (name: string, fn: () => Promise<void>, timeout = 60000) =>
-  nodeIt(name, { timeout }, fn);
+const caseResults: Array<{
+  name: string;
+  status: string;
+  code?: string | number;
+  type?: string;
+}> = [];
+const hookResults: Array<{
+  phase: string;
+  code?: string | number;
+  type?: string;
+}> = [];
+const safeFailure = (error: any) => ({
+  code:
+    typeof error?.code === 'number' ||
+    (typeof error?.code === 'string' && /^[A-Z0-9_-]{1,40}$/.test(error.code))
+      ? error.code
+      : undefined,
+  type:
+    typeof error?.name === 'string' && /^[A-Za-z0-9_]{1,60}$/.test(error.name)
+      ? error.name
+      : 'Error',
+});
+const it = (name: string, fn: () => Promise<void>, timeout = 60000) => {
+  const record = { name, status: 'NOT_RUN' } as (typeof caseResults)[number];
+  caseResults.push(record);
+  return nodeIt(name, { timeout }, async (context) => {
+    try {
+      await fn();
+      record.status = context.signal.aborted ? 'ABORTED' : 'BODY_COMPLETED';
+    } catch (error) {
+      Object.assign(record, { status: 'FAILED', ...safeFailure(error) });
+      throw error;
+    }
+  });
+};
 const beforeAll = (fn: () => Promise<void>, timeout = 90000) =>
-  before(fn, { timeout });
+  before(
+    async () => {
+      try {
+        await fn();
+      } catch (error) {
+        hookResults.push({ phase: 'SETUP', ...safeFailure(error) });
+        throw error;
+      }
+    },
+    { timeout }
+  );
 const afterAll = (fn: () => Promise<void>, timeout = 30000) =>
-  after(fn, { timeout });
+  after(
+    async () => {
+      try {
+        await fn();
+      } catch (error) {
+        hookResults.push({ phase: 'TEARDOWN', ...safeFailure(error) });
+        throw error;
+      }
+    },
+    { timeout }
+  );
+process.on('exit', (exitCode) => {
+  if (
+    process.env.MCP_WORKER_TEST_RESULT_FILE ===
+      '/tmp/mcp-native-summary.json' &&
+    !process.argv.includes('--check-imports')
+  )
+    writeFileSync(
+      '/tmp/mcp-native-summary.json',
+      JSON.stringify(
+        { frameworkExitCode: exitCode, cases: caseResults, hooks: hookResults },
+        null,
+        2
+      )
+    );
+});
 let mockStorage: any;
 // Process-local external transport substitutions; no production module is patched on disk.
 const substitute = (name: string, exports: any) => {
@@ -120,6 +188,7 @@ class FixtureAdapter {
   editor = 'normal';
   convertToJPEG = true;
   denyNextComment = false;
+  failFollowupNext = false;
   private acceptBarrier?: { reached: () => void; wait: Promise<void> };
   holdNextAccept() {
     let reached!: () => void;
@@ -207,6 +276,19 @@ class FixtureAdapter {
       digest,
       receipt,
     });
+    if (this.failFollowupNext) {
+      this.failFollowupNext = false;
+      const {
+        PublishedWithError,
+      } = require('../../../integrations/social.abstract');
+      throw new PublishedWithError(
+        'fixture',
+        post.id,
+        receipt.postId,
+        receipt.releaseURL,
+        'Owned fixture thumbnail failure after live acceptance.'
+      );
+    }
     return [receipt];
   }
   async post(_id: string, _token: string, posts: any[], integration: any) {
@@ -234,12 +316,11 @@ class FixtureAdapter {
       integration.id !== this.channelId
     )
       throw new Error('Unknown fixture reconciliation denied.');
-    const event = this.events().find(
+    const history = this.events().filter(
       (event) =>
         ['ACCEPT', 'DENY'].includes(event.kind) &&
         event.attemptId === attempt.attemptId &&
-        event.segmentId === attempt.segmentId &&
-        event.digest === attempt.payloadHash
+        event.segmentId === attempt.segmentId
     );
     this.persist({
       kind: 'RECONCILE',
@@ -247,10 +328,30 @@ class FixtureAdapter {
       segmentId: attempt.segmentId,
       digest: attempt.payloadHash,
     });
-    if (!event) return { terminal: false, outcome: 'UNKNOWN' };
-    return event.kind === 'ACCEPT'
-      ? { terminal: true, outcome: 'PUBLISHED', receipt: event.receipt }
-      : { terminal: true, outcome: 'UNPUBLISHED' };
+    if (
+      !history.length ||
+      history.some((event) => event.digest !== attempt.payloadHash)
+    )
+      return { terminal: false, outcome: 'UNKNOWN' };
+    const accepted = history.filter((event) => event.kind === 'ACCEPT');
+    const denied = history.filter((event) => event.kind === 'DENY');
+    // Keep all evidence. Contradictory or duplicate dispatch cannot be used as
+    // a terminal oracle, and a prior DENY never masks a later acceptance.
+    if (accepted.length > 1 || (accepted.length && denied.length))
+      return { terminal: false, outcome: 'UNKNOWN' };
+    if (accepted.length === 1) {
+      const receipt = accepted[0].receipt;
+      if (
+        receipt?.id !== attempt.segmentId ||
+        receipt?.postId !== `fixture-${attempt.attemptId}` ||
+        receipt?.status !== 'published'
+      )
+        return { terminal: false, outcome: 'UNKNOWN' };
+      return { terminal: true, outcome: 'PUBLISHED', receipt };
+    }
+    return denied.length
+      ? { terminal: true, outcome: 'UNPUBLISHED' }
+      : { terminal: false, outcome: 'UNKNOWN' };
   }
 }
 
@@ -1183,6 +1284,271 @@ pg(
           .events()
           .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id!)
       ).toHaveLength(1);
+    }, 60000);
+    it('a verified live receipt with a thumbnail follow-up failure remains CONFIRMED/PUBLISHED with a separate warning and no replay', async () => {
+      adapter.failFollowupNext = true;
+      const id = await create(1);
+      await waitForRun(id, 0);
+      const attempt = (await repo.mcpAttempts(org, id))[0];
+      expect(attempt.status).toBe('CONFIRMED');
+      expect(attempt.followUpWarning).toContain('Published successfully');
+      expect((await db.post.findUniqueOrThrow({ where: { id } })).state).toBe(
+        'PUBLISHED'
+      );
+      expect(await posts.resumeMcp(org, id)).toMatchObject({
+        status: 'ALREADY_PUBLISHED',
+        warnings: [{ segmentId: id, message: attempt.followUpWarning }],
+      });
+      expect(
+        adapter
+          .events()
+          .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id)
+      ).toHaveLength(1);
+    }, 60000);
+
+    it('the real review tool returns saved IDs but cannot submit a recovered Publisher save over a newer authorized schedule', async () => {
+      const {
+        IntegrationSchedulePostTool,
+      } = require('../../../chat/tools/integration.schedule.post');
+      const {
+        CreatePostForReviewTool,
+      } = require('../../../chat/tools/post.review.tool');
+      const { ApprovalsService } = require('../approvals/approvals.service');
+      const { runWithContext } = require('../../../chat/async.storage');
+      const policy = (posts as any)._approvalPolicyService;
+      const approvals = new ApprovalsService(
+        (policy as any)._approvalsRepository,
+        policy,
+        (posts as any)._activityLogService,
+        posts
+      );
+      let saved!: () => void;
+      let saveFailed!: (error: unknown) => void;
+      let release!: () => void;
+      let id!: string;
+      const observed = new Promise<void>((resolve, reject) => {
+        saved = resolve;
+        saveFailed = reject;
+      });
+      const paused = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const delegated = {
+        validatePosts: posts.validatePosts.bind(posts),
+        withAgentAdmission: posts.withAgentAdmission.bind(posts),
+        createPost: async (...args: any[]) => {
+          const result = await posts
+            .createPost(...args)
+            .catch((error: unknown) => {
+              saveFailed(error);
+              throw error;
+            });
+          id = result[0].postId;
+          saved();
+          await paused;
+          return result;
+        },
+      };
+      const schedule = new IntegrationSchedulePostTool(
+        delegated as any,
+        (posts as any)._integrationService,
+        policy,
+        approvals
+      );
+      const tool = new CreatePostForReviewTool(schedule).run();
+      const values = new Map<string, string>();
+      const ctx = {
+        requestContext: {
+          get: (key: string) => values.get(key),
+          set: (key: string, value: string) => values.set(key, value),
+        },
+      };
+      const input = {
+        socialPost: [
+          {
+            integrationId: channel,
+            isPremium: false,
+            date: new Date(Date.now() + 86400000).toISOString(),
+            type: 'draft',
+            shortLink: false,
+            settings: [],
+            postsAndComments: [
+              {
+                content: 'Recovered Publisher review fixture',
+                attachments: [],
+              },
+            ],
+          },
+        ],
+      };
+      const old = runWithContext(
+        {
+          requestId: 'owned-review-fixture',
+          auth: { id: org },
+          source: 'fixture Publisher',
+          authKind: 'legacy',
+        },
+        () => (tool as any).execute(input, ctx)
+      );
+      void old.catch(() => undefined);
+      let before: any;
+      let fenceBefore: any;
+      let notificationsBefore = 0;
+      try {
+        await observed;
+        const admission = await repo.agentAdmissionStatus(org);
+        await repo.recoverAgentAdmission(
+          org,
+          admission!.owner,
+          'fixture-admin'
+        );
+        expect(await posts.resumeMcp(org, id)).toMatchObject({
+          status: 'RESUMED',
+        });
+        before = await db.post.findUniqueOrThrow({ where: { id } });
+        fenceBefore = await repo.mcpFence(org, id);
+        notificationsBefore = fixtureNotifications.length;
+      } finally {
+        release();
+      }
+      const result = await old;
+      expect(result.output.errors).toContain(id);
+      expect(result.output.errors).toContain('recovered');
+      expect(await db.post.findUniqueOrThrow({ where: { id } })).toMatchObject({
+        state: before.state,
+        approvalStatus: before.approvalStatus,
+        updatedAt: before.updatedAt,
+      });
+      expect(await repo.mcpFence(org, id)).toMatchObject({
+        state: fenceBefore.state,
+        generation: fenceBefore.generation,
+        revisionHash: fenceBefore.revisionHash,
+      });
+      expect(fixtureNotifications).toHaveLength(notificationsBefore);
+      expect(
+        await db.activityLog.count({
+          where: { organizationId: org, postId: id, action: 'SUBMITTED' },
+        })
+      ).toBe(0);
+      expect(
+        adapter
+          .events()
+          .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id)
+      ).toHaveLength(0);
+      expect(await posts.unscheduleMcp(org, id)).toMatchObject({
+        status: 'UNSCHEDULED',
+      });
+      await client.workflow
+        .getHandle(`post_${id}_mcp_${fenceBefore.generation}`)
+        .terminate('Owned future fixture cleanup after fencing.');
+    }, 60000);
+    it('the independent provider oracle never grants retry for contradictory, duplicated or inconsistent attempt history', async () => {
+      const file = join(fixtureRoot, 'oracle-negatives.jsonl');
+      writeFileSync(file, '');
+      const oracle = new FixtureAdapter(file, org, channel);
+      const integration = await db.integration.findUniqueOrThrow({
+        where: { id: channel },
+      });
+      const parent = [
+        {
+          id: 'oracle-parent',
+          message: 'parent',
+          settings: {},
+          media: [],
+          clientReference: { attemptId: randomUUID() },
+        },
+      ];
+      const [parentReceipt] = await oracle.post(
+        integration.internalId,
+        'fixture',
+        parent,
+        integration
+      );
+      const attemptId = randomUUID();
+      const payload = [
+        {
+          id: 'oracle-child',
+          message: 'child',
+          settings: {},
+          media: [],
+          clientReference: { attemptId },
+        },
+      ];
+      oracle.denyNextComment = true;
+      await expect(
+        oracle.comment(
+          integration.internalId,
+          parentReceipt.postId,
+          undefined as any,
+          'fixture',
+          payload,
+          integration
+        )
+      ).rejects.toThrow();
+      await oracle.comment(
+        integration.internalId,
+        parentReceipt.postId,
+        undefined as any,
+        'fixture',
+        payload,
+        integration
+      );
+      const digest = createHash('sha256')
+        .update(JSON.stringify(payload))
+        .digest('hex');
+      expect(
+        await oracle.reconcileMcpAttempt(integration, {
+          attemptId,
+          segmentId: 'oracle-child',
+          payloadHash: digest,
+        })
+      ).toMatchObject({ terminal: false, outcome: 'UNKNOWN' });
+      const duplicateId = randomUUID();
+      const duplicate = [
+        {
+          id: 'duplicate',
+          message: 'duplicate',
+          settings: {},
+          media: [],
+          clientReference: { attemptId: duplicateId },
+        },
+      ];
+      await oracle.post(
+        integration.internalId,
+        'fixture',
+        duplicate,
+        integration
+      );
+      await oracle.post(
+        integration.internalId,
+        'fixture',
+        duplicate,
+        integration
+      );
+      expect(
+        await oracle.reconcileMcpAttempt(integration, {
+          attemptId: duplicateId,
+          segmentId: 'duplicate',
+          payloadHash: createHash('sha256')
+            .update(JSON.stringify(duplicate))
+            .digest('hex'),
+        })
+      ).toMatchObject({ terminal: false, outcome: 'UNKNOWN' });
+      expect(
+        oracle
+          .events()
+          .filter(
+            (event) =>
+              event.kind === 'ACCEPT' && event.attemptId === duplicateId
+          )
+      ).toHaveLength(2);
+      expect(
+        await oracle.reconcileMcpAttempt(integration, {
+          attemptId,
+          segmentId: 'oracle-child',
+          payloadHash: 'wrong',
+        })
+      ).toMatchObject({ terminal: false, outcome: 'UNKNOWN' });
     }, 60000);
   }
 );

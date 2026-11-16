@@ -2210,6 +2210,27 @@ describe('tracked MCP publication admission', () => {
     const receipt = [{ id: 'root', postId: 'remote', releaseURL: 'https://test/remote', status: 'published' }];
     return { service, root, repo, hash, receipt };
   };
+  it('preserves a known published warning with best-effort accounting and never demotes it for accounting failure', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    (receipt[0] as any).warning = 'thumbnail failed';
+    (receipt[0] as any).publicationAccountingPending = true;
+    const accounting = jest.spyOn(service, 'recordProviderPublish').mockRejectedValue(new Error('accounting unavailable'));
+    const result = await service.runMcpSegment('org', 'root', 'root', 0, hash, jest.fn().mockResolvedValue(receipt));
+    expect(result[0]).toMatchObject({ postId: 'remote', warning: expect.stringContaining('Published successfully') });
+    expect(repo.finishMcpSegment).toHaveBeenCalledWith('org', 'attempt', result);
+    expect(repo.markMcpUnknown).not.toHaveBeenCalled();
+    expect(accounting).toHaveBeenCalledWith('org', 'test', ['root']);
+  });
+  it('keeps a mismatched typed published identity or failed atomic completion UNKNOWN without a legacy release write', async () => {
+    const first = fixture();
+    const mismatched = first.receipt.map(receipt => ({ ...receipt, id: 'foreign-segment', warning: 'follow-up failed' }));
+    await expect(first.service.runMcpSegment('org', 'root', 'root', 0, first.hash, jest.fn().mockResolvedValue(mismatched))).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(first.repo.finishMcpSegment).not.toHaveBeenCalled();
+    const second = fixture();
+    second.repo.finishMcpSegment.mockRejectedValue(new Error('owned commit fault'));
+    await expect(second.service.runMcpSegment('org', 'root', 'root', 0, second.hash, jest.fn().mockResolvedValue(second.receipt.map(receipt => ({ ...receipt, warning: 'follow-up failed' }))))).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(second.repo.markMcpUnknown).toHaveBeenCalledWith('org', 'attempt');
+  });
   it('persists STARTED admission before sending and stores the receipt before returning', async () => {
     const { service, repo, hash, receipt } = fixture();
     const send = jest.fn(async () => { expect(repo.claimMcpSegment).toHaveBeenCalled(); return receipt; });

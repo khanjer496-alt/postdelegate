@@ -67,6 +67,7 @@ Each item has an "id", its publish date, state, error (for errored posts), conte
                 .describe(
                   'Curated failure message for errored posts, null otherwise'
                 ),
+              warning: z.string().optional().describe('Ancillary follow-up warning; a PUBLISHED post remains published'),
               content: z.string(),
               settings: z
                 .any()
@@ -91,6 +92,8 @@ Each item has an "id", its publish date, state, error (for errored posts), conte
           customer: inputData.customer,
         } as any);
 
+        const warnings = await this._postsService.getMcpWarnings(organizationId, (posts || []).map(p => p.id));
+        const warningByPost = new Map(warnings.map(warning => [warning.segmentPostId, warning.followUpWarning]));
         return {
           output: {
             posts: (posts || []).map((p: any) => ({
@@ -100,6 +103,7 @@ Each item has an "id", its publish date, state, error (for errored posts), conte
                 .format('YYYY-MM-DDTHH:mm:ss'),
               state: p.state,
               error: p.error ?? null,
+              ...(warningByPost.has(p.id) ? { warning: warningByPost.get(p.id) } : {}),
               content: p.content || '',
               settings: parseSettings(p.settings),
               group: p.group,

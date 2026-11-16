@@ -1,3 +1,4 @@
+import { agentAdmissionContext, AgentSaveRecovered } from '../posts/agent-admission.context';
 import { Injectable } from '@nestjs/common';
 import { ApprovalStatus, Prisma, Role, State } from '@prisma/client';
 import {
@@ -150,6 +151,12 @@ export class ApprovalsRepository {
         : {}),
     };
     return this._transaction.model.$transaction(async (tx) => {
+      const admission = agentAdmissionContext.getStore();
+      if (admission) {
+        if (admission.orgId !== organizationId || typeof admission.owner !== 'string' || !admission.owner) throw new AgentSaveRecovered();
+        const owned = await tx.mcpAgentAdmission.updateMany({ where: { organizationId, owner: admission.owner }, data: { owner: admission.owner } });
+        if (!owned.count) throw new AgentSaveRecovered();
+      }
       let previousFenceState: string | undefined;
       if (post.mcpWorkflowVersion === 114) {
         const fence = await tx.mcpPublishFence.findFirst({ where: { postId: post.id, organizationId } });
@@ -176,6 +183,11 @@ export class ApprovalsRepository {
         },
         data: write,
       });
+      if (admission) {
+        const current = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId } });
+        const entries = await tx.post.findMany({ where: { organizationId, group: post.group, deletedAt: null }, select: { id: true } });
+        await tx.mcpAgentAdmission.update({ where: { organizationId, owner: admission.owner }, data: { writtenPostIds: [...new Set([...(current.writtenPostIds as string[]), ...entries.map(entry => entry.id)])] } });
+      }
       if (previousFenceState !== undefined) await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED', ...(data.state === 'QUEUE' && previousFenceState === 'CANCELLED' ? { generation: { increment: 1 } } : {}) } });
       return true;
     });

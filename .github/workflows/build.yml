@@ -110,7 +110,7 @@ jobs:
           AGENT_CREDENTIAL_TEST_DATABASE_URL: postgresql://postgres:ci-only@localhost:5432/pd_security_ledger_test?schema=agent_credentials
         run: |
           pnpm exec prisma db push --skip-generate --schema libraries/nestjs-libraries/src/database/prisma/schema.prisma
-          pnpm exec jest --runInBand --testMatch '**/agent.credentials.pgtest.ts'
+          pnpm exec jest --runInBand --testMatch '**/agent.credentials.pgtest.ts' --json --outputFile=/tmp/mcp-credential-results.json
 
       - name: MCP publication PostgreSQL fence
         env:
@@ -118,18 +118,44 @@ jobs:
           MCP_PUBLICATION_TEST_DATABASE_URL: postgresql://postgres:ci-only@localhost:5432/pd_security_ledger_test?schema=mcp_publication
         run: |
           pnpm exec prisma db push --skip-generate --schema libraries/nestjs-libraries/src/database/prisma/schema.prisma
-          pnpm exec jest --runInBand --testMatch '**/mcp.publish.pgtest.ts'
+          pnpm exec jest --runInBand --testMatch '**/mcp.publish.pgtest.ts' --json --outputFile=/tmp/mcp-publication-results.json
 
       - name: MCP actual native worker and provider fixture
         env:
           DATABASE_URL: postgresql://postgres:ci-only@localhost:5432/pd_security_ledger_test?schema=mcp_worker
           MCP_WORKER_TEST_DATABASE_URL: postgresql://postgres:ci-only@localhost:5432/pd_security_ledger_test?schema=mcp_worker
           TS_NODE_COMPILER_OPTIONS: '{"module":"CommonJS","moduleResolution":"node"}'
+          MCP_WORKER_TEST_RESULT_FILE: /tmp/mcp-native-summary.json
           MCP_WORKER_TEST_NAMESPACE: mcp-fixture-ci
           MCP_WORKER_TEST_TEMPORAL_ADDRESS: localhost:7233
         run: |
           pnpm exec prisma db push --skip-generate --schema libraries/nestjs-libraries/src/database/prisma/schema.prisma
           node --experimental-require-module -r ts-node/register/transpile-only -r tsconfig-paths/register libraries/nestjs-libraries/src/database/prisma/posts/mcp.worker.fixture.ts
+          node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/mcp-native-summary.json','utf8'));if(r.frameworkExitCode!==0||r.cases.length<12||r.cases.some(t=>t.status!=='BODY_COMPLETED')||r.hooks.length)process.exit(1)"
+
+      - name: Collect structured MCP evidence
+        if: always()
+        run: |
+          mkdir -p ci-evidence
+          node <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+          const result = { testedCommit: cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim(), testedTree: cp.execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {encoding:'utf8'}).trim(), suites: {} };
+          for (const [name, file] of [['credential','/tmp/mcp-credential-results.json'], ['publication','/tmp/mcp-publication-results.json']]) {
+            if (!fs.existsSync(file)) { result.suites[name] = {status:'NO_RESULT'}; continue; }
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            result.suites[name] = { success: data.success, passed: data.numPassedTests, failed: data.numFailedTests, assertions: (data.testResults||[]).flatMap(suite => (suite.assertionResults||[]).map(test => ({name:test.fullName,status:test.status,codes:(test.failureDetails||[]).map(error=>error?.code).filter(code=>typeof code==='number'||(typeof code==='string'&&/^[A-Z0-9_-]{1,40}$/.test(code)))}))) };
+          }
+          result.suites.native = fs.existsSync('/tmp/mcp-native-summary.json') ? JSON.parse(fs.readFileSync('/tmp/mcp-native-summary.json','utf8')) : {status:'NO_RESULT'};
+          fs.writeFileSync('ci-evidence/mcp-summary.json', JSON.stringify(result,null,2));
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-structured-evidence
+          path: ci-evidence/mcp-summary.json
+          if-no-files-found: warn
 
       - name: Build
         # the default Node heap runs out building the backend; the release

@@ -1,7 +1,7 @@
 import { getContext } from '../../../chat/async.storage';
 import { hostname } from 'os';
 import { readFile } from 'fs/promises';
-import { agentAdmissionContext as agentAdmission } from './agent-admission.context';
+import { agentAdmissionContext as agentAdmission, AgentSaveRecovered } from './agent-admission.context';
 import { createHash } from 'crypto';
 import { assertAgentPostWrite, agentDraftOnly } from '../../../chat/agent-credential.policy';
 import {
@@ -1263,7 +1263,7 @@ export class PostsService {
     }
     const materialized = await this.mcpThread(orgId, postId);
     const confirmed = await this._postRepository.mcpAttempts(orgId, postId);
-    if (materialized.every(post => post.state === 'PUBLISHED' && confirmed.some(attempt => attempt.segmentPostId === post.id && attempt.status === 'CONFIRMED' && (attempt.receipt as any)?.[0]?.postId))) return { status: 'ALREADY_PUBLISHED' };
+    if (materialized.every(post => post.state === 'PUBLISHED' && confirmed.some(attempt => attempt.segmentPostId === post.id && attempt.status === 'CONFIRMED' && (attempt.receipt as any)?.[0]?.postId))) return { status: 'ALREADY_PUBLISHED', warnings: confirmed.filter(attempt => attempt.followUpWarning).map(attempt => ({ segmentId: attempt.segmentPostId, message: attempt.followUpWarning })) };
     const execution = await this.mcpExecutionState(orgId, postId);
     if (execution.closed === undefined) return { status: 'OUTCOME_UNKNOWN', reason: 'Current workflow execution could not be confirmed.' };
     const result = await this._postRepository.resumeMcp(orgId, postId, this.mcpRevision(rows), execution.closed ? execution.generation : undefined);
@@ -1294,6 +1294,8 @@ export class PostsService {
     if (!fence || fence.state !== 'ACTIVE' || fence.generation !== generation || fence.revisionHash !== revisionHash || this.mcpRevision(rows) !== revisionHash) throw new BadRequestException('Workflow fence or revision changed.');
     return { publishAt: new Date(rows[0].publishDate).getTime(), segments: rows.map(p => ({ id: p.id, delay: p.delay })) };
   }
+
+  getMcpWarnings(orgId: string, postIds: string[]) { return this._postRepository.mcpWarnings(orgId, postIds); }
 
   async mcpThread(orgId: string, postId: string) {
     const rows = await this.getPostsRecursively(postId, true, orgId, true);
@@ -1343,7 +1345,8 @@ export class PostsService {
       if (!Array.isArray(result) || result.length !== 1 || !result[0]?.postId || result[0].postId === 'missing' || result[0].id !== segmentId || ['pending', 'unknown', 'error', 'failed', 'processing'].includes(result[0].status)) throw new BadRequestException('OUTCOME_UNKNOWN: provider did not return a final receipt.');
       // Persist before reporting success. A failure here keeps the durable
       // STARTED/UNKNOWN marker and may never be converted into a fresh send.
-      const receipt = result.map(r => ({ id: r.id, postId: String(r.postId), releaseURL: String(r.releaseURL || ''), status: String(r.status || 'published') }));
+      const receipt = result.map(r => ({ id: r.id, postId: String(r.postId), releaseURL: String(r.releaseURL || ''), status: String(r.status || 'published'), ...(r.warning ? { warning: 'Published successfully, but a follow-up change failed. Inspect the post in the provider.' } : {}) }));
+      if (result[0].publicationAccountingPending) await this.recordProviderPublish(orgId, root.integration.providerIdentifier, [segmentId]).catch(() => undefined);
       await this._postRepository.finishMcpSegment(orgId, admission.id, receipt);
       return receipt;
     } catch (err) {
@@ -1942,12 +1945,13 @@ export class PostsService {
 
       // an update held for review must stop the workflow already waiting
       if (body.type !== 'update' || decision?.hold || movedQueued || (existing?.mcpWorkflowVersion === 114 && posts[0].state === 'QUEUE')) {
-        this.startWorkflow(
-          post.settings.__type.split('-')[0].toLowerCase(),
-          posts[0].id,
-          orgId,
-          posts[0].state
-        ).catch((err) => {});
+        const dispatched = this.startWorkflow(
+          post.settings.__type.split('-')[0].toLowerCase(), posts[0].id, orgId, posts[0].state
+        );
+        // A tracked producer must finish its guarded dispatch before its save
+        // admission is settled. Legacy fire-and-forget behavior stays intact.
+        if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) await dispatched.catch(error => { if (error instanceof AgentSaveRecovered) throw error; });
+        else dispatched.catch(() => undefined);
       }
 
       if (actor) {

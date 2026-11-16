@@ -2495,6 +2495,7 @@ model McpPublishAttempt {
   receipt Json?
   providerPayload Json?
   providerPayloadHash String?
+  followUpWarning String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([rootPostId, segmentPostId, revisionHash, generation])

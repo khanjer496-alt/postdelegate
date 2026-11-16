@@ -1,3 +1,5 @@
+import { ApprovalsRepository } from '../approvals/approvals.repository';
+import { AgentSaveRecovered } from './agent-admission.context';
 import { agentAdmissionContext } from './agent-admission.context';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
@@ -498,5 +500,247 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
           )
       )
     ).rejects.toThrow('recovered');
+  });
+  it('known-live follow-up warnings commit with receipt and published state and remain separate from publication failure', async () => {
+    const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
+    const receipt = [
+      {
+        id: root,
+        postId: 'known-live-video',
+        releaseURL: 'https://fixture/video',
+        status: 'published',
+        warning: 'Published successfully; thumbnail needs attention.',
+      },
+    ];
+    await finish(org, attempt.id, receipt);
+    expect((await repo.mcpAttempts(org, root))[0]).toMatchObject({
+      status: 'CONFIRMED',
+      followUpWarning: receipt[0].warning,
+      receipt,
+    });
+    expect(
+      await db.post.findUniqueOrThrow({ where: { id: root } })
+    ).toMatchObject({
+      state: 'PUBLISHED',
+      releaseId: 'known-live-video',
+      error: null,
+    });
+    expect(await repo.mcpWarnings(org, [root])).toEqual([
+      { segmentPostId: root, followUpWarning: receipt[0].warning },
+    ]);
+    expect(await repo.mcpWarnings('foreign', [root])).toEqual([]);
+  });
+
+  it('a recovered Publisher save cannot submit review over a new schedule, while new-owner and standalone human controls remain valid', async () => {
+    await db.post.updateMany({
+      where: { organizationId: org, group: root },
+      data: { state: 'DRAFT', approvalStatus: 'NONE' },
+    });
+    await repo.acquireAgentAdmission(org, 'review-old');
+    await repo.recoverAgentAdmission(org, 'review-old', 'fixture-admin');
+    expect(await repo.resumeMcp(org, root, revision, 0)).toMatchObject({
+      status: 'RESUMED',
+    });
+    const approvalRepo = new ApprovalsRepository(
+      { model: db } as any,
+      { model: db } as any,
+      { model: db } as any,
+      { model: db } as any,
+      { model: db } as any,
+      { model: db } as any,
+      { model: db } as any
+    );
+    const before = await db.post.findUniqueOrThrow({ where: { id: root } });
+    const fence = await repo.mcpFence(org, root);
+    const target = { id: root, group: root, mcpWorkflowVersion: 114 };
+    await expect(
+      agentAdmissionContext.run(
+        { orgId: org, owner: 'review-old', persistedIds: [root] },
+        () =>
+          approvalRepo.transitionGroup(
+            org,
+            target,
+            {},
+            { state: 'DRAFT', approvalStatus: 'IN_REVIEW' }
+          )
+      )
+    ).rejects.toBeInstanceOf(AgentSaveRecovered);
+    expect(
+      await db.post.findUniqueOrThrow({ where: { id: root } })
+    ).toMatchObject({
+      state: before.state,
+      approvalStatus: before.approvalStatus,
+      updatedAt: before.updatedAt,
+    });
+    expect(await repo.mcpFence(org, root)).toMatchObject({
+      state: fence!.state,
+      generation: fence!.generation,
+      revisionHash: fence!.revisionHash,
+    });
+    await repo.acquireAgentAdmission(org, 'review-new');
+    expect(
+      await agentAdmissionContext.run(
+        { orgId: org, owner: 'review-new', persistedIds: [] },
+        () =>
+          approvalRepo.transitionGroup(
+            org,
+            target,
+            {},
+            { state: 'DRAFT', approvalStatus: 'IN_REVIEW' }
+          )
+      )
+    ).toBe(true);
+    expect((await repo.agentAdmissionStatus(org))!.writtenPostIds).toEqual(
+      expect.arrayContaining([root, child])
+    );
+    await repo.releaseAgentAdmission(org, 'review-new');
+    expect(
+      await approvalRepo.transitionGroup(
+        org,
+        target,
+        { state: 'DRAFT' },
+        { state: 'QUEUE', approvalStatus: 'APPROVED' }
+      )
+    ).toBe(true);
+  });
+
+  it('recovery waits for an already-admitted review transaction and reconciles its committed outcomes without stale follow-up authority', async () => {
+    await db.post.updateMany({
+      where: { organizationId: org, group: root },
+      data: { state: 'DRAFT', approvalStatus: 'NONE' },
+    });
+    await repo.acquireAgentAdmission(org, 'held-review');
+    let entered!: () => void;
+    let release!: () => void;
+    let recoveryEntered!: () => void;
+    const observed = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const recoveryObserved = new Promise<void>((resolve) => {
+      recoveryEntered = resolve;
+    });
+    const reviewTx = {
+      model: {
+        $transaction: (fn: any) =>
+          db.$transaction((tx) =>
+            fn(
+              new Proxy(tx, {
+                get: (target: any, key) =>
+                  key === 'mcpPublishFence'
+                    ? new Proxy(target[key], {
+                        get: (model: any, method) =>
+                          method === 'findFirst'
+                            ? async (args: any) => {
+                                const result = await model.findFirst(args);
+                                entered();
+                                await held;
+                                return result;
+                              }
+                            : typeof model[method] === 'function'
+                            ? model[method].bind(model)
+                            : model[method],
+                      })
+                    : typeof target[key] === 'function'
+                    ? target[key].bind(target)
+                    : target[key],
+              })
+            )
+          ),
+      },
+    };
+    const approvalRepo = new ApprovalsRepository(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      reviewTx as any
+    );
+    const recoveryTx = {
+      model: {
+        $transaction: (fn: any, options: any) =>
+          db.$transaction(
+            (tx) =>
+              fn(
+                new Proxy(tx, {
+                  get: (target: any, key) =>
+                    key === 'mcpAgentAdmission'
+                      ? new Proxy(target[key], {
+                          get: (model: any, method) =>
+                            method === 'updateMany'
+                              ? async (args: any) => {
+                                  recoveryEntered();
+                                  return model.updateMany(args);
+                                }
+                              : typeof model[method] === 'function'
+                              ? model[method].bind(model)
+                              : model[method],
+                        })
+                      : typeof target[key] === 'function'
+                      ? target[key].bind(target)
+                      : target[key],
+                })
+              ),
+            options
+          ),
+      },
+    };
+    const recovering = new PostsRepository(
+      { model: db } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      recoveryTx as any,
+      {} as any
+    );
+    const transition = agentAdmissionContext.run(
+      { orgId: org, owner: 'held-review', persistedIds: [root] },
+      () =>
+        approvalRepo.transitionGroup(
+          org,
+          { id: root, group: root, mcpWorkflowVersion: 114 },
+          { state: 'DRAFT' },
+          { state: 'DRAFT', approvalStatus: 'IN_REVIEW' }
+        )
+    );
+    await observed;
+    let settled = false;
+    const recovery = recovering
+      .recoverAgentAdmission(org, 'held-review', 'fixture-admin')
+      .then(
+        (result) => {
+          settled = true;
+          return { result };
+        },
+        (error) => ({ error })
+      );
+    try {
+      await recoveryObserved;
+      expect(settled).toBe(false);
+    } finally {
+      release();
+    }
+    expect(await transition).toBe(true);
+    const outcome = await recovery;
+    // A Serializable loser is blocked, then retried only after the admitted
+    // transaction has authoritatively completed, with a fresh DB snapshot.
+    if ('error' in outcome) expect((outcome.error as any).code).toBe('P2034');
+    const result =
+      'error' in outcome
+        ? await repo.recoverAgentAdmission(org, 'held-review', 'fixture-admin')
+        : outcome.result;
+    expect(result).toMatchObject({
+      status: 'RECOVERED',
+      persistedPosts: expect.arrayContaining([
+        expect.objectContaining({ id: root, state: 'DRAFT' }),
+      ]),
+    });
+    expect(await repo.agentAdmissionStatus(org)).toBeNull();
   });
 });

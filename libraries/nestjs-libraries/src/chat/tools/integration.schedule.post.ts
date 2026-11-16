@@ -1,3 +1,4 @@
+import { AgentSaveRecovered } from '../../database/prisma/posts/agent-admission.context';
 import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
@@ -387,6 +388,10 @@ If validation fails, or the workspace limits what agents can do (allowed channel
               actor as Extract<ApprovalActor, { type: 'agent' }>
             );
           } catch (err) {
+            if (err instanceof AgentSaveRecovered) {
+              const createdIds = [...finalOutput.map(p => p.postId), ...output.map(p => p.postId)];
+              return { output: { errors: `This save was recovered; its remaining review submission was stopped. Already created IDs (do not recreate): ${createdIds.join(', ')}. Inspect their current state before continuing; another authorized action may have changed it.` } };
+            }
             // the posts so far exist: say which, so the client does not
             // create them again
             if (!(err instanceof HttpException)) {

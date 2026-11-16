@@ -52,6 +52,7 @@ CREATE TABLE "McpPublishAttempt" (
     "receipt" JSONB,
     "providerPayload" JSONB,
     "providerPayloadHash" TEXT,
+    "followUpWarning" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
