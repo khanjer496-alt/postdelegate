@@ -23,6 +23,7 @@ import { ToolbarV2 } from './toolbar.v2';
 import { ChannelStripV2 } from './channel.strip.v2';
 import { CalendarV2 } from './views.v2';
 import { WeekPanelV2 } from './week.panel.v2';
+import { CalendarFiltersV2 } from '@gitroom/frontend/components/features/calendar-filters/calendar.filters.v2';
 
 // import, bulk videos and the generator: the classic channel column's tools
 const ToolsMenu: FC = () => {
@@ -122,7 +123,9 @@ export const LaunchesComponentV2: FC = () => {
               />
               <FirstRunChecklist />
             </div>
-            <CalendarV2 />
+            <CalendarFiltersV2>
+              <CalendarV2 />
+            </CalendarFiltersV2>
           </div>
           <WeekPanelV2
             refreshChannel={refreshChannel}
