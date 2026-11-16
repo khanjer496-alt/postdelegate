@@ -18,6 +18,15 @@ export class ActivationController {
     return this._activationService.getChecklist(user.id, organization.id);
   }
 
+  // the v2 onboarding card; dismissed together with the checklist
+  @Get('/onboarding')
+  getOnboarding(
+    @GetUserFromRequest() user: User,
+    @GetOrgFromRequest() organization: Organization
+  ) {
+    return this._activationService.getOnboarding(user.id, organization.id);
+  }
+
   @Post('/checklist/dismiss')
   dismissChecklist(
     @GetUserFromRequest() user: User,
