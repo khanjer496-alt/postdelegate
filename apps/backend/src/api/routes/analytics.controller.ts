@@ -86,6 +86,19 @@ export class AnalyticsController {
     return this._analyticsService.getTopPosts(org.id, query.days, query);
   }
 
+  // the v2 Analytics gallery: the top posts with a thumbnail and an excerpt
+  @Get('/top-posts/gallery')
+  async getTopPostsGallery(
+    @GetOrgFromRequest() org: Organization,
+    @Query() query: AnalyticsTopPostsDto
+  ) {
+    return this._analyticsService.getTopPostsGallery(org.id, query.days, {
+      sort: query.sort,
+      integrations: query.integrations,
+      limit: query.limit,
+    });
+  }
+
   // daily view gains per channel; like the channel view, an expired token of a
   // network read live is refreshed
   @Get('/views')
