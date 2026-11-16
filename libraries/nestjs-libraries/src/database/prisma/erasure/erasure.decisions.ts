@@ -222,6 +222,15 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     note: 'deleted, post titles, links and metrics',
   },
   AnalyticsPostSnapshot: { scope: 'org', note: 'deleted, daily post metrics' },
+  SmartLinkPage: {
+    scope: 'org',
+    note: 'deleted, the public link-in-bio page (title, bio, avatar URL)',
+  },
+  SmartLinkItem: { scope: 'org', note: 'deleted before the page' },
+  SmartLinkStat: {
+    scope: 'org',
+    note: 'deleted before the page, daily view and click counts only',
+  },
   AnalyticsReportSettings: {
     scope: 'org',
     note: 'deleted, recipient user ids and branding',
