@@ -44,6 +44,7 @@ import { CopilotKit } from '@copilotkit/react-core';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Impersonate } from '@gitroom/frontend/components/layout/impersonate';
 import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announcement.banner';
+import { FreePlanBanner } from '@gitroom/frontend/components/features/free-plan/free.plan.banner';
 import { TitleV2 } from './title.v2';
 import { SidebarV2 } from '@gitroom/frontend/components/new-layout/v2/sidebar.v2';
 import { UI_V2_BODY_CLASS } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
@@ -242,11 +243,15 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                 {t('skip_to_content', 'Skip to content')}
               </a>
               <div>{user?.admin ? <Impersonate /> : <div />}</div>
-              {user.tier === 'FREE' && isGeneral && billingEnabled ? (
+              {user.tier === 'FREE' &&
+              !user.freePlan &&
+              isGeneral &&
+              billingEnabled ? (
                 <FirstBillingComponent />
               ) : (
                 <>
                   <AnnouncementBanner />
+                  {!!user.freePlan && <FreePlanBanner />}
                   <div className="flex-1 flex">
                     <Support />
                     <ReviewPrompt />

@@ -20,7 +20,11 @@ import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { getAuthCookieOptions } from '@gitroom/helpers/subdomain/subdomain.management';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
+import {
+  freeChannels,
+  freePlanEnabled,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/ai-credentials/ai.credential.service';
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -48,8 +52,20 @@ export class UsersController {
     private _orgService: OrganizationService,
     private _userService: UsersService,
     private _trackService: TrackService,
-    private _aiCredentialService: AiCredentialService
+    private _aiCredentialService: AiCredentialService,
+    private _permissionsService: PermissionsService
   ) {}
+
+  // the free plan's limits and this month's use (PD_FF_FREE_PLAN)
+  @Get('/free-plan')
+  async getFreePlan(@GetOrgFromRequest() organization: Organization) {
+    return (
+      (await this._permissionsService.freePlanUsage(
+        organization.id,
+        organization.createdAt
+      )) || { limits: null }
+    );
+  }
 
   @Get('/chatbase-token')
   async getChatbaseToken(
@@ -104,8 +120,13 @@ export class UsersController {
       totalChannels: !process.env.STRIPE_PUBLISHABLE_KEY
         ? 10000
         : // @ts-ignore
-          organization?.subscription?.totalChannels || pricing.FREE.channel,
+          organization?.subscription?.totalChannels || freeChannels(),
       tier,
+      // PD_FF_FREE_PLAN: a workspace without a plan uses the free plan's limits
+      freePlan:
+        !!process.env.STRIPE_PUBLISHABLE_KEY &&
+        tier === 'FREE' &&
+        freePlanEnabled(),
       aiAvailable: await this._aiCredentialService.hasCredential(
         organization.id
       ),

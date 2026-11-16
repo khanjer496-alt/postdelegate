@@ -2,6 +2,9 @@ import { Ability, AbilityBuilder, AbilityClass } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
 import {
   allowsExtraChannels,
+  FREE_PLAN_LIMITS,
+  freePlanEnabled,
+  planOptionsOf,
   pricing,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/payment.providers';
@@ -40,7 +43,8 @@ export class PermissionsService {
       subscription?.subscriptionTier ||
       (!process.env.STRIPE_PUBLISHABLE_KEY ? 'PRO' : 'FREE');
 
-    const { channel, ...all } = pricing[tier];
+    // FREE has the free plan's limits when PD_FF_FREE_PLAN is on
+    const { channel, ...all } = planOptionsOf(tier);
     return {
       subscription,
       options: {
@@ -110,6 +114,28 @@ export class PermissionsService {
       0,
       options.posts_per_month - (await this.postsThisMonth(orgId, created_at))
     );
+  }
+
+  // What a workspace on the free plan (PD_FF_FREE_PLAN=on) has used this
+  // month; null when it has a subscription, billing is off or the flag is off
+  async freePlanUsage(orgId: string, created_at: Date) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY || !freePlanEnabled()) {
+      return null;
+    }
+    const subscription =
+      await this._subscriptionService.getSubscriptionByOrganizationId(orgId);
+    if (subscription) {
+      return null;
+    }
+    const [posts, integrations] = await Promise.all([
+      this.postsThisMonth(orgId, created_at),
+      this._integrationService.getIntegrationsList(orgId),
+    ]);
+    return {
+      limits: FREE_PLAN_LIMITS,
+      posts,
+      channels: countPlanChannels(integrations),
+    };
   }
 
   // whether the plan allows a section, for a check that depends on the

@@ -363,7 +363,10 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
   const showMain =
     // (same check as the classic TopMenu, tier is compared as it comes in)
     !!user?.orgId &&
-    ((user.tier as unknown as string) !== 'FREE' || !isGeneral || !billingEnabled);
+    ((user.tier as unknown as string) !== 'FREE' ||
+      !!user.freePlan ||
+      !isGeneral ||
+      !billingEnabled);
   const { data: integrationList } = useIntegrationList();
   const integrations = useMemo(
     () =>
