@@ -1,5 +1,6 @@
 import { agentAdmissionContext, AgentSaveRecovered } from '../posts/agent-admission.context';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { mcpPayloadRevision } from '../posts/posts.repository';
 import { ApprovalStatus, Prisma, Role, State } from '@prisma/client';
 import {
   PrismaRepository,
@@ -132,6 +133,26 @@ export class ApprovalsRepository {
     });
   }
 
+  private async orderedTrackedThread(tx: Prisma.TransactionClient, organizationId: string, post: { id: string; group: string }, integrationId: string) {
+    const rows = await tx.post.findMany({
+      where: { organizationId, integrationId, group: post.group, deletedAt: null },
+      select: { id: true, integrationId: true, content: true, settings: true, image: true, delay: true, publishDate: true, parentPostId: true, mcpWorkflowVersion: true },
+    });
+    const root = rows.find(row => row.id === post.id && row.parentPostId === null && row.mcpWorkflowVersion === 114);
+    if (!root) throw new BadRequestException('The tracked revision changed. Refresh before reviewing.');
+    const ordered = [root];
+    const seen = new Set([root.id]);
+    let current = root;
+    while (true) {
+      const children = rows.filter(row => row.parentPostId === current.id);
+      if (!children.length) break;
+      if (children.length !== 1 || seen.has(children[0].id)) throw new BadRequestException('The tracked revision has an invalid thread.');
+      current = children[0]; ordered.push(current); seen.add(current.id);
+    }
+    if (ordered.length !== rows.length) throw new BadRequestException('The tracked revision has an incomplete thread.');
+    return ordered;
+  }
+
   // A post and its comments move together, they share the group. The main
   // post is claimed first, only when it still matches `expected`, so two
   // people acting at once can't both approve (and publish) it. Both writes
@@ -157,13 +178,17 @@ export class ApprovalsRepository {
         const owned = await tx.mcpAgentAdmission.updateMany({ where: { organizationId, owner: admission.owner }, data: { owner: admission.owner } });
         if (!owned.count) throw new AgentSaveRecovered();
       }
-      let previousFenceState: string | undefined;
+      let previousFence: { state: string; revisionHash: string; integrationId: string } | undefined;
       if (post.mcpWorkflowVersion === 114) {
-        const fence = await tx.mcpPublishFence.findFirst({ where: { postId: post.id, organizationId } });
-        if (!fence) return false;
-        await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { updatedAt: new Date() } });
+        const existing = await tx.mcpPublishFence.findFirst({ where: { postId: post.id, organizationId } });
+        if (!existing) return false;
+        // Use the row returned after acquiring the write lock, not a state/hash
+        // snapshot read before a concurrent cancellation or edit completed.
+        const fence = await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { updatedAt: new Date() } });
         if (await tx.mcpPublishAttempt.count({ where: { rootPostId: post.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING', 'CONFIRMED'] } } })) return false;
-        previousFenceState = fence.state;
+        const stored = await this.orderedTrackedThread(tx, organizationId, post, fence.integrationId);
+        if (mcpPayloadRevision(stored) !== fence.revisionHash) throw new BadRequestException('The tracked revision changed. Refresh before reviewing.');
+        previousFence = fence;
       }
       const claimed = await tx.post.updateMany({
         where: {
@@ -178,6 +203,7 @@ export class ApprovalsRepository {
         where: {
           organizationId,
           group: post.group,
+          ...(previousFence ? { integrationId: previousFence.integrationId } : {}),
           deletedAt: null,
           id: { not: post.id },
         },
@@ -185,10 +211,22 @@ export class ApprovalsRepository {
       });
       if (admission) {
         const current = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId } });
-        const entries = await tx.post.findMany({ where: { organizationId, group: post.group, deletedAt: null }, select: { id: true } });
+        const entries = await tx.post.findMany({ where: { organizationId, group: post.group, ...(previousFence ? { integrationId: previousFence.integrationId } : {}), deletedAt: null }, select: { id: true } });
         await tx.mcpAgentAdmission.update({ where: { organizationId, owner: admission.owner }, data: { writtenPostIds: [...new Set([...(current.writtenPostIds as string[]), ...entries.map(entry => entry.id)])] } });
       }
-      if (previousFenceState !== undefined) await tx.mcpPublishFence.update({ where: { postId: post.id }, data: { state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED', dispatchState: data.state === 'QUEUE' ? 'PENDING' : 'CANCELLED', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null, ...(data.state === 'QUEUE' && previousFenceState === 'CANCELLED' ? { generation: { increment: 1 } } : {}) } });
+      if (previousFence) {
+        // Approval may move an overdue schedule to now. Hash the actual final
+        // ordered rows under this same fence transaction, never a later registration.
+        const finalRows = await this.orderedTrackedThread(tx, organizationId, post, previousFence.integrationId);
+        const revisionHash = mcpPayloadRevision(finalRows);
+        await tx.mcpPublishFence.update({ where: { postId: post.id }, data: {
+          revisionHash,
+          state: data.state === 'QUEUE' ? 'ACTIVE' : 'CANCELLED',
+          dispatchState: data.state === 'QUEUE' ? 'PENDING' : 'CANCELLED',
+          dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null,
+          ...(data.state === 'QUEUE' && (previousFence.state === 'CANCELLED' || previousFence.revisionHash !== revisionHash) ? { generation: { increment: 1 } } : {}),
+        } });
+      }
       return true;
     });
   }

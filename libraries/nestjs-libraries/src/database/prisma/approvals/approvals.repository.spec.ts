@@ -1,4 +1,5 @@
 import { agentAdmissionContext, AgentSaveRecovered } from '../posts/agent-admission.context';
+import { mcpPayloadRevision } from '../posts/posts.repository';
 import { ApprovalsRepository } from './approvals.repository';
 
 const makeRepo = (claimed = 1) => {
@@ -104,5 +105,76 @@ describe('save admission before review transition', () => {
     admission.updateMany.mockClear();
     expect(await repo.transitionGroup('org', { id: 'post', group: 'group' }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED' })).toBe(true);
     expect(admission.updateMany).not.toHaveBeenCalled(); expect(post.updateMany).toHaveBeenCalledTimes(4);
+  });
+});
+
+
+describe('atomic tracked approval revision and dispatch', () => {
+  const build = (changed = false) => {
+    const rows: any[] = [
+      { id: 'root', mcpWorkflowVersion: 114, parentPostId: null, organizationId: 'org', integrationId: 'channel', group: 'thread', content: 'root', image: '[]', settings: '{}', delay: 0, publishDate: new Date('2020-01-01'), state: 'DRAFT' },
+      { id: 'child', parentPostId: 'root', organizationId: 'org', integrationId: 'channel', group: 'thread', content: 'child', image: '[]', settings: '{}', delay: 0, publishDate: new Date('2020-01-01'), state: 'DRAFT' },
+    ];
+    const stored = { state: 'ACTIVE', integrationId: 'channel', revisionHash: mcpPayloadRevision(rows), generation: 2 };
+    if (changed) rows[1].content = 'unbound replacement';
+    const post = {
+      findMany: jest.fn(async () => structuredClone([...rows].reverse())),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const matches = where.AND ? rows.filter(row => row.id === 'root') : rows.filter(row => row.id !== 'root');
+        for (const row of matches) Object.assign(row, data);
+        return { count: matches.length };
+      }),
+    };
+    const fence = { findFirst: jest.fn(async () => ({ ...stored })), update: jest.fn(async ({ data }: any) => {
+      const { generation, ...rest } = data; Object.assign(stored, rest);
+      if (generation?.increment) stored.generation += generation.increment;
+      return { ...stored };
+    }) };
+    const tx = { post, mcpPublishFence: fence, mcpPublishAttempt: { count: jest.fn().mockResolvedValue(0) } };
+    const transaction = { model: { $transaction: jest.fn((run: any) => run(tx)) } };
+    const repo = new ApprovalsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, transaction as any);
+    return { repo, rows, stored, post, fence, transaction };
+  };
+  it('commits the final ordered date/hash/generation with QUEUE before any dispatch registration', async () => {
+    const { repo, rows, stored, fence, transaction } = build();
+    const previous = stored.revisionHash;
+    const publishDate = new Date('2026-11-17T00:00:00Z');
+    expect(await repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate })).toBe(true);
+    expect(rows.every(row => row.state === 'QUEUE' && row.publishDate === publishDate)).toBe(true);
+    expect(stored).toMatchObject({ revisionHash: mcpPayloadRevision(rows), generation: 3, dispatchState: 'PENDING' });
+    expect(stored.revisionHash).not.toBe(previous);
+    expect(fence.update.mock.calls.at(-1)![0].data.revisionHash).toBe(mcpPayloadRevision(rows));
+    expect(transaction.model.$transaction).toHaveBeenCalledTimes(1);
+    // Simulated producer death here: no later registerMcpFence is needed to make the record recoverable.
+  });
+  it('keeps the hash/generation for an unchanged-date approval under the same active fence', async () => {
+    const { repo, rows, stored } = build();
+    const previous = stored.revisionHash;
+    await repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED' });
+    expect(stored).toMatchObject({ revisionHash: previous, generation: 2, dispatchState: 'PENDING' });
+    expect(stored.revisionHash).toBe(mcpPayloadRevision(rows));
+  });
+  it('increments a cancelled fence only once when approval also changes its date', async () => {
+    const { repo, stored } = build(); stored.state = 'CANCELLED';
+    await repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: new Date('2030-01-01') });
+    expect(stored).toMatchObject({ generation: 3, state: 'ACTIVE', dispatchState: 'PENDING' });
+  });
+  it('uses the locked fence state if cancellation completed after the initial read', async () => {
+    const { repo, stored, fence } = build(); stored.state = 'CANCELLED';
+    fence.findFirst.mockImplementation(async () => ({ ...stored, state: 'ACTIVE' }));
+    await repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED' });
+    expect(stored).toMatchObject({ generation: 3, state: 'ACTIVE' });
+  });
+  it('refuses malformed thread membership before changing stored posts', async () => {
+    const { repo, rows, post } = build(); rows[1].parentPostId = 'foreign-parent';
+    await expect(repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED' })).rejects.toThrow('revision');
+    expect(post.updateMany).not.toHaveBeenCalled();
+  });
+  it('does not repair an arbitrary stored-content/fence mismatch during approval', async () => {
+    const { repo, post, stored } = build(true);
+    const previous = stored.revisionHash;
+    await expect(repo.transitionGroup('org', { id: 'root', group: 'thread', mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: new Date() })).rejects.toThrow('revision');
+    expect(post.updateMany).not.toHaveBeenCalled();
+    expect(stored.revisionHash).toBe(previous);
   });
 });

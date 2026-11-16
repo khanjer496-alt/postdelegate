@@ -3,7 +3,7 @@ import { AgentSaveRecovered } from './agent-admission.context';
 import { agentAdmissionContext } from './agent-admission.context';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { PostsRepository } from './posts.repository';
+import { PostsRepository, mcpPayloadRevision } from './posts.repository';
 
 // Explicit disposable CI schema only: no DATABASE_URL fallback and no app DB.
 const url = process.env.MCP_PUBLICATION_TEST_DATABASE_URL;
@@ -21,7 +21,7 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
   let integration: string;
   let root: string;
   let child: string;
-  const revision = 'a'.repeat(64);
+  let revision: string;
   const finish = async (organizationId: string, id: string, receipt: any) => {
     await repo.bindMcpProviderPayload(
       organizationId,
@@ -92,6 +92,7 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
         state: 'QUEUE',
       },
     });
+    revision = mcpPayloadRevision([await db.post.findUniqueOrThrow({ where: { id: root } }), await db.post.findUniqueOrThrow({ where: { id: child } })]);
     await repo.registerMcpFence(org, root, integration, revision);
   });
   afterAll(async () => {
@@ -375,6 +376,54 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
       // A serialization conflict is a refused cancellation, never success.
       expect(cancellation.status === 'rejected' || cancellation.value.status !== 'UNSCHEDULED').toBe(true);
     }
+  });
+
+  it.each([true, false])('approval keeps final hash/dispatch atomic across producer loss (changes date=%s)', async movedDate => {
+    await db.post.updateMany({ where: { organizationId: org, group: root }, data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' } });
+    const approvalRepo = new ApprovalsRepository({ model: db } as any, {} as any, { model: db } as any, {} as any, {} as any, {} as any, { model: db } as any);
+    const before = await db.post.findUniqueOrThrow({ where: { id: root } });
+    const publishDate = movedDate ? new Date('2031-01-01') : undefined;
+    expect(await approvalRepo.transitionGroup(org, { id: root, group: root, mcpWorkflowVersion: 114 }, { updatedAt: before.updatedAt }, { state: 'QUEUE', approvalStatus: 'APPROVED', ...(publishDate ? { publishDate } : {}) })).toBe(true);
+    // No startWorkflow/registerMcpFence after transition: simulate producer death.
+    const finalRows = [await db.post.findUniqueOrThrow({ where: { id: root } }), await db.post.findUniqueOrThrow({ where: { id: child } })];
+    expect(await repo.mcpFence(org, root)).toMatchObject({ revisionHash: mcpPayloadRevision(finalRows), generation: movedDate ? 1 : 0, state: 'ACTIVE', dispatchState: 'PENDING' });
+    expect((await repo.pendingMcpDispatches()).some(row => row.postId === root)).toBe(true);
+    const admitted = await repo.claimMcpSegment(org, root, root, mcpPayloadRevision(finalRows), movedDate ? 1 : 0);
+    expect(admitted.replay).toBe(false);
+  });
+
+  it('approval refuses a stored payload/hash mismatch without queueing or repairing the fence', async () => {
+    await db.post.updateMany({ where: { organizationId: org, group: root }, data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' } });
+    await db.post.update({ where: { id: child }, data: { content: 'unbound replacement' } });
+    const before = await db.post.findUniqueOrThrow({ where: { id: root } });
+    const approvalRepo = new ApprovalsRepository({ model: db } as any, {} as any, { model: db } as any, {} as any, {} as any, {} as any, { model: db } as any);
+    await expect(approvalRepo.transitionGroup(org, { id: root, group: root, mcpWorkflowVersion: 114 }, {}, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: new Date() })).rejects.toThrow('revision');
+    expect(await db.post.findUniqueOrThrow({ where: { id: root } })).toMatchObject({ state: 'DRAFT', updatedAt: before.updatedAt });
+    expect(await repo.mcpFence(org, root)).toMatchObject({ revisionHash: revision, generation: 0 });
+  });
+
+  it('a final approval revision-write failure rolls back root, children and dispatch in the same SQL transaction', async () => {
+    await db.post.updateMany({ where: { organizationId: org, group: root }, data: { state: 'DRAFT', approvalStatus: 'IN_REVIEW' } });
+    const before = await db.post.findUniqueOrThrow({ where: { id: root } });
+    const transaction = { model: { $transaction: (run: any) => db.$transaction(tx => run(new Proxy(tx, {
+      get(target, key) {
+        if (key === 'mcpPublishFence') return new Proxy(target.mcpPublishFence, {
+          get(model, method) {
+            if (method === 'update') return async (args: any) => {
+              if (args.data.revisionHash) throw new Error('Owned final approval revision-write failure.');
+              return model.update(args);
+            };
+            const value = Reflect.get(model, method); return typeof value === 'function' ? value.bind(model) : value;
+          },
+        });
+        const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }))) } };
+    const approvalRepo = new ApprovalsRepository({ model: db } as any, {} as any, { model: db } as any, {} as any, {} as any, {} as any, transaction as any);
+    await expect(approvalRepo.transitionGroup(org, { id: root, group: root, mcpWorkflowVersion: 114 }, { updatedAt: before.updatedAt }, { state: 'QUEUE', approvalStatus: 'APPROVED', publishDate: new Date('2031-01-01') })).rejects.toThrow('revision-write failure');
+    expect(await db.post.findUniqueOrThrow({ where: { id: root } })).toMatchObject({ state: 'DRAFT', publishDate: before.publishDate, updatedAt: before.updatedAt });
+    expect(await db.post.findUniqueOrThrow({ where: { id: child } })).toMatchObject({ state: 'DRAFT', publishDate: before.publishDate });
+    expect(await repo.mcpFence(org, root)).toMatchObject({ revisionHash: revision, generation: 0 });
   });
 
   it('a terminal generation with no admitted attempts can recover, while stale closure proof cannot restart its successor', async () => {

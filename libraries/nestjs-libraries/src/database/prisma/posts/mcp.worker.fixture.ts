@@ -1179,6 +1179,45 @@ pg(
           .filter((event) => event.kind === 'ACCEPT' && event.segmentId === id)
       ).toHaveLength(1);
     }, 60000);
+    for (const overdue of [true, false]) it(`approval crash before registration recovers the final persisted revision (overdue=${overdue})`, async () => {
+      const { ApprovalsService } = require('../approvals/approvals.service');
+      const policy = (posts as any)._approvalPolicyService;
+      const approvals = new ApprovalsService((policy as any)._approvalsRepository, policy, (posts as any)._activityLogService, posts);
+      await db.approvalSettings.upsert({ where: { organizationId: org }, create: { organizationId: org, requireAgentApproval: true }, update: { requireAgentApproval: true } });
+      const date = new Date(Date.now() + (overdue ? -60000 : 60000)).toISOString();
+      const actor: any = { type: 'user', userId: 'fixture-admin', role: 'ADMIN' };
+      let id: string | undefined;
+      const originalStart = posts.startWorkflow;
+      try {
+        id = await create(2, [], date);
+        const before = await repo.mcpFence(org, id);
+        // This fault is BEFORE startWorkflow's registerMcpFence, unlike enqueue failure.
+        posts.startWorkflow = async () => { throw new Error('Owned post-transition/pre-registration producer crash.'); };
+        await expect(approvals.approve(org, id, actor)).rejects.toThrow('pre-registration');
+        posts.startWorkflow = originalStart;
+        const thread = await posts.mcpThread(org, id);
+        const fence = await repo.mcpFence(org, id);
+        expect(fence).toMatchObject({ state: 'ACTIVE', dispatchState: 'PENDING', revisionHash: posts.mcpRevision(thread) });
+        if (overdue) expect(fence!.revisionHash).not.toBe(before!.revisionHash);
+        else expect(fence!.revisionHash).toBe(before!.revisionHash);
+        expect(adapter.events().filter(event => event.kind === 'ACCEPT' && thread.some(row => row.id === event.segmentId))).toHaveLength(0);
+        // A fresh stateless dispatcher reconstructs its work from SQL alone.
+        const { McpDispatchRecoveryService } = require('./mcp.dispatch.recovery.service');
+        await new McpDispatchRecoveryService(posts).tick();
+        expect((await repo.mcpFence(org, id))!.dispatchState).toBe('CONFIRMED');
+        if (overdue) {
+          await waitForRun(id, fence!.generation);
+          expect(adapter.events().filter(event => event.kind === 'ACCEPT' && thread.some(row => row.id === event.segmentId))).toHaveLength(2);
+        } else {
+          expect((await client.workflow.getHandle(`post_${id}_mcp_${fence!.generation}`).describe()).status.name).toBe('RUNNING');
+          expect(await posts.unscheduleMcp(org, id)).toMatchObject({ status: 'UNSCHEDULED' });
+          await client.workflow.getHandle(`post_${id}_mcp_${fence!.generation}`).terminate('Owned unchanged-date approval fixture complete.');
+        }
+      } finally {
+        posts.startWorkflow = originalStart;
+        await db.approvalSettings.update({ where: { organizationId: org }, data: { requireAgentApproval: false } });
+      }
+    }, 60000);
     it('an accepted execution that completes before a lost start response is reconciled without another run or provider acceptance', async () => {
       loseStartReply = true;
       let failure: any;
