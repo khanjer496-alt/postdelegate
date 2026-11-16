@@ -104,7 +104,7 @@ export class CampaignsService {
     );
     const { posts, metrics } = await this.load(orgId, tags.map((t) => t.id), days, now);
     const campaigns: CampaignSummary[] = tags.map((tag) => {
-      const tagged = posts.filter((p) => p.tags.some((t) => t.tagId === tag.id));
+      const tagged = posts.filter((p) => p.tags.some((t: { tagId: string }) => t.tagId === tag.id));
       const dates = tagged.map((p) => p.publishDate.getTime());
       return {
         id: tag.id,
