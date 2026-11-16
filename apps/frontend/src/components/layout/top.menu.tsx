@@ -336,7 +336,11 @@ export const TopMenu: FC = () => {
           // @ts-ignore
           user?.orgId &&
             // @ts-ignore
-            (user.tier !== 'FREE' || !isGeneral || !billingEnabled) &&
+            (user.tier !== 'FREE' ||
+              // @ts-ignore
+              user.freePlan ||
+              !isGeneral ||
+              !billingEnabled) &&
             firstMenu
               .filter((f) => {
                 if (f.hide) {
