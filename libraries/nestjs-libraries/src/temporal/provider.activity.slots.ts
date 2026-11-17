@@ -89,9 +89,9 @@ export class ProviderActivitySlots implements CustomSlotSupplier<ActivitySlotInf
 }
 
 /** Called ONCE per finite provider/process and reused by legacy + V114 Workers. */
-export const providerActivityOptions = (provider: string, maximum: number | undefined, divider: number): Partial<WorkerOptions> => {
+export const providerActivityOptions = (provider: string, maximum: number | undefined, divider: number) => {
   if (!Number.isSafeInteger(divider) || divider < 1) throw new Error('WORKER_CONCURRENCY_DIVIDER must be a positive integer.');
-  if (maximum == null) return { maxConcurrentActivityTaskExecutions: 1000000 };
+  if (maximum == null) return { maxConcurrentActivityTaskExecutions: 1000000 } satisfies Partial<WorkerOptions>;
   if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error('Provider concurrency cap must be a positive integer.');
   const capacity = Math.floor(maximum / divider);
   if (capacity < 1) throw new Error(`Provider ${provider} has no safe worker share; pin it to one eligible compatible process via EXCLUDE_QUEUE and its verified divider.`);
@@ -102,5 +102,5 @@ export const providerActivityOptions = (provider: string, maximum: number | unde
       workflowTaskSlotSupplier: fixed(40), activityTaskSlotSupplier: new ProviderActivitySlots(capacity),
       localActivityTaskSlotSupplier: fixed(), nexusTaskSlotSupplier: fixed(),
     },
-  };
+  } satisfies Partial<WorkerOptions>;
 };
