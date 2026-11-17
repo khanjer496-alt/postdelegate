@@ -836,7 +836,7 @@ pg(
       const pool = capacity.tuner.activityTaskSlotSupplier;
       const running: Array<[Worker, Promise<void>]> = [];
       const launch = async (options: any) => {
-        const current = await Worker.create({ connection: native, namespace, ...options });
+        const current = await Worker.create({ connection: native, namespace, bundlerOptions: fixtureBundlerOptions, ...options });
         const promise = current.run(); running.push([current, promise]); activeWorkers.set(current, promise);
         return current;
       };
@@ -930,7 +930,7 @@ pg(
       };
       const running: Array<[Worker, Promise<void>]> = [];
       const launch = async (options: any) => {
-        const current = await Worker.create({ connection: native, namespace, ...options });
+        const current = await Worker.create({ connection: native, namespace, bundlerOptions: fixtureBundlerOptions, ...options });
         const promise = current.run(); running.push([current, promise]); activeWorkers.set(current, promise); return current;
       };
       const until = async (check: () => boolean, label: string) => {
