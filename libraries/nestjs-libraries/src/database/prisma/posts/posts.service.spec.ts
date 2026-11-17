@@ -2210,6 +2210,24 @@ describe('tracked MCP publication admission', () => {
     const receipt = [{ id: 'root', postId: 'remote', releaseURL: 'https://test/remote', status: 'published' }];
     return { service, root, repo, hash, receipt };
   };
+  it.each([null, 'not-an-array', [], [{ id: 'foreign', postId: 'remote', releaseURL: '', status: 'published' }], [{ id: 'root', postId: 'remote', releaseURL: '', status: 'processing' }], [{ id: 'root', postId: 'remote' }]])('refuses malformed recorded receipt replay without a provider call or ledger rewrite: %j', async (stored) => {
+    const { service, repo, hash } = fixture();
+    repo.mcpAttempts.mockResolvedValue([{ segmentPostId: 'root', status: 'CONFIRMED', revisionHash: hash }]);
+    repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt: stored, id: 'prior' });
+    const send = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(send).not.toHaveBeenCalled();
+    expect(repo.finishMcpSegment).not.toHaveBeenCalled();
+    expect(repo.markMcpUnknown).not.toHaveBeenCalled();
+  });
+  it('returns the validated recorded receipt array without resending', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    repo.mcpAttempts.mockResolvedValue([{ segmentPostId: 'root', status: 'CONFIRMED', revisionHash: hash }]);
+    repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt, id: 'prior' });
+    const send = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).resolves.toEqual(receipt);
+    expect(send).not.toHaveBeenCalled();
+  });
   it('preserves a known published warning with best-effort accounting and never demotes it for accounting failure', async () => {
     const { service, repo, hash, receipt } = fixture();
     (receipt[0] as any).warning = 'thumbnail failed';

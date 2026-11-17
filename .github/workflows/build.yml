@@ -183,9 +183,9 @@ jobs:
           let location;
           const inspect = line => {
             const project = /apps\/(frontend|backend|orchestrator) build/.exec(line)?.[1];
-            const source = /((?:apps|libraries)\/[A-Za-z0-9_./@()\[\]-]+|\.\/src\/[A-Za-z0-9_./@()\[\]-]+)(?:\((\d+),(\d+)\)|:(\d+):(\d+))?/.exec(line);
+            const source = /((?:apps|libraries)\/[A-Za-z0-9_./@()\[\]-]+|(?:\.\/)?src\/[A-Za-z0-9_./@()\[\]-]+)(?:\((\d+),(\d+)\)|:(\d+):(\d+))?/.exec(line);
             if(source) {
-              const file = source[1].startsWith('./') ? (project ? `apps/${project}/${source[1].slice(2)}` : undefined) : source[1];
+              const file = (/^(?:\.\/)?src\//.test(source[1])) ? (project ? `apps/${project}/${source[1].replace(/^\.\//,'')}` : undefined) : source[1];
               if(file) location = {file,...(source[2]||source[4] ? {line:Number(source[2]||source[4]),column:Number(source[3]||source[5])} : {})};
             }
             const code = /\bTS(\d{3,5})\b/.exec(line);

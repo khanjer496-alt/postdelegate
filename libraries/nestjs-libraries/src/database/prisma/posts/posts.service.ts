@@ -1386,6 +1386,17 @@ export class PostsService {
     return rows;
   }
 
+  private mcpReplayReceipt(value: unknown, segmentId: string) {
+    const receipt = Array.isArray(value) && value.length === 1 ? value[0] : undefined;
+    if (!receipt || typeof receipt !== 'object' || receipt.id !== segmentId ||
+      typeof receipt.postId !== 'string' || !receipt.postId || receipt.postId === 'missing' ||
+      typeof receipt.releaseURL !== 'string' || typeof receipt.status !== 'string' ||
+      ['pending', 'unknown', 'error', 'failed', 'processing'].includes(receipt.status))
+      throw new BadRequestException('OUTCOME_UNKNOWN: stored publication receipt is not valid for this segment.');
+    return [{ id: segmentId, postId: receipt.postId, releaseURL: receipt.releaseURL, status: receipt.status,
+      ...(typeof receipt.warning === 'string' ? { warning: receipt.warning } : {}) }];
+  }
+
   async runMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, expectedRevision: string, send: (integration: Integration, post: Post, predecessors: { parent?: string; previous?: string }, attemptId: string) => Promise<any>) {
     const rows = await this.mcpThread(orgId, rootId);
     const root = rows[0];
@@ -1402,7 +1413,7 @@ export class PostsService {
     if (storedAttempts.some(a => a.segmentPostId === segmentId && a.status === 'CONFIRMED' && a.revisionHash === actualRevision)) {
       const replay = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, actualRevision, generation);
       if (!replay.replay) throw new BadRequestException('Confirmed receipt changed unexpectedly.');
-      return replay.receipt;
+      return this.mcpReplayReceipt(replay.receipt, segmentId);
     }
     const predecessors: { parent?: string; previous?: string } = {};
     const priorSegments = rows.slice(0, rows.findIndex(p => p.id === segmentId));
@@ -1422,7 +1433,7 @@ export class PostsService {
         const revision = this.mcpRevision(rows);
     if (revision !== expectedRevision) throw new BadRequestException('Workflow payload revision changed.');
     const admission = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, revision, generation);
-    if (admission.replay) return admission.receipt;
+    if (admission.replay) return this.mcpReplayReceipt(admission.receipt, segmentId);
     try {
       const result = await send(root.integration, segment, predecessors, admission.id);
       if (!Array.isArray(result) || result.length !== 1 || !result[0]?.postId || result[0].postId === 'missing' || result[0].id !== segmentId || ['pending', 'unknown', 'error', 'failed', 'processing'].includes(result[0].status)) throw new BadRequestException('OUTCOME_UNKNOWN: provider did not return a final receipt.');
