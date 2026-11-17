@@ -29,6 +29,13 @@ let setupStage = 'NOT_STARTED';
 const bundleDiagnostics: Array<{ type: string; specifier?: string }> = [];
 const fixtureBundlerOptions = {
   webpackConfigHook: (config: any) => {
+    // SDK supplies the workflow parser/target inline. Do not inherit the
+    // application's .swcrc with a different developer's absolute Mac baseUrl.
+    // This applies only to this test bundle, never production build settings.
+    for (const rule of config.module?.rules || []) {
+      if (typeof rule.use?.loader === 'string' && rule.use.loader.includes('swc-loader'))
+        rule.use.options = { ...rule.use.options, swcrc: false, configFile: false };
+    }
     config.plugins = [...(config.plugins || []), {
       apply: (compiler: any) => compiler.hooks.done.tap('QaBundleDiagnostics', (stats: any) => {
         for (const error of stats.toJson({ all: false, errors: true, errorDetails: false }).errors || []) {
