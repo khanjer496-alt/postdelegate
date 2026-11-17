@@ -106,6 +106,11 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
           where: { organizationId: org },
         });
         await db.post.deleteMany({ where: { organizationId: org } });
+        // Recovery cases create audits, and setup always creates an integration.
+        // Both have restrictive organization foreign keys; remove only this
+        // disposable fixture's dependants before deleting its organization.
+        await db.activityLog.deleteMany({ where: { organizationId: org } });
+        await db.integration.deleteMany({ where: { organizationId: org } });
         await db.organization.delete({ where: { id: org } });
       }
       await db.$disconnect();
