@@ -166,8 +166,46 @@ jobs:
           if-no-files-found: warn
 
       - name: Build
+        id: application-build
         # the default Node heap runs out building the backend; the release
         # image builds with 3 GB (deploy/postdelegate/Dockerfile.release)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm run build
+
+      - name: Collect structured compiler failure evidence
+        if: failure() && steps.application-build.outcome == 'failure'
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p ci-build-evidence
+          node <<'NODE'
+          const fs = require('fs'), path = require('path'), ts = require('typescript');
+          const root = process.cwd();
+          const result = { head: require('child_process').execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim(), tree: require('child_process').execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {encoding:'utf8'}).trim(), projects: [] };
+          for (const project of ['apps/frontend', 'apps/backend', 'apps/orchestrator']) {
+            try {
+              const configFile = path.join(root, project, 'tsconfig.json');
+              const config = ts.readConfigFile(configFile, ts.sys.readFile);
+              const parsed = ts.parseJsonConfigFileContent(config.config || {}, ts.sys, path.dirname(configFile));
+              const program = ts.createProgram(parsed.fileNames, {...parsed.options, noEmit:true, incremental:false});
+              const diagnostics = [...(config.error ? [config.error] : []), ...parsed.errors, ...ts.getPreEmitDiagnostics(program)];
+              result.projects.push({ project, errorCount: diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length, diagnostics: diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).slice(0,100).map(d=>{
+                const relative = d.file ? path.relative(root,d.file.fileName).replaceAll(path.sep,'/') : '';
+                const file = /^(apps|libraries)\/[A-Za-z0-9_./@()\[\]-]{1,220}$/.test(relative) ? relative : '<external-or-config>';
+                const position = d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : undefined;
+                return {code:d.code,file,...(position ? {line:position.line+1,column:position.character+1}: {})};
+              })});
+            } catch (error) {
+              result.projects.push({project, collectorErrorType:/^[A-Za-z0-9_]{1,60}$/.test(error.name) ? error.name : 'Error'});
+            }
+          }
+          fs.writeFileSync('ci-build-evidence/type-diagnostics.json',JSON.stringify(result,null,2));
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.application-build.outcome == 'failure'
+        with:
+          name: build-type-diagnostics
+          path: ci-build-evidence/type-diagnostics.json
+          if-no-files-found: error
