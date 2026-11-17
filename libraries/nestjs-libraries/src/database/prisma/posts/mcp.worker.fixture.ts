@@ -24,8 +24,10 @@ const caseResults: Array<{
   code?: string | number;
   type?: string;
 }> = [];
+let setupStage = 'NOT_STARTED';
 const hookResults: Array<{
   phase: string;
+  stage?: string;
   code?: string | number;
   type?: string;
 }> = [];
@@ -59,7 +61,7 @@ const beforeAll = (fn: () => Promise<void>, timeout = 90000) =>
       try {
         await fn();
       } catch (error) {
-        hookResults.push({ phase: 'SETUP', ...safeFailure(error) });
+        hookResults.push({ phase: 'SETUP', stage: setupStage, ...safeFailure(error) });
         throw error;
       }
     },
@@ -489,6 +491,7 @@ pg(
       });
     const activeWorkers = new Map<Worker, Promise<void>>();
     const startWorker = async () => {
+      setupStage = 'WORKFLOW_WORKER_CREATE';
       worker = await Worker.create({
         connection: native,
         namespace,
@@ -506,10 +509,12 @@ pg(
           mcpPublishSegment: publishActivity,
         },
       });
+      setupStage = 'WORKFLOW_WORKER_RUN';
       workerRun = worker.run();
       const workflowWorker = worker;
       const workflowRun = workerRun;
       activeWorkers.set(workflowWorker, workflowRun);
+      setupStage = 'PUBLISHER_WORKER_CREATE';
       const publisher = await Worker.create({
         connection: native,
         namespace,
@@ -519,6 +524,7 @@ pg(
           mcpPublishSegment: publishActivity,
         },
       });
+      setupStage = 'PUBLISHER_WORKER_RUN';
       const publisherRun = publisher.run();
       activeWorkers.set(publisher, publisherRun);
       return async () => {
@@ -532,11 +538,13 @@ pg(
     };
     let stop: (() => Promise<void>) | undefined;
     beforeAll(async () => {
+      setupStage = 'ENVIRONMENT';
       if (process.env.STRIPE_SECRET_KEY || process.env.STRIPE_PUBLISHABLE_KEY)
         throw new Error(
           'No billing/provider credentials permitted in fixture composition.'
         );
       process.env.MCP_V114_ADMISSION_ENABLED = 'true';
+      setupStage = 'PRIVATE_FILES';
       fixtureRoot = mkdtempSync(join(tmpdir(), 'postdelegate-mcp-worker-'));
       mockStorage = {
         uploadFile: async ({ buffer }: any) => {
@@ -548,6 +556,7 @@ pg(
       process.env.UPLOAD_DIRECTORY = fixtureRoot;
       process.env.FRONTEND_URL = 'https://fixture.invalid';
       process.env.NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY = 'media';
+      setupStage = 'DATABASE_FIXTURE';
       db = new PrismaClient({ datasources: { db: { url } } });
       org = (
         await db.organization.create({
@@ -576,7 +585,9 @@ pg(
           return adapter;
         },
       };
+      setupStage = 'TEMPORAL_CONNECT';
       clientConnection = await Connection.connect({ address });
+      setupStage = 'TEMPORAL_NAMESPACE';
       try {
         await clientConnection.workflowService.registerNamespace({
           namespace,
@@ -585,6 +596,7 @@ pg(
       } catch (error) {
         if ((error as any).code !== 6) throw error;
       }
+      setupStage = 'TEMPORAL_SEARCH_ATTRIBUTES';
       await clientConnection.operatorService.addSearchAttributes({
         namespace,
         searchAttributes: {
@@ -595,6 +607,7 @@ pg(
         },
       });
       client = new Client({ connection: clientConnection, namespace });
+      setupStage = 'NATIVE_CONNECT';
       native = await NativeConnection.connect({ address });
       const temporalService = {
         client: {
@@ -625,6 +638,7 @@ pg(
           }),
         },
       };
+      setupStage = 'DOMAIN_COMPOSITION';
       const transaction = factory({
         $transaction: (fn: any, options: any) =>
           db.$transaction((tx) => fn(modelProxy(tx)), options),
@@ -721,6 +735,7 @@ pg(
       expect((posts as any)._integrationManager).toBe(manager);
       expect((activity as any)._integrationManager).toBe(manager);
       stop = await startWorker();
+      setupStage = 'READY';
     }, 90000);
     afterEach(async () => {
       if (db && org)
