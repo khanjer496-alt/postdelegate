@@ -1,0 +1,30 @@
+{
+  "source_sha": "1a604fe35ba94bb3934109944ec5e4f2f10b7291",
+  "source_tree": "df3e8a53e24bd6477f60a77a7baeaadd0a5d147c",
+  "required_ci_run": 44148435497,
+  "recipe_sha256": "3c6e102776d769877c7b5cc5ada23c9ca6f282a62d8df30d68f51b4718cdf3d0",
+  "base_reference": "ghcr.io/gitroomhq/postiz-app:v2.25.3@sha256:1e376ff2cb781022d528f171719cf174cf693a985a30cb40eefb13eae3ddda13",
+  "base_amd64_manifest": "sha256:3e2facf0c1ffdfe07b31cebdc5b850767721cb40a7a389dd07485f8e381bb49f",
+  "compressed_bytes_measured": 1632447252,
+  "unpacked_bytes_measured": 7049378629,
+  "prior_successful_release_unpacked_bytes_measured": 11081414126,
+  "prior_successful_build_peak_rss": null,
+  "intermediate_delta_estimate_bytes": 8064070994,
+  "additional_scratch_estimate_bytes": 3221225472,
+  "disk_reserve_bytes": 10737418240,
+  "memory_build_estimate_bytes": 12884901888,
+  "memory_reserve_bytes": 2147483648,
+  "cancellation_margin_bytes": 268435456,
+  "budget_model": "ESTIMATE_NOT_PEAK: 4GiB primary+4GiB child allowance+4GiB extra-child/native/builder. Next child count is not source-capped; review model before build mode. Runtime reserve monitor is cancellation, not a hard aggregate cgroup guarantee.",
+  "public_standard_runner_documented": {
+    "cpu": 4,
+    "ram_gb": 16,
+    "ssd_gb": 14
+  },
+  "no_guaranteed_runner_fit": true,
+  "required_free_disk_bytes": 30704540587,
+  "required_available_memory_bytes": 15032385536,
+  "qa_copy_memory_estimate_bytes": 1073741824,
+  "qa_copy_disk_estimate_bytes": 1073741824,
+  "qa_copy_model": "COPY-only, no RUN/install; same source critical closure must compare equal afterward"
+}

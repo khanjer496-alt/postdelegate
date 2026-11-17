@@ -16,12 +16,21 @@ on:
       - '**/*.md'
       - .github/workflows/uptime.yml
   workflow_dispatch:
+    inputs:
+      image_review:
+        description: 'Manual artifact review only; none retains ordinary CI'
+        type: choice
+        default: none
+        options:
+          - none
+          - capacity-only
+          - build-metadata
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.image_review != 'none' && inputs.image_review != '' && format('image-review-{0}-{1}', github.ref, inputs.image_review) || format('build-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -208,3 +217,70 @@ jobs:
           name: build-type-diagnostics
           path: ci-build-evidence/type-diagnostics.json
           if-no-files-found: error
+
+
+  release_image_review:
+    needs: build
+    name: Candidate image capacity / unadmitted metadata
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.image_review == 'capacity-only' || inputs.image_review == 'build-metadata') &&
+      github.repository == 'khanjer496-alt/postdelegate' &&
+      github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      SOURCE_SHA: 1a604fe35ba94bb3934109944ec5e4f2f10b7291
+      ORCHESTRATION_SHA: ${{ github.sha }}
+      REVIEW_MODE: ${{ inputs.image_review }}
+    steps:
+      - name: Anonymous immutable review checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ORCHESTRATION_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          WORK="$RUNNER_TEMP/postdelegate-image-review"
+          mkdir -m 700 "$WORK"
+          git -C "$WORK" init -q
+          git -C "$WORK" -c credential.helper= -c http.extraheader= fetch --no-tags --depth=1 \
+            https://github.com/khanjer496-alt/postdelegate.git "$ORCHESTRATION_SHA" "$SOURCE_SHA"
+          git -C "$WORK" -c core.hooksPath=/dev/null checkout --detach "$ORCHESTRATION_SHA"
+          test "$(git -C "$WORK" rev-parse HEAD)" = "$ORCHESTRATION_SHA"
+          mkdir -m 700 "$RUNNER_TEMP/postdelegate-image-docker-config"
+      - name: Capacity or build and metadata only
+        shell: bash
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/postdelegate-image-docker-config
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/postdelegate-image-review"
+          python3 "$WORK/.github/release-image-review/image_review.py" \
+            --mode "$REVIEW_MODE" --repo "$WORK" \
+            --out "$RUNNER_TEMP/postdelegate-image-result"
+      - name: Bounded structured review summary only
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY_SUMMARY'
+          import json, os
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'postdelegate-image-result'
+          files=sorted(root.glob('*.json')) if root.exists() else []
+          report={'mode':os.environ['REVIEW_MODE'],'source':os.environ['SOURCE_SHA'],
+                  'image_delivery':'NOT_IMPLEMENTED','registry_writes':False,
+                  'runtime_admission':False,'ordinary_ci':'REQUIRED_SEPARATE_JOB_SUCCESS',
+                  'records':{}}
+          total=0
+          for file in files:
+              total+=file.stat().st_size
+              if total>128*1024: raise SystemExit('Bounded summary exceeded; not qualified')
+              report['records'][file.name]=json.loads(file.read_text())
+          if not files: report['status']='NO_RESULT_NOT_QUALIFIED'
+          text=json.dumps(report,indent=2)
+          if len(text.encode())>192*1024: raise SystemExit('Summary exceeded; not qualified')
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as stream:
+              stream.write('## Unadmitted image review (not runtime or delivery proof)\n\n```json\n'+text+'\n```\n')
+          PY_SUMMARY

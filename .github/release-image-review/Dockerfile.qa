@@ -1,0 +1,4 @@
+ARG REVIEWED_RELEASE_IMAGE
+FROM ${REVIEWED_RELEASE_IMAGE}
+# No dependency installation or production dependency-tree replacement.
+COPY test/fixtures/mcp-authenticated-qa/ /app/test/fixtures/mcp-authenticated-qa/
