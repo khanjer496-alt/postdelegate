@@ -1,7 +1,13 @@
 // Hosted CI unit gate. Never executes bootstrap, seed, DB, Redis, Temporal or HTTP.
-import { validateManifest, QaManifest, fixtureAllowsRequest } from './guard';
+import {
+  validateManifest,
+  QaManifest,
+  fixtureAllowsRequest,
+  applyQaAdmission,
+} from './guard';
 const example = (): QaManifest => ({
   purpose: 'postdelegate-authenticated-qa',
+  admissionState: 'CLOSED',
   runId: '123456abcdef',
   sourceSha: '1'.repeat(40),
   refName: 'qa/mcp-123456abcdef',
@@ -136,4 +142,100 @@ it('does not infer unpublished after a rejected duplicate dispatch', () => {
       { ...input, runId: 'r', kind: 'DUPLICATE_CALL' },
     ])
   ).toEqual({ terminal: false, outcome: 'UNKNOWN' });
+});
+
+// Synthetic contract only: no loadRun/AppModule, filesystem or transport invocation.
+describe('protected fixture admission state', () => {
+  const proofFor = (c: QaManifest) => ({
+    runId: c.runId,
+    sourceSha: c.sourceSha,
+    origin: c.origin,
+    admissionState: c.admissionState,
+    owner: 'Release Engineer',
+    providerEgress: 'DENIED',
+    trustedReferenceParents: 'RE_IMMUTABLE_NO_CONCURRENT_UNTRUSTED_WRITERS',
+    trustedHttps: true,
+    frontendBakedApi: `${c.origin}/api`,
+    sourceReviewedSha: c.sourceSha,
+    reviewedRuntimeGo: true,
+    runtimeGoRef: 'example-reviewed-runtime-go',
+    evidenceRef: 'example-containment-evidence',
+  });
+  it.each(['CLOSED', 'OPEN'] as const)(
+    'derives %s only from the reviewed contract',
+    (state) => {
+      const c = { ...example(), admissionState: state };
+      const env = {};
+      applyQaAdmission(
+        c,
+        {
+          ...proofFor(c),
+          admissionOpenPermitted: true,
+          admissionOpenGoRef: 'example-open-go',
+        },
+        env
+      );
+      expect(env).toEqual({
+        MCP_V114_ADMISSION_ENABLED: state === 'OPEN' ? 'true' : 'false',
+      });
+    }
+  );
+  it.each([undefined, null, '', 'open', 'true'])(
+    'rejects missing/invalid protected state %s',
+    (state) => {
+      const c = { ...example(), admissionState: state } as QaManifest;
+      expect(() => validateManifest(c)).toThrow();
+      const env = {};
+      expect(() => applyQaAdmission(c, proofFor(c), env)).toThrow();
+      expect(env).toEqual({});
+    }
+  );
+  it.each(['true', 'false', '', undefined])(
+    'rejects inherited global flag %s without replacing it',
+    (value) => {
+      const c = example(),
+        env = { MCP_V114_ADMISSION_ENABLED: value };
+      expect(() => applyQaAdmission(c, proofFor(c), env)).toThrow('Inherited');
+      expect(env.MCP_V114_ADMISSION_ENABLED).toBe(value);
+    }
+  );
+  it.each([
+    { admissionOpenPermitted: false },
+    { admissionOpenGoRef: undefined },
+    { admissionOpenGoRef: ' ' },
+    { reviewedRuntimeGo: false },
+    { runtimeGoRef: '' },
+    { runId: 'other' },
+    { sourceSha: '2'.repeat(40) },
+    { sourceReviewedSha: '2'.repeat(40) },
+    { admissionState: 'CLOSED' },
+    { providerEgress: 'ALLOWED' },
+  ])(
+    'refuses OPEN before any environment effect when proof is invalid %j',
+    (delta) => {
+      const c = { ...example(), admissionState: 'OPEN' as const },
+        env = {};
+      expect(() =>
+        applyQaAdmission(
+          c,
+          {
+            ...proofFor(c),
+            admissionOpenPermitted: true,
+            admissionOpenGoRef: 'example-open-go',
+            ...delta,
+          },
+          env
+        )
+      ).toThrow();
+      expect(env).toEqual({});
+    }
+  );
+  it('refuses OPEN without an explicit opening go even when general runtime go exists', () => {
+    const c = { ...example(), admissionState: 'OPEN' as const };
+    const env = {};
+    expect(() => applyQaAdmission(c, proofFor(c), env)).toThrow(
+      'OPEN admission permission'
+    );
+    expect(env).toEqual({});
+  });
 });

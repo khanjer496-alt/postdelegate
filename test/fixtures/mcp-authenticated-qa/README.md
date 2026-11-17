@@ -15,6 +15,7 @@ All containers share the necessary protected references under `/run/postdelegate
 ```json
 {
   "purpose": "postdelegate-authenticated-qa",
+  "admissionState": "CLOSED",
   "runId": "<12hex>",
   "sourceSha": "<reviewed40hex>",
   "refName": "qa/mcp-<12hex>",
@@ -116,3 +117,11 @@ The original 11-file R2 patch is retained by digest in the integration evidence:
 
 
 Bounded synthetic integration check: 76/76 across the three explicit fixture specs passed under the shared Mac guard with an owned 0700 PD_QA_FS_TEST_ROOT and zero skipped cases. This includes five actual synthetic-filesystem cases; all HTTP/persistence issuance ports were in-memory fakes. The first run found the expected reconciliation wording missing from the curated stop message; the message now explicitly names journal reconciliation and the affected 44-case issuance suite passed. This is neither a credential issuance nor an authenticated runtime/DI/worker/TLS result. The default application Jest scope intentionally excludes this test-only folder; the CI workflow has a separate explicit fixture testMatch and rejects skipped acceptance.
+
+## Explicit disposable admission state (compatibility correction)
+
+The protected manifest MUST declare `admissionState: "CLOSED"` or `"OPEN"`; no missing/default state is accepted. The protected containment record must declare the SAME state, run ID and reviewed image/source identity and retain all existing containment/TLS/runtime-go evidence. Both states still require the reviewed contained-runtime go. Any inherited `MCP_V114_ADMISSION_ENABLED` variable (including `false` or an empty value) is rejected; RE must omit it entirely, rather than inject a global opening flag. After all checks, before AppModule imports, the guard derives `false` for CLOSED and `true` for OPEN. Production defaults are unchanged. `MCP_V114_DISPATCH_RECOVERY_DISABLED=true` remains forced in both states.
+
+CLOSED is the explicitly reviewed preparation/negative-test state: V114 save/resume admission must return the real service's 503 admission-closed outcome. It does not stop already accepted jobs; no new provider work is authorized by closing this flag. Positive save/review/resume cases require OPEN. OPEN additionally requires `admissionOpenPermitted: true` and a nonempty `admissionOpenGoRef` in the same protected containment record, referencing the explicit reviewed disposable-only opening permission. General `reviewedRuntimeGo` alone is insufficient. Those fields record actual approval, not permission created by writing a file. No OPEN runtime has been approved or executed by this source correction.
+
+There is no public toggle or environment-only override. A state change requires RE's separately authorized protected same-run/source contract update and restarting the isolated composition through the full guard; it is not a blind rerun of seed or key issuance. Preserve all exclusive issuance reservations. API, worker/sink and helper processes for the run must use the same reviewed contract. Synthetic contract cases exercise CLOSED/authorized OPEN, missing/invalid states, inherited flags, wrong run/source/containment and OPEN without a specific go without importing AppModule or opening transports. These newly written cases remain unrun until the resource guard permits validation.

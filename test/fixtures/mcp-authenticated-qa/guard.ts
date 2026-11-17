@@ -16,6 +16,7 @@ export type Tenant = {
 };
 export type QaManifest = {
   purpose: 'postdelegate-authenticated-qa';
+  admissionState: 'CLOSED' | 'OPEN';
   runId: string;
   sourceSha: string;
   refName: string;
@@ -32,6 +33,7 @@ export type QaManifest = {
 export function validateManifest(c: QaManifest) {
   if (
     c.purpose !== 'postdelegate-authenticated-qa' ||
+    !['CLOSED', 'OPEN'].includes(c.admissionState) ||
     !/^[a-f0-9]{12}$/.test(c.runId) ||
     !/^[a-f0-9]{40}$/.test(c.sourceSha) ||
     c.refName !== `qa/mcp-${c.runId}`
@@ -98,6 +100,49 @@ export function validateManifest(c: QaManifest) {
     throw new Error('Distinct predeclared fixture UUIDs required.');
   return c;
 }
+// Pure environment/proof boundary: no app imports, files, sockets or public toggle.
+export function applyQaAdmission(
+  c: QaManifest,
+  proof: any,
+  env: NodeJS.ProcessEnv
+) {
+  if ('MCP_V114_ADMISSION_ENABLED' in env)
+    throw new Error(
+      'Inherited MCP admission flag forbidden in QA composition.'
+    );
+  if (!['CLOSED', 'OPEN'].includes(c.admissionState))
+    throw new Error('Explicit protected CLOSED/OPEN admission state required.');
+  if (
+    proof.runId !== c.runId ||
+    proof.admissionState !== c.admissionState ||
+    proof.sourceSha !== c.sourceSha ||
+    proof.origin !== c.origin ||
+    proof.owner !== 'Release Engineer' ||
+    proof.providerEgress !== 'DENIED' ||
+    proof.trustedReferenceParents !==
+      'RE_IMMUTABLE_NO_CONCURRENT_UNTRUSTED_WRITERS' ||
+    proof.trustedHttps !== true ||
+    proof.frontendBakedApi !== `${c.origin}/api` ||
+    proof.sourceReviewedSha !== c.sourceSha ||
+    proof.reviewedRuntimeGo !== true ||
+    !proof.runtimeGoRef ||
+    !proof.evidenceRef
+  )
+    throw new Error(
+      'Reviewed RE containment/TLS/image evidence reference required.'
+    );
+  if (
+    c.admissionState === 'OPEN' &&
+    (proof.admissionOpenPermitted !== true ||
+      typeof proof.admissionOpenGoRef !== 'string' ||
+      !proof.admissionOpenGoRef.trim())
+  )
+    throw new Error('Reviewed same-run OPEN admission permission required.');
+  // Derive only after the same-run/source containment and runtime-go checks.
+  env.MCP_V114_ADMISSION_ENABLED =
+    c.admissionState === 'OPEN' ? 'true' : 'false';
+}
+
 export function loadRun() {
   const c = validateManifest(
     readProtected<QaManifest>(process.env.PD_QA_MANIFEST_REF || '')
@@ -132,24 +177,7 @@ export function loadRun() {
       'External credentials/configuration forbidden in QA composition.'
     );
   const proof = readProtected<any>(c.containmentRef);
-  if (
-    proof.runId !== c.runId ||
-    proof.sourceSha !== c.sourceSha ||
-    proof.origin !== c.origin ||
-    proof.owner !== 'Release Engineer' ||
-    proof.providerEgress !== 'DENIED' ||
-    proof.trustedReferenceParents !==
-      'RE_IMMUTABLE_NO_CONCURRENT_UNTRUSTED_WRITERS' ||
-    proof.trustedHttps !== true ||
-    proof.frontendBakedApi !== `${c.origin}/api` ||
-    proof.sourceReviewedSha !== c.sourceSha ||
-    proof.reviewedRuntimeGo !== true ||
-    !proof.runtimeGoRef ||
-    !proof.evidenceRef
-  )
-    throw new Error(
-      'Reviewed RE containment/TLS/image evidence reference required.'
-    );
+  applyQaAdmission(c, proof, process.env);
   // The reference is a prerequisite, NOT independent proof of network containment.
   process.env.DATABASE_URL = c.databaseUrl;
   process.env.REDIS_URL = c.redisUrl;
