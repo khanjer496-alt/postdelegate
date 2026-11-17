@@ -2210,7 +2210,7 @@ describe('tracked MCP publication admission', () => {
     const receipt = [{ id: 'root', postId: 'remote', releaseURL: 'https://test/remote', status: 'published' }];
     return { service, root, repo, hash, receipt };
   };
-  it.each([null, 'not-an-array', [], [{ id: 'foreign', postId: 'remote', releaseURL: '', status: 'published' }], [{ id: 'root', postId: 'remote', releaseURL: '', status: 'processing' }], [{ id: 'root', postId: 'remote' }]])('refuses malformed recorded receipt replay without a provider call or ledger rewrite: %j', async (stored) => {
+  it.each([null, 'not-an-array', [], [{ id: 'foreign', postId: 'remote', releaseURL: '', status: 'published' }], [{ id: 'root', postId: 'remote', releaseURL: '', status: 'processing' }], [{ id: 'root', postId: 'remote' }]].map(stored => [stored]))('refuses malformed recorded receipt replay without a provider call or ledger rewrite: %j', async (stored) => {
     const { service, repo, hash } = fixture();
     repo.mcpAttempts.mockResolvedValue([{ segmentPostId: 'root', status: 'CONFIRMED', revisionHash: hash }]);
     repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt: stored, id: 'prior' });
