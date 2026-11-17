@@ -865,6 +865,69 @@ pg(
         stop = await startWorker();
       }
     }, 90000);
+    it('native shutdown abandons an unconsumed grant without leaking the surviving queue budget', async () => {
+      if (stop) { await stop(); stop = undefined; }
+      const { providerActivityOptions } = require('../../../temporal/provider.activity.slots');
+      const capacity = providerActivityOptions('fixture', 1, 1), pool = capacity.tuner.activityTaskSlotSupplier;
+      const originalReserve = pool.reserveSlot.bind(pool);
+      let handoff = false, legacyCancelled = false;
+      let releaseHandoff = () => {};
+      pool.reserveSlot = async (context: any, signal: AbortSignal) => {
+        const permit = await originalReserve(context, signal);
+        if (context.taskQueue === 'fixture' && !handoff) {
+          handoff = true;
+          // Hold the JS callback result before Core can construct its permit.
+          // Only the real SDK shutdown/drop may abort this reservation.
+          if (!signal.aborted) await new Promise<void>(resolve => {
+            const cancelled = () => { legacyCancelled = true; signal.removeEventListener('abort', cancelled); resolve(); };
+            releaseHandoff = () => { signal.removeEventListener('abort', cancelled); resolve(); };
+            signal.addEventListener('abort', cancelled, { once: true });
+            if (signal.aborted) cancelled();
+          });
+          else legacyCancelled = true;
+        }
+        return permit;
+      };
+      const running: Array<[Worker, Promise<void>]> = [];
+      const launch = async (options: any) => {
+        const current = await Worker.create({ connection: native, namespace, ...options });
+        const promise = current.run(); running.push([current, promise]); activeWorkers.set(current, promise); return current;
+      };
+      const until = async (check: () => boolean, label: string) => {
+        const limit = Date.now() + 20000;
+        while (!check()) { if (Date.now() >= limit) throw new Error(`Native handoff boundary not reached: ${label}`); await new Promise(resolve => setTimeout(resolve, 25)); }
+      };
+      let active = 0, maximum = 0;
+      const originalPost = adapter.post;
+      adapter.post = async (...args: Parameters<FixtureAdapter['post']>) => {
+        active++; maximum = Math.max(maximum, active);
+        try { return await originalPost.apply(adapter, args); } finally { active--; }
+      };
+      try {
+        await launch({ taskQueue: 'mcp-publish-v114', maxConcurrentActivityTaskExecutions: 2,
+          workflowsPath: require.resolve('../../../../../../apps/orchestrator/src/workflows/post-workflows/post.workflow.v1.1.4'),
+          activities: { mcpThreadPlan: activity.mcpThreadPlan.bind(activity), mcpFailSegment: activity.mcpFailSegment.bind(activity) },
+        });
+        const legacy = await launch({ taskQueue: 'fixture', ...capacity, activities: { postSocial: activity.postSocial.bind(activity) } });
+        await until(() => handoff, 'JS grant held before native consumption');
+        await launch({ taskQueue: 'mcp-v114-fixture', ...capacity, activities: { mcpPublishSegment: publishActivity } });
+        const id = await create(1);
+        await until(() => pool.pendingFor('mcp-v114-fixture') > 0, 'surviving queue waits');
+        expect(active).toBe(0); expect(pool.reserved).toBe(1);
+        legacy.shutdown();
+        await until(() => legacyCancelled, 'SDK cancellation delivered');
+        await waitForRun(id, 0);
+        expect(maximum).toBe(1);
+        expect(adapter.events().filter(event => event.kind === 'ACCEPT' && event.segmentId === id)).toHaveLength(1);
+      } finally {
+        releaseHandoff(); // Test-latch cleanup only; never releases a supplier permit.
+        for (const [current] of running) if (current.getState() === 'RUNNING') current.shutdown();
+        await Promise.all(running.map(([, promise]) => promise));
+        for (const [current] of running) activeWorkers.delete(current);
+        adapter.post = originalPost; expect(pool.reserved).toBe(0);
+        stop = await startWorker();
+      }
+    }, 90000);
     it('runs two real segments, reconciles a terminal-unpublished child through resumeMcp and never replays the parent', async () => {
       adapter.denyNextComment = true;
       const id = await create(2);

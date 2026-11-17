@@ -30,6 +30,31 @@ describe('provider activity slot ownership', () => {
     pool.releaseSlot({ permit: structuredClone(first) }); expect(pool.reserved).toBe(0);
     const second = pool.tryReserveSlot(ctx('v114'))!; pool.releaseSlot({ permit: first }); expect(pool.reserved).toBe(1); pool.releaseSlot({ permit: second });
   });
+  it('reclaims a fast grant cancelled before native consumption, idempotently', async () => {
+    const pool = new ProviderActivitySlots(1), abort = new AbortController();
+    const abandoned = pool.reserveSlot(ctx('legacy'), abort.signal);
+    expect(pool.reserved).toBe(1); abort.abort();
+    expect(pool.reserved).toBe(0); const old = await abandoned;
+    const active = pool.tryReserveSlot(ctx('v114'))!;
+    abort.abort(); pool.releaseSlot({ permit: old });
+    expect(pool.reserved).toBe(1); pool.releaseSlot({ permit: active });
+  });
+  it('reclaims a queued grant cancelled in the grant-to-native handoff', async () => {
+    const pool = new ProviderActivitySlots(1), abort = new AbortController();
+    const first = pool.tryReserveSlot(ctx('legacy'))!;
+    const queued = pool.reserveSlot(ctx('v114'), abort.signal);
+    pool.releaseSlot({ permit: first }); expect(pool.reserved).toBe(1);
+    abort.abort(); expect(pool.reserved).toBe(0);
+    pool.releaseSlot({ permit: await queued }); expect(pool.reserved).toBe(0);
+    expect(pool.tryReserveSlot(ctx('survivor'))).toBeTruthy();
+  });
+  it('abort after mark-used cannot free active capacity or grant an overlap', async () => {
+    const pool = new ProviderActivitySlots(1), abort = new AbortController();
+    const used = await pool.reserveSlot(ctx('legacy'), abort.signal);
+    pool.markSlotUsed({ permit: used, slotInfo: { type: 'activity', activityType: 'postSocial' } });
+    abort.abort(); expect(pool.reserved).toBe(1); expect(pool.tryReserveSlot(ctx('v114'))).toBeNull();
+    pool.releaseSlot({ permit: used }); expect(pool.reserved).toBe(0);
+  });
   it('does not allocate one provider from another provider pool', () => {
     const a = providerActivityOptions('a', 1, 1).tuner as any, b = providerActivityOptions('b', 1, 1).tuner as any;
     expect(a.activityTaskSlotSupplier.tryReserveSlot(ctx('a'))).toBeTruthy();
