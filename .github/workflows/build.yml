@@ -91,6 +91,7 @@ jobs:
           run_install: false
 
       - name: Install dependencies
+        id: dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Test
@@ -166,6 +167,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Build
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         id: application-build
         # the default Node heap runs out building the backend; the release
         # image builds with 3 GB (deploy/postdelegate/Dockerfile.release)

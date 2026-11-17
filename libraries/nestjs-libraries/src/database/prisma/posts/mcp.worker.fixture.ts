@@ -25,6 +25,7 @@ const caseResults: Array<{
   type?: string;
 }> = [];
 let setupStage = 'NOT_STARTED';
+const dispatchDiagnostics: Array<Record<string, unknown>> = [];
 // Bounded build diagnostics only; never emit raw webpack messages/source/stacks.
 const bundleDiagnostics: Array<{ type: string; specifier?: string }> = [];
 const fixtureBundlerOptions = {
@@ -112,7 +113,7 @@ process.on('exit', (exitCode) => {
     writeFileSync(
       '/tmp/mcp-native-summary.json',
       JSON.stringify(
-        { frameworkExitCode: exitCode, cases: caseResults, hooks: hookResults, bundleDiagnostics },
+        { frameworkExitCode: exitCode, cases: caseResults, hooks: hookResults, bundleDiagnostics, dispatchDiagnostics },
         null,
         2
       )
@@ -639,7 +640,16 @@ pg(
           getRawClient: () => ({
             connection: clientConnection,
             workflow: {
-              getHandle: client.workflow.getHandle.bind(client.workflow),
+              getHandle: (...args: any[]) => {
+                const handle = (client.workflow.getHandle as any)(...args);
+                return new Proxy(handle, { get: (target, key) => {
+                  if (key === 'describe') return async (...input: any[]) => {
+                    try { return await target.describe(...input); }
+                    catch (error) { if(dispatchDiagnostics.length < 32) dispatchDiagnostics.push({operation:'DESCRIBE',...safeFailure(error),cause:safeFailure((error as any)?.cause)}); throw error; }
+                  };
+                  return typeof target[key] === 'function' ? target[key].bind(target) : target[key];
+                }});
+              },
               signalWithStart: async () => {
                 legacyDispatches++;
                 throw new Error('Legacy dispatch denied in fixture.');
@@ -652,10 +662,12 @@ pg(
                   failEnqueue = false;
                   throw new Error('Owned pre-RPC enqueue fault.');
                 }
-                const started = await client.workflow.start(name, {
+                let started;
+                try { started = await client.workflow.start(name, {
                   ...options,
                   workflowExecutionTimeout: '2 minutes',
-                });
+                }); }
+                catch (error) { if(dispatchDiagnostics.length < 32) dispatchDiagnostics.push({operation:'START',...safeFailure(error),cause:safeFailure((error as any)?.cause)}); throw error; }
                 if (loseStartReply) { loseStartReply = false; throw new Error('Owned accepted-start response-loss fault.'); }
                 return started;
               },
