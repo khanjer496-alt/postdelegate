@@ -171,40 +171,37 @@ jobs:
         # image builds with 3 GB (deploy/postdelegate/Dockerfile.release)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-        run: pnpm run build
-
-      - name: Collect structured compiler failure evidence
-        if: failure() && steps.application-build.outcome == 'failure'
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           mkdir -p ci-build-evidence
           node <<'NODE'
-          const fs = require('fs'), path = require('path'), ts = require('typescript');
-          const root = process.cwd();
-          const result = { head: require('child_process').execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim(), tree: require('child_process').execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {encoding:'utf8'}).trim(), projects: [] };
-          for (const project of ['apps/frontend', 'apps/backend', 'apps/orchestrator']) {
-            try {
-              const configFile = path.join(root, project, 'tsconfig.json');
-              const config = ts.readConfigFile(configFile, ts.sys.readFile);
-              const parsed = ts.parseJsonConfigFileContent(config.config || {}, ts.sys, path.dirname(configFile));
-              const program = ts.createProgram(parsed.fileNames, {...parsed.options, noEmit:true, incremental:false});
-              const diagnostics = [...(config.error ? [config.error] : []), ...parsed.errors, ...ts.getPreEmitDiagnostics(program)];
-              result.projects.push({ project, errorCount: diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length, diagnostics: diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).slice(0,100).map(d=>{
-                const relative = d.file ? path.relative(root,d.file.fileName).replaceAll(path.sep,'/') : '';
-                const file = /^(apps|libraries)\/[A-Za-z0-9_./@()\[\]-]{1,220}$/.test(relative) ? relative : '<external-or-config>';
-                const position = d.file && d.start !== undefined ? d.file.getLineAndCharacterOfPosition(d.start) : undefined;
-                return {code:d.code,file,...(position ? {line:position.line+1,column:position.character+1}: {})};
-              })});
-            } catch (error) {
-              result.projects.push({project, collectorErrorType:/^[A-Za-z0-9_]{1,60}$/.test(error.name) ? error.name : 'Error'});
+          const fs = require('fs'), cp = require('child_process');
+          const report = { head:cp.execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(), tree:cp.execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim(), exitCode:null, diagnostics:[] };
+          const save = () => fs.writeFileSync('ci-build-evidence/type-diagnostics.json',JSON.stringify(report,null,2));
+          save();
+          let location;
+          const inspect = line => {
+            const project = /apps\/(frontend|backend|orchestrator) build/.exec(line)?.[1];
+            const source = /((?:apps|libraries)\/[A-Za-z0-9_./@()\[\]-]+|\.\/src\/[A-Za-z0-9_./@()\[\]-]+)(?:\((\d+),(\d+)\)|:(\d+):(\d+))?/.exec(line);
+            if(source) {
+              const file = source[1].startsWith('./') ? (project ? `apps/${project}/${source[1].slice(2)}` : undefined) : source[1];
+              if(file) location = {file,...(source[2]||source[4] ? {line:Number(source[2]||source[4]),column:Number(source[3]||source[5])} : {})};
             }
+            const code = /\bTS(\d{3,5})\b/.exec(line);
+            const category = code ? 'TYPESCRIPT' : /Type error:/.test(line) ? 'TYPECHECK' : /Failed to compile|Module not found|Module build failed/.test(line) ? 'BUNDLE' : undefined;
+            if(category && report.diagnostics.length < 100) { report.diagnostics.push({category,...(project ? {project}:{}),...(code ? {code:Number(code[1])}:{}),...location}); save(); }
+          };
+          const child = cp.spawn('pnpm',['run','build'],{env:{...process.env,FORCE_COLOR:'0',NO_COLOR:'1'},stdio:['ignore','pipe','pipe']});
+          for(const [stream,output] of [[child.stdout,process.stdout],[child.stderr,process.stderr]]) {
+            let pending = '';
+            stream.on('data',chunk=>{ output.write(chunk); pending += chunk.toString(); let index; while((index=pending.indexOf('\n'))>=0){inspect(pending.slice(0,index));pending=pending.slice(index+1);} if(pending.length>8192) pending=''; });
+            stream.on('end',()=>{if(pending)inspect(pending);});
           }
-          fs.writeFileSync('ci-build-evidence/type-diagnostics.json',JSON.stringify(result,null,2));
+          child.on('error',()=>{report.launchFailed=true;report.exitCode=1;save();process.exitCode=1;});
+          child.on('close',(code,signal)=>{report.exitCode=code===null?1:code;if(signal)report.signal=/^[A-Z0-9]{1,20}$/.test(signal)?signal:'OTHER';save();process.exitCode=report.exitCode;});
           NODE
 
       - uses: actions/upload-artifact@v4
-        if: failure() && steps.application-build.outcome == 'failure'
+        if: always() && steps.application-build.outcome != 'skipped'
         with:
           name: build-type-diagnostics
           path: ci-build-evidence/type-diagnostics.json
