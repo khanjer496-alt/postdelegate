@@ -26,7 +26,8 @@ jest.mock(
 import 'reflect-metadata';
 import { McpDispatchUnconfirmed } from '../../database/prisma/posts/mcp.dispatch.status';
 import { PostsListTool } from './posts.list.tool';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { PostResumeTool } from './post.lifecycle.tools';
 import { runWithContext } from '@gitroom/nestjs-libraries/chat/async.storage';
 import { IntegrationSchedulePostTool } from '@gitroom/nestjs-libraries/chat/tools/integration.schedule.post';
 import {
@@ -110,6 +111,14 @@ describe('createPostForReviewTool', () => {
       approvals,
     };
   };
+
+  it('propagates a closed save as a tool execution error rather than a successful output', async () => {
+    const { tool, postsService, approvals } = build();
+    const closed = new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
+    postsService.createPost.mockRejectedValue(closed);
+    await expect(call(tool, socialPost('draft'))).rejects.toBe(closed);
+    expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
 
   it('saves a draft, checks it like a scheduled post and sends it for review', async () => {
     const { tool, postsService, approvals } = build();
@@ -524,5 +533,16 @@ describe('tracked dispatch read receipt', () => {
     expect(posts.getMcpDispatchStatuses).toHaveBeenCalledWith('org-1', ['tracked', 'legacy']);
     expect(result.output.posts[0].dispatch).toEqual({ generation: 2, status: 'UNKNOWN', code: 'START_UNCONFIRMED' });
     expect(result.output.posts[1]).not.toHaveProperty('dispatch');
+  });
+});
+
+
+describe('closed tracked MCP resume tool result', () => {
+  it('preserves BLOCKED and its reason under output instead of throwing or claiming resumed', async () => {
+    const blocked = { status: 'BLOCKED', reason: 'Assistant post saves are temporarily unavailable while the service updates.' };
+    const posts = { resumeMcp: jest.fn().mockResolvedValue(blocked) };
+    const result = await call(new PostResumeTool(posts as any), { postId: 'root' });
+    expect(result).toEqual({ output: blocked });
+    expect(posts.resumeMcp).toHaveBeenCalledWith('org-1', 'root');
   });
 });

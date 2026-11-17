@@ -1,4 +1,4 @@
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import dayjs from 'dayjs';
 
 // the service pulls in heavy provider / upload modules that are not under test
@@ -2381,12 +2381,34 @@ describe('exact-generation execution liveness and remainder policy', () => {
 });
 
 describe('MCP producer rollout gate', () => {
+  it('returns BLOCKED for a closed tracked resume before policy/provider/recovery effects', async () => {
+    const provider = jest.fn(), { service, postRepository } = makeService({ getSocialIntegration: provider });
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([{ id: 'root', mcpWorkflowVersion: 114, integration: { providerIdentifier: 'fixture' } }] as any);
+    const policy = { assertAgentGuardrails: jest.fn() };
+    (service as any)._approvalPolicyService = policy;
+    const resume = jest.fn();
+    (postRepository as any).resumeMcp = resume;
+    const before = process.env.MCP_V114_ADMISSION_ENABLED;
+    process.env.MCP_V114_ADMISSION_ENABLED = 'false';
+    try {
+      await expect(service.resumeMcp('org', 'root')).resolves.toEqual({ status: 'BLOCKED', reason: 'Assistant post saves are temporarily unavailable while the service updates.' });
+      expect(policy.assertAgentGuardrails).not.toHaveBeenCalled();
+      expect(provider).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+    } finally {
+      if (before === undefined) delete process.env.MCP_V114_ADMISSION_ENABLED;
+      else process.env.MCP_V114_ADMISSION_ENABLED = before;
+    }
+  });
+
   it('does not create a post or an admission while old publishing pollers may still exist', async () => {
     const { service, postRepository } = makeService();
     const before = process.env.MCP_V114_ADMISSION_ENABLED;
     process.env.MCP_V114_ADMISSION_ENABLED = 'false';
     try {
-      await expect(service.createPost('org', { type: 'draft', posts: [{ integration: { id: 'channel' } }] } as any, 'MCP', false, { type: 'agent', source: 'test' })).rejects.toThrow('temporarily unavailable');
+      const save = service.createPost('org', { type: 'draft', posts: [{ integration: { id: 'channel' } }] } as any, 'MCP', false, { type: 'agent', source: 'test' });
+      await expect(save).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(save).rejects.toMatchObject({ status: 503, message: 'Assistant post saves are temporarily unavailable while the service updates.' });
       expect(postRepository.acquireAgentAdmission).not.toHaveBeenCalled();
     } finally { process.env.MCP_V114_ADMISSION_ENABLED = before; }
   });
