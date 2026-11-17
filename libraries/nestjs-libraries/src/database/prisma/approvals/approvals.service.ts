@@ -1,3 +1,4 @@
+import { agentDraftOnly, assertAgentPostWrite } from '../../../chat/agent-credential.policy';
 import {
   BadRequestException,
   ConflictException,
@@ -193,8 +194,10 @@ export class ApprovalsService {
       const items = history.filter((p) => p.postId === post.id);
       const submitted = items.find((p) => p.action === 'SUBMITTED');
       const changes = items.find((p) => p.action === 'CHANGES_REQUESTED');
+      const { state, mcpWorkflowVersion, ...visible } = post;
       return {
-        ...post,
+        ...visible,
+        ...(state === 'PUBLISHED' && mcpWorkflowVersion === 114 ? { remainingThreadReview: true } : {}),
         submittedBy: submitted?.actorName || post.agentSource || null,
         submittedAt: submitted?.createdAt || post.createdAt,
         changesRequested:
@@ -273,6 +276,7 @@ export class ApprovalsService {
       return false;
     }
 
+    if (state === 'QUEUE' && approvalStatus === 'APPROVED') await this._postsService.activateApprovedMcp(organizationId, post.id);
     await this._postsService.startWorkflow(
       post.integration.providerIdentifier.split('-')[0].toLowerCase(),
       post.id,
@@ -301,6 +305,7 @@ export class ApprovalsService {
       {
         AND: [
           notPublishing(),
+          ...(agentDraftOnly() ? [{ state: 'DRAFT' as const, releaseId: null }] : []),
           { NOT: [{ state: 'DRAFT', approvalStatus: 'IN_REVIEW' }] },
         ],
       },
@@ -308,6 +313,7 @@ export class ApprovalsService {
       'IN_REVIEW'
     );
     if (!moved) {
+      if (agentDraftOnly()) throw new ConflictException('The draft changed. Refresh before submitting for review.');
       return false;
     }
     if (shared) {
@@ -343,12 +349,16 @@ export class ApprovalsService {
     actor: Extract<ApprovalActor, { type: 'agent' }>
   ) {
     const post = await this.getPost(organizationId, postId);
+    assertAgentPostWrite(organizationId, post.integration.id, 'draft');
+    if (agentDraftOnly() && (post.state !== 'DRAFT' || post.releaseId)) throw new ForbiddenException('Draft-only credentials can submit drafts only.');
     await this._approvalPolicyService.assertAgentGuardrails(
       organizationId,
       actor,
       [post.integration.id],
       { countsTowardLimit: false }
     );
+    const problem = await this._postsService.getStoredPostProblem(organizationId, postId);
+    if (problem) throw new BadRequestException(`This draft cannot be submitted for review yet: ${problem}.`);
     const sent = await this.hold(organizationId, post, {
       actorType: 'AGENT',
       actorName: actor.source,
@@ -373,6 +383,7 @@ export class ApprovalsService {
     // the version the approver saw: an edit since then needs a new look
     expectedUpdatedAt?: Date
   ) {
+    if (post.mcpWorkflowVersion === 114) this._postsService.assertMcpAdmissionReady();
     const already = {
       id: post.id,
       approvalStatus: 'APPROVED',
@@ -383,7 +394,7 @@ export class ApprovalsService {
     if (post.state === 'QUEUE' && post.approvalStatus === 'APPROVED') {
       return already;
     }
-    if (post.state === 'PUBLISHED') {
+    if (post.state === 'PUBLISHED' && post.mcpWorkflowVersion !== 114) {
       throw new BadRequestException('This post was already published.');
     }
     if (!approvable.includes(post.approvalStatus)) {
@@ -433,6 +444,12 @@ export class ApprovalsService {
       publishDate
     );
 
+    if (post.state === 'PUBLISHED' && post.mcpWorkflowVersion === 114) {
+      const result = await this._postsService.approveRemainingMcp(organizationId, post.id, post.updatedAt);
+      await this._activityLogService.recordSafely({ organizationId, postId: post.id, action: 'APPROVED', comment: 'Approved remaining unpublished thread segments.', ...by });
+      return result;
+    }
+
     const moved = await this.moveTo(
       organizationId,
       post,
@@ -440,7 +457,7 @@ export class ApprovalsService {
         approvalStatus: { in: approvable },
         state: { not: 'PUBLISHED' },
         // bound to the version that was checked above, not one saved since
-        ...(expectedUpdatedAt ? { updatedAt: post.updatedAt } : {}),
+        updatedAt: post.updatedAt,
       },
       'QUEUE',
       'APPROVED',
@@ -518,6 +535,11 @@ export class ApprovalsService {
     comment: string | undefined,
     expected: Prisma.PostWhereInput = {}
   ) {
+    if (post.state === 'PUBLISHED' && post.mcpWorkflowVersion === 114) {
+      const result = await this._postsService.holdRemainingMcp(organizationId, post.id, status, post.updatedAt);
+      await this._activityLogService.recordSafely({ organizationId, postId: post.id, action: status, comment: comment?.trim() || null, ...by });
+      return result;
+    }
     this.assertNotPublished(post);
     const text = comment?.trim() || null;
     const moved = await this.moveTo(

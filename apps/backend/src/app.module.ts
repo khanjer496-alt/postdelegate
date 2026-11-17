@@ -1,3 +1,4 @@
+import { McpDispatchRecoveryService } from '@gitroom/nestjs-libraries/database/prisma/posts/mcp.dispatch.recovery.service';
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '@gitroom/nestjs-libraries/database/prisma/database.module';
 import { ApiModule } from '@gitroom/backend/api/api.module';
@@ -46,6 +47,7 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
   ],
   controllers: [],
   providers: [
+    McpDispatchRecoveryService,
     FILTER,
     {
       provide: APP_GUARD,

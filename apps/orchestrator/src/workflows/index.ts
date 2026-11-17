@@ -31,3 +31,5 @@ export * from './trial.onboarding.workflow.v1';
 export * from './studio.render.workflow.v1';
 export * from './studio.cleanup.workflow.v1';
 export * from './studio.render.workflow.v2';
+
+export * from './post-workflows/post.workflow.v1.1.4';

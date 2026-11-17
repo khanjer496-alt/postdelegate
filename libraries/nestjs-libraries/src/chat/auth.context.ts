@@ -5,7 +5,7 @@ export const checkAuth = (
   context: any
 ) => {
   const auth = getAuth();
-  const authInfo = context?.mcp?.extra?.authInfo || auth;
+  const authInfo = auth || context?.mcp?.extra?.authInfo;
   if (authInfo && context?.requestContext) {
     (context.requestContext as any).set(
       'organization',

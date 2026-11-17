@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import dayjs from 'dayjs';
 
 // the service pulls in heavy provider / upload modules that are not under test
@@ -22,10 +22,17 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 import { YoutubeSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/youtube.settings.dto';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 
+const previousMcpAdmission = process.env.MCP_V114_ADMISSION_ENABLED;
+beforeAll(() => { process.env.MCP_V114_ADMISSION_ENABLED = 'true'; });
+afterAll(() => { if (previousMcpAdmission === undefined) delete process.env.MCP_V114_ADMISSION_ENABLED; else process.env.MCP_V114_ADMISSION_ENABLED = previousMcpAdmission; });
+
 const safeUrl = isSafePublicHttpsUrl as jest.Mock;
 
 const makeService = (integrationManager: any = {}) => {
   const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
     getPost: jest.fn(),
     getPosts: jest.fn(),
     createComment: jest.fn().mockResolvedValue({ id: 'c-1' }),
@@ -34,6 +41,7 @@ const makeService = (integrationManager: any = {}) => {
   const mediaService = {
     getOrgMediaById: jest.fn(),
     getMediaById: jest.fn(),
+    getOrgMediaByPaths: jest.fn().mockResolvedValue([]),
   };
   const service = new PostsService(
     postRepository as any,
@@ -193,6 +201,11 @@ describe('PostsService.getPostsMinified published label', () => {
 describe('PostsService approvals on save', () => {
   const makeApprovalService = (decision: any) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
+      getPost: jest.fn().mockResolvedValue({ id: 'p-1', integrationId: 'i-1', content: 'hi', publishDate: new Date('2026-12-01T12:00:00Z'), childrenPost: [] }),
+      registerMcpFence: jest.fn().mockResolvedValue({}),
       getPostById: jest.fn().mockResolvedValue(null),
       createOrUpdatePost: jest.fn().mockResolvedValue({
         posts: [{ id: 'p-1', state: decision?.hold ? 'DRAFT' : 'QUEUE', content: 'hi' }],
@@ -222,6 +235,7 @@ describe('PostsService approvals on save', () => {
       { recordPublished: jest.fn() } as any,
       { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
     );
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
     return { service, postRepository, policy };
@@ -247,7 +261,7 @@ describe('PostsService approvals on save', () => {
 
   it('checks the agent guardrails before saving anything', async () => {
     const { service, postRepository, policy } = makeApprovalService({ hold: false });
-    policy.assertAgentGuardrails.mockRejectedValue(new Error('blocked'));
+    policy.assertAgentGuardrails.mockRejectedValue(new BadRequestException('blocked'));
     await expect(
       service.createPost('org-1', body(), 'MCP', false, agent)
     ).rejects.toThrow('blocked');
@@ -393,6 +407,9 @@ describe('PostsService status and date changes', () => {
 
   const makeStateService = (decision: any = { hold: false }) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
       getPostById: jest.fn().mockResolvedValue(stored()),
       changeGroupState: jest.fn().mockResolvedValue({ count: 2 }),
       changeState: jest.fn().mockResolvedValue({}),
@@ -419,6 +436,7 @@ describe('PostsService status and date changes', () => {
       { recordPublished: jest.fn() } as any,
       { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
     );
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
     return { service, postRepository, policy };
@@ -693,7 +711,7 @@ describe('PostsService status and date changes', () => {
       },
     };
     const service = new PostsService(
-      {} as any,
+      { mcpWorkflowVersion: jest.fn().mockResolvedValue(null) } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -728,6 +746,9 @@ describe('PostsService monthly cap on one network', () => {
     stored: any[] = []
   ) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
       countProviderUsage: jest.fn().mockResolvedValue(usage),
       countQueuedProviderPosts: jest.fn().mockResolvedValue(queued),
       getPostsState: jest.fn().mockResolvedValue(stored),
@@ -775,6 +796,7 @@ describe('PostsService monthly cap on one network', () => {
       subscriptionService as any,
       paymentService as any
     );
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     return { service, postRepository, subscriptionService, paymentService };
   };
@@ -1605,6 +1627,9 @@ describe('PostsService posting limits', () => {
 
   const make = (dates: Date[] = [], stored: any[] = []) => {
     const postRepository = {
+    acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+    releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
       getAccountPostingDates: jest.fn().mockResolvedValue(dates),
       getPostsState: jest.fn().mockResolvedValue(stored),
       getPostById: jest.fn().mockResolvedValue({
@@ -2123,5 +2148,386 @@ describe('saved composition optional-reply compatibility', () => {
     const { service } = make(false);
     const [result] = await service.validatePosts('org-1', [payload()], 'schedule');
     expect(result.errors).toMatch(/optional permission/);
+  });
+});
+
+describe('no-write post preflight and final preparation', () => {
+  const fixture = () => {
+    const provider = { editor: 'normal', maxLength: () => 5, checkValidity: jest.fn().mockResolvedValue(true) };
+    const { service, postRepository } = makeService({ getSocialIntegration: () => provider });
+    const integration = { id: 'channel', name: 'Channel', providerIdentifier: 'test', additionalSettings: '[]', disabled: false };
+    (service as any)._integrationService = { getIntegrationById: jest.fn().mockResolvedValue(integration) };
+    const writes = { convertTextToShortLinks: jest.fn(), askShortLinkedin: jest.fn().mockReturnValue(true) };
+    (service as any)._shortLinkService = writes;
+    const post = { date: '2026-12-01T12:00:00Z', integration: { id: 'channel' }, settings: {}, value: [{ content: '<p>hello</p>', image: [] }] };
+    return { service, post, provider, postRepository, writes };
+  };
+  it('reports input/config identity and per-entry limits without creating links or posts', async () => {
+    const { service, post, writes, postRepository } = fixture();
+    const [result] = await service.preflightPosts('org', [post], 'schedule');
+    expect(result.inputHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.configHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.checks.find((c: any) => c.field === 'value.0.content.length').status).toBe('VALID');
+    expect(result.status).toBe('UNKNOWN'); // provider authorization/final media readiness is not refreshed
+    expect(writes.convertTextToShortLinks).not.toHaveBeenCalled();
+    expect(postRepository.createComment).not.toHaveBeenCalled();
+  });
+  it('short-link transformation is UNKNOWN without an invented length bound', async () => {
+    const { service, post, writes } = fixture();
+    const [result] = await service.preflightPosts('org', [post], 'schedule', undefined, true);
+    expect(result.checks.find((c: any) => c.field === 'shortLink').status).toBe('UNKNOWN');
+    expect(writes.convertTextToShortLinks).not.toHaveBeenCalled();
+  });
+  it('rejects an empty thread, rather than vacuously passing every check', async () => {
+    const { service, post } = fixture();
+    const [result] = await service.preflightPosts('org', [{ ...post, value: [] }], 'schedule');
+    expect(result.status).toBe('INVALID');
+  });
+  it('uses the actual provider-formatted text for character limits', async () => {
+    const { service, post, provider } = fixture();
+    const [result] = await service.preflightPosts('org', [{ ...post, value: [{ content: '<p>toolong</p>', image: [] }] }], 'schedule');
+    expect(result.status).toBe('INVALID');
+    expect(provider.checkValidity).toHaveBeenCalledWith([[]], expect.anything(), [], ['toolong']);
+  });
+  it('marks unfinished media UNKNOWN and supplies a practical fix', async () => {
+    const { service, post } = fixture();
+    const [result] = await service.preflightPosts('org', [{ ...post, value: [{ content: 'ok', image: [{ path: 'https://media.test/a.mp4' }] }] }], 'schedule');
+    expect(result.checks.find((c: any) => c.field === 'mediaIdentity').status).toBe('UNKNOWN');
+  });
+});
+
+describe('tracked MCP publication admission', () => {
+  const fixture = () => {
+    const { service } = makeService({ getSocialIntegration: () => ({}) });
+    const root: any = { id: 'root', organizationId: 'org', integrationId: 'channel', parentPostId: null, mcpWorkflowVersion: 114, state: 'QUEUE', approvalStatus: 'APPROVED', content: 'text', settings: '{}', image: '[]', publishDate: new Date('2026-12-01T12:00:00Z'), integration: { id: 'channel', organizationId: 'org', providerIdentifier: 'test' } };
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([root]);
+    jest.spyOn(service, 'getStoredPostProblem').mockResolvedValue(null);
+    jest.spyOn(service, 'mcpExecutionState').mockResolvedValue({ generation: 0, closed: true });
+    const repo = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), finishMcpSegment: jest.fn().mockResolvedValue({}), markMcpUnknown: jest.fn().mockResolvedValue({}), mcpAttempts: jest.fn(), reconcileMcpAttempt: jest.fn(), resumeMcp: jest.fn() };
+    (service as any)._postRepository = repo;
+    (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: true }) };
+    const hash = (service as any).mcpRevision([root]);
+    const receipt = [{ id: 'root', postId: 'remote', releaseURL: 'https://test/remote', status: 'published' }];
+    return { service, root, repo, hash, receipt };
+  };
+  it.each([null, 'not-an-array', [], [{ id: 'foreign', postId: 'remote', releaseURL: '', status: 'published' }], [{ id: 'root', postId: 'remote', releaseURL: '', status: 'processing' }], [{ id: 'root', postId: 'remote' }]].map(stored => [stored]))('refuses malformed recorded receipt replay without a provider call or ledger rewrite: %j', async (stored) => {
+    const { service, repo, hash } = fixture();
+    repo.mcpAttempts.mockResolvedValue([{ segmentPostId: 'root', status: 'CONFIRMED', revisionHash: hash }]);
+    repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt: stored, id: 'prior' });
+    const send = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(send).not.toHaveBeenCalled();
+    expect(repo.finishMcpSegment).not.toHaveBeenCalled();
+    expect(repo.markMcpUnknown).not.toHaveBeenCalled();
+  });
+  it('returns the validated recorded receipt array without resending', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    repo.mcpAttempts.mockResolvedValue([{ segmentPostId: 'root', status: 'CONFIRMED', revisionHash: hash }]);
+    repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt, id: 'prior' });
+    const send = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).resolves.toEqual(receipt);
+    expect(send).not.toHaveBeenCalled();
+  });
+  it('preserves a known published warning with best-effort accounting and never demotes it for accounting failure', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    (receipt[0] as any).warning = 'thumbnail failed';
+    (receipt[0] as any).publicationAccountingPending = true;
+    const accounting = jest.spyOn(service, 'recordProviderPublish').mockRejectedValue(new Error('accounting unavailable'));
+    const result = await service.runMcpSegment('org', 'root', 'root', 0, hash, jest.fn().mockResolvedValue(receipt));
+    expect(result[0]).toMatchObject({ postId: 'remote', warning: expect.stringContaining('Published successfully') });
+    expect(repo.finishMcpSegment).toHaveBeenCalledWith('org', 'attempt', result);
+    expect(repo.markMcpUnknown).not.toHaveBeenCalled();
+    expect(accounting).toHaveBeenCalledWith('org', 'test', ['root']);
+  });
+  it('keeps a mismatched typed published identity or failed atomic completion UNKNOWN without a legacy release write', async () => {
+    const first = fixture();
+    const mismatched = first.receipt.map(receipt => ({ ...receipt, id: 'foreign-segment', warning: 'follow-up failed' }));
+    await expect(first.service.runMcpSegment('org', 'root', 'root', 0, first.hash, jest.fn().mockResolvedValue(mismatched))).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(first.repo.finishMcpSegment).not.toHaveBeenCalled();
+    const second = fixture();
+    second.repo.finishMcpSegment.mockRejectedValue(new Error('owned commit fault'));
+    await expect(second.service.runMcpSegment('org', 'root', 'root', 0, second.hash, jest.fn().mockResolvedValue(second.receipt.map(receipt => ({ ...receipt, warning: 'follow-up failed' }))))).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(second.repo.markMcpUnknown).toHaveBeenCalledWith('org', 'attempt');
+  });
+  it('persists STARTED admission before sending and stores the receipt before returning', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    const send = jest.fn(async () => { expect(repo.claimMcpSegment).toHaveBeenCalled(); return receipt; });
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).resolves.toEqual(receipt);
+    expect(repo.finishMcpSegment).toHaveBeenCalledWith('org', 'attempt', receipt);
+  });
+  it('acceptance followed by receipt-persistence failure is UNKNOWN, never confirmed failure', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    repo.finishMcpSegment.mockRejectedValue(new Error('database unavailable'));
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, jest.fn().mockResolvedValue(receipt))).rejects.toThrow('OUTCOME_UNKNOWN');
+    expect(repo.markMcpUnknown).toHaveBeenCalledWith('org', 'attempt');
+  });
+  it('a durable published receipt is returned without a provider call', async () => {
+    const { service, repo, hash, receipt } = fixture();
+    repo.claimMcpSegment.mockResolvedValue({ replay: true, receipt });
+    const send = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).resolves.toEqual(receipt);
+    expect(send).not.toHaveBeenCalled();
+  });
+  it('never sends after uncertain admission, changed revision or revoked approval', async () => {
+    const { service, repo, hash, root } = fixture();
+    const send = jest.fn();
+    repo.claimMcpSegment.mockRejectedValue(new Error('OUTCOME_UNKNOWN'));
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('OUTCOME_UNKNOWN');
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, 'changed', send)).rejects.toThrow('revision');
+    root.approvalStatus = 'IN_REVIEW';
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('approval');
+    expect(send).not.toHaveBeenCalled();
+  });
+  it('unsupported reconciliation blocks recovery without updating or retrying', async () => {
+    const { service, repo } = fixture();
+    repo.mcpAttempts.mockResolvedValue([{ id: 'uncertain', status: 'STARTED' }]);
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'OUTCOME_UNKNOWN' });
+    expect(repo.reconcileMcpAttempt).not.toHaveBeenCalled();
+    expect(repo.resumeMcp).not.toHaveBeenCalled();
+  });
+  it('only explicit terminal unpublished adapter evidence can unlock the failed segment', async () => {
+    const { service, repo } = fixture();
+    const reconcile = jest.fn().mockResolvedValue({ terminal: true, outcome: 'UNPUBLISHED' });
+    (service as any)._integrationManager = { getSocialIntegration: () => ({ reconcileMcpAttempt: reconcile }) };
+    repo.mcpAttempts.mockResolvedValue([{ id: 'child-attempt', segmentPostId: 'child', revisionHash: 'hash', status: 'UNKNOWN' }, { id: 'parent-attempt', status: 'CONFIRMED' }]);
+    repo.resumeMcp.mockResolvedValue({ status: 'RESUMED' });
+    jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'RESUMED' });
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(repo.reconcileMcpAttempt).toHaveBeenCalledWith('org', 'child-attempt', 'FAILED');
+  });
+  it('nonterminal reconciliation never creates a new attempt', async () => {
+    const { service, repo } = fixture();
+    (service as any)._integrationManager = { getSocialIntegration: () => ({ reconcileMcpAttempt: async () => ({ terminal: false, outcome: 'UNKNOWN' }) }) };
+    repo.mcpAttempts.mockResolvedValue([{ id: 'a', status: 'UNKNOWN' }]);
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'OUTCOME_UNKNOWN' });
+    expect(repo.resumeMcp).not.toHaveBeenCalled();
+  });
+});
+
+describe('review intent survives draft storage', () => {
+  const fixture = (invalid: any) => {
+    const { service, postRepository } = makeService({ getSocialIntegration: () => ({}) });
+    Object.assign(postRepository, { getPostById: jest.fn().mockResolvedValue(null), createOrUpdatePost: jest.fn().mockResolvedValue({ posts: [{ id: 'new-root', state: 'DRAFT', content: 'saved' }] }) });
+    (service as any)._shortLinkService = { convertTextToShortLinks: jest.fn().mockResolvedValue(['expanded payload']) };
+    (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), decide: jest.fn().mockResolvedValue({ hold: false }), afterSave: jest.fn().mockResolvedValue({ submitted: false }), notifyApprovers: jest.fn() };
+    jest.spyOn(service, 'checkProviderPostsLimit').mockResolvedValue(new Set());
+    jest.spyOn(service, 'checkPostingLimits').mockResolvedValue(undefined);
+    jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
+    jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ valid: true, errors: true, tooLong: false, emptyContent: false, disabled: false, ...invalid }] as any);
+    const body: any = { type: 'draft', date: '2030-01-01T00:00:00Z', shortLink: true, tags: [], posts: [{ integration: { id: 'channel' }, settings: { __type: 'fixture' }, value: [{ id: 'new', content: 'short', image: [] }] }] };
+    return { service, postRepository, body };
+  };
+  it.each([{ tooLong: true }, { valid: false, settingsError: 'settings invalid' }, { errors: 'media invalid' }, { disabled: true }])('rejects final transformed review payload before saving: %j', async invalid => {
+    const { service, postRepository, body } = fixture(invalid);
+    await expect(service.createPost('org', body, 'MCP', false, { type: 'agent', source: 'test' }, undefined, 'review')).rejects.toThrow();
+    expect((postRepository as any).createOrUpdatePost).not.toHaveBeenCalled();
+    expect((service.validatePosts as jest.Mock).mock.calls[0][2]).toBe('schedule');
+  });
+  it('still allows an incomplete ordinary editable draft without claiming review validity', async () => {
+    const { service, postRepository, body } = fixture({ tooLong: true, valid: false, errors: 'not ready' });
+    await expect(service.createPost('org', body, 'MCP', false, { type: 'agent', source: 'test' })).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ postId: 'new-root' })]));
+    expect((postRepository as any).createOrUpdatePost).toHaveBeenCalled();
+  });
+});
+
+describe('MCP immutable media preparation', () => {
+  it('can refresh a ready media path without rewriting the approved image JSON', async () => {
+    const { service, postRepository, mediaService } = makeService();
+    const original = [{ id: 'owned', path: 'https://uploads.test/original.png' }];
+    mediaService.getOrgMediaById.mockResolvedValue({ id: 'owned', path: 'https://uploads.test/normalized.jpg', status: 'ready' });
+    const result = await service.updateMedia('post', 'org', original, false, false);
+    expect(result[0].url).toBe('https://uploads.test/normalized.jpg');
+    expect(original[0].path).toBe('https://uploads.test/original.png');
+    expect(postRepository.updateImages).not.toHaveBeenCalled();
+  });
+  it('PNG to JPEG binds a derived payload and does not mutate the approved source image', async () => {
+    const { service, postRepository, mediaService } = makeService();
+    const source = [{ id: 'owned', path: 'https://uploads.test/original.png' }];
+    mediaService.getOrgMediaById.mockResolvedValue({ id: 'owned', path: source[0].path, status: 'ready' });
+    const sharp = require('sharp');
+    const png = await sharp({ create: { width: 1, height: 1, channels: 3, background: 'white' } }).png().toBuffer();
+    const dispatcher = require('@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher');
+    const fetch = jest.spyOn(dispatcher, 'getSsrfSafeAxios').mockReturnValue({ get: jest.fn().mockResolvedValue({ data: png }) });
+    (service as any).storage = { uploadFile: jest.fn().mockResolvedValue({ path: 'https://uploads.test/derived.jpg', originalname: 'derived.jpg' }) };
+    try {
+      const result = await service.updateMedia('post', 'org', source, true, false);
+      expect(result[0].url).toBe('https://uploads.test/derived.jpg');
+      expect(postRepository.updateImages).not.toHaveBeenCalled();
+      expect(source[0].path).toBe('https://uploads.test/original.png');
+    } finally { fetch.mockRestore(); }
+  });
+  it('preflight refuses an unowned or unfinished media path before invoking provider validation', async () => {
+    const provider = { checkValidity: jest.fn(), maxLength: jest.fn() };
+    const { service } = makeService({ getSocialIntegration: () => provider });
+    const [result] = await service.preflightPosts('org', [{ integration: { id: 'c' }, value: [{ content: 'text', image: [{ path: 'https://uploads.test/other-tenant.png' }] }] }]);
+    expect(result.status).toBe('UNKNOWN');
+    expect(provider.checkValidity).not.toHaveBeenCalled();
+  });
+});
+
+describe('exact-generation execution liveness and remainder policy', () => {
+  it('uses authoritative execution states and preserves UNKNOWN for network failures', async () => {
+    const { service, postRepository } = makeService();
+    (postRepository as any).mcpFence = jest.fn().mockResolvedValue({ generation: 3 });
+    const describe = jest.fn().mockResolvedValue({ status: { name: 'RUNNING' } });
+    const getHandle = jest.fn(() => ({ describe }));
+    (service as any)._temporalService = { client: { getRawClient: () => ({ connection: { withDeadline: (_deadline: number, fn: any) => fn() }, workflow: { getHandle } }) } };
+    expect(await service.mcpExecutionState('org', 'root')).toEqual({ generation: 3, closed: false });
+    expect(getHandle).toHaveBeenCalledWith('post_root_mcp_3');
+    describe.mockResolvedValue({ status: { name: 'COMPLETED' } });
+    expect(await service.mcpExecutionState('org', 'root')).toEqual({ generation: 3, closed: true });
+    describe.mockRejectedValue(new Error('network unavailable'));
+    expect(await service.mcpExecutionState('org', 'root')).toEqual({ generation: 3, closed: undefined });
+    describe.mockRejectedValue(Object.assign(new Error('missing'), { name: 'WorkflowNotFoundError' }));
+    expect(await service.mcpExecutionState('org', 'root')).toEqual({ generation: 3, closed: true });
+  });
+  it('checks held unpublished children even when the published parent retains an old approval', async () => {
+    const { service, postRepository } = makeService();
+    const root: any = { id: 'root', organizationId: 'org', integrationId: 'c', mcpWorkflowVersion: 114, state: 'PUBLISHED', approvalStatus: 'APPROVED', integration: { providerIdentifier: 'fixture' } };
+    const child: any = { id: 'child', state: 'DRAFT', approvalStatus: 'IN_REVIEW' };
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([root, child]);
+    (service as any)._approvalPolicyService = { getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: true }), assertAgentGuardrails: jest.fn() };
+    const send = jest.fn();
+    (postRepository as any).claimMcpSegment = jest.fn();
+    await expect(service.runMcpSegment('org', 'root', 'child', 0, 'hash', send)).rejects.toThrow('approval');
+    expect(await service.resumeMcp('org', 'root')).toMatchObject({ status: 'BLOCKED' });
+    expect(send).not.toHaveBeenCalled();
+    expect((postRepository as any).claimMcpSegment).not.toHaveBeenCalled();
+  });
+});
+
+describe('MCP producer rollout gate', () => {
+  it('returns BLOCKED for a closed tracked resume before policy/provider/recovery effects', async () => {
+    const provider = jest.fn(), { service, postRepository } = makeService({ getSocialIntegration: provider });
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([{ id: 'root', mcpWorkflowVersion: 114, integration: { providerIdentifier: 'fixture' } }] as any);
+    const policy = { assertAgentGuardrails: jest.fn() };
+    (service as any)._approvalPolicyService = policy;
+    const resume = jest.fn();
+    (postRepository as any).resumeMcp = resume;
+    const before = process.env.MCP_V114_ADMISSION_ENABLED;
+    process.env.MCP_V114_ADMISSION_ENABLED = 'false';
+    try {
+      await expect(service.resumeMcp('org', 'root')).resolves.toEqual({ status: 'BLOCKED', reason: 'Assistant post saves are temporarily unavailable while the service updates.' });
+      expect(policy.assertAgentGuardrails).not.toHaveBeenCalled();
+      expect(provider).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+    } finally {
+      if (before === undefined) delete process.env.MCP_V114_ADMISSION_ENABLED;
+      else process.env.MCP_V114_ADMISSION_ENABLED = before;
+    }
+  });
+
+  it('does not create a post or an admission while old publishing pollers may still exist', async () => {
+    const { service, postRepository } = makeService();
+    const before = process.env.MCP_V114_ADMISSION_ENABLED;
+    process.env.MCP_V114_ADMISSION_ENABLED = 'false';
+    try {
+      const save = service.createPost('org', { type: 'draft', posts: [{ integration: { id: 'channel' } }] } as any, 'MCP', false, { type: 'agent', source: 'test' });
+      await expect(save).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(save).rejects.toMatchObject({ status: 503, message: 'Assistant post saves are temporarily unavailable while the service updates.' });
+      expect(postRepository.acquireAgentAdmission).not.toHaveBeenCalled();
+    } finally { process.env.MCP_V114_ADMISSION_ENABLED = before; }
+  });
+});
+
+
+describe('durable exact-generation MCP dispatch', () => {
+  const setup = () => {
+    const { service, postRepository } = makeService();
+    const rows: any[] = [{ id: 'root', integrationId: 'channel', state: 'QUEUE', integration: { providerIdentifier: 'fixture' } }];
+    jest.spyOn(service, 'mcpThread').mockResolvedValue(rows);
+    jest.spyOn(service, 'mcpRevision').mockReturnValue('revision');
+    const fence = { organizationId: 'org', postId: 'root', state: 'ACTIVE', generation: 4, revisionHash: 'revision' };
+    Object.assign(postRepository, {
+      mcpFence: jest.fn().mockResolvedValue(fence),
+      mcpAttempts: jest.fn().mockResolvedValue([]),
+      recordMcpDispatch: jest.fn().mockResolvedValue({ count: 1 }),
+      pendingMcpDispatches: jest.fn().mockResolvedValue([fence]),
+    });
+    const missing = Object.assign(new Error('missing'), { name: 'WorkflowNotFoundError' });
+    const describe = jest.fn().mockRejectedValue(missing);
+    const start = jest.fn().mockResolvedValue({});
+    const getHandle = jest.fn(() => ({ describe }));
+    const withDeadline = jest.fn((_deadline: number, fn: any) => fn());
+    (service as any)._temporalService = { client: { getRawClient: () => ({ connection: { withDeadline }, workflow: { getHandle, start } }) } };
+    return { service, repo: postRepository as any, rows, fence, missing, describe, start, getHandle, withDeadline };
+  };
+
+  it('returns saved identity on a pre-start failure and recovers the same generation after a scheduler restart', async () => {
+    const { service, repo, start, getHandle, withDeadline } = setup();
+    start.mockRejectedValueOnce(new Error('before RPC'));
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED', savedPostIds: ['root'] });
+    expect(repo.recordMcpDispatch).toHaveBeenLastCalledWith('org', 'root', 4, 'revision', 'UNKNOWN', 'START_UNCONFIRMED');
+    expect(await service.recoverPendingMcpDispatches()).toEqual({ examined: 1, confirmed: 1, unconfirmed: 0 });
+    expect(start.mock.calls.map(call => call[1])).toEqual([expect.objectContaining({ workflowId: 'post_root_mcp_4', workflowIdReusePolicy: 'REJECT_DUPLICATE', workflowIdConflictPolicy: 'USE_EXISTING' }), expect.objectContaining({ workflowId: 'post_root_mcp_4' })]);
+    expect(getHandle).toHaveBeenCalledWith('post_root_mcp_4');
+    expect(withDeadline).toHaveBeenCalledWith(expect.any(Number), expect.any(Function));
+  });
+
+  it.each(['RUNNING', 'COMPLETED', 'FAILED', 'TERMINATED'])('acknowledges an accepted %s execution after a lost start response without starting again', async status => {
+    const { service, start, describe } = setup();
+    start.mockRejectedValueOnce(new Error('response lost'));
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    describe.mockResolvedValue({ status: { name: status } });
+    await service.recoverPendingMcpDispatches();
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['network', 'invalid-status'])('keeps %s inspection uncertain without another start or a new generation', async mode => {
+    const { service, start, describe, repo } = setup();
+    if (mode === 'network') describe.mockRejectedValue(new Error('timeout'));
+    else describe.mockResolvedValue({ status: { name: 'unrecognized' } });
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    expect(start).not.toHaveBeenCalled();
+    expect(repo.recordMcpDispatch).toHaveBeenLastCalledWith('org', 'root', 4, 'revision', 'UNKNOWN', 'STATUS_UNCONFIRMED');
+  });
+
+  it('recognizes a duplicate closed execution rejected at start without replaying it', async () => {
+    const { service, start, describe } = setup();
+    start.mockRejectedValue(Object.assign(new Error('duplicate'), { name: 'WorkflowExecutionAlreadyStartedError' }));
+    describe.mockRejectedValueOnce(Object.assign(new Error('not retained yet'), { name: 'WorkflowNotFoundError' })).mockResolvedValue({ status: { name: 'COMPLETED' } });
+    await service.reconcileMcpDispatch('org', 'root', 4, 'revision');
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start.mock.calls[0][1].workflowIdReusePolicy).toBe('REJECT_DUPLICATE');
+  });
+
+  it('does not start when retention has lost a workflow that already has a provider attempt', async () => {
+    const { service, repo, start } = setup();
+    repo.mcpAttempts.mockResolvedValue([{ generation: 4, status: 'CONFIRMED' }]);
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    expect(start).not.toHaveBeenCalled();
+    expect(repo.recordMcpDispatch).toHaveBeenLastCalledWith('org', 'root', 4, 'revision', 'HELD', 'PROVIDER_RECONCILIATION_REQUIRED');
+  });
+
+  it.each(['future', 'old', 'published-root'])('dispatches an outbox record for %s without the due-root sweep', async kind => {
+    const { service, rows, start } = setup();
+    rows[0].publishDate = new Date(kind === 'old' ? '2000-01-01' : '2100-01-01');
+    if (kind === 'published-root') { rows[0].state = 'PUBLISHED'; rows.push({ id: 'reply', state: 'QUEUE' }); }
+    expect(await service.recoverPendingMcpDispatches()).toMatchObject({ confirmed: 1 });
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['cancel', 'edit'])('refuses stale dispatch admission after a concurrent %s', async () => {
+    const { service, repo, start } = setup();
+    repo.recordMcpDispatch.mockResolvedValue({ count: 0 });
+    await expect(service.reconcileMcpDispatch('org', 'root', 4, 'revision')).rejects.toMatchObject({ code: 'DISPATCH_UNCONFIRMED' });
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('lets concurrent dispatchers use one stable Temporal identity with closed-run reuse forbidden', async () => {
+    const { service, start } = setup();
+    await Promise.all([service.reconcileMcpDispatch('org', 'root', 4, 'revision'), service.reconcileMcpDispatch('org', 'root', 4, 'revision')]);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start.mock.calls.every(call => call[1].workflowId === 'post_root_mcp_4' && call[1].workflowIdReusePolicy === 'REJECT_DUPLICATE')).toBe(true);
+    // One actual execution is asserted by the native Temporal fixture, not this mock.
+  });
+
+  it('does not starve another pending generation when one row is unavailable', async () => {
+    const { service, repo, fence } = setup();
+    repo.pendingMcpDispatches.mockResolvedValue([fence, { ...fence, postId: 'next' }]);
+    jest.spyOn(service, 'reconcileMcpDispatch').mockRejectedValueOnce(new Error('DB unavailable')).mockResolvedValueOnce(undefined);
+    expect(await service.recoverPendingMcpDispatches()).toEqual({ examined: 2, confirmed: 1, unconfirmed: 1 });
   });
 });

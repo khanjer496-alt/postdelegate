@@ -374,7 +374,8 @@ describe('PostActivity state writes for postWorkflowV113', () => {
     const signalWithStart = jest.fn().mockResolvedValue(undefined);
     const activity = make(
       {
-        searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
+        recoverMissingMcpJob: jest.fn().mockResolvedValue(false),
+      searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
           {
             id: 'p-1',
             organizationId: 'org-1',
@@ -396,5 +397,43 @@ describe('PostActivity state writes for postWorkflowV113', () => {
         workflowIdConflictPolicy: 'USE_EXISTING',
       })
     );
+  });
+});
+
+describe('MCP final transformed payload validation', () => {
+  const activity = (provider: any) => new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any, { getSocialIntegration: () => provider } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const channel = { id: 'c', organizationId: 'o', providerIdentifier: 'fixture', additionalSettings: '[]' } as any;
+  it('rejects a link/mention expansion over the limit before any provider publication', async () => {
+    const publish = jest.fn();
+    const worker = activity({ maxLength: () => 5, checkValidity: jest.fn().mockResolvedValue(true), post: publish });
+    await expect((worker as any).assertMcpFinalPayload(channel, [{ message: 'expanded-long-url', media: [], settings: {} }])).rejects.toThrow('limit');
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('checks provider rules using the exact final messages and resolved media paths', async () => {
+    const checkValidity = jest.fn().mockResolvedValue(true);
+    const worker = activity({ maxLength: () => 100, checkValidity });
+    await (worker as any).assertMcpFinalPayload(channel, [{ message: 'ready', media: [{ path: '/local/file', url: 'https://media.test/file.png' }], settings: {} }]);
+    expect(checkValidity).toHaveBeenCalledWith([[expect.objectContaining({ path: 'https://media.test/file.png' })]], {}, [], ['ready']);
+  });
+});
+
+describe('V114 known published follow-up failures', () => {
+  it('preserves the verified typed receipt before the legacy release writer, while legacy behavior stays unchanged', async () => {
+    const { PublishedWithError } = require('@gitroom/nestjs-libraries/integrations/social.abstract');
+    const integration: any = { id: 'c', organizationId: 'org', providerIdentifier: 'fixture', internalId: 'i', token: 'fixture', disabled: false, inBetweenSteps: false, refreshNeeded: false };
+    const legacyRelease = jest.fn().mockResolvedValue({});
+    const integrations = { getIntegrationById: jest.fn().mockResolvedValue(integration) };
+    const activity = new PostActivity({ updateResolvedRelease: legacyRelease } as any, {} as any, {} as any, integrations as any, {} as any, {} as any, {} as any, {} as any);
+    const error = new PublishedWithError('fixture', 'post', 'video', 'https://fixture.invalid/video', 'thumbnail failed');
+    const result = await (activity as any).handleDisconnect(integration, async () => { throw error; }, true);
+    expect(result).toEqual([expect.objectContaining({ id: 'post', postId: 'video', status: 'published', warning: expect.any(String) })]);
+    expect(legacyRelease).not.toHaveBeenCalled();
+    expect(integrations.getIntegrationById).not.toHaveBeenCalled();
+    await expect((activity as any).handleDisconnect(integration, async () => { throw error; })).rejects.toBeInstanceOf(BadBody);
+    expect(legacyRelease).toHaveBeenCalledTimes(1);
   });
 });

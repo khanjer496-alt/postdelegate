@@ -248,6 +248,7 @@ export type PostResponse = {
   postId: string; // The ID of the scheduled post returned by the platform
   releaseURL: string; // The URL of the post on the platform
   status: string; // Status of the operation or initial post status, 'pending' means the workflow must poll checkPostStatus
+  warning?: string; // Confirmed publication with an ancillary follow-up warning
   pendingData?: any; // Opaque provider state used by checkPostStatus / finalizePost, never inspected by generic code
 };
 
@@ -268,6 +269,8 @@ export type PendingCheckResponse =
   | { status: 'completed'; postId: string; releaseURL: string };
 
 export type PostDetails<T = any> = {
+  // Server-owned identity for adapters that explicitly support safe reconciliation.
+  clientReference?: { attemptId: string };
   id: string;
   message: string;
   settings: T;
@@ -299,6 +302,12 @@ export type FetchPageInformationResult = {
 export interface SocialProvider
   extends IAuthenticator,
     ISocialMediaIntegration {
+  /** Read-only terminal reconciliation; UNPUBLISHED proves this attempt was never accepted/published and no in-flight request can later land. A current 404 is insufficient. */
+  reconcileMcpAttempt?(integration: Integration, attempt: { attemptId: string; payloadHash: string; segmentId: string }): Promise<
+    { terminal: true; outcome: 'UNPUBLISHED' } |
+    { terminal: true; outcome: 'PUBLISHED'; receipt: PostResponse } |
+    { terminal: false; outcome: 'UNKNOWN' }
+  >;
   identifier: string;
   authorizationPolicy?: ProviderAuthorizationPolicy;
   checkAuthorization?(

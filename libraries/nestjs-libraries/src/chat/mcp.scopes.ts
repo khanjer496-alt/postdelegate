@@ -2,6 +2,7 @@ import { getContext } from './async.storage';
 
 // Default deny for unknown tools. This list is server-owned, not client annotations.
 const readTools = new Set([
+  'postPreflightTool', 'resultsToReviewedDraftsTool',
   'integrationList', 'integrationSchema', 'groupList', 'postsListTool',
   'mediaListTool', 'mediaStatusTool', 'videoStatusTool', 'generateVideoOptions',
   'videoFunctionTool', 'clippingStatusTool', 'studioTemplatesTool',

@@ -1,3 +1,6 @@
+import { PostUnscheduleTool, PostResumeTool } from './post.lifecycle.tools';
+import { PostPreflightTool } from './post.preflight.tool';
+import { ResultsToReviewedDraftsTool } from './results.to.reviewed.drafts.tool';
 import { IntegrationValidationTool } from '@gitroom/nestjs-libraries/chat/tools/integration.validation.tool';
 import { IntegrationTriggerTool } from '@gitroom/nestjs-libraries/chat/tools/integration.trigger.tool';
 import { IntegrationSchedulePostTool } from './integration.schedule.post';
@@ -37,6 +40,10 @@ import {
 import { StudioCancelTool } from '@gitroom/nestjs-libraries/chat/tools/studio.cancel.tool';
 
 export const toolList = [
+  PostPreflightTool,
+  PostUnscheduleTool,
+  PostResumeTool,
+  ResultsToReviewedDraftsTool,
   IntegrationListTool,
   GroupListTool,
   IntegrationValidationTool,

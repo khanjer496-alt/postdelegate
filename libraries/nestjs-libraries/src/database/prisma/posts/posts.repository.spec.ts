@@ -17,7 +17,7 @@ const makeRepo = () => {
     { model: { tags } } as any,
     { model: { tagsPosts: { deleteMany: jest.fn() } } } as any,
     {} as any,
-    {} as any
+    { model: { $transaction: (action: any) => action({ post, tags, tagsPosts: { deleteMany: jest.fn() }, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) } }) } } as any
   );
   return { repo, post, tags };
 };
@@ -545,7 +545,7 @@ describe('PostsRepository state and date of a thread', () => {
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
     };
     const transaction = {
-      model: { $transaction: jest.fn((run: any) => run({ post })) },
+      model: { $transaction: jest.fn((run: any) => run({ post, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) }, tagsPosts: { deleteMany: jest.fn() }, tags: { findMany: jest.fn() } })) },
     };
     const repo = new PostsRepository(
       { model: { post } } as any,
@@ -706,5 +706,15 @@ describe('saved sequence permission compatibility boundary', () => {
     post.findFirst.mockResolvedValue({ group: 'saved-group' });
     (post as any).count = jest.fn().mockResolvedValue(1);
     await expect((repo as any).isExistingPostSequence('org-A', 'int-1', ['p-1', 'new-entry'])).resolves.toBe(false);
+  });
+});
+
+describe('MCP version stamp before enqueue', () => {
+  it('stores the new workflow version atomically with new MCP rows, leaving existing update data unstamped', async () => {
+    const { repo, post } = makeRepo();
+    await repo.createOrUpdatePost('schedule', 'org', '2030-01-01T00:00:00Z', body(), [], 'MCP');
+    const args = post.upsert.mock.calls[0][0];
+    expect(args.create).toMatchObject({ creationMethod: 'MCP', mcpWorkflowVersion: 114 });
+    expect(args.update).not.toHaveProperty('mcpWorkflowVersion');
   });
 });
