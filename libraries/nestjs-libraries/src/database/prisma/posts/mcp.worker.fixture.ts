@@ -793,6 +793,8 @@ pg(
         await db.post.deleteMany({ where: { organizationId: org } });
         await db.integration.deleteMany({ where: { organizationId: org } });
         await db.media.deleteMany({ where: { organizationId: org } });
+        await db.approvalLink.deleteMany({ where: { organizationId: org } });
+        await db.approvalSettings.deleteMany({ where: { organizationId: org } });
         await db.organization.delete({ where: { id: org } });
       }
       if (db) await db.$disconnect();
