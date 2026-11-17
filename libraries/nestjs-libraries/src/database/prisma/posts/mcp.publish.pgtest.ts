@@ -97,6 +97,8 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
   });
   afterAll(async () => {
     if (db) {
+      let cleanupFailure: unknown;
+      try {
       if (org) {
         await db.mcpPublishAttempt.deleteMany({
           where: { organizationId: org },
@@ -113,7 +115,13 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
         await db.integration.deleteMany({ where: { organizationId: org } });
         await db.organization.delete({ where: { id: org } });
       }
-      await db.$disconnect();
+      } catch (error) {
+        cleanupFailure = error;
+        throw error;
+      } finally {
+        try { await db.$disconnect(); }
+        catch (error) { if (!cleanupFailure) throw error; }
+      }
     }
   });
   it('admission and cancel serialize: never both STARTED and cancellation success', async () => {

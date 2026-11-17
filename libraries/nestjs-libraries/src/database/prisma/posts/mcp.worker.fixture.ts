@@ -25,6 +25,23 @@ const caseResults: Array<{
   type?: string;
 }> = [];
 let setupStage = 'NOT_STARTED';
+// Bounded build diagnostics only; never emit raw webpack messages/source/stacks.
+const bundleDiagnostics: Array<{ type: string; specifier?: string }> = [];
+const fixtureBundlerOptions = {
+  webpackConfigHook: (config: any) => {
+    config.plugins = [...(config.plugins || []), {
+      apply: (compiler: any) => compiler.hooks.done.tap('QaBundleDiagnostics', (stats: any) => {
+        for (const error of stats.toJson({ all: false, errors: true, errorDetails: false }).errors || []) {
+          if (bundleDiagnostics.length >= 16) break;
+          const type = typeof error.name === 'string' && /^[A-Za-z0-9_]{1,60}$/.test(error.name) ? error.name : 'BundlerError';
+          const match = /Can't resolve '([@A-Za-z0-9_./-]{1,160})'/.exec(error.message || '');
+          bundleDiagnostics.push({ type, ...(match ? { specifier: match[1] } : {}) });
+        }
+      }),
+    }];
+    return config;
+  },
+};
 const hookResults: Array<{
   phase: string;
   stage?: string;
@@ -88,7 +105,7 @@ process.on('exit', (exitCode) => {
     writeFileSync(
       '/tmp/mcp-native-summary.json',
       JSON.stringify(
-        { frameworkExitCode: exitCode, cases: caseResults, hooks: hookResults },
+        { frameworkExitCode: exitCode, cases: caseResults, hooks: hookResults, bundleDiagnostics },
         null,
         2
       )
@@ -493,6 +510,7 @@ pg(
     const startWorker = async () => {
       setupStage = 'WORKFLOW_WORKER_CREATE';
       worker = await Worker.create({
+        bundlerOptions: fixtureBundlerOptions,
         connection: native,
         namespace,
         taskQueue: 'mcp-publish-v114',
