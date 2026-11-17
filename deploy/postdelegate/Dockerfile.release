@@ -95,6 +95,24 @@ RUN grep -qE "@aws-sdk/client-sesv2@3\.1003\.0'?:" /tmp/pd-pnpm-lock.yaml \
     && rm -rf "$(pnpm store path)" /tmp/pd-pnpm-lock.yaml \
     && node -e "require.resolve('@aws-sdk/client-sesv2')"
 
+# Next.js the same way, and for the same reason as @sentry/*: bumping it in this
+# repo's package.json alone (Dependabot #230) leaves the release on the pinned
+# image's 16.4.2, which misses the 16.4.5 security fixes (among them cached
+# responses leaking between users and HttpOnly cookies leaking on Edge routes).
+# The pinned image also forces next through its own pnpm "overrides", so that
+# entry is moved to the same version first, or pnpm keeps 16.4.2. The version
+# is asserted against our own pnpm-lock.yaml, and the build fails if any copy
+# of next or @next/env in the image is not 16.4.5.
+COPY pnpm-lock.yaml /tmp/pd-pnpm-lock-next.yaml
+RUN grep -qE "^  next@16\.4\.5'?:" /tmp/pd-pnpm-lock-next.yaml \
+    && grep -qE "^  '@next/env@16\.4\.5'?:" /tmp/pd-pnpm-lock-next.yaml \
+    && grep -q '"next": "16.4.2"' /app/package.json \
+    && sed -i 's/"next": "16\.4\.2"/"next": "16.4.5"/g' /app/package.json \
+    && pnpm add -w next@16.4.5 \
+    && node -e "for (const p of ['next','@next/env','@next/swc-linux-x64-gnu']) { const v=require('/app/node_modules/'+p+'/package.json').version; if (v !== '16.4.5') { throw new Error(p + ' installed ' + v); } }" \
+    && node -e "const fs=require('fs'),path=require('path'); const bad=[]; (function walk(d,depth){ if(depth>8) return; let e=[]; try{ e=fs.readdirSync(d,{withFileTypes:true}); }catch(x){ return; } for(const i of e){ if(!i.isDirectory()) continue; const q=path.join(d,i.name); if((i.name==='next' && d.endsWith('node_modules')) || (i.name==='env' && d.endsWith(path.join('node_modules','@next')))){ try{ const v=require(q+'/package.json').version; if(v!=='16.4.5') bad.push(q+' @'+v); }catch(x){} } walk(q,depth+1); } })('/app',0); if(bad.length) throw new Error('stale next: '+bad.join(', ')); " \
+    && rm -rf "$(pnpm store path)" /tmp/pd-pnpm-lock-next.yaml
+
 # The provider changes are used by both HTTP handlers and Temporal workers.
 # Rebuild all three applications with the pinned image's installed dependencies.
 # COPY only adds and overwrites, so clear the upstream sources and public
