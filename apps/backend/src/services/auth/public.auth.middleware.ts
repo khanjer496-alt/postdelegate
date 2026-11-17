@@ -27,6 +27,10 @@ export class PublicAuthMiddleware implements NestMiddleware {
       res.status(HttpStatus.UNAUTHORIZED).json({ msg: 'No API Key found' });
       return;
     }
+    if (/^(?:Bearer\s+)?mca_/i.test(auth.trim())) {
+      res.status(HttpStatus.UNAUTHORIZED).json({ msg: 'This credential is only valid for MCP.' });
+      return;
+    }
     try {
       let org: Organization & { subscription?: unknown };
       const isOAuthApp = auth.startsWith('pos_');

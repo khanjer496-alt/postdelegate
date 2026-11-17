@@ -8,7 +8,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AgentCredentialRole {
+  ANALYST
+  DRAFT_ONLY
+  PUBLISHER
+}
+
+model AgentCredential {
+  id String @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name String
+  secretHash String @unique
+  role AgentCredentialRole @default(DRAFT_ONLY)
+  // null = all channels; [] = no channels. Never collapse these states.
+  channelIds Json?
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([organizationId, createdAt])
+}
+
 model Organization {
+  agentCredentials AgentCredential[]
   id                  String               @id @default(uuid())
   name                String
   description         String?

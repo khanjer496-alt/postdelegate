@@ -107,6 +107,7 @@ export class ApprovalsRepository {
         id: true,
         group: true,
         state: true,
+        releaseId: true,
         approvalStatus: true,
         publishDate: true,
         content: true,

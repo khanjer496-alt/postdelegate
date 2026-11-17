@@ -115,3 +115,11 @@ describe('PublicAuthMiddleware x-postiz-org override', () => {
     expect(next).not.toHaveBeenCalled();
   });
 });
+
+describe('MCP credential audience', () => {
+  it.each(['mca_secret', 'Bearer mca_secret'])('rejects %s before legacy resolver or SUPERADMIN context', async authorization => {
+    const { req, res, next, organizationService } = await run({ authorization });
+    expect(res.statusCode).toBe(401); expect(next).not.toHaveBeenCalled();
+    expect(organizationService.getOrgByApiKey).not.toHaveBeenCalled(); expect(req.org).toBeUndefined();
+  });
+});

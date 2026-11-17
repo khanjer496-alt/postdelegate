@@ -1,3 +1,4 @@
+import { AgentCredentialService } from './agent-credential.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Agent } from '@mastra/core/agent';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -27,6 +28,7 @@ const renderArray = (list: string[], show: boolean) => {
 export class LoadToolsService {
   constructor(
     private _moduleRef: ModuleRef,
+    private _agentCredentials: AgentCredentialService,
     private _aiCredentialService: AiCredentialService
   ) {}
 
@@ -42,7 +44,7 @@ export class LoadToolsService {
           .filter((p) => !p.available || p.available())
           .map(async (p) => ({
             name: p.name as string,
-            tool: await p.run(),
+            tool: this._agentCredentials.wrapTool(p.name, await p.run()),
           }))
       )
     ).reduce(
@@ -135,8 +137,8 @@ export class LoadToolsService {
           | string
           | undefined;
         const orgId =
-          (organization ? JSON.parse(organization)?.id : undefined) ||
-          getAuth()?.id;
+          getAuth()?.id ||
+          (organization ? JSON.parse(organization)?.id : undefined);
         if (!orgId) {
           throw new BadRequestException(MISSING_AI_KEY);
         }
