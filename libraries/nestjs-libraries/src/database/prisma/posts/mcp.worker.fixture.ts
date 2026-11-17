@@ -1,6 +1,8 @@
 // Separately invoked CI/staging fixture composition; never imported by production.
 import { PrismaClient } from '@prisma/client';
 import { Client, Connection } from '@temporalio/client';
+import { TypedSearchAttributes } from '@temporalio/common';
+import { organizationId as organizationAttribute, postId as postAttribute } from '../../../temporal/temporal.search.attribute';
 import { Worker, NativeConnection } from '@temporalio/worker';
 import { temporal } from '@temporalio/proto';
 import { randomUUID, createHash } from 'crypto';
@@ -633,6 +635,34 @@ pg(
         },
       });
       client = new Client({ connection: clientConnection, namespace });
+      setupStage = 'TEMPORAL_SEARCH_ATTRIBUTE_READINESS';
+      // Registration can precede frontend validation-cache readiness. Prove the
+      // exact typed attributes through Start, before admitting any real post.
+      // This queue has NO poller, no activity/body executes, and the accepted
+      // probe is terminated. Only this same-id fixture probe may retry code3.
+      const readinessDeadline = Date.now() + 20000;
+      let readinessHandle;
+      for (;;) {
+        try {
+          readinessHandle = await client.workflow.start('mcpFixtureAttributeReadiness', {
+            taskQueue: 'mcp-fixture-attribute-readiness-unpolled',
+            workflowId: `attribute_readiness_${org}`,
+            workflowExecutionTimeout: '30 seconds',
+            workflowIdConflictPolicy: 'USE_EXISTING', workflowIdReusePolicy: 'REJECT_DUPLICATE',
+            typedSearchAttributes: new TypedSearchAttributes([
+              { key: postAttribute, value: `attribute_readiness_${org}` },
+              { key: organizationAttribute, value: org },
+            ]),
+          });
+          break;
+        } catch (error) {
+          const code = (error as any)?.cause?.code ?? (error as any)?.code;
+          if (code !== 3 || Date.now() >= readinessDeadline) throw error;
+          if (dispatchDiagnostics.length < 32) dispatchDiagnostics.push({ operation: 'ATTRIBUTE_READINESS', ...safeFailure(error), cause: safeFailure((error as any)?.cause) });
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      await readinessHandle.terminate('Owned attribute readiness probe completed; no workflow task was polled.');
       setupStage = 'NATIVE_CONNECT';
       native = await NativeConnection.connect({ address });
       const temporalService = {
