@@ -376,7 +376,10 @@ export const AddOrEditWebhook: FC<{
             </Select>
             {allIntegrations.value === 'specific' && dataList && !isLoading && (
               <PickPlatforms
-                integrations={dataList.integrations}
+                // a network that takes no feed posts (autoPostUnsupported) is not offered
+                integrations={dataList.integrations.filter(
+                  (p: any) => p.autoPostAvailable !== false
+                )}
                 selectedIntegrations={integrations as any[]}
                 onChange={(e) => form.setValue('integrations', e)}
                 singleSelect={false}

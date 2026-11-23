@@ -197,6 +197,13 @@ export class PublicIntegrationsController {
       );
     }
 
+    // settings only the composer can take (TikTok Direct Post) are refused
+    // or replaced before they are validated, so the error is the real reason
+    body.posts = await this._postsService.applyOutsideComposerRules(
+      org.id,
+      body.posts
+    );
+
     // Server-side validation — same rules as the dashboard, surfaced as a
     // readable 400 (see PostValidationExceptionFilter).
     const validation = await this._postsService.validatePosts(

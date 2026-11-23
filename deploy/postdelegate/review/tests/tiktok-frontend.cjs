@@ -230,3 +230,12 @@ test('video metadata exceeding the creator limit blocks publishing until a permi
     document.createElement = createElement;
   }
 });
+
+test('the signed-in composer still offers Direct Post by default, with no preset privacy', async () => {
+  mount();
+  await ready();
+  assert.equal(field('content_posting_method').value, 'DIRECT_POST');
+  assert.deepEqual(Array.from(field('content_posting_method').options).map((option) => option.value).sort(), ['DIRECT_POST', 'UPLOAD']);
+  assert.equal(form.getValues('content_posting_method'), 'DIRECT_POST');
+  assert.equal(field('privacy_level').value, '');
+});

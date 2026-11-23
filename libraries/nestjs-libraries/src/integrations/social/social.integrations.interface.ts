@@ -342,6 +342,13 @@ export interface SocialProvider
   // it from the stored URL and the post's settings only - this runs on an
   // unauthenticated request, so it must do no network call and no token work.
   isPublicReleaseURL?(releaseURL: string, settings: any): boolean;
+  // A post saved anywhere but the signed-in composer (public API, CLI, MCP,
+  // the agent, CSV import, bulk and auto post): the settings it is stored
+  // with instead, or why only the composer can make it - for rules a network
+  // ties to the composer, like TikTok's consent before a Direct Post.
+  settingsOutsideComposer?(settings: any): { settings: any } | { error: string };
+  // auto post (RSS feeds) never creates posts for this network
+  autoPostUnsupported?: boolean;
   // what lifts the plan's monthly cap on this network
   // (provider_posts_per_month), the end of the message shown at the cap
   planLimitHint?: string;

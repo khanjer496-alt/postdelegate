@@ -78,6 +78,8 @@ const socialPost = (type = 'draft') => ({
 describe('createPostForReviewTool', () => {
   const build = () => {
     const postsService = {
+      // the network rules outside the composer leave these posts as they are
+      applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
       validatePosts: jest.fn().mockResolvedValue([
         { name: 'QA LinkedIn', valid: true, errors: true, tooLong: false },
       ]),
