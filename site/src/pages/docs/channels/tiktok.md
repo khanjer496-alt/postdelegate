@@ -30,6 +30,8 @@ Every TikTok post has a **Content posting method**:
 | **Post content directly to TikTok** | PostDelegate publishes the post to the connected account. Until TikTok finishes its Direct Post audit, those posts go out as **Only me**. Public, friends and other visibility choices cannot go live through this method until that audit is complete. |
 | **Upload content to TikTok without posting it** | The video is sent to the creator inbox in the TikTok app. You open TikTok, finish the caption and privacy there, and publish it yourself. Inbox items expire after 24 hours, and TikTok limits pending inbox posts to five in any 24-hour period. Privacy, comments, duet, stitch and branded-content settings are not applied in this mode; you set them in TikTok. |
 
+Posts sent through the public API, the CLI, MCP or an AI assistant, bulk upload or CSV import always go to the creator's TikTok inbox to finish in the TikTok app. Posting directly, with your choice of who can see the post, happens only in the PostDelegate composer.
+
 ## Post settings
 
 These settings apply when you post directly to TikTok. They are ignored on inbox uploads, because you finish those in the TikTok app.
