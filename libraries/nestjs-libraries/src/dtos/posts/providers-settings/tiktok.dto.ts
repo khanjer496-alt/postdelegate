@@ -71,6 +71,14 @@ export class TikTokLocation {
   address?: string;
 }
 
+// Friendly validation messages: these reach the composer's "needs attention"
+// banner as-is, so they must never list raw enum values.
+export const TIKTOK_PRIVACY_LEVEL_MESSAGE = 'Choose who can see this post.';
+export const TIKTOK_POSTING_METHOD_MESSAGE =
+  'Choose whether to post directly to TikTok or upload to your TikTok inbox.';
+export const TIKTOK_AUTO_ADD_MUSIC_MESSAGE =
+  'Choose whether TikTok should add music.';
+
 // The server supplies this ephemeral context from the operation it will
 // execute. Editing saved settings requires ordinary validation, while fresh
 // publishing acknowledgements apply only when scheduling or publishing.
@@ -120,13 +128,16 @@ export class TikTokDto {
         'Branded content visibility cannot be set to private.',
     },
   })
-  @IsIn([
-    'PUBLIC_TO_EVERYONE',
-    'MUTUAL_FOLLOW_FRIENDS',
-    'FOLLOWER_OF_CREATOR',
-    'SELF_ONLY',
-  ])
-  @IsString()
+  @IsIn(
+    [
+      'PUBLIC_TO_EVERYONE',
+      'MUTUAL_FOLLOW_FRIENDS',
+      'FOLLOWER_OF_CREATOR',
+      'SELF_ONLY',
+    ],
+    { message: TIKTOK_PRIVACY_LEVEL_MESSAGE }
+  )
+  @IsString({ message: TIKTOK_PRIVACY_LEVEL_MESSAGE })
   @JSONSchema({
     description:
       'Applied only when content_posting_method=DIRECT_POST. Ignored by TikTok on UPLOAD.',
@@ -158,7 +169,7 @@ export class TikTokDto {
   })
   comment: boolean;
 
-  @IsIn(['yes', 'no'])
+  @IsIn(['yes', 'no'], { message: TIKTOK_AUTO_ADD_MUSIC_MESSAGE })
   @JSONSchema({
     description:
       'Photo posts only, and only when content_posting_method=DIRECT_POST. Ignored by TikTok on UPLOAD. ' +
@@ -253,8 +264,8 @@ export class TikTokDto {
   })
   location?: TikTokLocation;
 
-  @IsIn(['DIRECT_POST', 'UPLOAD'])
-  @IsString()
+  @IsIn(['DIRECT_POST', 'UPLOAD'], { message: TIKTOK_POSTING_METHOD_MESSAGE })
+  @IsString({ message: TIKTOK_POSTING_METHOD_MESSAGE })
   @JSONSchema({
     description:
       '"UPLOAD" does NOT publish: it only sends the media to the user\'s TikTok app inbox, ' +
