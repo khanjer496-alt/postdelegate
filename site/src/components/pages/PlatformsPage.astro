@@ -4,13 +4,14 @@ import NetworkBadge from '../NetworkBadge.astro';
 import PageHero from '../PageHero.astro';
 import CtaBand from '../CtaBand.astro';
 import { AVAILABLE_NETWORKS, OWN_APP_NETWORKS, WAITING_NETWORKS, type Network } from '../../data/networks';
-import { TRIAL_DAYS } from '../../data/plans';
-import { SITE } from '../../data/site';
+import { PLANS, TRIAL_DAYS } from '../../data/plans';
+import { SITE, PAY_HREF } from '../../data/site';
 import { localeHref, localizeLinks, strings, type Lang } from '../../i18n';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = strings(lang);
 const p = t.platformsPage;
+const lowestPrice = Math.min(...PLANS.map((plan) => plan.monthly));
 // Live networks, then the ones waiting on approval, then one line for X. Networks that are
 // not offered at all are not listed.
 const sections = [
@@ -23,8 +24,9 @@ const href = (network: Network, docs?: string) => docs ? localeHref(lang, docs) 
 <Base title={p.title(AVAILABLE_NETWORKS.length)} description={p.description(AVAILABLE_NETWORKS.length)} lang={lang}>
   <PageHero eyebrow={p.eyebrow} title={p.h1(AVAILABLE_NETWORKS.length)} lead={p.lead}>
     <a href={SITE.signup} data-pulse-goal="trial_clicked" class="button">{t.common.ctaLabel}</a>
+    <a href={PAY_HREF} data-pulse-goal="pay_clicked" class="button button-outline">{t.launch.payNow}</a>
     <a href={localeHref(lang, '/support')} class="button button-outline">{p.ask}</a>
-    <p class="platform-trial">{t.launch.trial(TRIAL_DAYS)}</p>
+    <p class="platform-trial">{t.launch.trial(TRIAL_DAYS, lowestPrice)}</p>
   </PageHero>
   <section class="section"><div class="container">
     <p class="coverage-note muted" set:html={localizeLinks(lang, p.note)} />

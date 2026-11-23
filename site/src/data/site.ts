@@ -12,6 +12,10 @@ export const SITE = {
 export const CTA_LABEL='Start your 7-day free trial';
 export const CTA_SHORT='Start free trial';
 export const CTA_NOTE='No credit card required';
+// After sign-in or sign-up, the billing page is where a plan is chosen and a card can be added.
+// Logged-out visits to /billing redirect to /auth/login?returnUrl=/billing (verified 2026-11-23).
+export const PAY_HREF=`${SITE.app}/auth?returnUrl=/billing`;
+export const CTA_PAY='Pay now';
 // Official PostDelegate profiles: Organization `sameAs` on every page and the footer links.
 // The Telegram bot is a product integration, not a social profile, so it is not listed.
 export const SOCIAL_PROFILES = [

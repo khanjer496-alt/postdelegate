@@ -29,7 +29,43 @@ export const SCHEDULERS: Scheduler[] = [
   {"slug": "instagram-scheduler", "key": "instagram", "pending": "Meta approves PostDelegate", "name": "Instagram", "h1": "Instagram content, ready to plan.", "intro": "Instagram publishing on PostDelegate is waiting on approval. It opens once Meta approves PostDelegate for publishing.", "plan": ["Instagram is planned through Facebook and as a standalone Instagram connection.", "Prepare captions and media in the post composer.", "Use a channel preview to review the post before scheduling."], "limits": ["The supported account type and permissions must be confirmed when connecting.", "Available media formats depend on the connection and account."], "docs": "/docs/channels/coming-soon"},
   {"slug": "linkedin-scheduler", "key": "linkedin", "name": "LinkedIn", "h1": "Keep your LinkedIn content in view.", "intro": "LinkedIn personal-profile publishing is available on PostDelegate. Keep drafts and scheduled posts in one calendar; company Pages are still waiting on approval.", "plan": ["Connect your LinkedIn personal profile through LinkedIn sign-in.", "Prepare a post with its text and media, then review it on the calendar.", "Choose Post now or schedule the post for later."], "limits": ["Posts to personal profiles use public visibility.", "Company Pages remain unavailable while their separate app review is pending."], "docs": "/docs/channels/linkedin"},
   {"slug": "facebook-scheduler", "key": "facebook", "pending": "Meta approves PostDelegate", "name": "Facebook", "h1": "A clearer plan for your Facebook Page.", "intro": "Facebook Page publishing on PostDelegate is waiting on approval. It opens once Meta approves PostDelegate for publishing.", "plan": ["Plan Page content with its caption and media together.", "Review the selected destination in the composer.", "Keep Facebook posts on the same calendar as your other channels."], "limits": ["Page access and account permissions affect what can connect.", "Publishing options vary with the media and permission granted."], "docs": "/docs/channels/coming-soon"},
-  {"slug": "tiktok-scheduler", "key": "tiktok", "pending": "TikTok completes its review of PostDelegate", "name": "TikTok", "h1": "Give your TikTok content a place in the plan.", "intro": "TikTok publishing on PostDelegate is waiting on TikTok's review of PostDelegate.", "plan": ["TikTok and TikTok Business connections are planned.", "Prepare a caption and media before choosing a schedule.", "Review the posting settings available to the connected account."], "limits": ["Account permissions, privacy choices and platform review affect publishing availability.", "A prepared or scheduled post is not proof that it has been published."], "docs": "/docs/channels/coming-soon"},
+  {
+    slug: "tiktok-scheduler", key: "tiktok", name: "TikTok",
+    action: "Schedule TikTok Videos",
+    description: "Schedule TikTok videos from one calendar. Send a video to the TikTok inbox, or publish it privately until TikTok finishes its posting audit. 7-day free trial, no card required.",
+    h1: "Schedule TikTok videos from one calendar.",
+    intro: "Connect a TikTok account to PostDelegate and schedule videos alongside the rest of your plan. Until TikTok finishes its Direct Post audit, videos published directly go out as Only me; you can also send a video to the TikTok inbox and finish the post in the TikTok app.",
+    about: [
+      "TikTok posts are videos, so the work is in the file, the caption and how the post should go out. PostDelegate keeps those together on the same calendar as your other channels.",
+      "You can post directly to TikTok, or upload to the creator inbox and finish the post in the TikTok app within 24 hours. Until TikTok finishes its Direct Post audit, a direct post is published as Only me (private). Inbox upload is the way to finish a public post in TikTok today.",
+    ],
+    steps: [
+      { name: "Connect your TikTok account", text: "On the calendar page choose Add Channel, then TikTok. Sign in with TikTok and approve the permissions." },
+      { name: "Start a post and add the video", text: "Choose Create Post and select the TikTok channel. Attach a video. Every TikTok video post needs a video file." },
+      { name: "Choose how it should go out", text: "Pick Post content directly to TikTok, or Upload content to TikTok without posting it to send the video to your TikTok inbox. For a direct post, choose who can see it; until the Direct Post audit is finished, it still goes out as Only me." },
+      { name: "Pick a time and schedule it", text: "Choose a date and time, then Add to Calendar. Use Save as draft to hold the video back, or Post now to send it right away." },
+    ],
+    plan: [
+      "Connect from Add Channel and sign in with TikTok.",
+      "Keep the caption and video with the planned post.",
+      "Choose a direct post or an inbox upload. Until TikTok finishes its Direct Post audit, a direct post goes out as Only me.",
+    ],
+    settings: [
+      { label: "Content posting method", note: "Required. Post directly to TikTok, or upload to the TikTok inbox and finish the post in the TikTok app within 24 hours." },
+      { label: "Who can see this post?", note: "Required for a direct post. Until the Direct Post audit is finished, a direct post is published as Only me." },
+      { label: "Title", note: "Optional, for photo posts, up to 90 characters. On a video, the post text is the caption, up to 2,200 characters." },
+    ],
+    limits: [
+      "Until TikTok finishes its Direct Post audit, videos published directly go out as Only me.",
+      "Inbox uploads expire after 24 hours, and TikTok limits pending inbox posts to five in any 24-hour period.",
+      "TikTok Business is not offered on PostDelegate today.",
+    ],
+    docs: "/docs/channels/tiktok",
+    faq: [
+      { q: "Can I publish a public TikTok post from PostDelegate today?", a: "You can connect TikTok and schedule videos now. Until TikTok finishes its Direct Post audit, a post sent straight to TikTok goes out as Only me (private). To publish publicly, send the video to your TikTok inbox and finish the post in the TikTok app." },
+      { q: "What is an inbox upload?", a: "It sends the video to the creator inbox in the TikTok app. You open TikTok, finish the caption and privacy there, and publish it yourself. Inbox items expire after 24 hours." },
+    ],
+  },
   {"slug": "threads-scheduler", "key": "threads", "pending": "Meta approves PostDelegate", "name": "Threads", "h1": "Keep your Threads ideas moving.", "intro": "Threads publishing on PostDelegate is waiting on approval. It opens once Meta approves PostDelegate for publishing.", "plan": ["Keep captions and media together while planning.", "Customize the content for its destination before scheduling.", "See Threads posts on the same calendar as your other channels."], "limits": ["Account permissions affect connection and publishing options.", "The platform validates the final post and media."], "docs": "/docs/channels/coming-soon"},
   {"slug": "pinterest-scheduler", "key": "pinterest", "pending": "Pinterest approves PostDelegate", "name": "Pinterest", "h1": "Put your next Pin in the plan.", "intro": "Pinterest publishing on PostDelegate is waiting on Pinterest's approval.", "plan": ["Prepare the caption, media and destination link together.", "Review board and post settings when the connection is available.", "Plan Pins alongside the rest of your content."], "limits": ["Board access depends on the connected Pinterest account.", "App access and publishing permissions must be confirmed."], "docs": "/docs/channels/coming-soon"},
   {

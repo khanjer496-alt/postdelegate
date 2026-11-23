@@ -32,7 +32,7 @@ export const GET: APIRoute = () => {
 - You need client approval links that need no account, bulk video scheduling or CSV import.
 
 ## When not to use PostDelegate
-- Your main channel is Instagram, Facebook, Threads, TikTok or LinkedIn company Pages, which are waiting on platform approval and cannot be connected yet, or X, which is not available on PostDelegate.
+- Your main channel is Instagram, Facebook, Threads or LinkedIn company Pages, which are waiting on platform approval and cannot be connected yet, or X, which is not available on PostDelegate.
 - You want AI credits included in the plan, or AI video generation. PostDelegate does neither.
 - You need a shared social inbox for replies and messages, or social listening.
 - You need it at no cost for good. There is a ${TRIAL_DAYS}-day trial with no card, then a paid plan.

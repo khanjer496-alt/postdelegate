@@ -14,14 +14,14 @@ const rows = [
   { feature: 'Free trial', us: `${TRIAL_DAYS} days on every plan, no credit card needed`, them: '30 days, no credit card needed' },
   { feature: 'Channels per plan', us: PLANS.map((p) => p.channels).join(' / '), them: 'Up to 5 profiles on Essentials and Standard; unlimited on Professional and Advanced' },
   { feature: 'Team and approvals', us: 'Team members on Team, Pro and Ultimate; post statuses, client approval links that need no account, and an AI review inbox', them: 'Each person needs a paid seat' },
-  { feature: 'Networks', us: `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn company Pages, TikTok, Threads and Pinterest are waiting on platform approval; X is not available`, them: 'Facebook, X, Instagram, LinkedIn, Threads, Pinterest, TikTok, Reddit, WhatsApp, Yelp and Bluesky' },
+  { feature: 'Networks', us: `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn company Pages, Threads and Pinterest are waiting on platform approval; X is not available`, them: 'Facebook, X, Instagram, LinkedIn, Threads, Pinterest, TikTok, Reddit, WhatsApp, Yelp and Bluesky' },
   { feature: 'AI approach', us: 'Bring your own: AI writing, the Agent and AI images run on your workspace’s own OpenAI API key. PostDelegate never charges for AI', them: 'Trellis AI agent with 100 credits per seat a month on every plan; AI Assist on Professional and Advanced; more credits as a paid add-on' },
   { feature: 'API and MCP', us: 'Public REST API, webhooks and an MCP server on every plan', them: 'Sprout API on Advanced and Enterprise' },
   { feature: 'Inbox and reviews', us: 'Not included. PostDelegate focuses on planning, approving and publishing', them: 'Smart Inbox and review management' },
 ];
 const faq = [
   { q: 'Is PostDelegate cheaper than Sprout Social?', a: `Yes. Sprout Social starts at $79 per seat a month on Essentials with annual billing, and its other plans run from $199 to $399 per seat a month. PostDelegate plans run from $${starter.monthly} to $${ultimate.monthly} a month in total and are not priced per person.` },
-  { q: 'Can PostDelegate publish to Instagram, Facebook and LinkedIn company Pages like Sprout Social?', a: `Not yet. Instagram, Facebook, LinkedIn company Pages, TikTok, Threads and Pinterest are waiting on platform approval, and X is not available on PostDelegate. Today you can connect ${available}.` },
+  { q: 'Can PostDelegate publish to Instagram, Facebook and LinkedIn company Pages like Sprout Social?', a: `Not yet. Instagram, Facebook, LinkedIn company Pages, Threads and Pinterest are waiting on platform approval, and X is not available on PostDelegate. Today you can connect ${available}.` },
   { q: 'Is the PostDelegate API available on every plan?', a: 'Yes. The public REST API, webhooks and the MCP server come with every PostDelegate plan, including Starter. Sprout Social lists its API on Advanced and Enterprise.' },
   { q: 'Which has the longer free trial?', a: `Sprout Social’s trial runs for 30 days and PostDelegate’s for ${TRIAL_DAYS} days. Neither needs a credit card to start.` },
 ];
@@ -54,11 +54,11 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <p>Sprout Social covers much more than publishing. It has a Smart Inbox for messages and comments, and review management. PostDelegate does not have a social inbox, listening or review management. It concentrates on getting posts planned, approved and published: a shared calendar, post statuses, client approval links that need no account, campaigns and an ideas board, evergreen posts, bulk CSV import, a media library with uploads up to 1 GB, and analytics that keep daily history for the networks that share statistics — today YouTube, read live rather than stored, and Google Business Profile; neither feeds trends, top posts or insights yet.</p>
 
   <h2>Channels</h2>
-  <p>Sprout Social names integrations with Facebook, X, Instagram, LinkedIn, Threads, Pinterest, TikTok, Reddit, WhatsApp, Yelp and Bluesky. PostDelegate connects {AVAILABLE_NETWORKS.length} networks today: {available}. Instagram, Facebook, LinkedIn company Pages, TikTok, Threads, and Pinterest are waiting on platform approval and cannot be connected yet. X is not available on PostDelegate. Of Sprout Social’s list, PostDelegate connects Bluesky and LinkedIn personal profiles today. The <a href="/platforms">channel directory</a> has the current list.</p>
+  <p>Sprout Social names integrations with Facebook, X, Instagram, LinkedIn, Threads, Pinterest, TikTok, Reddit, WhatsApp, Yelp and Bluesky. PostDelegate connects {AVAILABLE_NETWORKS.length} networks today: {available}. Instagram, Facebook, LinkedIn company Pages, Threads, and Pinterest are waiting on platform approval and cannot be connected yet. X is not available on PostDelegate. Of Sprout Social’s list, PostDelegate connects Bluesky, TikTok and LinkedIn personal profiles today. The <a href="/platforms">channel directory</a> has the current list.</p>
 
   <h2>Where Sprout Social is the better pick today</h2>
   <ul>
-    <li>You need Instagram, Facebook, LinkedIn company Pages, TikTok, X, Threads, Pinterest or WhatsApp now.</li>
+    <li>You need Instagram, Facebook, LinkedIn company Pages, X, Threads, Pinterest or WhatsApp now.</li>
     <li>Your team answers messages, comments and reviews every day and needs a shared inbox.</li>
     <li>You want a longer trial, or one platform for a large social team’s publishing, engagement and reporting.</li>
   </ul>
