@@ -37,7 +37,7 @@ History is only kept for channels whose network allows it. A channel without his
 
 ## Views
 
-**Views** charts the new views your channels get each day, like a daily bar chart per channel. Today YouTube is the only network you can connect that shares view counts, so a workspace with a YouTube channel sees its views here and other channels say "This network doesn't share view counts yet". TikTok, Instagram and Facebook are ready for this section and fill in once their connections open.
+**Views** charts the new views your channels get each day, like a daily bar chart per channel. Today YouTube is the network you can connect that shares view counts in this chart, so a workspace with a YouTube channel sees its views here. TikTok can also be connected, and it only lists public videos in analytics; posts set to Only me do not appear. Instagram and Facebook will fill in once their connections open. Other channels say "This network doesn't share view counts yet".
 
 - **Views gained**, **Best day** and **Daily average** for the range.
 - **Daily views gained**: a bar chart of new views per day across the selected channels. Hover or tap a bar to read that day. When more than one channel has views, pick channels at the top to narrow the chart, the totals and the top posts. With none picked, every channel with views counts.

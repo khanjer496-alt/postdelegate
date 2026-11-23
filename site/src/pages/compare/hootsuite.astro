@@ -14,14 +14,14 @@ const rows = [
   { feature: 'Free trial', us: `${TRIAL_DAYS} days on every plan, no credit card needed`, them: '14 days on Standard, Professional and Advanced, with a daily posting limit and no bulk scheduling during the trial' },
   { feature: 'Channels per plan', us: PLANS.map((p) => p.channels).join(' / '), them: '10 social accounts on Standard; unlimited on Professional and above' },
   { feature: 'Team and approvals', us: 'Team members on Team, Pro and Ultimate; post statuses, client approval links that need no account, and an AI review inbox', them: 'Add as many paid seats as you need; content approval on Advanced and Enterprise' },
-  { feature: 'Networks', us: `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn company Pages, TikTok, Threads and Pinterest are waiting on platform approval; X is not available`, them: 'Facebook, Instagram, X, LinkedIn, TikTok, YouTube, Threads, WhatsApp and Pinterest' },
+  { feature: 'Networks', us: `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn company Pages, Threads and Pinterest are waiting on platform approval; X is not available`, them: 'Facebook, Instagram, X, LinkedIn, TikTok, YouTube, Threads, WhatsApp and Pinterest' },
   { feature: 'AI approach', us: 'Bring your own: AI writing, the Agent and AI images run on your workspace’s own OpenAI API key. PostDelegate never charges for AI', them: 'AI post and image generation and an AI teammate on every plan; AI smart replies and trend forecasting from Professional' },
   { feature: 'API and MCP', us: 'Public REST API, webhooks and an MCP server on every plan', them: 'MCP connectors for ChatGPT, Claude, Copilot and Gemini' },
   { feature: 'Inbox and listening', us: 'Not included. PostDelegate focuses on planning, approving and publishing', them: 'Shared inbox on every plan; inbox automation and listening from Professional' },
 ];
 const faq = [
   { q: 'Is PostDelegate cheaper than Hootsuite?', a: `For most teams, yes. Hootsuite Standard is $99 per user a month on annual billing. PostDelegate plans run from $${starter.monthly} to $${ultimate.monthly} a month in total and are not priced per person; ${team.name} at $${team.monthly} includes 10 channels and team members.` },
-  { q: 'Can PostDelegate replace Hootsuite for Instagram, Facebook and LinkedIn company Pages?', a: `Not yet. Instagram, Facebook, LinkedIn company Pages, TikTok, Threads and Pinterest are waiting on platform approval, and X is not available on PostDelegate. Today you can connect ${available}.` },
+  { q: 'Can PostDelegate replace Hootsuite for Instagram, Facebook and LinkedIn company Pages?', a: `Not yet. Instagram, Facebook, LinkedIn company Pages, Threads and Pinterest are waiting on platform approval, and X is not available on PostDelegate. Today you can connect ${available}.` },
   { q: 'Does PostDelegate have a social inbox like Hootsuite?', a: 'No. PostDelegate is built for planning, approving and publishing posts, with analytics on what you publish. If replying to comments and messages from one inbox is central to your work, Hootsuite covers that and PostDelegate does not.' },
   { q: 'Does PostDelegate offer a free trial?', a: `Yes. Every plan starts with a ${TRIAL_DAYS}-day free trial that needs no credit card. Add a card before the trial ends to keep your plan.` },
   { q: 'Can AI assistants work with PostDelegate?', a: 'Yes. The PostDelegate MCP server lets Claude, ChatGPT, Cursor, Claude Code and other MCP clients draft and schedule posts on every plan, and assistant drafts can wait in the AI review inbox for a person to approve.' },
@@ -56,11 +56,11 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <p>Hootsuite does more beyond publishing. Every plan includes an inbox for replying to messages, and higher plans add inbox automation, message routing and social listening. PostDelegate does not have a social inbox or listening. It covers planning, approving and publishing, with analytics that keep daily history for the networks that share statistics — today YouTube, read live rather than stored, and Google Business Profile; neither feeds trends, top posts or insights yet.</p>
 
   <h2>Channels</h2>
-  <p>Hootsuite supports Facebook, Instagram, X, LinkedIn, TikTok, YouTube, Threads, WhatsApp and Pinterest. PostDelegate connects {AVAILABLE_NETWORKS.length} networks today: {available}. Instagram, Facebook, LinkedIn company Pages, TikTok, Threads, and Pinterest are waiting on platform approval and cannot be connected yet. X is not available on PostDelegate. Of Hootsuite’s list, PostDelegate connects YouTube and LinkedIn personal profiles today. See the <a href="/platforms">channel directory</a> for the current list.</p>
+  <p>Hootsuite supports Facebook, Instagram, X, LinkedIn, TikTok, YouTube, Threads, WhatsApp and Pinterest. PostDelegate connects {AVAILABLE_NETWORKS.length} networks today: {available}. Instagram, Facebook, LinkedIn company Pages, Threads, and Pinterest are waiting on platform approval and cannot be connected yet. X is not available on PostDelegate. Of Hootsuite’s list, PostDelegate connects YouTube, TikTok and LinkedIn personal profiles today. See the <a href="/platforms">channel directory</a> for the current list.</p>
 
   <h2>Where Hootsuite is the better pick today</h2>
   <ul>
-    <li>You need Instagram, Facebook, LinkedIn company Pages, TikTok, X, Threads, Pinterest or WhatsApp now.</li>
+    <li>You need Instagram, Facebook, LinkedIn company Pages, X, Threads, Pinterest or WhatsApp now.</li>
     <li>Replying to comments and messages from a shared inbox is a large part of the job.</li>
     <li>You need social listening, trend forecasting or enterprise features such as message routing.</li>
   </ul>
