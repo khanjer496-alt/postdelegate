@@ -23,6 +23,8 @@ import { TikTokDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settin
 import { timer } from '@gitroom/helpers/utils/timer';
 import { setHeartbeatDetails } from '@gitroom/nestjs-libraries/temporal/temporal.heartbeat';
 import { createReadStream } from 'fs';
+import { spawn } from 'child_process';
+import { Readable } from 'stream';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
@@ -42,7 +44,7 @@ type TikTokCreatorInfo = {
 @Rules(
   [
     'TikTok can have one video or one picture or multiple pictures, it cannot be without an attachment.',
-    'content_posting_method=DIRECT_POST publishes the post to the account. content_posting_method=UPLOAD does NOT publish: it only sends the media to the user inbox of the TikTok app, where the user must manually complete and publish it within 24 hours or it is discarded. Use DIRECT_POST unless the user explicitly asks to review or edit the post inside the TikTok app first.',
+    'content_posting_method=UPLOAD does NOT publish: it only sends the media to the user inbox of the TikTok app, where the user must manually complete and publish it within 24 hours or it is discarded. Posts created or changed here always use UPLOAD (leave content_posting_method out or set it to UPLOAD). content_posting_method=DIRECT_POST is only available in the PostDelegate composer, where TikTok requires the user to confirm the account, who can see the post and the Music Usage Confirmation; a DIRECT_POST request here is refused. Tell the user the post goes to their TikTok inbox, and that a TikTok post that was set up as a Direct Post in the composer can only be changed there.',
     'With content_posting_method=UPLOAD, video inbox uploads accept only media; the user adds the caption inside TikTok. Photo inbox uploads also accept the photo title and description. Never tell the user that video_made_with_ai, privacy_level, duet, stitch, comment, autoAddMusic, brand_content_toggle or brand_organic_toggle will be applied in UPLOAD mode. Those settings require DIRECT_POST.',
     'video_made_with_ai, duet and stitch are applied by this integration to video posts only. They are not sent when the attachment is a picture.',
   ].join(' ')
@@ -52,6 +54,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   name = 'TikTok';
   isBetweenSteps = false;
   convertToJPEG = true;
+  // TikTok wants creators to post their own content, not feed items
+  autoPostUnsupported = true;
   optionalScopes = ['video.list', 'user.info.profile', 'user.info.stats'];
   override get analyticsAvailable() {
     return ['user.info.stats', 'video.list'].every((scope) =>
@@ -533,6 +537,88 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
+  // TikTok's Direct Post rules need the composer: it shows the account from
+  // creator_info, has the user pick who can see the post and asks for consent
+  // right before publishing. Anywhere else the media goes to the creator's
+  // TikTok inbox, and the composer-only acknowledgements are never taken.
+  settingsOutsideComposer(settings: any) {
+    if (settings?.content_posting_method === 'DIRECT_POST') {
+      return {
+        error:
+          'TikTok Direct Post is only available in the PostDelegate composer, where you confirm the TikTok account, who can see the post and TikTok\'s Music Usage Confirmation. Leave content_posting_method out or set it to "UPLOAD" to send the media to your TikTok inbox and finish the post in the TikTok app. A Direct Post set up in the composer can only be changed there.',
+      };
+    }
+    const {
+      music_usage_consent: _consent,
+      creator_info_verified: _verified,
+      ...rest
+    } = settings || {};
+    return { settings: { ...rest, content_posting_method: 'UPLOAD' } };
+  }
+
+  // The video's length in seconds as ffprobe reads it: the stored file, or the
+  // hosted one streamed through the SSRF-safe fetch. undefined when it can't be
+  // read - TikTok checks the duration again when it pulls the video.
+  protected async videoDurationSeconds(path: string): Promise<number | undefined> {
+    const controller = new AbortController();
+    try {
+      let input: Readable | undefined;
+      let source = path;
+      if (/^https?:\/\//i.test(path)) {
+        const response = await fetch(path, {
+          headers: { 'accept-encoding': 'identity' },
+          dispatcher: getSsrfSafeDispatcher(),
+          signal: controller.signal,
+        } as any);
+        if (!response.ok || !response.body) {
+          await response.body?.cancel().catch(() => {});
+          return undefined;
+        }
+        input = Readable.fromWeb(response.body as any);
+        source = 'pipe:0';
+      } else {
+        source = this.localMediaPath(path, 'tiktok-error-upload');
+      }
+
+      const output = await new Promise<string>((resolve, reject) => {
+        const child = spawn(
+          'ffprobe',
+          [
+            '-v',
+            'error',
+            '-protocol_whitelist',
+            input ? 'pipe' : 'file',
+            '-show_entries',
+            'format=duration',
+            '-of',
+            'json',
+            source,
+          ],
+          { stdio: [input ? 'pipe' : 'ignore', 'pipe', 'ignore'], timeout: 60000 }
+        );
+        let stdout = '';
+        child.stdout!.on('data', (chunk) => (stdout += chunk));
+        child.on('error', reject);
+        child.on('close', (code) =>
+          code === 0 ? resolve(stdout) : reject(new Error(`ffprobe ${code}`))
+        );
+        if (input) {
+          // ffprobe stops reading once it has the duration
+          input.on('error', () => {});
+          child.stdin!.on('error', () => {});
+          input.pipe(child.stdin!);
+        }
+      });
+
+      const seconds = Number(JSON.parse(output)?.format?.duration);
+      return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+    } catch (err) {
+      return undefined;
+    } finally {
+      controller.abort();
+    }
+  }
+
   private async validateDirectPost(
     accessToken: string,
     firstPost: PostDetails<TikTokDto>
@@ -577,6 +663,25 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     }
     if (branded && settings.privacy_level === 'SELF_ONLY') {
       invalid('Branded content visibility cannot be set to private.');
+    }
+    return creator;
+  }
+
+  // The composer checked the length against creator_info when the post was
+  // made; a scheduled post is checked again against the limit TikTok gives
+  // the account now.
+  private async validateDirectPostDuration(
+    maxDurationSeconds: number,
+    path: string
+  ) {
+    const seconds = await this.videoDurationSeconds(path);
+    if (seconds !== undefined && seconds > maxDurationSeconds) {
+      throw new BadBody(
+        'tiktok-settings',
+        '{}',
+        '{}',
+        `This video is too long for this TikTok account. Choose a video no longer than ${maxDurationSeconds} seconds.`
+      );
     }
   }
 
@@ -992,9 +1097,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     const videoPath = firstPost?.media?.[0]?.path!;
     const hostedVideo = !isPhoto && /^https?:\/\//i.test(videoPath || '');
 
-    if (this.contentPostingMethod(firstPost) === 'DIRECT_POST') {
-      await this.validateDirectPost(accessToken, firstPost);
-    }
+    const creator =
+      this.contentPostingMethod(firstPost) === 'DIRECT_POST'
+        ? await this.validateDirectPost(accessToken, firstPost)
+        : undefined;
 
     // TikTok pulls media already hosted by the app. Require public HTTPS URLs
     // (including every photo), and reject embedded credentials. TikTok also
@@ -1024,6 +1130,14 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
           'TikTok media must have a public HTTPS URL without embedded credentials.'
         );
       }
+    }
+
+    // read only once the hosted url passed the public-HTTPS checks above
+    if (creator && !isPhoto) {
+      await this.validateDirectPostDuration(
+        creator.maxDurationSeconds,
+        videoPath
+      );
     }
 
     // Local files still use TikTok's streaming FILE_UPLOAD fallback. Hosted

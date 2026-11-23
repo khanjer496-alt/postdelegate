@@ -257,11 +257,12 @@ export class TikTokDto {
   @IsString()
   @JSONSchema({
     description:
-      'Required. Use "DIRECT_POST" to actually publish the post to TikTok. ' +
       '"UPLOAD" does NOT publish: it only sends the media to the user\'s TikTok app inbox, ' +
-      'where they must manually finish and publish it within 24 hours or it is discarded, ' +
+      'where they must manually finish and publish it within 24 hours or it is discarded. ' +
       'Legacy video UPLOAD sends only media; users add caption metadata inside TikTok. Photo UPLOAD also sends title and description. Direct-post settings do not apply. ' +
-      'Only use "UPLOAD" when the user explicitly asks to review or edit the post inside the TikTok app before publishing.',
+      'TikTok (legacy): posts created or changed outside the PostDelegate composer (public API, CLI, MCP, the agent) always use "UPLOAD"; leave this out or send "UPLOAD". ' +
+      '"DIRECT_POST" is only available in the composer, where TikTok requires the user to confirm the account, who can see the post and the Music Usage Confirmation, and is refused anywhere else. ' +
+      'TikTok Business: "DIRECT_POST" publishes the post.',
   })
   content_posting_method: 'DIRECT_POST' | 'UPLOAD';
 }
