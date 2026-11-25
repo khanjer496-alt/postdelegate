@@ -19,7 +19,10 @@ import {
   ValidityMedia,
   rangeReadFailure,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { TikTokDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
+import {
+  TikTokDto,
+  TIKTOK_CONSENT_MESSAGE,
+} from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { setHeartbeatDetails } from '@gitroom/nestjs-libraries/temporal/temporal.heartbeat';
 import { createReadStream } from 'fs';
@@ -49,6 +52,10 @@ type TikTokCreatorInfo = {
     'video_made_with_ai, duet and stitch are applied by this integration to video posts only. They are not sent when the attachment is a picture.',
   ].join(' ')
 )
+
+export const TIKTOK_DAILY_APP_LIMIT_MESSAGE =
+  "TikTok's daily posting limit for this app has been reached. Try again later.";
+
 export class TiktokProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tiktok';
   name = 'TikTok';
@@ -261,14 +268,13 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       };
     }
 
-    // TikTok limits how many users of this app can post per day: refreshing
-    // the token cannot help, the channel must be re-connected (and can be
-    // migrated to another app via MIGRATE_PROVIDERS).
+    // TikTok's daily cap on active creators for this app (an app-wide quota,
+    // not a problem with the account): keep the channel connected and ask the
+    // user to try again later, as TikTok's Direct Post guidelines require.
     if (body.indexOf('reached_active_user_cap') > -1) {
       return {
-        type: 'disconnect' as const,
-        value:
-          'TikTok daily user limit reached, please re-connect your account',
+        type: 'bad-body' as const,
+        value: TIKTOK_DAILY_APP_LIMIT_MESSAGE,
       };
     }
 
@@ -487,6 +493,14 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     // moment: stop and ask to try again later (a ban keeps its own message).
     // Rejected requests already get these messages from handleErrors.
     const code = String(response?.error?.code || '');
+    if (code === 'reached_active_user_cap') {
+      throw new BadBody(
+        'tiktok-creator-info',
+        JSON.stringify(response),
+        '{}',
+        TIKTOK_DAILY_APP_LIMIT_MESSAGE
+      );
+    }
     if (code.indexOf('spam_risk') === 0) {
       throw new BadBody(
         'tiktok-creator-info',
@@ -638,7 +652,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       );
     }
     if (settings.music_usage_consent !== true) {
-      invalid('Accept TikTok Music Usage Confirmation before posting.');
+      invalid(TIKTOK_CONSENT_MESSAGE);
     }
     if (creator.commentDisabled && this.assetBoolean(settings.comment)) {
       invalid('Comments are disabled by this TikTok account.');
