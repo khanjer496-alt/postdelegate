@@ -29,6 +29,25 @@ describe('IntegrationManager hidden providers', () => {
     expect(manager.isHiddenFor('bluesky', 'org-1')).toBe(false);
   });
 
+  it('hides TikTok Business everywhere while its client id is not configured', async () => {
+    process.env.HIDDEN_PROVIDERS = 'tiktok-business';
+    process.env.PREVIEW_PROVIDER_ORGS = 'org-qa';
+    delete process.env.TIKTOK_BUSINESS_CLIENT_ID;
+    expect(manager.isHiddenFor('tiktok-business', 'org-qa')).toBe(true);
+    expect(manager.isHiddenFor('tiktok', 'org-qa')).toBe(false);
+    const tiktokTiles = (await manager.getAllIntegrations('org-qa')).social.filter(
+      (p) => p.name === 'TikTok'
+    );
+    expect(tiktokTiles.map((p) => p.identifier)).toEqual(['tiktok']);
+
+    process.env.TIKTOK_BUSINESS_CLIENT_ID = '   ';
+    expect(manager.isHiddenFor('tiktok-business', 'org-qa')).toBe(true);
+
+    process.env.TIKTOK_BUSINESS_CLIENT_ID = 'configured';
+    expect(manager.isHiddenFor('tiktok-business', 'org-qa')).toBe(false);
+    expect(manager.isHiddenFor('tiktok-business', 'org-1')).toBe(true);
+  });
+
   it('shows hidden providers to the allowlisted workspaces', () => {
     expect(manager.isHiddenFor('x', 'org-qa')).toBe(false);
     expect(manager.isHiddenFor('pinterest', 'org-demo')).toBe(false);

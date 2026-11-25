@@ -616,3 +616,27 @@ describe('TiktokProvider.profileInfo (user.info.profile)', () => {
     ).toBe(true);
   });
 });
+
+describe('TiktokProvider.generateAuthUrl', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it("always shows TikTok's consent page with all requested scopes", async () => {
+    process.env.TIKTOK_CLIENT_ID = 'client-key';
+    process.env.FRONTEND_URL = 'https://app.example.com';
+    const instance = new TiktokProvider();
+    const { url, state } = await instance.generateAuthUrl();
+    const parsed = new URL(url);
+
+    expect(parsed.origin + parsed.pathname).toBe('https://www.tiktok.com/v2/auth/authorize/');
+    expect(parsed.searchParams.get('disable_auto_auth')).toBe('1');
+    expect(parsed.searchParams.get('response_type')).toBe('code');
+    expect(parsed.searchParams.get('state')).toBe(state);
+    expect(parsed.searchParams.get('redirect_uri')).toBe(
+      'https://app.example.com/integrations/social/tiktok'
+    );
+    expect(parsed.searchParams.get('scope')!.split(',')).toEqual(instance.scopes);
+  });
+});
