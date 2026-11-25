@@ -429,6 +429,9 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         )}` +
         `&state=${state}` +
         `&response_type=code` +
+        // always show TikTok's consent page with the requested scopes, even
+        // when the user already authorized the app (TikTok skips it otherwise)
+        `&disable_auto_auth=1` +
         `&scope=${encodeURIComponent(this.scopes.join(','))}`,
       codeVerifier: state,
       state,
