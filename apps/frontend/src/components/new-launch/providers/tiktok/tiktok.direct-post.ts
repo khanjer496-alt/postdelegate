@@ -33,6 +33,37 @@ export function parseTikTokCreatorInfo(value: unknown): TikTokCreatorInfo | unde
   return info;
 }
 
+// From TikTok user.info.profile: shown next to "Posting to", display only.
+export type TikTokProfileInfo = {
+  username?: string;
+  profileUrl?: string;
+  bioDescription?: string;
+  isVerified?: boolean;
+};
+
+// Only links that open on TikTok itself are kept; every field is optional and
+// anything unexpected is dropped, so a bad response simply shows less.
+export function parseTikTokProfileInfo(value: unknown): TikTokProfileInfo {
+  if (!value || typeof value !== 'object') return {};
+  const raw = value as Record<string, unknown>;
+  const info: TikTokProfileInfo = {};
+  if (typeof raw.username === 'string' && raw.username.trim()) info.username = raw.username.trim();
+  if (typeof raw.profileUrl === 'string') {
+    try {
+      const url = new URL(raw.profileUrl);
+      const host = url.hostname.toLowerCase();
+      if (url.protocol === 'https:' && (host === 'tiktok.com' || host.endsWith('.tiktok.com'))) {
+        info.profileUrl = url.toString();
+      }
+    } catch {
+      // not a URL: no link
+    }
+  }
+  if (typeof raw.bioDescription === 'string' && raw.bioDescription.trim()) info.bioDescription = raw.bioDescription.trim();
+  if (typeof raw.isVerified === 'boolean') info.isVerified = raw.isVerified;
+  return info;
+}
+
 // TikTok's Content Sharing Guidelines wording, shown on the disabled actions.
 export const TIKTOK_COMMERCIAL_SELECTION_REQUIRED =
   'You need to indicate if your content promotes yourself, a third party, or both.';
