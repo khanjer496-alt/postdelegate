@@ -44,6 +44,9 @@ type TikTokCreatorInfo = {
   maxDurationSeconds: number;
 };
 
+export const TIKTOK_DAILY_APP_LIMIT_MESSAGE =
+  "TikTok's daily posting limit for this app has been reached. Try again later.";
+
 @Rules(
   [
     'TikTok can have one video or one picture or multiple pictures, it cannot be without an attachment.',
@@ -52,9 +55,6 @@ type TikTokCreatorInfo = {
     'video_made_with_ai, duet and stitch are applied by this integration to video posts only. They are not sent when the attachment is a picture.',
   ].join(' ')
 )
-
-export const TIKTOK_DAILY_APP_LIMIT_MESSAGE =
-  "TikTok's daily posting limit for this app has been reached. Try again later.";
 
 export class TiktokProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tiktok';
