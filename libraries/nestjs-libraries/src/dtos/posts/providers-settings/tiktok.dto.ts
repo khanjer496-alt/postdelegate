@@ -76,6 +76,8 @@ export class TikTokLocation {
 export const TIKTOK_PRIVACY_LEVEL_MESSAGE = 'Choose who can see this post.';
 export const TIKTOK_POSTING_METHOD_MESSAGE =
   'Choose whether to post directly to TikTok or upload to your TikTok inbox.';
+export const TIKTOK_CONSENT_MESSAGE =
+  'Confirm that PostDelegate can upload and publish this content to TikTok.';
 export const TIKTOK_AUTO_ADD_MUSIC_MESSAGE =
   'Choose whether TikTok should add music.';
 
@@ -225,7 +227,7 @@ export class TikTokDto {
 
   @ValidateIf(requiresDirectPostAcknowledgements)
   @Equals(true, {
-    message: 'Accept TikTok Music Usage Confirmation before posting.',
+    message: TIKTOK_CONSENT_MESSAGE,
   })
   @JSONSchema({
     description:

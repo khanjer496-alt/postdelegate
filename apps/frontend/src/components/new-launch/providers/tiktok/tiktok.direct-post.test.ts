@@ -133,7 +133,7 @@ test('a brand choice re-validates the disclosure, so its error clears at once', 
 
 test('the missing brand choice is shown once, not again under the checkbox', () => {
   assert.equal(getTikTokCheckboxError(TIKTOK_COMMERCIAL_SELECTION_REQUIRED), undefined);
-  assert.equal(getTikTokCheckboxError('Accept TikTok Music Usage Confirmation before posting.'), 'Accept TikTok Music Usage Confirmation before posting.');
+  assert.equal(getTikTokCheckboxError('Confirm that PostDelegate can upload and publish this content to TikTok.'), 'Confirm that PostDelegate can upload and publish this content to TikTok.');
   assert.equal(getTikTokCheckboxError(undefined), undefined);
 });
 

@@ -4,6 +4,7 @@ import { validate, ValidationError } from 'class-validator';
 import {
   TikTokDto,
   TIKTOK_AUTO_ADD_MUSIC_MESSAGE,
+  TIKTOK_CONSENT_MESSAGE,
   TIKTOK_POSTING_METHOD_MESSAGE,
   TIKTOK_PRIVACY_LEVEL_MESSAGE,
 } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
@@ -114,6 +115,15 @@ describe('TikTokDto validation messages', () => {
     expect(bannerFor(errors, 'autoAddMusic')).toBe(
       TIKTOK_AUTO_ADD_MUSIC_MESSAGE
     );
+  });
+
+  it('asks for the authorization checkbox in the words the checkbox uses', async () => {
+    const errors = await check({ ...ready, music_usage_consent: false });
+    expect(bannerFor(errors, 'music_usage_consent')).toBe(TIKTOK_CONSENT_MESSAGE);
+    expect(TIKTOK_CONSENT_MESSAGE).toBe(
+      'Confirm that PostDelegate can upload and publish this content to TikTok.'
+    );
+    expect(TIKTOK_CONSENT_MESSAGE).not.toContain('Music Usage Confirmation');
   });
 
   it('never lists raw enum values in any message', async () => {

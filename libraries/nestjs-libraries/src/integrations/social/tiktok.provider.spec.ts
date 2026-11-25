@@ -8,7 +8,10 @@ jest.mock('@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher', () => 
 
 import 'reflect-metadata';
 import { validateSync } from 'class-validator';
-import { TiktokProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
+import {
+  TiktokProvider,
+  TIKTOK_DAILY_APP_LIMIT_MESSAGE,
+} from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
 import { BadBody } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TikTokDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
 import { execFileSync } from 'child_process';
@@ -119,6 +122,36 @@ describe('TiktokProvider creator_info gate', () => {
     });
 
     await expect(publish(post())).rejects.toThrow(/try again tomorrow/);
+    expect(initCalls(urls)).toBe(0);
+  });
+
+  it("stops with a try-again-later message when the app's daily creator cap is reached", async () => {
+    const { urls, publish } = provider({
+      data: {},
+      error: { code: 'reached_active_user_cap', message: 'cap' },
+    });
+
+    await expect(publish(post())).rejects.toThrow(TIKTOK_DAILY_APP_LIMIT_MESSAGE);
+    expect(initCalls(urls)).toBe(0);
+  });
+
+  it('keeps the channel connected when TikTok rejects a post for the daily creator cap', () => {
+    const result = new TiktokProvider().handleErrors(
+      JSON.stringify({ error: { code: 'reached_active_user_cap' } })
+    );
+
+    expect(result).toEqual({
+      type: 'bad-body',
+      value: "TikTok's daily posting limit for this app has been reached. Try again later.",
+    });
+  });
+
+  it('refuses a Direct Post without the authorization checkbox', async () => {
+    const { urls, publish } = provider({ data: creator, error: { code: 'ok' } });
+
+    await expect(publish(post({ music_usage_consent: false }))).rejects.toThrow(
+      'Confirm that PostDelegate can upload and publish this content to TikTok.'
+    );
     expect(initCalls(urls)).toBe(0);
   });
 
