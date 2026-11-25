@@ -44,6 +44,29 @@ type TikTokCreatorInfo = {
   maxDurationSeconds: number;
 };
 
+export type TikTokProfileInfo = {
+  username?: string;
+  profileUrl?: string;
+  bioDescription?: string;
+  isVerified?: boolean;
+};
+
+// TikTok profile links open on TikTok itself; anything else is dropped so the
+// composer never renders a link TikTok did not send.
+export const safeTikTokProfileUrl = (value: unknown): string | undefined => {
+  if (typeof value !== 'string' || value.length > 2048) return undefined;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' &&
+      (host === 'tiktok.com' || host.endsWith('.tiktok.com'))
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const TIKTOK_DAILY_APP_LIMIT_MESSAGE =
   "TikTok's daily posting limit for this app has been reached. Try again later.";
 
@@ -542,6 +565,43 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       stitchDisabled: data.stitch_disabled,
       maxDurationSeconds: data.max_video_post_duration_sec,
     };
+  }
+
+  // user.info.profile: the creator's profile link, username, bio and verified
+  // badge, shown next to "Posting to" in the composer. Display only: it never
+  // gates publishing, so a missing scope or a TikTok error returns {}.
+  @DashboardFunction()
+  async profileInfo(accessToken: string): Promise<TikTokProfileInfo> {
+    try {
+      // Plain fetch like accountStats: an error here must never trigger a
+      // token refresh or a re-connect prompt for the channel.
+      const response = await (
+        await fetch(
+          'https://open.tiktokapis.com/v2/user/info/?fields=username,profile_deep_link,bio_description,is_verified',
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+      ).json();
+      if (response?.error?.code !== 'ok') return {};
+      const user = response?.data?.user || {};
+      const info: TikTokProfileInfo = {};
+      if (typeof user.username === 'string' && user.username.trim()) {
+        info.username = user.username.trim().slice(0, 100);
+      }
+      const profileUrl = safeTikTokProfileUrl(user.profile_deep_link);
+      if (profileUrl) info.profileUrl = profileUrl;
+      if (typeof user.bio_description === 'string' && user.bio_description.trim()) {
+        info.bioDescription = user.bio_description.trim().slice(0, 300);
+      }
+      if (typeof user.is_verified === 'boolean') info.isVerified = user.is_verified;
+      return info;
+    } catch {
+      return {};
+    }
   }
 
   async maxVideoLength(accessToken: string) {

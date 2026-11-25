@@ -550,3 +550,69 @@ describe('TiktokProvider.publishedLinkLabel', () => {
     ).toBeUndefined();
   });
 });
+
+describe('TiktokProvider.profileInfo (user.info.profile)', () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+  const reply = (body: any) => {
+    const mock = jest.fn(async () => ({ json: async () => body }) as any);
+    global.fetch = mock as any;
+    return mock;
+  };
+
+  it('reads the profile link, username, bio and verified badge', async () => {
+    const mock = reply({
+      data: {
+        user: {
+          username: 'review_account',
+          profile_deep_link: 'https://vm.tiktok.com/ZMexample/',
+          bio_description: ' Weekend baker ',
+          is_verified: false,
+        },
+      },
+      error: { code: 'ok' },
+    });
+
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({
+      username: 'review_account',
+      profileUrl: 'https://vm.tiktok.com/ZMexample/',
+      bioDescription: 'Weekend baker',
+      isVerified: false,
+    });
+    const [url, options] = mock.mock.calls[0] as any;
+    expect(url).toBe(
+      'https://open.tiktokapis.com/v2/user/info/?fields=username,profile_deep_link,bio_description,is_verified'
+    );
+    expect(options.headers.Authorization).toBe('Bearer token');
+  });
+
+  it('drops a profile link that does not open on TikTok', async () => {
+    reply({
+      data: { user: { profile_deep_link: 'https://evil.example/tiktok.com' } },
+      error: { code: 'ok' },
+    });
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({});
+  });
+
+  it('shows nothing (and never fails) without the scope or on errors', async () => {
+    reply({ data: {}, error: { code: 'scope_not_authorized' } });
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({});
+
+    global.fetch = jest.fn(async () => {
+      throw new Error('network');
+    }) as any;
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({});
+  });
+
+  it('can be called from the composer', () => {
+    expect(
+      Reflect.getMetadata(
+        'custom:dashboard_function',
+        TiktokProvider.prototype,
+        'profileInfo'
+      )
+    ).toBe(true);
+  });
+});
