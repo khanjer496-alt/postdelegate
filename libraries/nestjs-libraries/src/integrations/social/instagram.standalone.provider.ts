@@ -367,6 +367,12 @@ export class InstagramStandaloneProvider
     return comments;
   }
 
+  // A reply is not idempotent: Instagram can answer a 5xx after it created
+  // the reply, and this.fetch would send the same POST again. The POST runs
+  // through runStreamedUpload instead (the same retry and error rules), which
+  // calls the factory again for a retry, and every attempt after the first
+  // looks for the reply under the comment before sending it again. A lookup
+  // that fails counts as no reply, so the retry still sends it.
   async replyToComment(
     id: string,
     accessToken: string,
@@ -374,15 +380,61 @@ export class InstagramStandaloneProvider
     message: string
   ) {
     const [token] = accessToken.split('___');
-    const { id: replyId } = await (
-      await this.fetch(
-        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}/replies?message=${encodeURIComponent(
+    let sent = false;
+    return this.runStreamedUpload(async () => {
+      if (sent) {
+        const existing = await this.commentReply(
+          id,
+          accessToken,
+          commentId,
           message
-        )}&access_token=${token}`,
-        { method: 'POST' }
-      )
-    ).json();
-    return { id: replyId };
+        ).catch(() => undefined);
+        if (existing) return existing;
+      }
+      sent = true;
+      const { data } = await this.getSsrfSafeAxios()
+        .post(
+          `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}/replies?message=${encodeURIComponent(
+            message
+          )}&access_token=${token}`,
+          undefined,
+          // a hung POST fails like a dropped connection instead of holding
+          // the claim until the activity times out
+          { timeout: 30_000 }
+        )
+        .catch((err) => {
+          // runStreamedUpload turns an answer into BadBody / RefreshToken; a
+          // dropped connection or a timeout is not retried, and its axios
+          // error (which carries the URL, so the token) never travels on
+          if (err?.response) throw err;
+          throw new Error('Instagram did not answer the reply');
+        });
+      return { id: data?.id as string };
+    }, this.identifier);
+  }
+
+  // the account's own reply with this text under the comment, read like
+  // postComments reads a post's comments (up to COMMENT_PAGES of 50)
+  async commentReply(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    message: string
+  ) {
+    const [token] = accessToken.split('___');
+    const fields = encodeURIComponent('id,text,username,from,user,timestamp,hidden');
+    const normalize = (text: string) => text.replace(/\r\n/g, '\n').trim();
+    const wanted = normalize(message);
+    let nextUrl: string | undefined = `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}/replies?fields=${fields}&limit=50&access_token=${token}`;
+    for (let page = 0; nextUrl && page < COMMENT_PAGES; page++) {
+      const response: any = await (await this.fetch(nextUrl)).json();
+      const reply = (response.data || [])
+        .map((item: any) => this.toComment(id, item))
+        .find((item: PostComment) => item.own && normalize(item.text) === wanted);
+      if (reply) return { id: reply.id as string };
+      nextUrl = response.paging?.next;
+    }
+    return undefined;
   }
 
   async hideComment(

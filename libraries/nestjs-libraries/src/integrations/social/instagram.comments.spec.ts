@@ -1,3 +1,7 @@
+// a retry waits 5 seconds first
+jest.mock('@gitroom/helpers/utils/timer', () => ({
+  timer: jest.fn(async () => undefined),
+}));
 import 'reflect-metadata';
 import { InstagramStandaloneProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.standalone.provider';
 
@@ -11,6 +15,26 @@ const provider = (answer: (url: string, method: string) => any) => {
     return { json: async () => answer(url, method) } as any;
   }) as any;
   return { instance, fetched };
+};
+
+// The reply POST goes through axios (runStreamedUpload), answered in order:
+// a body, an HTTP error status or a dropped connection
+const replies = (
+  instance: InstagramStandaloneProvider,
+  answers: { data?: any; status?: number; drop?: boolean }[]
+) => {
+  const post = jest.fn(async (url: string) => {
+    const answer = answers.shift() || { data: {} };
+    if (answer.drop) throw new Error('socket hang up');
+    if (answer.status) {
+      throw Object.assign(new Error(`status ${answer.status}`), {
+        response: { status: answer.status, data: { error: { message: 'boom' } } },
+      });
+    }
+    return { data: answer.data };
+  });
+  jest.spyOn(instance as any, 'getSsrfSafeAxios').mockReturnValue({ post });
+  return post;
 };
 
 describe('InstagramStandaloneProvider comment management', () => {
@@ -133,7 +157,8 @@ describe('InstagramStandaloneProvider comment management', () => {
   });
 
   it('replies to a comment through /replies', async () => {
-    const { instance, fetched } = provider(() => ({ id: 'reply-1' }));
+    const { instance, fetched } = provider(() => ({}));
+    const post = replies(instance, [{ data: { id: 'reply-1' } }]);
 
     const reply = await instance.replyToComment(
       'ig-1',
@@ -143,14 +168,113 @@ describe('InstagramStandaloneProvider comment management', () => {
     );
 
     expect(reply).toEqual({ id: 'reply-1' });
-    expect(fetched).toEqual([
-      {
-        url: expect.stringMatching(
-          /^https:\/\/graph\.instagram\.com\/v[\d.]+\/c-1\/replies\?message=Hi%20%26%20thanks!&access_token=token$/
-        ),
-        method: 'POST',
-      },
-    ]);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toMatch(
+      /^https:\/\/graph\.instagram\.com\/v[\d.]+\/c-1\/replies\?message=Hi%20%26%20thanks!&access_token=token$/
+    );
+    // a hung POST gives up instead of holding the claim
+    expect(post.mock.calls[0][2]).toEqual({ timeout: 30_000 });
+    // nothing to check before the first send
+    expect(fetched).toEqual([]);
+  });
+
+  it('never sends a reply again that Instagram created before a 5xx', async () => {
+    const { instance, fetched } = provider(() => ({
+      data: [
+        { id: 'r-fan', text: 'Hi & thanks!', from: { id: 'fan-id' } },
+        { id: 'r-own', text: 'Hi & thanks!\r\n', user: { id: 'ig-1' } },
+      ],
+    }));
+    const post = replies(instance, [{ status: 500 }]);
+
+    const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi & thanks!');
+
+    // the retry found the channel's own reply, not the fan's one with the
+    // same text, and did not post it a second time
+    expect(reply).toEqual({ id: 'r-own' });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(fetched).toHaveLength(1);
+    expect(fetched[0].method).toBe('GET');
+    expect(fetched[0].url).toMatch(
+      /^https:\/\/graph\.instagram\.com\/v[\d.]+\/c-1\/replies\?fields=/
+    );
+  });
+
+  it('sends a reply again after a 5xx when it is not under the comment', async () => {
+    const { instance, fetched } = provider(() => ({ data: [] }));
+    const post = replies(instance, [{ status: 500 }, { data: { id: 'reply-2' } }]);
+
+    const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi');
+
+    expect(reply).toEqual({ id: 'reply-2' });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('sends a reply again after a 5xx when the lookup itself fails', async () => {
+    const { instance, fetched } = provider(() => {
+      throw new Error('lookup failed');
+    });
+    const post = replies(instance, [{ status: 500 }, { data: { id: 'reply-3' } }]);
+
+    const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi');
+
+    expect(reply).toEqual({ id: 'reply-3' });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('gives up after the usual retries when the lookup keeps failing', async () => {
+    const { instance } = provider(() => {
+      throw new Error('lookup failed');
+    });
+    const post = replies(instance, Array.from({ length: 5 }, () => ({ status: 500 })));
+
+    await expect(
+      instance.replyToComment('ig-1', 'token', 'c-1', 'Hi')
+    ).rejects.toBeTruthy();
+    // the first send and three retries, like this.fetch
+    expect(post).toHaveBeenCalledTimes(4);
+  });
+
+  it('sends a reply again after a 429, once nothing is under the comment', async () => {
+    const { instance, fetched } = provider(() => ({ data: [] }));
+    const post = replies(instance, [{ status: 429 }, { data: { id: 'reply-4' } }]);
+
+    const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi');
+
+    expect(reply).toEqual({ id: 'reply-4' });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('does not send a reply again after a dropped connection', async () => {
+    const { instance, fetched } = provider(() => ({ data: [] }));
+    const post = replies(instance, [{ drop: true }]);
+
+    await expect(
+      instance.replyToComment('ig-1', 'token', 'c-1', 'Hi')
+    ).rejects.toThrow('Instagram did not answer the reply');
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(fetched).toEqual([]);
+  });
+
+  it('finds the account own reply on a later page', async () => {
+    const { instance, fetched } = provider((url) =>
+      url.includes('next-2')
+        ? { data: [{ id: 'r-own', text: 'Hi', user: { id: 'ig-1' } }] }
+        : {
+            data: [{ id: 'r-other', text: 'Hello', user: { id: 'ig-1' } }],
+            paging: { next: 'https://graph.instagram.com/next-2' },
+          }
+    );
+
+    expect(await instance.commentReply('ig-1', 'token___x', 'c-1', ' Hi ')).toEqual({
+      id: 'r-own',
+    });
+    expect(fetched[0].url).toMatch(/access_token=token$/);
+    expect(fetched).toHaveLength(2);
+    expect(await instance.commentReply('ig-1', 'token', 'c-1', 'Bye')).toBeUndefined();
   });
 
   it('hides, unhides and deletes a comment', async () => {

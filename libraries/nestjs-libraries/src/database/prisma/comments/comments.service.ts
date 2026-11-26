@@ -71,8 +71,8 @@ export const matchingRule = <T extends RuleLike>(
 
 // The comments view and keyword auto-replies (PD_FF_COMMENTS). The platform
 // calls go through the channel's provider (commentPosts, postComments,
-// replyToComment, hideComment, deleteComment), so any provider that
-// implements them gets the view.
+// replyToComment, commentReply, hideComment, deleteComment), so any provider
+// that implements them gets the view.
 @Injectable()
 export class CommentsService {
   constructor(
@@ -319,23 +319,78 @@ export class CommentsService {
         await this._commentsRepository.finish(claim.id, 'replied', id || null);
       } catch (err) {
         console.error('comment rules: reply failed', integration.id, comment.id);
-        await this._commentsRepository.finish(claim.id, 'failed', null);
+        // a reply that failed may still have gone out (a 5xx or a dropped
+        // connection after the platform created it), so it is recorded as
+        // replied when the channel's reply is there
+        const sent = await this.sentReply(integration, provider, comment.id, rule.reply);
+        await this._commentsRepository.finish(
+          claim.id,
+          sent ? 'replied' : 'failed',
+          sent?.id || null
+        );
       }
     }
     return answered;
   }
 
+  // the channel's own reply with this text under the comment, when the
+  // provider can look it up; a failed lookup counts as no reply
+  private async sentReply(
+    integration: Integration,
+    provider: NonNullable<ReturnType<CommentsService['provider']>>,
+    commentId: string,
+    message: string
+  ) {
+    if (!provider.commentReply) return undefined;
+    try {
+      return await provider.commentReply(
+        integration.internalId,
+        integration.token,
+        commentId,
+        message
+      );
+    } catch (err) {
+      return undefined;
+    }
+  }
+
+  // A channel that is back (reconnected, or turned on again) polls its active
+  // rules again: a poller stops for good while its channel is off or needs a
+  // reconnect. A poller that is still running is kept as it is, so a repeated
+  // reconnect never starts a second one. Runs after the channel was saved,
+  // also from billing webhooks, so it never throws.
+  async restartPollers(orgId: string, integrationId?: string) {
+    if (!commentsEnabled()) return;
+    try {
+      const channels = await this._commentsRepository.activeRuleChannels(
+        orgId,
+        integrationId
+      );
+      for (const channel of channels) {
+        await this.startPoller(orgId, channel.integrationId, true);
+      }
+    } catch (err) {
+      console.error('comment rules: could not restart the pollers', orgId);
+    }
+  }
+
   // a fresh poller with a new fast-polling window; the old one, if any, is
-  // replaced
-  async startPoller(orgId: string, integrationId: string) {
+  // replaced. `restart` keeps a running poller (USE_EXISTING) and polls every
+  // minute, saving a rule is what opens the fast window.
+  async startPoller(orgId: string, integrationId: string, restart = false) {
     try {
       await this._temporalService.client
         .getRawClient()
         ?.workflow.start('commentRulesWorkflowV1', {
           workflowId: `comment-rules-${integrationId}`,
           taskQueue: 'main',
-          args: [{ integrationId, fastUntil: Date.now() + FAST_POLLING_MS }],
-          workflowIdConflictPolicy: 'TERMINATE_EXISTING',
+          args: [
+            {
+              integrationId,
+              fastUntil: restart ? Date.now() : Date.now() + FAST_POLLING_MS,
+            },
+          ],
+          workflowIdConflictPolicy: restart ? 'USE_EXISTING' : 'TERMINATE_EXISTING',
           typedSearchAttributes: new TypedSearchAttributes([
             { key: organizationId, value: orgId },
           ]),
