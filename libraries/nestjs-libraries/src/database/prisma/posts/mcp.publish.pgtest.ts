@@ -522,7 +522,18 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
     expect(await repo.markMcpUnfinished(org, attempt.id)).toBe('FAILED');
     expect((await repo.mcpAttempts(org, root))[0]).toMatchObject({ status: 'FAILED' });
-    expect(await repo.claimMcpSegment(org, root, root, revision, 0)).toMatchObject({ replay: false });
+    // the workflow marks the segment failed; resume opens the next generation
+    await repo.failMcpSegment(org, root, root, 0, revision);
+    expect(await repo.resumeMcp(org, root, revision)).toMatchObject({ status: 'RESUMED' });
+    expect(await repo.claimMcpSegment(org, root, root, revision, 1)).toMatchObject({ replay: false });
+    await expect(repo.deletePost(org, root)).rejects.toThrow('active or uncertain');
+  });
+
+  it('a never-sent FAILED attempt does not block deleting the post', async () => {
+    const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
+    expect(await repo.markMcpUnfinished(org, attempt.id)).toBe('FAILED');
+    await repo.deletePost(org, root);
+    expect((await db.post.findUniqueOrThrow({ where: { id: root } })).deletedAt).not.toBeNull();
   });
 
   it('an attempt with a bound payload stays UNKNOWN; a person may delete its failed root', async () => {
