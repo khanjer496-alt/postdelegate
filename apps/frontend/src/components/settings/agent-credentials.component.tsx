@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -15,6 +15,48 @@ type Credential = {
   expiresAt: string | null;
   revokedAt: string | null;
 };
+type AgentSaveAdmission = null | {
+  owner: string;
+  host: string;
+  processId: number;
+  instanceId: string;
+  createdAt: string;
+  writtenPostIds: string[];
+};
+
+const useAgentCredentials = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/settings/agent-credentials');
+    if (!res.ok) throw new Error('Could not read agent access.');
+    return res.json();
+  }, []);
+  return useSWR<Credential[]>('agent-credentials', load);
+};
+
+const useAgentCredentialChannels = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/integrations/list');
+    if (!res.ok) throw new Error('Could not read the channels.');
+    return (await res.json()).integrations;
+  }, []);
+  return useSWR<Array<{ id: string; name: string }>>(
+    'agent-credential-channels',
+    load
+  );
+};
+
+const useAgentSaveAdmission = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/settings/agent-admission');
+    if (!res.ok) throw new Error('Could not read the active agent save.');
+    return res.json();
+  }, []);
+  return useSWR<AgentSaveAdmission>('agent-save-admission', load);
+};
+
 export default function AgentCredentials() {
   const user = useUser();
   return user?.role === 'ADMIN' || user?.role === 'SUPERADMIN' ? (
@@ -44,13 +86,8 @@ function AdminCredentials() {
       );
     return res.json();
   };
-  const { data = [], mutate } = useSWR<Credential[]>('agent-credentials', () =>
-    request('/settings/agent-credentials')
-  );
-  const { data: channels = [] } = useSWR<Array<{ id: string; name: string }>>(
-    'agent-credential-channels',
-    async () => (await request('/integrations/list')).integrations
-  );
+  const { data = [], mutate } = useAgentCredentials();
+  const { data: channels = [] } = useAgentCredentialChannels();
   const act = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError('');
@@ -259,11 +296,7 @@ function AgentSaveRecovery() {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const { data, mutate } = useSWR<null | { owner: string; host: string; processId: number; instanceId: string; createdAt: string; writtenPostIds: string[] }>('agent-save-admission', async () => {
-    const response = await fetch('/settings/agent-admission');
-    if (!response.ok) throw new Error('Could not read the active agent save.');
-    return response.json();
-  });
+  const { data, mutate } = useAgentSaveAdmission();
   if (!data) return message ? <p role="status">{message}</p> : null;
   return <div className="border border-fifth rounded p-3 flex flex-col gap-2">
     <h5>{t('agent_save_active', 'Agent save in progress')}</h5>
