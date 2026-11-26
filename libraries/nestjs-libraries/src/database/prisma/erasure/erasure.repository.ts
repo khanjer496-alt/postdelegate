@@ -222,6 +222,16 @@ const organizationSteps = (org: string): Step[] => [
     where: { organizationId: org },
   },
   {
+    table: 'CommentAutoReply',
+    model: 'commentAutoReply',
+    where: { organizationId: org },
+  },
+  {
+    table: 'CommentReplyRule',
+    model: 'commentReplyRule',
+    where: { organizationId: org },
+  },
+  {
     table: 'Integration',
     model: 'integration',
     where: { organizationId: org },
