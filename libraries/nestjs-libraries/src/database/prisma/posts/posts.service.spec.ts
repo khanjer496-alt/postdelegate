@@ -2841,6 +2841,27 @@ describe('an MCP attempt that stopped before anything was sent', () => {
     await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('FAILED');
     expect(repo.markMcpUnfinished).toHaveBeenCalledWith('org', 'attempt');
   });
+
+  const failing = (err: unknown, settled = 'UNKNOWN') => {
+    const { service } = makeService({ getSocialIntegration: () => ({}) });
+    const root: any = { id: 'root', organizationId: 'org', integrationId: 'channel', parentPostId: null, mcpWorkflowVersion: 114, state: 'QUEUE', approvalStatus: 'APPROVED', content: 'text', settings: '{}', image: '[]', publishDate: new Date('2026-12-01T12:00:00Z'), integration: { id: 'channel', organizationId: 'org', providerIdentifier: 'test' } };
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([root]);
+    jest.spyOn(service, 'getStoredPostProblem').mockResolvedValue(null);
+    (service as any)._postRepository = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), markMcpUnfinished: jest.fn().mockResolvedValue(settled), mcpAttempts: jest.fn().mockResolvedValue([]) };
+    (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: false }) };
+    return service.runMcpSegment('org', 'root', 'root', 0, (service as any).mcpRevision([root]), jest.fn().mockRejectedValue(err));
+  };
+
+  it('keeps the platform message of a provider refusal for the failed segment', async () => {
+    const { BadBody } = jest.requireActual('@gitroom/nestjs-libraries/integrations/social.abstract');
+    await expect(failing(new BadBody('test', '{}', '{}', 'Your video is longer than 60 seconds'))).rejects.toMatchObject({ type: 'bad_body', message: 'Your video is longer than 60 seconds' });
+  });
+
+  it('never carries our own failures or the unmapped placeholder', async () => {
+    const { BadBody } = jest.requireActual('@gitroom/nestjs-libraries/integrations/social.abstract');
+    await expect(failing(new BadBody('test', '{}', '{}', 'Unknown Error'))).rejects.toThrow('OUTCOME_UNKNOWN');
+    await expect(failing(new Error('error:1C800064:Provider routines::bad decrypt'))).rejects.toThrow('OUTCOME_UNKNOWN: publication was admitted; reconcile before retrying.');
+  });
 });
 
 describe('PostsService.deletePost of a failed tracked MCP post', () => {

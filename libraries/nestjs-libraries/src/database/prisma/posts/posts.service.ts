@@ -59,7 +59,7 @@ import {
 import { AnalyticsData } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { BadBody, providerCause, RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
@@ -1406,8 +1406,8 @@ export class PostsService {
     if (await this._postRepository.mcpWorkflowVersion(orgId, postId) === 114) await this._postRepository.activateApprovedMcp(orgId, postId);
   }
 
-  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string) {
-    return this._postRepository.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash);
+  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, err?: any) {
+    return this._postRepository.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash, err);
   }
 
   async mcpPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
@@ -1486,6 +1486,11 @@ export class PostsService {
       return receipt;
     } catch (err) {
       const settled = await this._postRepository.markMcpUnfinished(orgId, admission.id).catch(() => undefined);
+      const outcome = settled === 'FAILED' ? 'FAILED' : 'OUTCOME_UNKNOWN';
+      // what the platform said (a BadBody, never one of our own failures) is
+      // carried to the failed segment, which curates it like any post error
+      const reason = (err as any)?.type === 'bad_body' ? providerCause((err as any)?.message) : undefined;
+      if (reason) throw new BadBody(root.integration.providerIdentifier, JSON.stringify({ outcome }), '{}', reason);
       if (settled === 'FAILED') throw new BadRequestException('FAILED: publication stopped before anything was sent to the provider.');
       throw new BadRequestException('OUTCOME_UNKNOWN: publication was admitted; reconcile before retrying.');
     }

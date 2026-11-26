@@ -51,8 +51,10 @@ export async function postWorkflowV114({
       previous = receipt.postId;
       // The segment activity commits receipt + PUBLISHED state atomically.
 
-    } catch {
-      await mcpFailSegment(organizationId, postId, item.id, generation, revisionHash);
+    } catch (err) {
+      // the failure goes with the segment, like changeState in the older
+      // workflows, so its provider message stays readable on the post
+      await mcpFailSegment(organizationId, postId, item.id, generation, revisionHash, err);
       return;
     }
   }

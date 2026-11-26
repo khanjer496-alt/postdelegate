@@ -1,4 +1,5 @@
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 
 const makeRepo = () => {
   const post = {
@@ -902,5 +903,28 @@ describe('PostsRepository.deletePost of a failed tracked MCP thread', () => {
     const { repo, post } = make(null);
     await expect(repo.deletePost('org', 'group', ['root'])).rejects.toThrow('active or uncertain');
     expect(post.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostsRepository.failMcpSegment error', () => {
+  const make = () => {
+    const tx = { mcpPublishFence: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }, post: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+    const repo = new PostsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction: (run: any) => run(tx) } } as any, {} as any);
+    const stored = () => curatedPostError(tx.post.updateMany.mock.calls[0][0].data.error);
+    return { repo, stored };
+  };
+  // the activity failure as the workflow passes it on
+  const failure = (type: string, message: string) => ({ cause: { type, failure: { message } } });
+
+  it('keeps the reconciliation note and adds what the platform said', async () => {
+    const { repo, stored } = make();
+    await repo.failMcpSegment('org', 'root', 'child', 1, 'hash', failure('bad_body', 'Your video is longer than 60 seconds'));
+    expect(stored()).toBe('Publication outcome needs reconciliation before retry. Your video is longer than 60 seconds');
+  });
+
+  it('shows only the note for one of our own failures', async () => {
+    const { repo, stored } = make();
+    await repo.failMcpSegment('org', 'root', 'child', 1, 'hash', failure('BadRequestException', 'Invalid `prisma.post.update()` invocation: https://db.internal/?password=x'));
+    expect(stored()).toBe('Publication outcome needs reconciliation before retry.');
   });
 });

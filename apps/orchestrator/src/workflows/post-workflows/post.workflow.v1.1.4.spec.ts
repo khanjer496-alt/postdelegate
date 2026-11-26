@@ -54,11 +54,13 @@ describe('tracked MCP workflow', () => {
     expect(activity.updatePost).not.toHaveBeenCalled();
   });
   it('unknown publication outcome never loops into another provider call', async () => {
-    activity.mcpPublishSegment.mockRejectedValue(new Error('OUTCOME_UNKNOWN'));
+    const failure = new Error('OUTCOME_UNKNOWN');
+    activity.mcpPublishSegment.mockRejectedValue(failure);
     await postWorkflowV114(input);
     expect(activity.mcpPublishSegment).toHaveBeenCalledTimes(1);
     expect(activity.updatePost).not.toHaveBeenCalled();
-    expect(activity.mcpFailSegment).toHaveBeenCalledWith('o', 'root', 'root', 2, 'hash');
+    // the failure goes with the segment, so the provider message stays readable
+    expect(activity.mcpFailSegment).toHaveBeenCalledWith('o', 'root', 'root', 2, 'hash', failure);
   });
   it('does not invoke the legacy unfenced receipt application activity', async () => {
     activity.mcpPublishSegment.mockResolvedValue([{ postId: 'published', releaseURL: 'https://fixture/published' }]);

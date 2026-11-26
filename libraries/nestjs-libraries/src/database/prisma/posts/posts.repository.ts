@@ -270,11 +270,16 @@ export class PostsRepository {
   async mcpFence(orgId: string, rootId: string) {
     return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findFirst({ where: { postId: rootId, organizationId: orgId } }));
   }
-  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string) {
+  // err: the workflow failure of the segment. Only its curated provider
+  // message is kept, after the note, stored in the shape curatedPostError
+  // reads so the calendar and the MCP tools show both.
+  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, err?: any) {
+    const reason = err ? curatedPostError(typeof err === 'string' ? err : JSON.stringify(err)) : null;
+    const message = ['Publication outcome needs reconciliation before retry.', reason].filter(Boolean).join(' ');
     return this._transaction.model.$transaction(async tx => {
       const current = await tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId, generation, revisionHash, state: 'ACTIVE' }, data: { updatedAt: new Date() } });
       if (!current.count) return;
-      await tx.post.updateMany({ where: { id: segmentId, organizationId: orgId, state: 'QUEUE', deletedAt: null }, data: { state: 'ERROR', error: 'Publication outcome needs reconciliation before retry.' } });
+      await tx.post.updateMany({ where: { id: segmentId, organizationId: orgId, state: 'QUEUE', deletedAt: null }, data: { state: 'ERROR', error: JSON.stringify({ cause: { type: 'bad_body', failure: { message } } }) } });
     }, { isolationLevel: 'Serializable' });
   }
   async mcpWarnings(orgId: string, postIds: string[]) {
