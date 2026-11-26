@@ -1,6 +1,8 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  CommentPost,
+  PostComment,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -292,6 +294,101 @@ export class InstagramStandaloneProvider
       postDetails,
       integration,
       'graph.instagram.com'
+    );
+  }
+
+  // The comments view (PD_FF_COMMENTS), instagram_business_manage_comments:
+  // the channel's latest media, their comments, and replying, hiding and
+  // deleting a comment through the Instagram Login Graph API
+  async commentPosts(
+    id: string,
+    accessToken: string,
+    limit: number
+  ): Promise<CommentPost[]> {
+    const [token] = accessToken.split('___');
+    const { data = [] } = await (
+      await this.fetch(
+        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${id}/media?fields=id,caption,permalink,media_type,media_url,thumbnail_url,timestamp,comments_count&access_token=${token}&limit=${limit}`
+      )
+    ).json();
+    return data.map((media: any) => ({
+      id: media.id,
+      caption: media.caption || '',
+      permalink: media.permalink,
+      thumbnail: media.thumbnail_url || media.media_url,
+      createdAt: media.timestamp,
+      comments: media.comments_count || 0,
+    }));
+  }
+
+  private toComment(id: string, comment: any): PostComment {
+    return {
+      id: comment.id,
+      text: comment.text || '',
+      username: comment.username || comment.from?.username || '',
+      createdAt: comment.timestamp,
+      hidden: !!comment.hidden,
+      // Instagram only returns `user` on comments the account wrote itself
+      own: !!comment.user || comment.from?.id === id,
+      replies: (comment.replies?.data || []).map((reply: any) =>
+        this.toComment(id, reply)
+      ),
+    };
+  }
+
+  async postComments(
+    id: string,
+    accessToken: string,
+    postId: string
+  ): Promise<PostComment[]> {
+    const [token] = accessToken.split('___');
+    const fields = encodeURIComponent(
+      'id,text,username,from,user,timestamp,hidden,replies{id,text,username,from,user,timestamp,hidden}'
+    );
+    const { data = [] } = await (
+      await this.fetch(
+        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${postId}/comments?fields=${fields}&limit=50&access_token=${token}`
+      )
+    ).json();
+    return data.map((comment: any) => this.toComment(id, comment));
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    message: string
+  ) {
+    const [token] = accessToken.split('___');
+    const { id: replyId } = await (
+      await this.fetch(
+        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}/replies?message=${encodeURIComponent(
+          message
+        )}&access_token=${token}`,
+        { method: 'POST' }
+      )
+    ).json();
+    return { id: replyId };
+  }
+
+  async hideComment(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    hide: boolean
+  ) {
+    const [token] = accessToken.split('___');
+    await this.fetch(
+      `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}?hide=${hide}&access_token=${token}`,
+      { method: 'POST' }
+    );
+  }
+
+  async deleteComment(id: string, accessToken: string, commentId: string) {
+    const [token] = accessToken.split('___');
+    await this.fetch(
+      `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}?access_token=${token}`,
+      { method: 'DELETE' }
     );
   }
 

@@ -72,6 +72,7 @@ import { WeeklySummaryController } from '@gitroom/backend/api/routes/weekly.summ
 import { StudioController } from '@gitroom/backend/api/routes/studio.controller';
 import { SmartLinksController } from '@gitroom/backend/api/routes/smartlinks.controller';
 import { PublicSmartLinksController } from '@gitroom/backend/api/routes/public.smartlinks.controller';
+import { CommentsController } from '@gitroom/backend/api/routes/comments.controller';
 
 const authenticatedController = [
   UsersController,
@@ -107,6 +108,7 @@ const authenticatedController = [
   WeeklySummaryController,
   StudioController,
   SmartLinksController,
+  CommentsController,
 ];
 @Module({
   imports: [UploadModule],

@@ -63,6 +63,7 @@ model Organization {
   activityLogs        ActivityLog[]
   ideas               Idea[]
   postImports         PostImport[]
+  commentReplyRules     CommentReplyRule[]
   trialOnboardingEmails TrialOnboardingEmail[]
   // Affiliate attribution, set once at registration and never changed
   referredByAffiliateId String?
@@ -526,6 +527,7 @@ model Integration {
   organization          Organization           @relation(fields: [organizationId], references: [id])
   webhooks              IntegrationsWebhooks[]
   orderItems            OrderItems[]
+  commentReplyRules     CommentReplyRule[]
   plugs                 Plugs[]
   posts                 Post[]
 
@@ -2418,4 +2420,44 @@ model SmartLinkStat {
 
   @@unique([pageId, itemId, date])
   @@index([pageId, date])
+}
+
+// Keyword auto-replies on one post of a channel (PD_FF_COMMENTS): a new
+// comment on postId that contains keyword gets reply, once
+model CommentReplyRule {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  integrationId  String
+  integration    Integration        @relation(fields: [integrationId], references: [id])
+  // the platform's id of the post (Instagram media id)
+  postId         String
+  keyword        String
+  reply          String
+  active         Boolean            @default(true)
+  answered       CommentAutoReply[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([integrationId, active])
+  @@index([organizationId])
+}
+
+// A comment an auto-reply rule claimed: the unique key makes sure a comment
+// is answered once, even when the poller and the open comments view race
+model CommentAutoReply {
+  id            String           @id @default(cuid())
+  ruleId        String
+  rule          CommentReplyRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  integrationId String
+  commentId     String
+  // the platform's id of the reply, once it went out
+  replyId       String?
+  // pending, replied or failed
+  status        String           @default("pending")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([integrationId, commentId])
+  @@index([ruleId])
 }

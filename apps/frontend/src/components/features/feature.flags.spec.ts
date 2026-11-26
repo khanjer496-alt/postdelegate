@@ -23,6 +23,13 @@ describe('parity feature flags', () => {
     expect(flags.analytics_v2).toBe(false);
     expect(flags.free_plan).toBe(false);
   });
+  it('reads the comments flag from PD_FF_COMMENTS', () => {
+    expect(resolveFeatureFlags({}).comments).toBe(false);
+    expect(resolveFeatureFlags({ PD_FF_COMMENTS: 'on' }).comments).toBe(true);
+    expect(
+      resolveFeatureFlags({ PD_FF_COMMENTS: 'optin' }, 'comments').comments
+    ).toBe(true);
+  });
   it('optin needs the key in the cookie', () => {
     const env = { PD_FF_BEST_TIMES: 'optin', PD_FF_CAMPAIGNS: 'optin' };
     expect(resolveFeatureFlags(env).best_times).toBe(false);

@@ -235,4 +235,12 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     scope: 'org',
     note: 'deleted, recipient user ids and branding',
   },
+  CommentReplyRule: {
+    scope: 'org',
+    note: 'deleted, keyword auto-reply rules (keyword and reply text)',
+  },
+  CommentAutoReply: {
+    scope: 'org',
+    note: 'deleted before the rules, comment and reply ids only',
+  },
 };

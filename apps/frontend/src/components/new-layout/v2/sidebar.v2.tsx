@@ -39,6 +39,7 @@ const ICON_BY_PATH: Record<string, string> = {
   '/analytics': 'chart-no-axes-column',
   '/campaigns': 'tag',
   '/smartlinks': 'link-2',
+  '/comments': 'message-circle',
   '/channels': 'radio-tower',
   '/settings': 'settings-2',
   '/billing': 'credit-card',
@@ -71,7 +72,7 @@ const useVisible = () => {
 const GROUPS: { key: string; label: [string, string]; paths: string[] }[] = [
   { key: 'plan', label: ['nav_group_plan', 'Plan'], paths: ['/launches', '/review', '/ideas'] },
   { key: 'create', label: ['nav_group_create', 'Create'], paths: ['/studio', '/media', '/agents'] },
-  { key: 'measure', label: ['nav_group_measure', 'Measure'], paths: ['/analytics', '/campaigns', '/smartlinks'] },
+  { key: 'measure', label: ['nav_group_measure', 'Measure'], paths: ['/analytics', '/campaigns', '/smartlinks', '/comments'] },
   { key: 'workspace', label: ['nav_group_workspace', 'Workspace'], paths: ['/channels', '/settings', '/billing'] },
 ];
 
@@ -358,6 +359,7 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
   const visible = useVisible();
   const campaignsOn = useFeature('campaigns');
   const smartlinksOn = useFeature('smartlinks');
+  const commentsOn = useFeature('comments');
 
   // the classic menu hides the main items until a plan is picked
   const showMain =
@@ -391,6 +393,9 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
       : []),
     ...(smartlinksOn
       ? [{ name: t('smartlinks', 'SmartLinks'), icon: <Icon name="link-2" size={16} />, path: '/smartlinks' } as MenuItem]
+      : []),
+    ...(commentsOn
+      ? [{ name: t('comments', 'Comments'), icon: <Icon name="message-circle" size={16} />, path: '/comments' } as MenuItem]
       : []),
   ];
   const items = [...all.filter(visible), channelsItem, ...featureItems];
