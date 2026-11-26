@@ -461,7 +461,7 @@
   "faq_can_i_trust_postiz_gitroom": "আমি কি PostDelegate-এ বিশ্বাস করতে পারি?",
   "faq_postiz_gitroom_is_proudly_open_source": "PostDelegate পরিচালনা করে Nasida Apps LLC। আমরা নৈতিক ও স্বচ্ছ সংস্কৃতিতে বিশ্বাস করি, তাই অ্যাপ্লিকেশনের সোর্স কোড AGPL-3.0 লাইসেন্সের অধীনে সবার জন্য উন্মুক্ত। সোর্স কোড পেতে, <a href=\"/source\" target=\"_blank\" style=\"text-decoration: underline;\">এখানে ক্লিক করুন</a>।",
   "faq_what_are_channels": "চ্যানেল কী?",
-  "faq_postiz_gitroom_allows_you_to_schedule_posts": "PostDelegate আপনাকে বিভিন্ন চ্যানেলের মধ্যে আপনার পোস্টগুলো সময়সূচি নির্ধারণ করতে দেয়।\nএকটি চ্যানেল হলো এমন একটি প্রকাশনা প্ল্যাটফর্ম যেখানে আপনি আপনার পোস্টগুলো সময়সূচি অনুযায়ী প্রকাশ করতে পারেন।\nউদাহরণস্বরূপ, আপনি X, Facebook, Instagram, TikTok, YouTube, Reddit, Linkedin, Dribbble, Threads এবং Pinterest-এ আপনার পোস্টগুলো সময়সূচি অনুযায়ী প্রকাশ করতে পারেন।",
+  "faq_postiz_gitroom_allows_you_to_schedule_posts": "PostDelegate আপনাকে বিভিন্ন চ্যানেলের মধ্যে আপনার পোস্টগুলো সময়সূচি নির্ধারণ করতে দেয়।\nএকটি চ্যানেল হলো এমন একটি প্রকাশনা প্ল্যাটফর্ম যেখানে আপনি আপনার পোস্টগুলো সময়সূচি অনুযায়ী প্রকাশ করতে পারেন।\nউদাহরণস্বরূপ, আপনি Facebook, TikTok, YouTube, LinkedIn, Bluesky, Telegram এবং Discord-এ আপনার পোস্টগুলো সময়সূচি অনুযায়ী প্রকাশ করতে পারেন।",
   "faq_what_are_team_members": "টিম সদস্য কী?",
   "faq_if_you_have_a_team_with_multiple_members": "যদি আপনার একাধিক সদস্যের একটি টিম থাকে",
   "faq_what_is_ai_auto_complete": "AI অটো কমপ্লিট কী?",
