@@ -232,14 +232,19 @@ export class CommentsService {
   // One poll of a channel (commentRulesWorkflowV1). False stops the poller:
   // no active rule left, or the channel is gone, off or needs a reconnect.
   async runRules(integrationId: string) {
+    // turning the flag off stops the pollers too, not only the view and the
+    // API; saving or re-enabling a rule starts one again
+    if (!commentsEnabled()) return false;
     const rules = await this._commentsRepository.activeRules(integrationId);
     if (!rules.length) return false;
     let channel: Awaited<ReturnType<CommentsService['channel']>>;
     try {
       channel = await this.channel(rules[0].organizationId, integrationId);
     } catch (err) {
-      // gone, off or waiting for a reconnect: saving a rule starts it again
-      return !(err instanceof HttpException);
+      // gone, off or waiting for a reconnect: saving a rule starts it again.
+      // A token refresh that failed (409) may be a passing outage, so the
+      // poller keeps going and tries again on its next run.
+      return !(err instanceof NotFoundException);
     }
     const { integration, provider } = channel;
     let budget = MAX_AUTO_REPLIES_PER_RUN;

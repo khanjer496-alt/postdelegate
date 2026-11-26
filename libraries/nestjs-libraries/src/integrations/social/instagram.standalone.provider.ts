@@ -25,6 +25,9 @@ import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorato
 
 const instagramProvider = new InstagramProvider();
 
+// pages of 50 comments read per post (the comments view and auto-replies)
+const COMMENT_PAGES = 10;
+
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
 )
@@ -345,12 +348,18 @@ export class InstagramStandaloneProvider
     const fields = encodeURIComponent(
       'id,text,username,from,user,timestamp,hidden,replies{id,text,username,from,user,timestamp,hidden}'
     );
-    const { data = [] } = await (
-      await this.fetch(
-        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${postId}/comments?fields=${fields}&limit=50&access_token=${token}`
-      )
-    ).json();
-    return data.map((comment: any) => this.toComment(id, comment));
+    // follows the pages Instagram returns, up to COMMENT_PAGES of 50, so the
+    // view and the auto-reply rules see more than the first 50 comments
+    const comments: PostComment[] = [];
+    let nextUrl: string | undefined = `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${postId}/comments?fields=${fields}&limit=50&access_token=${token}`;
+    for (let page = 0; nextUrl && page < COMMENT_PAGES; page++) {
+      const response: any = await (await this.fetch(nextUrl)).json();
+      comments.push(
+        ...(response.data || []).map((comment: any) => this.toComment(id, comment))
+      );
+      nextUrl = response.paging?.next;
+    }
+    return comments;
   }
 
   async replyToComment(

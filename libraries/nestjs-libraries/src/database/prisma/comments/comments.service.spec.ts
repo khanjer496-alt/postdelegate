@@ -113,6 +113,32 @@ describe('matchingRule', () => {
 });
 
 describe('CommentsService auto-replies', () => {
+  const flag = process.env.PD_FF_COMMENTS;
+  beforeEach(() => {
+    process.env.PD_FF_COMMENTS = 'on';
+  });
+  afterAll(() => {
+    process.env.PD_FF_COMMENTS = flag;
+  });
+
+  it('stops the poller when the comments flag is off', async () => {
+    const { service, provider } = setup();
+    process.env.PD_FF_COMMENTS = 'off';
+    expect(await service.runRules('int-1')).toBe(false);
+    expect(provider.postComments).not.toHaveBeenCalled();
+  });
+
+  it('keeps polling when a token refresh fails, it may be a passing outage', async () => {
+    const { service, integrationService, refresh, provider } = setup();
+    integrationService.getIntegrationById.mockResolvedValue({
+      ...(await integrationService.getIntegrationById()),
+      tokenExpiration: new Date(Date.now() - 1000),
+    });
+    refresh.refresh.mockResolvedValue(false);
+    expect(await service.runRules('int-1')).toBe(true);
+    expect(provider.postComments).not.toHaveBeenCalled();
+  });
+
   it('answers a new matching comment once, through the provider', async () => {
     const { service, provider, repository } = setup([
       comment(),
