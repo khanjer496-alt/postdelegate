@@ -23,6 +23,8 @@ import {
   RefreshToken,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TokenEncryptionError } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
+import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { countLength } from '@gitroom/helpers/utils/count.length';
 
 describe('PostActivity posting limits backstop', () => {
   const integration = {
@@ -467,6 +469,28 @@ describe('MCP final payload length of an X post', () => {
   });
   it('refuses 281 visible characters', async () => {
     await expect((worker as any).assertMcpFinalPayload(x, [{ message: xPost(243), media: [], settings: {} }])).rejects.toThrow('limit');
+  });
+});
+
+describe('MCP final payload length of a markdown post', () => {
+  // Discord and dev.to receive markdown; the limit is on the visible text the
+  // composer counted (a link counts as its address)
+  const html = (n: number) =>
+    `<p>${'a'.repeat(n)} <strong>bold</strong></p><p>Read <a href="https://e.co">the documentation page</a></p>`;
+  const message = (n: number) => stripHtmlValidation('markdown', html(n), true);
+  const worker = new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any,
+    { getSocialIntegration: () => ({ editor: 'markdown', maxLength: () => 100, checkValidity: jest.fn().mockResolvedValue(true) }) } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const discord = { id: 'c', organizationId: 'o', providerIdentifier: 'discord', additionalSettings: '[]' } as any;
+  it('accepts a post the composer counted under the limit', async () => {
+    expect(countLength('discord', stripHtmlValidation('normal', html(70), true))).toBeLessThanOrEqual(100);
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: message(70), media: [], settings: {} }])).resolves.toBeUndefined();
+  });
+  it('refuses one over the limit', async () => {
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: message(90), media: [], settings: {} }])).rejects.toThrow('limit');
   });
 });
 

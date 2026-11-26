@@ -13,6 +13,7 @@ import {
 import { Integration, Post, State } from '@prisma/client';
 import { applyEvergreen } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { removeMarkdown } from '@gitroom/helpers/utils/remove.markdown';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { AuthTokenDetails } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -449,8 +450,12 @@ export class PostActivity {
     const settings = payload[0]?.settings || {};
     const limit = provider.maxLength(additional, settings) || 1000000;
     // counted like validatePosts and the composer: the visible text, not the
-    // markup an html editor provider (X, Telegram) receives
-    const visible = (message: string) => countLength(integration.providerIdentifier, stripHtmlValidation('normal', message || '', true));
+    // markup an html editor provider (X, Telegram) or a markdown editor one
+    // (Discord, dev.to) receives. The composer counts a link as its address.
+    const visibleText = (message: string) => provider.editor === 'markdown'
+      ? removeMarkdown({ text: (message || '').replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '$2') })
+      : stripHtmlValidation('normal', message || '', true);
+    const visible = (message: string) => countLength(integration.providerIdentifier, visibleText(message));
     if (!payload.length || payload.some(p => visible(p.message) > limit || (!visible(p.message) && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
     const valid = await provider.checkValidity(payload.map(p => p.media.map((m: any) => ({ ...m, path: m.url || m.path }))), settings, additional, payload.map(p => p.message));
     if (valid !== true) throw new Error('Final transformed media or provider settings are invalid.');
