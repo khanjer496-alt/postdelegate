@@ -1652,6 +1652,7 @@ pg(
       const delegated = {
         validatePosts: posts.validatePosts.bind(posts),
         withAgentAdmission: posts.withAgentAdmission.bind(posts),
+        applyOutsideComposerRules: posts.applyOutsideComposerRules.bind(posts),
         createPost: async (...args: any[]) => {
           const result = await posts
             .createPost(...args)
