@@ -12,6 +12,8 @@ A channel is one connected account or destination, such as a Bluesky profile, a 
 | --- | --- | --- |
 | [LinkedIn personal profiles](/docs/channels/linkedin) | LinkedIn sign-in | Public profile posts |
 | [YouTube](/docs/channels/youtube) | Google sign-in, then choose a channel | Videos |
+| [Facebook Pages](/docs/channels/facebook) | Facebook sign-in, then choose a Page | Text, photo and video posts, and stories |
+| [TikTok](/docs/channels/tiktok) | TikTok sign-in | Videos, sent to the TikTok inbox or published privately until TikTok finishes its posting audit |
 | [Bluesky](/docs/channels/bluesky) | Service address, identifier and app password | Posts and threads, up to 4 images or 1 video |
 | [DEV.to](/docs/channels/devto) | API key | Articles in Markdown |
 | [Hashnode](/docs/channels/hashnode) | API key | Articles in Markdown |
@@ -42,13 +44,13 @@ Reddit is not in the list above and is not counted in the networks available on 
 
 ## Waiting on approval
 
-Facebook, Instagram, Threads, TikTok, LinkedIn company Pages, and Pinterest are waiting on approval from each network. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the tables above does not work today.
+Instagram, Threads, LinkedIn company Pages, and Pinterest are waiting on approval from each network. We do not give dates. See [Waiting on approval](/docs/channels/coming-soon). X is not available on PostDelegate. A network that is not in the tables above does not work today.
 
 ## How connections work
 
 There are four kinds of connection.
 
-**Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. LinkedIn personal profiles, YouTube, Kick, Twitch, Tumblr, Dribbble, Slack, Discord, Mastodon and Google Business Profile work this way. For Discord, approving also adds the PostDelegate bot to the server you choose.
+**Sign in with the network.** You are sent to the network's own page, approve PostDelegate, and come back. PostDelegate never sees your network password. LinkedIn personal profiles, YouTube, Facebook Pages, TikTok, Kick, Twitch, Tumblr, Dribbble, Slack, Discord, Mastodon and Google Business Profile work this way. For Discord, approving also adds the PostDelegate bot to the server you choose.
 
 **Paste a credential.** You enter an app password, API key or site address into PostDelegate. Bluesky, DEV.to, Hashnode, Lemmy, Listmonk, Medium, Nostr and WordPress work this way. Credentials you type are encrypted before they are stored. Use the narrowest credential the network offers, such as an app password or a dedicated API key, so you can revoke it from the network without changing your main password.
 
@@ -66,7 +68,7 @@ You can connect several accounts from the same network, such as two YouTube chan
 
 **Connecting the same account twice updates it.** If you connect an account that is already in the workspace, PostDelegate refreshes the existing channel instead of adding a copy.
 
-**Networks you sign in to remember who you are.** LinkedIn personal profiles, YouTube, Kick, Twitch, Tumblr, Dribbble, Slack, Discord, Mastodon and Google Business Profile send you to the network's own page. If you are already signed in there, the network usually approves the account you are signed in to, without asking. To add a different account:
+**Networks you sign in to remember who you are.** LinkedIn personal profiles, YouTube, Facebook Pages, TikTok, Kick, Twitch, Tumblr, Dribbble, Slack, Discord, Mastodon and Google Business Profile send you to the network's own page. If you are already signed in there, the network usually approves the account you are signed in to, without asking. To add a different account:
 
 1. Open the network's website in the same browser and sign out, or switch to the other account.
 2. Back in PostDelegate, choose **Add Channel** and the network again.
@@ -74,7 +76,7 @@ You can connect several accounts from the same network, such as two YouTube chan
 
 A private or incognito window also works, as long as you sign in to PostDelegate in that window too.
 
-Some networks let one login hold several destinations. On YouTube, choose the channel after you sign in; to connect another channel from the same Google account, add YouTube again and choose the other one. On Tumblr, each blog is its own channel. On Slack, each workspace is one channel and you pick the Slack channel for each post. On Discord, each server is one channel and you pick the Discord channel for each post; add Discord again to connect another server. On Telegram, add @PostDelegateBot to each channel or group you want to post to.
+Some networks let one login hold several destinations. On YouTube, choose the channel after you sign in; to connect another channel from the same Google account, add YouTube again and choose the other one. On Facebook, each Page is its own channel; add Facebook Page again and choose another Page. On Tumblr, each blog is its own channel. On Slack, each workspace is one channel and you pick the Slack channel for each post. On Discord, each server is one channel and you pick the Discord channel for each post; add Discord again to connect another server. On Telegram, add @PostDelegateBot to each channel or group you want to post to.
 
 **Networks where you paste a credential** take whatever you enter, so use the app password, API key or site address of the account you want to add.
 

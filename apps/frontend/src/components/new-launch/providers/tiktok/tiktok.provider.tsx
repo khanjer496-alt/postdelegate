@@ -25,6 +25,7 @@ import {
   getTikTokVideoDurationMessage,
   isTikTokVideoPath,
   parseTikTokCreatorInfo,
+  parseTikTokProfileInfo,
   TIKTOK_BRANDED_CONTENT_NOT_PRIVATE,
   TIKTOK_COMMERCIAL_SELECTION_REQUIRED,
   TikTokCreatorInfo,
@@ -47,6 +48,17 @@ const useTikTokCreatorInfo = (enabled: boolean, creatorKey: string) => {
       shouldRetryOnError: false,
       keepPreviousData: false,
     }
+  );
+};
+
+// user.info.profile, loaded beside creator_info. Display only: a failure just
+// hides the link and never blocks posting.
+const useTikTokProfileInfo = (enabled: boolean, creatorKey: string) => {
+  const { get } = useCustomProviderFunction();
+  return useSWR(
+    enabled ? ['tiktok-profile-info', creatorKey] : null,
+    async () => parseTikTokProfileInfo(await get('profileInfo')),
+    { revalidateOnFocus: false, shouldRetryOnError: false }
   );
 };
 
@@ -110,6 +122,7 @@ const TikTokSettings: FC<{ values?: any }> = () => {
     useTikTokCreatorInfo(!isBusiness && !isUploadMode, creatorKey);
   // Cached capabilities are hidden while SWR verifies them for this composer.
   const creatorInfo = !isValidating && !creatorError ? loadedCreatorInfo : undefined;
+  const { data: profileInfo } = useTikTokProfileInfo(!isBusiness && !isUploadMode, creatorKey);
   const [videoMetadata, setVideoMetadata] = useState<{
     key: string;
     duration?: number;
@@ -248,7 +261,13 @@ const TikTokSettings: FC<{ values?: any }> = () => {
             <div className="bg-tableBorder p-[12px] rounded-[10px] text-[14px]" aria-live="polite">
               {creatorInfo ? (
                 <>
-                  <div>Posting to <strong>{creatorInfo.creatorNickname}</strong>{creatorInfo.creatorUsername && ` (@${creatorInfo.creatorUsername})`}</div>
+                  <div>Posting to <strong>{creatorInfo.creatorNickname}</strong>{creatorInfo.creatorUsername && ` (@${creatorInfo.creatorUsername})`}{profileInfo?.isVerified && <span className="ms-[6px] text-[12px]" title="Verified on TikTok">✓ Verified</span>}</div>
+                  {profileInfo?.profileUrl && (
+                    <div className="mt-[6px]">
+                      <a href={profileInfo.profileUrl} target="_blank" rel="noopener noreferrer" className="underline">View this TikTok profile</a>
+                    </div>
+                  )}
+                  {profileInfo?.bioDescription && <div className="mt-[4px] text-[12px] opacity-80 line-clamp-2 break-words">{profileInfo.bioDescription}</div>}
                   {isVideo && <div className="mt-[6px]">This account currently allows videos up to {creatorInfo.maxDurationSeconds} seconds.</div>}
                 </>
               ) : creatorError ? (

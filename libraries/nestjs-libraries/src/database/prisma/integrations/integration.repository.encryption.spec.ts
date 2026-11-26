@@ -79,6 +79,8 @@ const makeStore = (initial: any[]) => {
     errors: { deleteMany: jest.fn() },
     exisingPlugData: { deleteMany: jest.fn() },
     plugs: { updateMany: jest.fn() },
+    commentReplyRule: { deleteMany: jest.fn() },
+    commentAutoReply: { deleteMany: jest.fn() },
   };
   const repo = new IntegrationRepository(
     { model: { integration } } as any,
@@ -90,7 +92,7 @@ const makeStore = (initial: any[]) => {
     { model: { $transaction: async (fn: any) => fn(tx) } } as any,
     {} as any
   );
-  return { repo, rows, integration, post };
+  return { repo, rows, integration, post, tx };
 };
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -466,11 +468,19 @@ describe('IntegrationRepository token encryption', () => {
 
   describe('erased sentinel', () => {
     it('scrubbing still writes empty credentials, never ciphertext', async () => {
-      const { repo, rows } = makeStore([
+      const { repo, rows, tx } = makeStore([
         row({ deletedAt: new Date(), disabled: true, refreshNeeded: true, token: enc('t'), refreshToken: enc('r') }),
       ]);
       await repo.scrubAuthorizationData('org-1', 'int-1');
       expect(rows[0]).toMatchObject({ token: '', refreshToken: null, internalId: 'erased_int-1' });
+      // the channel's comment auto-reply rules go with its authorization
+      expect(tx.commentReplyRule.deleteMany).toHaveBeenCalledWith({
+        where: { integrationId: 'int-1', organizationId: 'org-1' },
+      });
+      // and the comment ids its auto-replies answered, which outlive their rule
+      expect(tx.commentAutoReply.deleteMany).toHaveBeenCalledWith({
+        where: { integrationId: 'int-1', organizationId: 'org-1' },
+      });
     });
 
     it('the history wait touch still matches the erased row', async () => {

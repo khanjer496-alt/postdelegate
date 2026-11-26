@@ -224,13 +224,31 @@ If validation fails, or the workspace limits what agents can do (allowed channel
 
       // Same server-side validation as the dashboard / public API
       // (settings DTO + media checkValidity + empty / too-long content).
-      const settings = platform.settings.reduce(
-        (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
-          ...acc,
-          [s.key]: s.value,
-        }),
-        {} as AllProvidersSettings
-      );
+      let settings = {
+        ...platform.settings.reduce(
+          (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
+            ...acc,
+            [s.key]: s.value,
+          }),
+          {} as AllProvidersSettings
+        ),
+        // always the channel's network, never a passed key
+        __type: integrations[platform.integrationId]?.providerIdentifier,
+      } as AllProvidersSettings;
+
+      // settings only the composer can take (TikTok Direct Post) are refused
+      // or replaced here too; createPost applies the same rule when it saves
+      try {
+        [{ settings }] = await this._postsService.applyOutsideComposerRules(
+          organizationId,
+          [{ integration: { id: platform.integrationId }, settings }]
+        );
+      } catch (err) {
+        if (err instanceof BadRequestException) {
+          return { output: { errors: err.message } };
+        }
+        throw err;
+      }
 
       const [validation] = await this._postsService.validatePosts(
         organizationId,
@@ -330,15 +348,18 @@ If validation fails, or the workspace limits what agents can do (allowed channel
           {
             integration,
             group: makeId(10),
-            settings: post.settings.reduce(
-              (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
-                ...acc,
-                [s.key]: s.value,
-              }),
-              {
-                __type: integration.providerIdentifier,
-              } as AllProvidersSettings
-            ),
+            settings: {
+              ...post.settings.reduce(
+                (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
+                  ...acc,
+                  [s.key]: s.value,
+                }),
+                {} as AllProvidersSettings
+              ),
+              // always the channel's network, never a passed key: createPost
+              // picks the provider (and its rules) from it
+              __type: integration.providerIdentifier,
+            } as AllProvidersSettings,
             value: post.postsAndComments.map((p: any) => ({
               content: p.content,
               id: makeId(10),

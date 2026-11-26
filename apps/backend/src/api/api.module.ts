@@ -9,6 +9,7 @@ import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payme
 import { PaymentProviderManager } from '@gitroom/nestjs-libraries/services/payment/payment.provider.manager';
 import { RevenueCatProvider } from '@gitroom/nestjs-libraries/services/payment/providers/revenuecat.provider';
 import { AnalyticsController } from '@gitroom/backend/api/routes/analytics.controller';
+import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.controller';
 import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { IntegrationsController } from '@gitroom/backend/api/routes/integrations.controller';
@@ -69,10 +70,14 @@ import { PostsImportController } from '@gitroom/backend/api/routes/posts.import.
 import { PostsBulkVideosController } from '@gitroom/backend/api/routes/posts.bulk.videos.controller';
 import { WeeklySummaryController } from '@gitroom/backend/api/routes/weekly.summary.controller';
 import { StudioController } from '@gitroom/backend/api/routes/studio.controller';
+import { SmartLinksController } from '@gitroom/backend/api/routes/smartlinks.controller';
+import { PublicSmartLinksController } from '@gitroom/backend/api/routes/public.smartlinks.controller';
+import { CommentsController } from '@gitroom/backend/api/routes/comments.controller';
 
 const authenticatedController = [
   UsersController,
   AnalyticsController,
+  CampaignsController,
   IntegrationsController,
   SettingsController,
   PostsController,
@@ -102,6 +107,8 @@ const authenticatedController = [
   PostsBulkVideosController,
   WeeklySummaryController,
   StudioController,
+  SmartLinksController,
+  CommentsController,
 ];
 @Module({
   imports: [UploadModule],
@@ -120,6 +127,7 @@ const authenticatedController = [
         PublicController,
         PublicReviewsController,
         PublicApprovalsController,
+        PublicSmartLinksController,
         MonitorController,
         EnterpriseController,
         NoAuthIntegrationsController,

@@ -62,6 +62,8 @@ import { AffiliateRepository } from '@gitroom/nestjs-libraries/database/prisma/a
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { ReviewRepository } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.repository';
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
 import { ActivationRepository } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.repository';
 import { ActivationService } from '@gitroom/nestjs-libraries/database/prisma/activation/activation.service';
 import { LoginLockoutService } from '@gitroom/nestjs-libraries/services/login.lockout.service';
@@ -71,6 +73,10 @@ import { StudioRepository } from '@gitroom/nestjs-libraries/database/prisma/stud
 import { StudioService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.service';
 import { StudioScheduleService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.schedule.service';
 import { StudioAiService } from '@gitroom/nestjs-libraries/database/prisma/studio/studio.ai.service';
+import { SmartLinksRepository } from '@gitroom/nestjs-libraries/database/prisma/smartlinks/smartlinks.repository';
+import { SmartLinksService } from '@gitroom/nestjs-libraries/database/prisma/smartlinks/smartlinks.service';
+import { CommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/comments/comments.repository';
+import { CommentsService } from '@gitroom/nestjs-libraries/database/prisma/comments/comments.service';
 import { PostsEvergreenRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.repository';
 import { PostsEvergreenService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.service';
 import { PostsImportRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.import.repository';
@@ -154,6 +160,8 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
     AnalyticsService,
     AnalyticsSnapshotService,
     AnalyticsReportService,
+    CampaignsRepository,
+    CampaignsService,
     AffiliateRepository,
     AffiliateService,
     ReviewRepository,
@@ -172,6 +180,10 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
     StudioService,
     StudioScheduleService,
     StudioAiService,
+    SmartLinksRepository,
+    SmartLinksService,
+    CommentsRepository,
+    CommentsService,
     PostsEvergreenRepository,
     PostsEvergreenService,
     PostsImportRepository,

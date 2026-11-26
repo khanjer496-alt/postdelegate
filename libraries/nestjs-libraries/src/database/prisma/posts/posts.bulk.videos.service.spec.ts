@@ -258,6 +258,8 @@ describe('PostsBulkVideosService', () => {
 
   const make = () => {
     const postsService = {
+      // the network rules outside the composer leave these posts as they are
+      applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
       validatePosts: jest.fn().mockImplementation(async (_org, posts) =>
         posts.map((post: any) => ({
           name: post.integration.id,

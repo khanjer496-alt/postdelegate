@@ -21,6 +21,17 @@ export interface ChecklistState {
   };
 }
 
+// The v2 onboarding card (PD_FF_ONBOARDING_V2): the agent-first path
+export interface OnboardingState {
+  dismissed: boolean;
+  steps: {
+    channel: boolean;
+    ai: boolean;
+    scheduled: boolean;
+    approver: boolean;
+  };
+}
+
 export type ChannelAttentionReason =
   | 'reconnect'
   | 'finish_setup'
@@ -107,6 +118,35 @@ export class ActivationService {
       dismissed: false,
       // a scheduled post is also a created post
       steps: { channel, post: post || scheduled, scheduled, teammate },
+    };
+  }
+
+  // Same dismissal as the checklist; every step is read from the workspace
+  async getOnboarding(
+    userId: string,
+    organizationId: string
+  ): Promise<OnboardingState> {
+    const dismissedAt = await this._activationRepository.getChecklistDismissedAt(
+      userId,
+      organizationId
+    );
+    if (dismissedAt) {
+      return {
+        dismissed: true,
+        steps: { channel: false, ai: false, scheduled: false, approver: false },
+      };
+    }
+    const [channel, ai, scheduled, approver, teammate] = await Promise.all([
+      this._activationRepository.hasChannel(organizationId),
+      this._activationRepository.hasAiConnection(organizationId),
+      this._activationRepository.hasScheduledPost(organizationId),
+      this._activationRepository.hasApprover(organizationId),
+      this._activationRepository.hasTeammate(organizationId),
+    ]);
+    return {
+      dismissed: false,
+      // an invited teammate can approve too (admins always can)
+      steps: { channel, ai, scheduled, approver: approver || teammate },
     };
   }
 

@@ -162,6 +162,8 @@ describe('PostsImportService', () => {
   const make = () => {
     const postsService = {
       getTags: jest.fn().mockResolvedValue([]),
+      // the network rules outside the composer leave these posts as they are
+      applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
       validatePosts: jest.fn().mockImplementation(async (_org, posts) =>
         posts.map(() => ({
           name: 'Acme X',

@@ -77,9 +77,11 @@ const post = (overrides = {}, mediaPath = 'https://93.184.216.34/review.mp4') =>
   id: 'post-1', message: 'Original PostDelegate review clip', settings: settings(overrides),
   media: [{ type: 'video', path: mediaPath }],
 });
-function provider(response = creator) {
+function provider(response = creator, videoSeconds = 30) {
   const instance = new TiktokProvider();
   const requests = [];
+  // the length ffprobe would read from the video
+  instance.videoDurationSeconds = async () => videoSeconds;
   instance.fetch = async (url, options) => {
     requests.push({ url, options, body: options.body ? JSON.parse(options.body) : undefined });
     return { json: async () => url.includes('creator_info')
@@ -234,4 +236,38 @@ test('pending checks preserve TikTok post IDs larger than JavaScript safe intege
   assert.equal(result.status, 'completed');
   assert.equal(result.postId, '7558564526789012345');
   assert.equal(result.releaseURL, 'https://www.tiktok.com/@review_account/video/7558564526789012345');
+});
+
+test('direct posting refuses a video longer than the account allows before starting a publish', async () => {
+  const { instance, requests } = provider(creator, 61);
+  await assert.rejects(publish(instance, post()), /no longer than 60 seconds/);
+  assert.equal(requests.filter((r) => r.url.includes('/video/init/')).length, 0);
+});
+
+test('direct posting accepts a video at the account limit, and an unreadable length is left to TikTok', async () => {
+  for (const seconds of [60, undefined]) {
+    const { instance, requests } = provider(creator, seconds);
+    await publish(instance, post());
+    assert.equal(requests.filter((r) => r.url.includes('/video/init/')).length, 1);
+  }
+});
+
+test('outside the composer a Direct Post is refused with the reason', () => {
+  const result = new TiktokProvider().settingsOutsideComposer(settings());
+  assert.match(result.error, /only available in the PostDelegate composer/);
+  assert.equal(result.settings, undefined);
+});
+
+test('outside the composer a post without a method goes to the TikTok inbox without consent flags', () => {
+  const result = new TiktokProvider().settingsOutsideComposer(settings({ content_posting_method: undefined }));
+  assert.equal(result.error, undefined);
+  assert.equal(result.settings.content_posting_method, 'UPLOAD');
+  assert.equal('music_usage_consent' in result.settings, false);
+  assert.equal('creator_info_verified' in result.settings, false);
+  const upload = new TiktokProvider().settingsOutsideComposer(settings({ content_posting_method: 'UPLOAD' }));
+  assert.equal(upload.settings.content_posting_method, 'UPLOAD');
+});
+
+test('TikTok is not offered as an RSS autopost target', () => {
+  assert.equal(new TiktokProvider().autoPostUnsupported, true);
 });

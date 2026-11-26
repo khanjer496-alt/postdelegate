@@ -20,6 +20,7 @@ import { useMenuItem } from '@gitroom/frontend/components/layout/top.menu';
 import { useReviewCount } from '@gitroom/frontend/components/approvals/approvals.hooks';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { NavItemV2 } from './nav.item.v2';
+import { useFeature } from '@gitroom/frontend/components/features/feature.flags.client';
 import { setUiLayoutCookie } from './ui.flag.client';
 import { Icon } from './icons.v2';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -36,6 +37,9 @@ const ICON_BY_PATH: Record<string, string> = {
   '/media': 'images',
   '/agents': 'sparkles',
   '/analytics': 'chart-no-axes-column',
+  '/campaigns': 'tag',
+  '/smartlinks': 'link-2',
+  '/comments': 'message-circle',
   '/channels': 'radio-tower',
   '/settings': 'settings-2',
   '/billing': 'credit-card',
@@ -68,7 +72,7 @@ const useVisible = () => {
 const GROUPS: { key: string; label: [string, string]; paths: string[] }[] = [
   { key: 'plan', label: ['nav_group_plan', 'Plan'], paths: ['/launches', '/review', '/ideas'] },
   { key: 'create', label: ['nav_group_create', 'Create'], paths: ['/studio', '/media', '/agents'] },
-  { key: 'measure', label: ['nav_group_measure', 'Measure'], paths: ['/analytics'] },
+  { key: 'measure', label: ['nav_group_measure', 'Measure'], paths: ['/analytics', '/campaigns', '/smartlinks', '/comments'] },
   { key: 'workspace', label: ['nav_group_workspace', 'Workspace'], paths: ['/channels', '/settings', '/billing'] },
 ];
 
@@ -353,12 +357,18 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
   const { all } = useMenuItem();
   const { data: reviewCount } = useReviewCount();
   const visible = useVisible();
+  const campaignsOn = useFeature('campaigns');
+  const smartlinksOn = useFeature('smartlinks');
+  const commentsOn = useFeature('comments');
 
   // the classic menu hides the main items until a plan is picked
   const showMain =
     // (same check as the classic TopMenu, tier is compared as it comes in)
     !!user?.orgId &&
-    ((user.tier as unknown as string) !== 'FREE' || !isGeneral || !billingEnabled);
+    ((user.tier as unknown as string) !== 'FREE' ||
+      !!user.freePlan ||
+      !isGeneral ||
+      !billingEnabled);
   const { data: integrationList } = useIntegrationList();
   const integrations = useMemo(
     () =>
@@ -376,7 +386,19 @@ export const SidebarV2: FC<{ collapsed: boolean; onToggle: () => void }> = ({
     icon: <Icon name="radio-tower" size={16} />,
     path: '/channels',
   };
-  const items = [...all.filter(visible), channelsItem];
+  // parity feature pages, listed only while their flag is on
+  const featureItems: MenuItem[] = [
+    ...(campaignsOn
+      ? [{ name: t('campaigns', 'Campaigns'), icon: <Icon name="tag" size={16} />, path: '/campaigns' } as MenuItem]
+      : []),
+    ...(smartlinksOn
+      ? [{ name: t('smartlinks', 'SmartLinks'), icon: <Icon name="link-2" size={16} />, path: '/smartlinks' } as MenuItem]
+      : []),
+    ...(commentsOn
+      ? [{ name: t('comments', 'Comments'), icon: <Icon name="message-circle" size={16} />, path: '/comments' } as MenuItem]
+      : []),
+  ];
+  const items = [...all.filter(visible), channelsItem, ...featureItems];
   // the affiliates page exists but the classic menu hides its entry; the
   // v2 sidebar shows it at the bottom like the mockup, same role rule
   const affiliatesItem = all.find((i) => i.path === '/affiliates');

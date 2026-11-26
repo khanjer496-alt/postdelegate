@@ -510,6 +510,17 @@ export class PostsImportService {
       row.images.map((path, index) => ({ id: `csv-${index}`, path }))
     );
 
+    // checked like createPost will save it: an import is not the composer
+    try {
+      request.posts = await this._postsService.applyOutsideComposerRules(
+        orgId,
+        request.posts
+      );
+    } catch (err) {
+      issues.push({ field: 'settings', message: errorMessage(err) });
+      return issues;
+    }
+
     try {
       const results = await this._postsService.validatePosts(
         orgId,

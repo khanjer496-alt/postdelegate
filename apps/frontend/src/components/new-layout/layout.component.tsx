@@ -57,6 +57,7 @@ import { CommandPalette } from '@gitroom/frontend/components/layout/command.pale
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useClickOutside } from '@mantine/hooks';
 import { useHasOpenModal } from '@gitroom/frontend/components/layout/new-modal';
+import { TryNewLayoutButton } from '@gitroom/frontend/components/new-layout/v2/try.new.layout';
 
 // On phones and tablets the secondary top bar icons fold into a "more" menu,
 // on desktop the wrappers are display: contents and the icons sit inline
@@ -115,7 +116,14 @@ const TopBarMore: FC<{ children: ReactNode }> = ({ children }) => {
   );
 };
 
-export const LayoutComponent = ({ children }: { children: ReactNode }) => {
+export const LayoutComponent = ({
+  children,
+  canTryNewLayout = false,
+}: {
+  children: ReactNode;
+  // PD_UI_V2 is optin or on: offer the way back to the new layout
+  canTryNewLayout?: boolean;
+}) => {
   const fetch = useFetch();
   const t = useT();
 
@@ -210,7 +218,10 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                 {t('skip_to_content', 'Skip to content')}
               </a>
               <div>{user?.admin ? <Impersonate /> : <div />}</div>
-              {user.tier === 'FREE' && isGeneral && billingEnabled ? (
+              {user.tier === 'FREE' &&
+              !user.freePlan &&
+              isGeneral &&
+              billingEnabled ? (
                 <FirstBillingComponent />
               ) : (
                 <>
@@ -284,6 +295,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           <CommandPalette />
                           <TrialCountdown />
                           <TopBarMore>
+                            {canTryNewLayout && <TryNewLayoutButton />}
                             <StreakComponent />
                             <div className="w-[1px] h-[20px] bg-blockSeparator mobile:hidden" />
                             <OrganizationSelector />

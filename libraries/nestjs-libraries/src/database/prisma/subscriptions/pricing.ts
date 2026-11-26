@@ -154,6 +154,36 @@ export const pricing: PricingInterface = {
   },
 };
 
+// Free plan (PD_FF_FREE_PLAN=on, off by default): a workspace without a
+// subscription keeps working with small limits instead of having to pick a
+// plan first. The FREE entry above, Stripe and the pricing page are not
+// changed; only the limits read through planOptionsOf follow the flag.
+export const FREE_PLAN_LIMITS = {
+  workspaces: 1,
+  channel: 3,
+  posts_per_month: 20,
+} as const;
+
+// same values as the frontend flag reader; optin is per browser, and plan
+// limits are per workspace, so only "on" turns them on
+export const freePlanEnabled = () =>
+  ['on', 'true', '1'].includes(
+    (process.env.PD_FF_FREE_PLAN || '').trim().toLowerCase()
+  );
+
+// the limits a tier has right now: the free plan's for FREE when it is on
+export const planOptionsOf = (tier: string): PricingInnerInterface =>
+  tier === 'FREE' && freePlanEnabled()
+    ? {
+        ...pricing.FREE,
+        channel: FREE_PLAN_LIMITS.channel,
+        posts_per_month: FREE_PLAN_LIMITS.posts_per_month,
+      }
+    : pricing[tier];
+
+// channels a workspace without a subscription can use
+export const freeChannels = () => planOptionsOf('FREE').channel || 0;
+
 // networks some plan caps a month, their published posts are counted
 export const isCappedProvider = (providerIdentifier: string) =>
   Object.values(pricing).some(

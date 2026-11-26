@@ -39,6 +39,8 @@ const setup = (validation = validationOf()) => {
   const posts = {
     // with replaceDraft off the real one keeps the request type
     mapTypeToPost: jest.fn(async (body: any) => body),
+    // the network rules outside the composer leave these posts as they are
+    applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
     validatePosts: jest.fn(async () => [validation]),
     createPost: jest.fn(async () => [{ postId: 'p1' }]),
   };
