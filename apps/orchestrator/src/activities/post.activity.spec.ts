@@ -492,6 +492,12 @@ describe('MCP final payload length of a markdown post', () => {
   it('refuses one over the limit', async () => {
     await expect((worker as any).assertMcpFinalPayload(discord, [{ message: message(90), media: [], settings: {} }])).rejects.toThrow('limit');
   });
+  it('accepts a plain post exactly at the limit the composer counted', async () => {
+    const plain = `<p>${'a'.repeat(100)}</p>`;
+    expect(countLength('discord', stripHtmlValidation('normal', plain, true))).toBe(100);
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: stripHtmlValidation('markdown', plain, true), media: [], settings: {} }])).resolves.toBeUndefined();
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: stripHtmlValidation('markdown', `<p>${'a'.repeat(101)}</p>`, true), media: [], settings: {} }])).rejects.toThrow('limit');
+  });
 });
 
 describe('V114 known published follow-up failures', () => {

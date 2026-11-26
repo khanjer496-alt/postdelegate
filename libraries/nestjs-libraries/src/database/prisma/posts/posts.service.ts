@@ -1487,8 +1487,9 @@ export class PostsService {
     } catch (err) {
       const settled = await this._postRepository.markMcpUnfinished(orgId, admission.id).catch(() => undefined);
       const outcome = settled === 'FAILED' ? 'FAILED' : 'OUTCOME_UNKNOWN';
-      // what the platform said (a BadBody, never one of our own failures) is
-      // carried to the failed segment, which curates it like any post error
+      // a BadBody's message (what the platform said, or a refusal we wrote
+      // for the customer) is carried to the failed segment, which curates it
+      // like any post error; other failures keep the generic outcome
       const reason = (err as any)?.type === 'bad_body' ? providerCause((err as any)?.message) : undefined;
       if (reason) throw new BadBody(root.integration.providerIdentifier, JSON.stringify({ outcome }), '{}', reason);
       if (settled === 'FAILED') throw new BadRequestException('FAILED: publication stopped before anything was sent to the provider.');

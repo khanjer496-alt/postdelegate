@@ -451,9 +451,10 @@ export class PostActivity {
     const limit = provider.maxLength(additional, settings) || 1000000;
     // counted like validatePosts and the composer: the visible text, not the
     // markup an html editor provider (X, Telegram) or a markdown editor one
-    // (Discord, dev.to) receives. The composer counts a link as its address.
+    // (Discord, dev.to) receives. The composer counts a link as its address,
+    // and not the line break a markdown message ends its last paragraph with.
     const visibleText = (message: string) => provider.editor === 'markdown'
-      ? removeMarkdown({ text: (message || '').replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '$2') })
+      ? removeMarkdown({ text: (message || '').replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '$2') }).trimEnd()
       : stripHtmlValidation('normal', message || '', true);
     const visible = (message: string) => countLength(integration.providerIdentifier, visibleText(message));
     if (!payload.length || payload.some(p => visible(p.message) > limit || (!visible(p.message) && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
