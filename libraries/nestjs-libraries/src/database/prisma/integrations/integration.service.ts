@@ -35,6 +35,7 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { TemporalService } from 'nestjs-temporal-core';
 import { IntegrationAuthorizationLifecycleService } from '@gitroom/nestjs-libraries/integrations/integration.authorization.lifecycle.service';
 import { isCappedProvider } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { CommentsService } from '@gitroom/nestjs-libraries/database/prisma/comments/comments.service';
 import {
   channelState,
   countPlanChannels,
@@ -72,7 +73,9 @@ export class IntegrationService {
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
     private _temporalService: TemporalService,
-    private _authorizationLifecycle: IntegrationAuthorizationLifecycleService
+    private _authorizationLifecycle: IntegrationAuthorizationLifecycleService,
+    @Inject(forwardRef(() => CommentsService))
+    private _commentsService: CommentsService
   ) {}
 
   // A plan without AutoPost stops every running feed. Each one is also marked
@@ -236,7 +239,7 @@ export class IntegrationService {
       uploadedPicture = await this.storage.uploadSimple(picture).catch(() => undefined);
     }
 
-    return this._integrationRepository.createOrUpdateIntegration(
+    const integration = await this._integrationRepository.createOrUpdateIntegration(
       additionalSettings,
       oneTimeToken,
       org,
@@ -255,6 +258,15 @@ export class IntegrationService {
       customInstanceDetails,
       !!policy
     );
+
+    // a reconnect brings the channel's comment rules back (a one time token
+    // also reconnects the channels that share it)
+    await this._commentsService.restartPollers(
+      org,
+      oneTimeToken ? undefined : integration.id
+    );
+
+    return integration;
   }
 
   updateIntegrationGroup(org: string, id: string, group: string) {
@@ -566,7 +578,9 @@ export class IntegrationService {
       );
     }
 
-    return this._integrationRepository.enableChannel(org, id);
+    const enabled = await this._integrationRepository.enableChannel(org, id);
+    await this._commentsService.restartPollers(org, id);
+    return enabled;
   }
 
   async getPostsForChannel(org: string, id: string) {
@@ -582,7 +596,15 @@ export class IntegrationService {
   }
 
   async enablePlanLockedIntegrations(org: string, room: number) {
-    return this._integrationRepository.enablePlanLockedIntegrations(org, room);
+    const enabled = await this._integrationRepository.enablePlanLockedIntegrations(
+      org,
+      room
+    );
+    // reached from billing webhooks: restartPollers never throws
+    if (enabled.count) {
+      await this._commentsService.restartPollers(org);
+    }
+    return enabled;
   }
 
   async checkForDeletedOnceAndUpdate(org: string, page: string) {

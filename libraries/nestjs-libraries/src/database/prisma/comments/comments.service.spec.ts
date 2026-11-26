@@ -70,6 +70,7 @@ const setup = (comments: any[] = [comment()], rules: any[] = [rule()]) => {
     updateRule: jest.fn().mockResolvedValue({ count: 1 }),
     getRule: jest.fn().mockResolvedValue(rule()),
     deleteRule: jest.fn().mockResolvedValue({ count: 1 }),
+    activeRuleChannels: jest.fn().mockResolvedValue([{ integrationId: 'int-1' }]),
   };
   const integrationService = {
     getIntegrationById: jest.fn().mockResolvedValue(integration),
@@ -221,6 +222,42 @@ describe('CommentsService auto-replies', () => {
     expect(repository.finish).toHaveBeenCalledWith('claim-2', 'replied', 'reply-2');
   });
 
+  it('records a reply that failed but went out anyway as replied', async () => {
+    const { service, provider, repository } = setup();
+    provider.replyToComment.mockRejectedValueOnce(new Error('socket hang up'));
+    (provider as any).commentReply = jest.fn().mockResolvedValue({ id: 'reply-9' });
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await service.runRules('int-1');
+
+    expect((provider as any).commentReply).toHaveBeenCalledWith(
+      'ig-1',
+      'token',
+      'c-1',
+      'Sent you the price list!'
+    );
+    expect(provider.replyToComment).toHaveBeenCalledTimes(1);
+    expect(repository.finish).toHaveBeenCalledWith('claim-1', 'replied', 'reply-9');
+  });
+
+  it('records a failed reply when the lookup finds nothing or fails', async () => {
+    const { service, provider, repository } = setup([
+      comment(),
+      comment({ id: 'c-2', text: 'price?' }),
+    ]);
+    provider.replyToComment.mockRejectedValue(new Error('500'));
+    (provider as any).commentReply = jest
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('500'));
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await service.runRules('int-1');
+
+    expect(repository.finish).toHaveBeenCalledWith('claim-1', 'failed', null);
+    expect(repository.finish).toHaveBeenCalledWith('claim-2', 'failed', null);
+  });
+
   it('stops the poller when there is no active rule', async () => {
     const { service, provider } = setup([comment()], []);
     expect(await service.runRules('int-1')).toBe(false);
@@ -298,5 +335,71 @@ describe('CommentsService turning a rule back on', () => {
     const { service, repository } = setup();
     await service.setRuleActive('org-1', 'rule-1', false);
     expect(repository.updateRule).toHaveBeenCalledWith('org-1', 'rule-1', { active: false });
+  });
+});
+
+describe('CommentsService restarting the pollers of a channel that is back', () => {
+  const flag = process.env.PD_FF_COMMENTS;
+  beforeEach(() => {
+    process.env.PD_FF_COMMENTS = 'optin';
+  });
+  afterAll(() => {
+    process.env.PD_FF_COMMENTS = flag;
+  });
+
+  it('starts each channel with an active rule, keeping a poller that still runs', async () => {
+    const { service, repository, start } = setup();
+    repository.activeRuleChannels.mockResolvedValue([
+      { integrationId: 'int-1' },
+      { integrationId: 'int-2' },
+    ]);
+
+    await service.restartPollers('org-1');
+
+    expect(repository.activeRuleChannels).toHaveBeenCalledWith('org-1', undefined);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start).toHaveBeenCalledWith(
+      'commentRulesWorkflowV1',
+      expect.objectContaining({
+        workflowId: 'comment-rules-int-2',
+        taskQueue: 'main',
+        // never a second poller, and never a restart of a running one
+        workflowIdConflictPolicy: 'USE_EXISTING',
+        // a reconnect is no rule change: no fast-polling window
+        args: [{ integrationId: 'int-2', fastUntil: now }],
+      })
+    );
+  });
+
+  it('only looks at the channel that came back', async () => {
+    const { service, repository, start } = setup();
+    await service.restartPollers('org-1', 'int-1');
+    expect(repository.activeRuleChannels).toHaveBeenCalledWith('org-1', 'int-1');
+    expect(start).toHaveBeenCalledWith(
+      'commentRulesWorkflowV1',
+      expect.objectContaining({ workflowId: 'comment-rules-int-1' })
+    );
+  });
+
+  it('starts nothing without an active rule or with the flag off', async () => {
+    const { service, repository, start } = setup();
+    repository.activeRuleChannels.mockResolvedValue([]);
+    await service.restartPollers('org-1', 'int-1');
+    expect(start).not.toHaveBeenCalled();
+
+    process.env.PD_FF_COMMENTS = 'off';
+    repository.activeRuleChannels.mockClear();
+    await service.restartPollers('org-1', 'int-1');
+    expect(repository.activeRuleChannels).not.toHaveBeenCalled();
+  });
+
+  it('never throws, it runs after the channel was saved', async () => {
+    const { service, repository, start } = setup();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    repository.activeRuleChannels.mockRejectedValueOnce(new Error('db'));
+    await expect(service.restartPollers('org-1')).resolves.toBeUndefined();
+
+    start.mockRejectedValueOnce(new Error('temporal down'));
+    await expect(service.restartPollers('org-1')).resolves.toBeUndefined();
   });
 });

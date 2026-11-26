@@ -33,6 +33,21 @@ export class CommentsRepository {
     });
   }
 
+  // the workspace's channels with an active rule (one channel, when given),
+  // whose pollers start again when the channel is back
+  activeRuleChannels(orgId: string, integrationId?: string) {
+    return this._rule.model.commentReplyRule.findMany({
+      where: {
+        organizationId: orgId,
+        active: true,
+        ...(integrationId ? { integrationId } : {}),
+        integration: { deletedAt: null },
+      },
+      select: { integrationId: true },
+      distinct: ['integrationId'],
+    });
+  }
+
   getRule(orgId: string, id: string) {
     return this._rule.model.commentReplyRule.findFirst({
       where: { id, organizationId: orgId },

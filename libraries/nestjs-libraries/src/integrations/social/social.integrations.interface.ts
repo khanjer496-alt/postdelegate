@@ -129,7 +129,13 @@ export interface IAuthenticator {
     accessToken: string,
     commentId: string,
     message: string
-  ): Promise<{ id: string }>; // Answers a comment as the channel
+  ): Promise<{ id: string }>; // Answers a comment as the channel. A reply is not idempotent: a retry after a failure that may have created it checks commentReply first
+  commentReply?(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    message: string
+  ): Promise<{ id: string } | undefined>; // The channel's own reply with this text under the comment, if there is one. Throws when the platform call fails
   hideComment?(
     id: string,
     accessToken: string,
