@@ -93,7 +93,7 @@ Posts only accept `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` or `.mp4` files, and 
 
 ## Limits to know about
 
-ChatGPT can only work with channels that are connected in PostDelegate. Facebook, Instagram, LinkedIn company Pages and other networks are waiting on each network's approval, and X is not available on PostDelegate, so ChatGPT cannot publish to them. It can draft the text, and you can bring it into PostDelegate later.
+ChatGPT can only work with channels that are connected in PostDelegate. Instagram, LinkedIn company Pages and other networks are waiting on each network's approval, and X is not available on PostDelegate, so ChatGPT cannot publish to them. It can draft the text, and you can bring it into PostDelegate later.
 
 The connector depends on your ChatGPT plan and settings, and PostDelegate cannot change those. If the connector option is missing, ask your workspace admin or check OpenAI's help pages for the current requirements.
 

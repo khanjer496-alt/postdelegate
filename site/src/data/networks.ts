@@ -17,7 +17,7 @@ export interface Network {
 }
 export const NETWORKS: Network[] = [
   { key: 'instagram', name: 'Instagram', color: '#c4256e', abbr: 'Ig', limit: 2200, unit: 'codepoints', scheduler: 'instagram-scheduler' },
-  { key: 'facebook', name: 'Facebook', color: '#1877f2', abbr: 'Fb', limit: 63206, unit: 'codepoints', scheduler: 'facebook-scheduler' },
+  { key: 'facebook', name: 'Facebook', color: '#1877f2', abbr: 'Fb', limit: 63206, unit: 'codepoints', scheduler: 'facebook-scheduler', available: true, blurb: 'Posts to the Facebook Pages you manage: text, photos, videos and stories.' },
   { key: 'linkedin', name: 'LinkedIn (personal)', color: '#0a66c2', abbr: 'in', limit: 3000, unit: 'codepoints', scheduler: 'linkedin-scheduler', available: true, pendingName: 'LinkedIn Company Pages', blurb: 'Posts to your personal profile. Company Pages are waiting on approval.' },
   { key: 'tiktok', name: 'TikTok', color: '#25f4ee', abbr: 'Tk', limit: 2200, unit: 'utf16', scheduler: 'tiktok-scheduler', available: true, blurb: 'Videos you can send to the TikTok inbox, or publish privately until TikTok finishes its posting audit.' },
   { key: 'youtube', name: 'YouTube', color: '#ff0000', abbr: 'Yt', limit: 5000, unit: 'utf8_bytes', scheduler: 'youtube-scheduler', available: true, blurb: 'Video uploads with a title, visibility, thumbnail and tags.' },
@@ -55,7 +55,7 @@ export const OWN_APP_NETWORKS: Network[] = [
   { key: 'reddit', name: 'Reddit (your own app)', color: '#ff4500', abbr: 'Re', limit: 0, unit: 'codepoints', blurb: 'Posts to subreddits through a Reddit app you create yourself, for personal, non-commercial use.' },
 ];
 // Live networks with the ones people ask about most first, for logo stacks.
-const FEATURED_KEYS = ['youtube', 'tiktok', 'bluesky', 'discord', 'telegram', 'wordpress', 'slack'];
+const FEATURED_KEYS = ['youtube', 'facebook', 'tiktok', 'bluesky', 'discord', 'telegram', 'wordpress', 'slack'];
 export const FEATURED_LIVE_NETWORKS = [
   ...FEATURED_KEYS.map((key) => AVAILABLE_NETWORKS.find((network) => network.key === key)).filter((network): network is Network => Boolean(network)),
   ...AVAILABLE_NETWORKS.filter((network) => !FEATURED_KEYS.includes(network.key)),
@@ -63,7 +63,7 @@ export const FEATURED_LIVE_NETWORKS = [
 // The networks listed on /docs/channels/coming-soon as waiting on approval, in that order.
 // pendingName distinguishes a pending destination from a live account type in the same family.
 // X is not one of them: it is not available on PostDelegate.
-export const WAITING_KEYS = ['facebook', 'instagram', 'threads', 'linkedin', 'pinterest'];
+export const WAITING_KEYS = ['instagram', 'threads', 'linkedin', 'pinterest'];
 export const WAITING_NETWORKS = WAITING_KEYS
   .map((key) => NETWORKS.find((network) => network.key === key))
   .filter((network): network is Network => Boolean(network))
