@@ -85,7 +85,7 @@ def finalize_diagnostics(path, process_state, process_exit, acceptance_exit, ver
                  'processExitBeforeCleanup': int(process_exit) if process_exit else None,
                  'acceptanceExit': acceptance_exit,
                  'configuredCommand': ['wrangler', 'pages', 'dev', '<disposable-public-payload>',
-                                       '--no-bundle', '--ip', '127.0.0.1', '--port', '8789',
+                                       '--ip', '127.0.0.1', '--port', '8789',
                                        '--compatibility-date', PREVIEW_COMPATIBILITY['configuredDate']],
                  'previewCompatibility': PREVIEW_COMPATIBILITY,
                  'configuredWranglerVersion': '4.162.0'})

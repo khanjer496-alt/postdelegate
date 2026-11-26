@@ -307,7 +307,7 @@ class PublicPayloadTests(unittest.TestCase):
             self.assertFalse(data['releasable'])
             self.assertEqual(data['processExitBeforeCleanup'], 1)
             self.assertEqual(data['observedWranglerVersion'], '4.162.0')
-            self.assertIn('--no-bundle', data['configuredCommand'])
+            self.assertNotIn('--no-bundle', data['configuredCommand'])
             self.assertNotIn('private', path.read_text())
             acceptance.finalize_diagnostics(path, 'running', '', 1, root)
             self.assertIsNone(json.loads(path.read_text())['processExitBeforeCleanup'])

@@ -17,7 +17,12 @@ raw `index.js` and any additional modules. The staging gate requires exactly one
 regular `index.js`, parses it without execution using Node's module `--check`,
 then copies those exact bytes to `dist/_worker.js`. Extra modules, metadata,
 directories or symlinks fail closed and need separate review; nothing is dropped
-or decoded. The subsequent Pages no-bundle import/runtime checks remain required.
+or decoded. The loopback preview runs `wrangler pages dev` without `--no-bundle`:
+in pinned 4.162.0 that flag still injects the dev-only middleware facade
+(`processEntrypoint` with bundling off), leaving an import of
+`.wrangler/tmp/.../middleware-insertion-facade.js` that workerd cannot resolve, so
+the runtime never starts and acceptance times out at readiness. The production
+upload in step 5 still uses `--no-bundle` with the same staged bytes.
 No generated routes output is directed into the payload; reviewed source controls
 are still compared byte-for-byte. [Pinned output serialization](https://github.com/cloudflare/workers-sdk/blob/wrangler%404.162.0/packages/wrangler/src/pages/build.ts#L311),
 [multipart helper](https://github.com/cloudflare/workers-sdk/blob/wrangler%404.162.0/packages/wrangler/src/api/pages/create-worker-bundle-contents.ts#L15).

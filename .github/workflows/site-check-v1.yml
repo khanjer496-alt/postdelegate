@@ -74,13 +74,15 @@ jobs:
           cp -R site/dist/. "$stage/payload/"
           cp "$RUNNER_TEMP/site-worker-format.json" "$stage/evidence/worker-format.json"
           # No repository/config/functions discovery or production bindings in preview.
+          # Pinned Wrangler's `pages dev --no-bundle` injects dev middleware imports it never
+          # resolves, so workerd cannot start; preview bundles the already-checked raw module.
           node --version > "$stage/evidence/node-version.txt"
           pnpm --version > "$stage/evidence/pnpm-version.txt"
           "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" --version > "$stage/evidence/wrangler-version.txt"
           node "$GITHUB_WORKSPACE/site/scripts/preview-runtime-diagnostics.mjs" \
             "$RUNNER_TEMP/site-cli" "$stage/diagnostics/runtime-diagnostics.json"
           cd "$stage"
-          setsid "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages dev "$stage/payload" --no-bundle --ip 127.0.0.1 --port 8789 --compatibility-date 2026-09-08 > "$stage/preview.log" 2>&1 &
+          setsid "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages dev "$stage/payload" --ip 127.0.0.1 --port 8789 --compatibility-date 2026-09-08 > "$stage/preview.log" 2>&1 &
           preview_pid=$!
           cleanup() {
             kill -- -"$preview_pid" 2>/dev/null || true
