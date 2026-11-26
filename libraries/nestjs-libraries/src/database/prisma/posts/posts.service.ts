@@ -1647,14 +1647,16 @@ export class PostsService {
           settings
         );
 
+        // counted like the composer shows it: the visible text, not the
+        // markup the provider receives (an html editor keeps <p>, <a>...)
         const emptyContent = !(post.value || []).length || (post.value || []).some((a) => {
-          const strip = this.preparedText(provider, a.content || '', settings);
+          const strip = stripHtmlValidation('normal', a.content || '', true);
           const length = countLength(integration.providerIdentifier, strip);
           return length === 0 && (a.image || []).length === 0;
         });
 
         const tooLong = (post.value || []).some((a) => {
-          const strip = this.preparedText(provider, a.content || '', settings);
+          const strip = stripHtmlValidation('normal', a.content || '', true);
           const counted = countLength(integration.providerIdentifier, strip);
           return counted > (maximumCharacters || 1000000);
         });
@@ -1735,7 +1737,8 @@ export class PostsService {
       add('date', operation === 'draft' || Number.isFinite(Date.parse(post.date || date || '')), 'Schedule date checked.', 'Supply an explicit UTC date.');
       const provider = this._integrationManager.getSocialIntegration(integration.providerIdentifier);
       for (const [entry, value] of (post.value || []).entries()) {
-        const count = countLength(integration.providerIdentifier, this.preparedText(provider, value.content || '', post.settings || {}));
+        // the same visible-text count the save enforces (validatePosts tooLong)
+        const count = countLength(integration.providerIdentifier, stripHtmlValidation('normal', value.content || '', true));
         add(`value.${entry}.content.length`, count <= (validation.maximumCharacters || 1000000), `${count}/${validation.maximumCharacters || 1000000} characters under this provider counting rule.`, 'Shorten this entry.');
         if (value.image?.length) checks.push({ field: `value.${entry}.image`, status: 'UNKNOWN', message: 'File readiness and later media transformations are not proven by URL shape.', fix: 'Wait for mediaStatusTool to report ready, then check the final payload again.' });
       }

@@ -441,7 +441,10 @@ export class PostActivity {
     const additional = JSON.parse(integration.additionalSettings || '[]');
     const settings = payload[0]?.settings || {};
     const limit = provider.maxLength(additional, settings) || 1000000;
-    if (!payload.length || payload.some(p => countLength(integration.providerIdentifier, p.message || '') > limit || (!p.message && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
+    // counted like validatePosts and the composer: the visible text, not the
+    // markup an html editor provider (X, Telegram) receives
+    const visible = (message: string) => countLength(integration.providerIdentifier, stripHtmlValidation('normal', message || '', true));
+    if (!payload.length || payload.some(p => visible(p.message) > limit || (!visible(p.message) && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
     const valid = await provider.checkValidity(payload.map(p => p.media.map((m: any) => ({ ...m, path: m.url || m.path }))), settings, additional, payload.map(p => p.message));
     if (valid !== true) throw new Error('Final transformed media or provider settings are invalid.');
     const [validation] = await this._postService.validatePosts(integration.organizationId, [{ integration: { id: integration.id }, settings, value: payload.map(p => ({ content: p.message, image: p.media.map((m: any) => ({ ...m, path: m.url || m.path })) })) }], 'now');

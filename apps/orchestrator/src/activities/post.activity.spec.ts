@@ -421,6 +421,25 @@ describe('MCP final transformed payload validation', () => {
   });
 });
 
+describe('MCP final payload length of an X post', () => {
+  // X receives the composer HTML; its limit is on the visible text
+  const xPost = (n: number) =>
+    `<p>${'a'.repeat(n)} <strong>bold</strong></p><p>Read <a href="https://example.com/a/very/long/path">example.com/a/very/long/path</a></p>`;
+  const worker = new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any,
+    { getSocialIntegration: () => ({ editor: 'html', maxLength: () => 280, checkValidity: jest.fn().mockResolvedValue(true) }) } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const x = { id: 'c', organizationId: 'o', providerIdentifier: 'x', additionalSettings: '[]' } as any;
+  it('accepts 279 visible characters with paragraph, bold and link markup', async () => {
+    await expect((worker as any).assertMcpFinalPayload(x, [{ message: xPost(241), media: [], settings: {} }])).resolves.toBeUndefined();
+  });
+  it('refuses 281 visible characters', async () => {
+    await expect((worker as any).assertMcpFinalPayload(x, [{ message: xPost(243), media: [], settings: {} }])).rejects.toThrow('limit');
+  });
+});
+
 describe('V114 known published follow-up failures', () => {
   it('preserves the verified typed receipt before the legacy release writer, while legacy behavior stays unchanged', async () => {
     const { PublishedWithError } = require('@gitroom/nestjs-libraries/integrations/social.abstract');

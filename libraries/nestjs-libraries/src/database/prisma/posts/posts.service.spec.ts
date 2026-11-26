@@ -1762,6 +1762,82 @@ describe('PostsService.validatePosts text for the provider rules', () => {
   });
 });
 
+// X keeps the composer HTML (editor 'html'), but its limit is on the text the
+// composer shows: the markup never counts
+describe('PostsService.validatePosts counts the visible text of an X post', () => {
+  // 'a' x n, a bold word and a link: n + 38 visible characters on X
+  const xPost = (n: number) =>
+    `<p>${'a'.repeat(n)} <strong>bold</strong></p><p>Read <a href="https://example.com/a/very/long/path">example.com/a/very/long/path</a></p>`;
+  const make = () => {
+    const service = new PostsService(
+      {} as any,
+      {
+        getSocialIntegration: () => ({
+          editor: 'html',
+          checkValidity: async () => true,
+          maxLength: () => 280,
+        }),
+      } as any,
+      {
+        getIntegrationById: jest.fn().mockResolvedValue({
+          id: 'x-1',
+          name: 'X',
+          providerIdentifier: 'x',
+          additionalSettings: '[]',
+        }),
+      } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+    return service;
+  };
+  const validate = (content: string) =>
+    make().validatePosts('org-1', [
+      { integration: { id: 'x-1' }, value: [{ content, image: [] }], settings: {} },
+    ]);
+
+  it('accepts 279 visible characters wrapped in paragraphs, bold and a link', async () => {
+    const [result] = await validate(xPost(241));
+    expect(result.tooLong).toBe(false);
+    expect(result.emptyContent).toBe(false);
+  });
+
+  it('refuses 281 visible characters', async () => {
+    const [result] = await validate(xPost(243));
+    expect(result.tooLong).toBe(true);
+  });
+
+  it('treats markup without text as empty', async () => {
+    const [result] = await validate('<p></p>');
+    expect(result.emptyContent).toBe(true);
+  });
+
+  it('approval re-checks a stored post with the same count', async () => {
+    const service = make();
+    const stored = (content: string) => [
+      {
+        id: 'p-1',
+        content,
+        image: '[]',
+        settings: '{}',
+        publishDate: new Date('2030-01-01T00:00:00Z'),
+        integration: { id: 'x-1', providerIdentifier: 'x' },
+      },
+    ];
+    const spy = jest.spyOn(service, 'getPostsRecursively' as any);
+    spy.mockResolvedValueOnce(stored(xPost(241)));
+    await expect(service.getStoredPostProblem('org-1', 'p-1')).resolves.toBeNull();
+    spy.mockResolvedValueOnce(stored(xPost(243)));
+    await expect(service.getStoredPostProblem('org-1', 'p-1')).resolves.toContain('280 characters');
+  });
+});
+
 // A network's posting rules for one connected account (postingLimits), like
 // Reddit's 5 posts a day, at least 10 minutes apart
 describe('PostsService posting limits', () => {
