@@ -1162,13 +1162,21 @@ export class PostsService {
       });
   }
 
-  async deletePost(orgId: string, group: string) {
-    if (getContext()?.agentPrincipal) {
+  // byUser: a signed-in person in the app (not an agent, the public API or
+  // a cleanup), who may delete a tracked MCP post that failed with an
+  // uncertain outcome once no workflow can still send it
+  async deletePost(orgId: string, group: string, byUser = false) {
+    const agent = !!getContext()?.agentPrincipal;
+    if (agent) {
       const groupPosts = await this._postRepository.getPostsByGroup(orgId, group);
       for (const post of groupPosts) assertAgentPostWrite(orgId, post.integrationId, 'delete');
       await this._approvalPolicyService.assertAgentGuardrails(orgId, { type: 'agent', source: 'MCP' }, [...new Set(groupPosts.map(p => p.integrationId))], { countsTowardLimit: false });
     }
-    const post = await this._postRepository.deletePost(orgId, group);
+    const post = await this._postRepository.deletePost(
+      orgId,
+      group,
+      byUser && !agent ? await this.failedMcpRootsWithoutWorkflow(orgId, group) : []
+    );
 
     if (post?.id) {
       try {
@@ -1198,6 +1206,35 @@ export class PostsService {
     }
 
     return { error: true };
+  }
+
+  // Deleting it only drops the post here, it never claims the uncertain
+  // attempt was not published.
+  private async failedMcpRootsWithoutWorkflow(orgId: string, group: string) {
+    const roots = (await this._postRepository.getPostsByGroup(orgId, group)).filter(
+      (p) => !p.parentPostId && p.mcpWorkflowVersion === 114 && p.state === 'ERROR'
+    );
+    const ids: string[] = [];
+    for (const root of roots) {
+      if (!(await this.hasRunningWorkflow(root.id))) ids.push(root.id);
+    }
+    return ids;
+  }
+
+  // unknown counts as running: the caller then keeps the post
+  private async hasRunningWorkflow(postId: string) {
+    try {
+      const workflows = this._temporalService.client
+        .getRawClient()
+        ?.workflow.list({
+          query: `postId="${postId}" AND ExecutionStatus="Running"`,
+        });
+      if (!workflows) return true;
+      for await (const _ of workflows) return true;
+      return false;
+    } catch (err) {
+      return true;
+    }
   }
 
   async countPostsFromDay(orgId: string, date: Date) {
@@ -1444,7 +1481,8 @@ export class PostsService {
       await this._postRepository.finishMcpSegment(orgId, admission.id, receipt);
       return receipt;
     } catch (err) {
-      await this._postRepository.markMcpUnknown(orgId, admission.id).catch(() => undefined);
+      const settled = await this._postRepository.markMcpUnfinished(orgId, admission.id).catch(() => undefined);
+      if (settled === 'FAILED') throw new BadRequestException('FAILED: publication stopped before anything was sent to the provider.');
       throw new BadRequestException('OUTCOME_UNKNOWN: publication was admitted; reconcile before retrying.');
     }
   }

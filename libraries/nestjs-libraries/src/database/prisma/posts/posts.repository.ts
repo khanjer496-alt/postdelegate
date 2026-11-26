@@ -404,8 +404,17 @@ export class PostsRepository {
     }, { isolationLevel: 'Serializable' });
   }
 
-  async markMcpUnknown(orgId: string, id: string) {
-    return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED' }, data: { status: 'UNKNOWN' } }));
+  // The activity binds the provider payload right before it calls the
+  // provider, so an attempt that stopped with no bound payload sent nothing:
+  // it FAILED and may be retried. With a bound payload it may have been
+  // published, so its outcome is UNKNOWN until it is reconciled.
+  async markMcpUnfinished(orgId: string, id: string): Promise<'FAILED' | 'UNKNOWN' | null> {
+    return this._transaction.model.$transaction(async tx => {
+      const failed = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED', providerPayloadHash: null }, data: { status: 'FAILED' } });
+      if (failed.count) return 'FAILED';
+      const unknown = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED' }, data: { status: 'UNKNOWN' } });
+      return unknown.count ? 'UNKNOWN' : null;
+    }, { isolationLevel: 'Serializable' });
   }
 
   async unscheduleMcp(orgId: string, rootPostId: string, preserveApproval = false, requireReview = false) {
@@ -740,12 +749,17 @@ export class PostsRepository {
     };
   }
 
-  async deletePost(orgId: string, group: string) {
+  // failedRootIds: tracked roots a person may delete although an attempt is
+  // uncertain, because they failed and no workflow runs for them (see
+  // PostsService.deletePost). They must still be in ERROR here.
+  async deletePost(orgId: string, group: string, failedRootIds: string[] = []) {
     const tracked = await this._post.model.post.findMany({ where: { organizationId: orgId, group, parentPostId: null, mcpWorkflowVersion: 114, deletedAt: null }, select: { id: true } });
     if (tracked.length) return this._transaction.model.$transaction(async tx => {
       for (const root of [...tracked].sort((a, b) => a.id.localeCompare(b.id))) {
         const fence = await tx.mcpPublishFence.updateMany({ where: { postId: root.id, organizationId: orgId }, data: { updatedAt: new Date() } });
-        if (!fence.count || await tx.mcpPublishAttempt.count({ where: { rootPostId: root.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } })) throw new BadRequestException('This publication is active or uncertain. Reconcile it before deleting; deletion cannot prove it was cancelled.');
+        const uncertain = await tx.mcpPublishAttempt.count({ where: { rootPostId: root.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } });
+        const failedByPerson = failedRootIds.includes(root.id) && !!(await tx.post.findFirst({ where: { id: root.id, organizationId: orgId, state: 'ERROR', deletedAt: null }, select: { id: true } }));
+        if (!fence.count || (uncertain && !failedByPerson)) throw new BadRequestException('This publication is active or uncertain. Reconcile it before deleting; deletion cannot prove it was cancelled.');
         await tx.mcpPublishFence.update({ where: { postId: root.id }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
       }
       await tx.post.updateMany({ where: { organizationId: orgId, group, deletedAt: null }, data: { deletedAt: new Date() } });

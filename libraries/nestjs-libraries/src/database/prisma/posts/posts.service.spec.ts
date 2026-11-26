@@ -2437,7 +2437,7 @@ describe('tracked MCP publication admission', () => {
     jest.spyOn(service, 'mcpThread').mockResolvedValue([root]);
     jest.spyOn(service, 'getStoredPostProblem').mockResolvedValue(null);
     jest.spyOn(service, 'mcpExecutionState').mockResolvedValue({ generation: 0, closed: true });
-    const repo = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), finishMcpSegment: jest.fn().mockResolvedValue({}), markMcpUnknown: jest.fn().mockResolvedValue({}), mcpAttempts: jest.fn(), reconcileMcpAttempt: jest.fn(), resumeMcp: jest.fn() };
+    const repo = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), finishMcpSegment: jest.fn().mockResolvedValue({}), markMcpUnfinished: jest.fn().mockResolvedValue({}), mcpAttempts: jest.fn(), reconcileMcpAttempt: jest.fn(), resumeMcp: jest.fn() };
     (service as any)._postRepository = repo;
     (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: true }) };
     const hash = (service as any).mcpRevision([root]);
@@ -2452,7 +2452,7 @@ describe('tracked MCP publication admission', () => {
     await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('OUTCOME_UNKNOWN');
     expect(send).not.toHaveBeenCalled();
     expect(repo.finishMcpSegment).not.toHaveBeenCalled();
-    expect(repo.markMcpUnknown).not.toHaveBeenCalled();
+    expect(repo.markMcpUnfinished).not.toHaveBeenCalled();
   });
   it('returns the validated recorded receipt array without resending', async () => {
     const { service, repo, hash, receipt } = fixture();
@@ -2470,7 +2470,7 @@ describe('tracked MCP publication admission', () => {
     const result = await service.runMcpSegment('org', 'root', 'root', 0, hash, jest.fn().mockResolvedValue(receipt));
     expect(result[0]).toMatchObject({ postId: 'remote', warning: expect.stringContaining('Published successfully') });
     expect(repo.finishMcpSegment).toHaveBeenCalledWith('org', 'attempt', result);
-    expect(repo.markMcpUnknown).not.toHaveBeenCalled();
+    expect(repo.markMcpUnfinished).not.toHaveBeenCalled();
     expect(accounting).toHaveBeenCalledWith('org', 'test', ['root']);
   });
   it('keeps a mismatched typed published identity or failed atomic completion UNKNOWN without a legacy release write', async () => {
@@ -2481,7 +2481,7 @@ describe('tracked MCP publication admission', () => {
     const second = fixture();
     second.repo.finishMcpSegment.mockRejectedValue(new Error('owned commit fault'));
     await expect(second.service.runMcpSegment('org', 'root', 'root', 0, second.hash, jest.fn().mockResolvedValue(second.receipt.map(receipt => ({ ...receipt, warning: 'follow-up failed' }))))).rejects.toThrow('OUTCOME_UNKNOWN');
-    expect(second.repo.markMcpUnknown).toHaveBeenCalledWith('org', 'attempt');
+    expect(second.repo.markMcpUnfinished).toHaveBeenCalledWith('org', 'attempt');
   });
   it('persists STARTED admission before sending and stores the receipt before returning', async () => {
     const { service, repo, hash, receipt } = fixture();
@@ -2493,7 +2493,7 @@ describe('tracked MCP publication admission', () => {
     const { service, repo, hash, receipt } = fixture();
     repo.finishMcpSegment.mockRejectedValue(new Error('database unavailable'));
     await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, jest.fn().mockResolvedValue(receipt))).rejects.toThrow('OUTCOME_UNKNOWN');
-    expect(repo.markMcpUnknown).toHaveBeenCalledWith('org', 'attempt');
+    expect(repo.markMcpUnfinished).toHaveBeenCalledWith('org', 'attempt');
   });
   it('a durable published receipt is returned without a provider call', async () => {
     const { service, repo, hash, receipt } = fixture();
@@ -2824,5 +2824,56 @@ describe('agent save admission is for MCP saves only', () => {
     expect(postRepository.acquireAgentAdmission).toHaveBeenCalledTimes(1);
     finish();
     await first;
+  });
+});
+
+describe('an MCP attempt that stopped before anything was sent', () => {
+  it('is reported FAILED, not an unknown outcome', async () => {
+    const { service } = makeService({ getSocialIntegration: () => ({}) });
+    const root: any = { id: 'root', organizationId: 'org', integrationId: 'channel', parentPostId: null, mcpWorkflowVersion: 114, state: 'QUEUE', approvalStatus: 'APPROVED', content: 'text', settings: '{}', image: '[]', publishDate: new Date('2026-12-01T12:00:00Z'), integration: { id: 'channel', organizationId: 'org', providerIdentifier: 'test' } };
+    jest.spyOn(service, 'mcpThread').mockResolvedValue([root]);
+    jest.spyOn(service, 'getStoredPostProblem').mockResolvedValue(null);
+    const repo = { claimMcpSegment: jest.fn().mockResolvedValue({ id: 'attempt', replay: false }), markMcpUnfinished: jest.fn().mockResolvedValue('FAILED'), mcpAttempts: jest.fn().mockResolvedValue([]), getOrgMediaByPaths: jest.fn() };
+    (service as any)._postRepository = repo;
+    (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), getSettings: jest.fn().mockResolvedValue({ requireAgentApproval: false }) };
+    const hash = (service as any).mcpRevision([root]);
+    const send = jest.fn().mockRejectedValue(new Error('final payload over the limit'));
+    await expect(service.runMcpSegment('org', 'root', 'root', 0, hash, send)).rejects.toThrow('FAILED');
+    expect(repo.markMcpUnfinished).toHaveBeenCalledWith('org', 'attempt');
+  });
+});
+
+describe('PostsService.deletePost of a failed tracked MCP post', () => {
+  const make = (running: boolean) => {
+    const { service, postRepository } = makeService();
+    Object.assign(postRepository, {
+      getPostsByGroup: jest.fn().mockResolvedValue([
+        { id: 'root', parentPostId: null, mcpWorkflowVersion: 114, state: 'ERROR', integrationId: 'channel' },
+        { id: 'child', parentPostId: 'root', mcpWorkflowVersion: null, state: 'QUEUE', integrationId: 'channel' },
+      ]),
+      deletePost: jest.fn().mockResolvedValue({ id: 'root' }),
+    });
+    const list = jest.fn(() => (async function* () { if (running) yield { workflowId: 'post_root_mcp_0' }; })());
+    (service as any)._temporalService = { client: { getRawClient: () => ({ workflow: { list } }), getWorkflowHandle: jest.fn() } };
+    return { service, postRepository, list };
+  };
+
+  it('lets a person delete it once no workflow runs for it', async () => {
+    const { service, postRepository } = make(false);
+    await expect(service.deletePost('org', 'group', true)).resolves.toEqual({ id: 'root' });
+    expect(postRepository.deletePost).toHaveBeenCalledWith('org', 'group', ['root']);
+  });
+
+  it('keeps the uncertain-publication guard while a workflow runs', async () => {
+    const { service, postRepository } = make(true);
+    await service.deletePost('org', 'group', true);
+    expect(postRepository.deletePost).toHaveBeenCalledWith('org', 'group', []);
+  });
+
+  it('keeps the guard for the public API and other callers', async () => {
+    const { service, postRepository, list } = make(false);
+    await service.deletePost('org', 'group');
+    expect(postRepository.deletePost).toHaveBeenCalledWith('org', 'group', []);
+    expect(list).toHaveBeenCalledTimes(1); // only the termination sweep after the delete
   });
 });

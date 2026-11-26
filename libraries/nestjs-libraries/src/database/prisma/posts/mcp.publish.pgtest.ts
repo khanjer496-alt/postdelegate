@@ -184,7 +184,7 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
       revision,
       0
     );
-    await repo.markMcpUnknown(org, failedChild.id);
+    await repo.markMcpUnfinished(org, failedChild.id);
     // Only terminal provider-adapter evidence may invoke this repository transition.
     await repo.reconcileMcpAttempt(org, failedChild.id, 'FAILED');
     expect(await repo.resumeMcp(org, root, revision)).toMatchObject({
@@ -516,6 +516,26 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     expect(
       await repo.claimMcpSegment(org, root, child, revision, 1)
     ).toMatchObject({ replay: false });
+  });
+
+  it('an attempt that stopped before its payload was bound is FAILED and blocks neither delete nor a retry', async () => {
+    const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
+    expect(await repo.markMcpUnfinished(org, attempt.id)).toBe('FAILED');
+    expect((await repo.mcpAttempts(org, root))[0]).toMatchObject({ status: 'FAILED' });
+    expect(await repo.claimMcpSegment(org, root, root, revision, 0)).toMatchObject({ replay: false });
+  });
+
+  it('an attempt with a bound payload stays UNKNOWN; a person may delete its failed root', async () => {
+    const attempt = await repo.claimMcpSegment(org, root, root, revision, 0);
+    await repo.bindMcpProviderPayload(org, attempt.id, [{ id: root, message: 'controlled fixture payload' }]);
+    expect(await repo.markMcpUnfinished(org, attempt.id)).toBe('UNKNOWN');
+    // still queued: not even a person may drop it
+    await expect(repo.deletePost(org, root, [root])).rejects.toThrow('active or uncertain');
+    await repo.failMcpSegment(org, root, root, 0, revision);
+    await expect(repo.deletePost(org, root)).rejects.toThrow('active or uncertain');
+    await repo.deletePost(org, root, [root]);
+    expect((await db.post.findUniqueOrThrow({ where: { id: root } })).deletedAt).not.toBeNull();
+    expect((await repo.mcpAttempts(org, root))[0]).toMatchObject({ status: 'UNKNOWN' });
   });
 
   it('deletion cannot bypass an uncertain publication fence and retains confirmed receipt history', async () => {
