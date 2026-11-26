@@ -411,7 +411,7 @@ export class PostsRepository {
   // it FAILED and may be retried. With a bound payload it may have been
   // published, so its outcome is UNKNOWN until it is reconciled.
   async markMcpUnfinished(orgId: string, id: string): Promise<'FAILED' | 'UNKNOWN' | null> {
-    return this._transaction.model.$transaction(async tx => {
+    return this._transaction.model.$transaction(async (tx): Promise<'FAILED' | 'UNKNOWN' | null> => {
       const failed = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED', providerPayloadHash: null }, data: { status: 'FAILED' } });
       if (failed.count) return 'FAILED';
       const unknown = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED' }, data: { status: 'UNKNOWN' } });
@@ -1465,7 +1465,7 @@ export class PostsRepository {
     await this.writeMcpFence(tx, orgId, posts);
     await this.recordAgentWrites(tx, orgId, admissionOwner, posts);
     return { previousPost, posts };
-    }, serializable ? { isolationLevel: 'Serializable' } : undefined)).catch(error => {
+    }, serializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined)).catch(error => {
       if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft) && ['P2025', 'P2034'].includes((error as any)?.code)) throw new BadRequestException('The draft changed. Refresh before editing.');
       throw error;
     });
