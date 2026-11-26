@@ -387,6 +387,163 @@ describe('PostsService approvals on save', () => {
   });
 });
 
+describe('PostsService TikTok Direct Post outside the composer', () => {
+  // the real TikTok rules, every other network has none
+  const { TiktokProvider } = jest.requireActual(
+    '@gitroom/nestjs-libraries/integrations/social/tiktok.provider'
+  );
+  const tiktok = new TiktokProvider();
+  const makeTikTokService = () => {
+    const postRepository = {
+      getPostById: jest.fn().mockResolvedValue(null),
+      createOrUpdatePost: jest.fn().mockResolvedValue({
+        posts: [{ id: 'p-1', state: 'QUEUE', content: 'hi' }],
+      }),
+      acquireAgentAdmission: jest.fn().mockResolvedValue({}),
+      releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+    };
+    const integrationService = {
+      getIntegrationById: jest.fn(async (_org: string, id: string) =>
+        id === 'i-tiktok' ? { id, providerIdentifier: 'tiktok' } : null
+      ),
+    };
+    const service = new PostsService(
+      postRepository as any,
+      {
+        getSocialIntegration: (identifier: string) =>
+          identifier === 'tiktok' ? tiktok : undefined,
+      } as any,
+      integrationService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {
+        assertAgentGuardrails: jest.fn().mockResolvedValue(undefined),
+        decide: jest.fn().mockResolvedValue({ hold: false }),
+        afterSave: jest.fn().mockResolvedValue({ submitted: false }),
+        notifyApprovers: jest.fn().mockResolvedValue(undefined),
+      } as any,
+      { recordPublished: jest.fn() } as any,
+      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
+    );
+    jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+    jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
+    return { service, postRepository, integrationService };
+  };
+
+  const directPost = {
+    __type: 'tiktok',
+    content_posting_method: 'DIRECT_POST',
+    privacy_level: 'PUBLIC_TO_EVERYONE',
+    music_usage_consent: true,
+    creator_info_verified: true,
+  };
+  const body = (settings: any) =>
+    ({
+      type: 'schedule',
+      date: '2026-12-02T10:00:00',
+      shortLink: false,
+      tags: [],
+      posts: [
+        {
+          integration: { id: 'i-tiktok' },
+          group: 'g',
+          settings,
+          value: [{ id: 'v-1', content: 'hi', image: [] }],
+        },
+      ],
+    } as any);
+  // the post argument of the save
+  const savedSettings = (postRepository: any) =>
+    postRepository.createOrUpdatePost.mock.calls[0].find(
+      (arg: any) => arg && typeof arg === 'object' && 'settings' in arg
+    )?.settings;
+  const agent = { type: 'agent' as const, source: 'Claude (MCP)' };
+
+  it.each(['API', 'CLI', 'MCP', 'AUTOPOST'] as const)(
+    'refuses a %s Direct Post with the reason, and saves nothing',
+    async (method) => {
+      const { service, postRepository } = makeTikTokService();
+      await expect(
+        service.createPost('org-1', body(directPost), method, false, agent)
+      ).rejects.toThrow(
+        'TikTok: TikTok Direct Post is only available in the PostDelegate composer'
+      );
+      expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses a Direct Post saved by bulk or import (WEB, not the composer)', async () => {
+    const { service, postRepository } = makeTikTokService();
+    await expect(
+      service.createPost('org-1', body(directPost), 'WEB', false, {
+        type: 'user',
+      } as any)
+    ).rejects.toThrow('only available in the PostDelegate composer');
+    expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
+  });
+
+  it('sends a post without a method to the inbox and drops self-made consent', async () => {
+    const { service, postRepository } = makeTikTokService();
+    await service.createPost(
+      'org-1',
+      body({ __type: 'tiktok', music_usage_consent: true, creator_info_verified: true }),
+      'API',
+      false,
+      agent
+    );
+    expect(savedSettings(postRepository)).toEqual({
+      __type: 'tiktok',
+      content_posting_method: 'UPLOAD',
+    });
+  });
+
+  it('keeps the composer Direct Post exactly as the composer sent it', async () => {
+    const { service, postRepository } = makeTikTokService();
+    await service.createPost(
+      'org-1',
+      body(directPost),
+      'WEB',
+      false,
+      { type: 'user' } as any,
+      undefined,
+      undefined,
+      true
+    );
+    expect(savedSettings(postRepository)).toEqual(directPost);
+  });
+
+  it('applies the rule of the channel when a request carries no __type yet', async () => {
+    const { service, integrationService } = makeTikTokService();
+    await expect(
+      service.applyOutsideComposerRules('org-1', [
+        {
+          integration: { id: 'i-tiktok' },
+          settings: { content_posting_method: 'DIRECT_POST' },
+        },
+      ])
+    ).rejects.toThrow('only available in the PostDelegate composer');
+    expect(integrationService.getIntegrationById).toHaveBeenCalledWith(
+      'org-1',
+      'i-tiktok'
+    );
+  });
+
+  it('leaves other networks alone without a lookup', async () => {
+    const { service, integrationService } = makeTikTokService();
+    const posts = [
+      { integration: { id: 'i-x' }, settings: { __type: 'x', who: 'me' } },
+    ];
+    expect(await service.applyOutsideComposerRules('org-1', posts)).toEqual(
+      posts
+    );
+    expect(integrationService.getIntegrationById).not.toHaveBeenCalled();
+  });
+});
+
 describe('PostsService status and date changes', () => {
   const future = () => new Date(Date.now() + 24 * 3600 * 1000);
   const past = () => new Date(Date.now() - 3600 * 1000);

@@ -13,6 +13,7 @@ export const FEATURE_FLAGS = {
   report_templates: 'PD_FF_REPORT_TEMPLATES',
   smartlinks: 'PD_FF_SMARTLINKS',
   free_plan: 'PD_FF_FREE_PLAN',
+  comments: 'PD_FF_COMMENTS',
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_FLAGS;

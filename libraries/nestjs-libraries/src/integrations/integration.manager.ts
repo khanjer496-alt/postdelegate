@@ -82,6 +82,12 @@ export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   // new MastodonCustomProvider(),
 ];
 
+// Providers that share a name and logo with another provider and need their
+// own OAuth client: listed only when that client is configured.
+const REQUIRED_CLIENT_ID_ENV: Record<string, string> = {
+  'tiktok-business': 'TIKTOK_BUSINESS_CLIENT_ID',
+};
+
 @Injectable()
 export class IntegrationManager {
   // Both are env-driven so cloud and self-hosted instances can differ:
@@ -96,10 +102,23 @@ export class IntegrationManager {
       .includes(identifier.toLowerCase());
   }
 
+  // A provider whose OAuth app is not configured on this instance can only
+  // fail at the platform's consent page, so it is hidden from everyone,
+  // preview workspaces included (e.g. the second "TikTok" tile, tiktok-business,
+  // when TIKTOK_BUSINESS_CLIENT_ID is unset).
+  isUnconfiguredProvider(identifier: string) {
+    const envName = REQUIRED_CLIENT_ID_ENV[identifier.toLowerCase()];
+    return !!envName && !(process.env[envName] || '').trim();
+  }
+
   // PREVIEW_PROVIDER_ORGS ("orgId1,orgId2") lets chosen workspaces (QA, demo
   // recordings for platform reviews) see and connect the hidden providers.
   // Org ids are case-sensitive, so they are only trimmed.
   isHiddenFor(identifier: string, orgId?: string) {
+    if (this.isUnconfiguredProvider(identifier)) {
+      return true;
+    }
+
     const previewOrgs = (process.env.PREVIEW_PROVIDER_ORGS || '')
       .split(',')
       .map((p) => p.trim());

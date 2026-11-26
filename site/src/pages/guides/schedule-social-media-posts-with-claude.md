@@ -107,7 +107,7 @@ An assistant connected over MCP can do what the tools allow, and that includes s
 
 ## What Claude cannot do
 
-Claude can only work with channels that are connected in PostDelegate. Facebook, Instagram, LinkedIn company Pages, TikTok and other networks are waiting on each network's approval, and X is not available on PostDelegate, so Claude cannot publish to them. It can still help you write the text.
+Claude can only work with channels that are connected in PostDelegate. Instagram, LinkedIn company Pages and other networks are waiting on each network's approval, and X is not available on PostDelegate, so Claude cannot publish to them. It can still help you write the text.
 
 ## Troubleshooting
 

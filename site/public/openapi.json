@@ -881,15 +881,14 @@
                         ],
                         "settings": {
                           "__type": "tiktok",
-                          "privacy_level": "PUBLIC_TO_EVERYONE",
-                          "duet": true,
-                          "stitch": true,
-                          "comment": true,
+                          "content_posting_method": "UPLOAD",
+                          "duet": false,
+                          "stitch": false,
+                          "comment": false,
                           "autoAddMusic": "no",
                           "brand_content_toggle": false,
                           "brand_organic_toggle": false,
-                          "video_made_with_ai": false,
-                          "content_posting_method": "DIRECT_POST"
+                          "video_made_with_ai": false
                         }
                       }
                     ]
@@ -1790,7 +1789,7 @@
               },
               "example": {
                 "settings": {
-                  "content_posting_method": "DIRECT_POST"
+                  "content_posting_method": "UPLOAD"
                 }
               }
             }
@@ -2650,7 +2649,7 @@
             "additionalProperties": true,
             "description": "The post's current provider-specific settings (the same shape used when creating the post). Keys depend on the channel's platform.",
             "example": {
-              "content_posting_method": "DIRECT_POST"
+              "content_posting_method": "UPLOAD"
             }
           },
           "publishDate": {
@@ -3073,14 +3072,12 @@
         "type": "object",
         "required": [
           "__type",
-          "privacy_level",
           "duet",
           "stitch",
           "comment",
           "autoAddMusic",
           "brand_content_toggle",
-          "brand_organic_toggle",
-          "content_posting_method"
+          "brand_organic_toggle"
         ],
         "properties": {
           "__type": {
@@ -3142,7 +3139,7 @@
               "DIRECT_POST",
               "UPLOAD"
             ],
-            "description": "Required. Use \"DIRECT_POST\" to actually publish the post to TikTok. \"UPLOAD\" does NOT publish: it only sends the media to the user's TikTok app inbox, where they must manually finish and publish it within 24 hours or it is discarded. Only use \"UPLOAD\" when the user explicitly asks to review or edit the post inside the TikTok app before publishing. \"UPLOAD\" also makes TikTok ignore every other setting in this object except the title."
+            "description": "\"UPLOAD\" sends the media to the user's TikTok app inbox, where they finish and publish it within 24 hours or it is discarded; it does not publish and TikTok ignores every other setting here except the title (photo posts). Posts created or changed through the public API, the CLI or MCP always use \"UPLOAD\": leave this out or send \"UPLOAD\". \"DIRECT_POST\" (publish straight to the profile) is only available in the PostDelegate composer, where TikTok requires the user to confirm the account, who can see the post and the Music Usage Confirmation; an API request with \"DIRECT_POST\" is refused with a 400, and so is a change through the API to a post that was set up as a Direct Post in the composer."
           }
         }
       },

@@ -62,9 +62,10 @@ describe('ComposerOnly', () => {
     const schema = (getValidationSchemas() as any).TikTokDto;
     expect(keys(schema).filter((key) => key.startsWith('x-'))).toEqual([]);
     // sha256 of JSON.stringify(TikTokDto schema) on main before ComposerOnly;
-    // a change to the TikTok DTO itself updates it on purpose
+    // a change to the TikTok DTO itself updates it on purpose: last for the
+    // content_posting_method description (Direct Post only in the composer)
     expect(createHash('sha256').update(JSON.stringify(schema)).digest('hex')).toBe(
-      '0e25d4e48bf299c1fcc5fd076cf6d4453e47eba6d558456881c1043ce48d4e4e'
+      '1e5b47576bd3cf89b6fb3085ebe26c716a525db1b1c813647e42dc93d6d00888'
     );
   });
 });

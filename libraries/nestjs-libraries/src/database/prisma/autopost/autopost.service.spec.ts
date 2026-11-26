@@ -33,6 +33,9 @@ jest.mock(
   () => ({ AutopostRepository: class {} })
 );
 jest.mock('nestjs-temporal-core', () => ({ TemporalService: class {} }));
+jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
+  IntegrationManager: class {},
+}));
 jest.mock('@gitroom/nestjs-libraries/dtos/autopost/autopost.dto', () => ({
   AutopostDto: class {},
 }));
@@ -111,6 +114,12 @@ describe('AutopostService workspace key', () => {
     hasCredential: jest.Mock;
     getOpenAiKey: jest.Mock;
   };
+  // tiktok takes no feed posts, every other network does
+  const integrationManager = {
+    getSocialIntegration: (identifier: string) => ({
+      autoPostUnsupported: identifier === 'tiktok',
+    }),
+  };
   let service: AutopostService;
 
   const autopost = (flags: { generateContent: boolean; addPicture: boolean }) => ({
@@ -149,7 +158,8 @@ describe('AutopostService workspace key', () => {
       {} as any,
       integrationService as any,
       postsService as any,
-      aiCredentialService as any
+      aiCredentialService as any,
+      integrationManager as any
     );
     jest.spyOn(service, 'loadXML').mockResolvedValue({
       success: true,
@@ -219,6 +229,37 @@ describe('AutopostService workspace key', () => {
     integrationService.getIntegrationsList.mockResolvedValue([
       { id: 'int-off', organizationId: 'org-1', disabled: true },
       { id: 'int-temp', organizationId: 'org-1', inBetweenSteps: true },
+    ]);
+
+    await service.startAutopost('autopost-1');
+
+    expect(postsService.createPost).not.toHaveBeenCalled();
+  });
+
+  it('autopost never posts to a network that takes no feed posts (TikTok)', async () => {
+    autopostsRepository.getAutopost.mockResolvedValue({
+      ...autopost({ generateContent: false, addPicture: false }),
+      integrations: JSON.stringify([{ id: 'int-tiktok' }, { id: 'int-x' }]),
+    });
+    integrationService.getIntegrationsList.mockResolvedValue([
+      { id: 'int-tiktok', organizationId: 'org-1', providerIdentifier: 'tiktok' },
+      { id: 'int-x', organizationId: 'org-1', providerIdentifier: 'x' },
+    ]);
+
+    await service.startAutopost('autopost-1');
+
+    expect(postsService.createPost).toHaveBeenCalledTimes(1);
+    const [, body] = postsService.createPost.mock.calls[0];
+    expect(body.posts.map((p: any) => p.integration.id)).toEqual(['int-x']);
+  });
+
+  it('autopost with only a TikTok channel creates nothing', async () => {
+    autopostsRepository.getAutopost.mockResolvedValue({
+      ...autopost({ generateContent: false, addPicture: false }),
+      integrations: JSON.stringify([{ id: 'int-tiktok' }]),
+    });
+    integrationService.getIntegrationsList.mockResolvedValue([
+      { id: 'int-tiktok', organizationId: 'org-1', providerIdentifier: 'tiktok' },
     ]);
 
     await service.startAutopost('autopost-1');

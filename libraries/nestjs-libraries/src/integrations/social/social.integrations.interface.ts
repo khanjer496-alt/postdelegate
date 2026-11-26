@@ -114,6 +114,33 @@ export interface IAuthenticator {
     releaseId: string,
     integration: Integration
   ): Promise<string | undefined>; // URL of a post the user connected by hand
+  commentPosts?(
+    id: string,
+    accessToken: string,
+    limit: number
+  ): Promise<CommentPost[]>; // Latest posts of the channel for the comments view (PD_FF_COMMENTS), newest first. Throws when the platform call fails
+  postComments?(
+    id: string,
+    accessToken: string,
+    postId: string
+  ): Promise<PostComment[]>; // Comments on one of the channel's posts, with their replies. Throws when the platform call fails
+  replyToComment?(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    message: string
+  ): Promise<{ id: string }>; // Answers a comment as the channel
+  hideComment?(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    hide: boolean
+  ): Promise<void>;
+  deleteComment?(
+    id: string,
+    accessToken: string,
+    commentId: string
+  ): Promise<void>;
   changeNickname?(
     id: string,
     accessToken: string,
@@ -128,6 +155,28 @@ export interface IAuthenticator {
     id: string,
     accessToken: string
   ): Promise<{ id: string; url: string }[]>;
+}
+
+// A post of the channel in the comments view (PD_FF_COMMENTS)
+export interface CommentPost {
+  id: string;
+  caption: string;
+  permalink?: string;
+  thumbnail?: string;
+  createdAt: string;
+  comments: number;
+}
+
+// A comment read back from the platform. `own` is a comment the channel
+// itself wrote (its replies), which auto-replies never answer.
+export interface PostComment {
+  id: string;
+  text: string;
+  username: string;
+  createdAt: string;
+  hidden: boolean;
+  own: boolean;
+  replies: PostComment[];
 }
 
 export interface AnalyticsData {
@@ -351,6 +400,13 @@ export interface SocialProvider
   // it from the stored URL and the post's settings only - this runs on an
   // unauthenticated request, so it must do no network call and no token work.
   isPublicReleaseURL?(releaseURL: string, settings: any): boolean;
+  // A post saved anywhere but the signed-in composer (public API, CLI, MCP,
+  // the agent, CSV import, bulk and auto post): the settings it is stored
+  // with instead, or why only the composer can make it - for rules a network
+  // ties to the composer, like TikTok's consent before a Direct Post.
+  settingsOutsideComposer?(settings: any): { settings: any } | { error: string };
+  // auto post (RSS feeds) never creates posts for this network
+  autoPostUnsupported?: boolean;
   // what lifts the plan's monthly cap on this network
   // (provider_posts_per_month), the end of the message shown at the cap
   planLimitHint?: string;
@@ -407,6 +463,7 @@ export interface SocialProvider
   scopes: string[];
   analyticsAvailable?: boolean;
   plugsAvailable?: boolean;
+  commentsAvailable?: boolean; // false when the permission the comments view needs is not requested (PD_FF_COMMENTS)
   externalUrl?: (
     url: string
   ) => Promise<{ client_id: string; client_secret: string }>;

@@ -269,7 +269,11 @@ export class PostsController {
       body,
       'WEB',
       false,
-      userActor(user, org as any)
+      userActor(user, org as any),
+      undefined,
+      undefined,
+      // the composer itself
+      true
     );
   }
 

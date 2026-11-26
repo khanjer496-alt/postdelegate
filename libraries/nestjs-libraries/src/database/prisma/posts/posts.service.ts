@@ -1832,6 +1832,41 @@ export class PostsService {
     if (process.env.MCP_V114_ADMISSION_ENABLED !== 'true') throw new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
   }
 
+  // A network can tie some settings to the signed-in composer (TikTok's
+  // Direct Post needs the account check and consent shown there). A post
+  // saved from anywhere else - public API, CLI, MCP, the agent, CSV import,
+  // bulk, clipping or auto post - gets the settings the provider allows
+  // outside it, or a readable error. The provider is the one of __type, which
+  // mapTypeToPost and every internal caller set from the channel (like the
+  // rest of createPost); a request that has none yet is looked up.
+  async applyOutsideComposerRules<
+    T extends { integration: { id: string }; settings?: any }
+  >(orgId: string, posts: T[]): Promise<T[]> {
+    return Promise.all(
+      (posts || []).map(async (post) => {
+        const identifier =
+          post?.settings?.__type ||
+          (
+            await this._integrationService.getIntegrationById(
+              orgId,
+              post?.integration?.id
+            )
+          )?.providerIdentifier;
+        const provider = identifier
+          ? this._integrationManager.getSocialIntegration(identifier)
+          : undefined;
+        if (!provider?.settingsOutsideComposer) {
+          return post;
+        }
+        const result = provider.settingsOutsideComposer(post.settings || {});
+        if ('error' in result) {
+          throw new BadRequestException(`${provider.name}: ${result.error}`);
+        }
+        return { ...post, settings: result.settings };
+      })
+    );
+  }
+
   async createPost(
     orgId: string,
     body: CreatePostDto,
@@ -1842,10 +1877,20 @@ export class PostsService {
     actor?: ApprovalActor,
     // Server-captured revision from the in-place draft editor, never authority.
     expectedDraftUpdatedAt?: Date,
-    validationIntent?: 'review'
+    validationIntent?: 'review',
+    // only the signed-in composer (POST /posts) and the drafts it generates
+    // pass true, see applyOutsideComposerRules
+    fromComposer = false
   ): Promise<any[]> {
     for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
     if (creationMethod === 'MCP') this.assertMcpAdmissionReady();
+    if (!fromComposer) {
+      body = {
+        ...body,
+        posts: await this.applyOutsideComposerRules(orgId, body.posts),
+      };
+    }
+
     return actor?.type === 'agent'
       ? this.withAgentAdmission(orgId, async () => {
           try { return await this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent); }
@@ -3229,7 +3274,13 @@ export class PostsService {
               },
             ],
           },
-          'WEB'
+          'WEB',
+          false,
+          undefined,
+          undefined,
+          undefined,
+          // drafts the dashboard generator opens in the composer
+          true
         );
       }
     }

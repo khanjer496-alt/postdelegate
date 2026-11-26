@@ -237,6 +237,8 @@ export class IntegrationsController {
             time: JSON.parse(p.postingTimes),
             changeProfilePicture: !!findIntegration?.changeProfilePicture,
             changeNickName: !!findIntegration?.changeNickname,
+            // auto post (RSS) can pick this channel
+            autoPostAvailable: !findIntegration?.autoPostUnsupported,
             commentsAvailable: findIntegration.plugsAvailable !== false,
             analyticsAvailable: findIntegration.analyticsAvailable !== false,
             recentPosts:

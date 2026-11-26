@@ -82,6 +82,8 @@ describe('createPostForReviewTool', () => {
   const build = () => {
     const postsService = {
       withAgentAdmission: (_org: string, action: () => unknown) => action(),
+      // the network rules outside the composer leave these posts as they are
+      applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
       validatePosts: jest.fn().mockResolvedValue([
         { name: 'QA LinkedIn', valid: true, errors: true, tooLong: false },
       ]),

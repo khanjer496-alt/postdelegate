@@ -17,6 +17,7 @@ import { AiCredentialService } from '@gitroom/nestjs-libraries/database/prisma/a
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { isChannelConnected } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import { TemporalService } from 'nestjs-temporal-core';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { TypedSearchAttributes } from '@temporalio/common';
 import {
   organizationId,
@@ -69,7 +70,8 @@ export class AutopostService {
     private _temporalService: TemporalService,
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
-    private _aiCredentialService: AiCredentialService
+    private _aiCredentialService: AiCredentialService,
+    private _integrationManager: IntegrationManager
   ) {}
 
   async stopAll(org: string) {
@@ -362,10 +364,17 @@ export class AutopostService {
     }
 
     // only channels that can be scheduled to: a channel turned off, removed
-    // or still picking its page never gets a feed post
+    // or still picking its page never gets a feed post, and neither does a
+    // network that takes no feed posts (autoPostUnsupported)
     const integrations = (
       await this._integrationService.getIntegrationsList(getPost.organizationId)
-    ).filter(isChannelConnected);
+    ).filter(
+      (integration) =>
+        isChannelConnected(integration) &&
+        !this._integrationManager.getSocialIntegration(
+          integration.providerIdentifier
+        )?.autoPostUnsupported
+    );
 
     const parseIntegrations = JSON.parse(getPost.integrations || '[]') || [];
     const neededIntegrations = integrations.filter((i) =>
