@@ -174,7 +174,14 @@ export class PostActivity {
   async searchForMissingThreeHoursPosts() {
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
-      if (await this._postService.recoverMissingMcpJob(post.organizationId, post.id)) continue;
+      // one tracked MCP post that cannot be recovered must not stop the sweep
+      // for the posts after it. It is never handed to the legacy workflow.
+      try {
+        if (await this._postService.recoverMissingMcpJob(post.organizationId, post.id)) continue;
+      } catch (err) {
+        console.error(`Missing post sweep could not recover MCP post ${post.id}: ${(err as Error)?.message}`);
+        continue;
+      }
       await this._temporalService.client
         .getRawClient()
         .workflow.signalWithStart('postWorkflowV113', {

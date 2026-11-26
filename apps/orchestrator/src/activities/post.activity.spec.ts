@@ -400,6 +400,36 @@ describe('PostActivity state writes for postWorkflowV113', () => {
   });
 });
 
+describe('the missing-posts sweep with a failing MCP recovery', () => {
+  it('logs it and still starts the legacy posts after it', async () => {
+    const signalWithStart = jest.fn().mockResolvedValue(undefined);
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const recoverMissingMcpJob = jest.fn(async (_org: string, id: string) => {
+      if (id === 'mcp-1') throw new Error('fence unavailable');
+      return false;
+    });
+    const activity = new PostActivity(
+      {
+        recoverMissingMcpJob,
+        searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
+          { id: 'mcp-1', organizationId: 'org-1', integration: { providerIdentifier: 'x' } },
+          { id: 'legacy-1', organizationId: 'org-1', integration: { providerIdentifier: 'x' } },
+        ]),
+      } as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any,
+      { client: { getRawClient: () => ({ workflow: { signalWithStart } }) } } as any,
+      {} as any
+    );
+
+    await expect(activity.searchForMissingThreeHoursPosts()).resolves.toBeUndefined();
+
+    expect(signalWithStart).toHaveBeenCalledTimes(1);
+    expect(signalWithStart).toHaveBeenCalledWith('postWorkflowV113', expect.objectContaining({ workflowId: 'post_legacy-1' }));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('mcp-1'));
+    error.mockRestore();
+  });
+});
+
 describe('MCP final transformed payload validation', () => {
   const activity = (provider: any) => new PostActivity(
     { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
