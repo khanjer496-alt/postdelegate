@@ -1,0 +1,54 @@
+---
+import Alternatives from '../../components/Alternatives.astro';
+const faq = [
+  { q: 'What is included in Post Planner Free?', a: 'The current plan help lists one account, one user, 30 queued posts and 12 daily posts per profile. Thirty is the queued inventory allowance, not a promise of 30 new posts each month. X and Pinterest require Growth or higher.' },
+  { q: 'Which alternative should I compare for RSS and recycling?', a: 'Publer Professional documents RSS and bulk scheduling; Business adds automatic recycling and recurring posts. Choose the tier for the job you need. Neither statement establishes that Publer reproduces Post Planner content discovery or imports its buckets.' },
+  { q: 'Does Post Planner have an API or MCP server?', a: 'Public API and MCP details were not listed in the product and pricing documentation checked for this batch. That is an unknown, not proof that the capabilities do not exist. Confirm your required integration with the vendor before making a migration depend on it.' },
+];
+const links = [
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/alternatives/recurpost', label: 'RecurPost alternatives: reusable libraries' },
+  { href: '/docs/bulk-import', label: 'PostDelegate bulk import' },
+  { href: '/docs/mcp', label: 'PostDelegate assistant connection' },
+  { href: '/docs/channels/coming-soon', label: 'Networks waiting on approval' },
+];
+---
+<Alternatives
+  subject="post-planner" alternatives={['publer', 'buffer', 'metricool', 'planable']} published="2026-11-15"
+  title="Post Planner Alternatives: Discovery, Queues and Team Fit"
+  description="Compare Post Planner alternatives for RSS, bulk scheduling, reporting and review. Separate content discovery from queue limits before choosing a replacement."
+  h1="Post Planner alternatives for discovery, queues and team fit"
+  shortAnswer="Compare Publer for RSS and bulk scheduling, Buffer for a small original-content queue, Metricool for brand reporting, and Planable for review workflows. Keep Post Planner if its discovery and recycling process already supplies the content you need."
+  fitIntro="PostDelegate is our product. It may fit when you already have your content and want CSV imports, assistant access and approval controls on supported channels. Do not treat it as a verified replacement for Post Planner's discovery sources or reusable buckets."
+  faq={faq} links={links}
+>
+  <Fragment slot="before-table">
+    <h2>Do you need ideas, distribution, or both?</h2>
+    <p>Someone who opens Post Planner to discover material has a different switching problem from someone who already writes everything in a document. Post Planner combines content discovery with buckets, a smart queue and recycling, according to its <a href="https://help.postplanner.com/en/articles/8797516-what-are-the-differences-between-plans">plan guide</a>. Replacing distribution alone leaves the sourcing job unresolved. Make a list of where usable ideas come from before comparing calendars.</p>
+    <p>Then measure inventory separately from output. The current help page gives Free 30 queued posts and Starter 150. A queue ceiling limits how much can wait to go out; it is not the same as a monthly publishing allowance. The <a href="https://www.postplanner.com/plans-signup">pricing page</a> also separates monthly billing from annual equivalents. Starter is $14 month to month or $9 per month billed annually, so compare the payment commitment as well as the displayed number.</p>
+  </Fragment>
+
+  <h2>Four ways to change the workflow</h2>
+  <h3>Publer: when the source is an RSS feed or a prepared batch</h3>
+  <p><a href="https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/">Publer Professional</a> includes RSS and bulk scheduling. Business adds automatic recycling and recurring posts. Start with the lower tier only if those are genuinely the jobs you need. A feed importing your own articles is a different source of material from discovering third-party posts, and a bulk uploader does not decide which items are worth repeating.</p>
+  <h3>Buffer: when a modest queue is enough</h3>
+  <p><a href="https://buffer.com/pricing">Buffer</a> offers a Free plan for three channels with ten queued posts per channel and one user. It is a candidate for a small set of original posts that you replenish often. Team adds approval workflows and unlimited users. Price the actual channels and review needs together rather than assuming that the cheapest single-channel paid price represents the team's total.</p>
+  <h3>Metricool: when performance review drives the next batch</h3>
+  <p><a href="https://metricool.com/pricing/">Metricool</a> organizes subscriptions around brands, each with one profile per network. Its Free plan excludes LinkedIn and X; team access starts on Advanced. Consider it if the main gap is reviewing results across brands. Website and advertising connections are measurement coverage, not evidence that every connected destination accepts scheduled social posts.</p>
+  <h3>Planable: when drafts need a clearer decision</h3>
+  <p><a href="https://planable.io/pricing/">Planable</a> offers optional approvals on Basic, required approvals on Pro and multi-level approvals on Enterprise, with unlimited users on paid plans. That gives a concrete review structure to evaluate. Post Planner's checked plan documentation did not establish its approval workflow details, so ask for the exact behavior you need instead of treating an undocumented feature as absent.</p>
+
+  <h2>When Post Planner is worth keeping</h2>
+  <p>Stay if its discovery process and reusable buckets already produce a suitable cadence within your account and queue limits. Its <a href="https://www.postplanner.com/features/social-posting-scheduler">scheduler documentation</a> describes recycling with a repeat count, an end date or indefinite reuse, plus queue pausing. Those controls can matter more than a different calendar layout. Check network eligibility too: the current <a href="https://help.postplanner.com/en/articles/8797516-what-are-the-differences-between-plans">plan guide</a> puts X and Pinterest on Growth or above, even when your account count would fit Starter.</p>
+
+  <p>Use one representative week to separate the two jobs. Mark which posts came from discovery and which arrived ready to schedule. Then note how much editing each needed and who made the final decision. This gives you a practical shortlist: a replacement that distributes finished content may be sufficient for one team, while another still needs a dependable source of ideas. Keep that sourcing decision visible instead of expecting a new scheduling subscription to solve it automatically.</p>
+
+  <h2>A fit and migration checklist</h2>
+  <ol>
+    <li>Separate discovered content from original content and identify the sources you will keep using after a move.</li>
+    <li>Count connected accounts, editing users and queued items; check the tier needed for each required network.</li>
+    <li>Record bucket membership, repeat counts, expiry dates and paused queues before rebuilding any schedule.</li>
+    <li>Validate a small sample of captions, media, dates and reviewer access. Stop overlapping queues at a planned handover time.</li>
+  </ol>
+  <p>For PostDelegate, compare the <a href="/docs/bulk-import">CSV preview and 200-post file limit</a> with the inventory you intend to move. Check <a href="/docs/channels/coming-soon">pending networks</a>: Instagram, Threads, LinkedIn company Pages and Pinterest cannot connect yet; X is unavailable. None of the sources checked establishes automatic transfer of discovery feeds, buckets or historical results. These recommendations are based on public documentation, not first-hand product trials.</p>
+</Alternatives>

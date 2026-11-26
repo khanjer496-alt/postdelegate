@@ -1,0 +1,54 @@
+---
+import Alternatives from '../../components/Alternatives.astro';
+const faq = [
+  { q: 'Which RecurPost alternative supports evergreen recycling?', a: 'Publer Business documents automatic recycling and recurring posts. Its Professional plan includes RSS and bulk scheduling, which are different jobs. RecurPost itself supports recurring, one-time and seasonal libraries, so compare the behavior you use before moving.' },
+  { q: 'Does RecurPost already offer API and MCP access?', a: 'Yes. RecurPost documents a public API and an official MCP server on every plan. Compare the actions, permissions and review workflow you need; connector availability alone is not a reason to switch.' },
+  { q: 'Will moving preserve my RecurPost libraries?', a: 'An automatic transfer of library rules, seasonal dates, recycling history and approval stages was not established by the sources checked here. Inventory those separately from post text, then validate a small replacement queue before retiring the old schedule.' },
+];
+const links = [
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/alternatives/post-planner', label: 'Post Planner alternatives: discovery and queue limits' },
+  { href: '/docs/bulk-import', label: 'PostDelegate CSV import limits and preview' },
+  { href: '/docs/approvals', label: 'PostDelegate approval controls' },
+  { href: '/docs/channels/coming-soon', label: 'Networks waiting on approval' },
+];
+---
+<Alternatives
+  subject="recurpost" alternatives={['publer', 'buffer', 'planable', 'metricool']} published="2026-11-15"
+  title="RecurPost Alternatives: Evergreen Libraries and Approvals"
+  description="Compare RecurPost alternatives for evergreen recycling, small queues, approvals and reporting. Check library migration work, API access and reasons to stay."
+  h1="RecurPost alternatives for evergreen libraries and approvals"
+  shortAnswer="Start with Publer Business if you need recurring posts and automatic recycling, Buffer for a small queue, Planable for review workflows, or Metricool for reporting across brands. Stay with RecurPost when its seasonal libraries and client handoffs already work."
+  fitIntro="PostDelegate is our product. Consider it for publishing through an assistant or API with configurable approval controls, provided its live channels cover your work. It is not a documented automatic migration of RecurPost's library rules or seasonal schedules."
+  faq={faq} links={links}
+>
+  <Fragment slot="before-table">
+    <h2>Replace the right part of your workflow</h2>
+    <p>A RecurPost replacement has to do more than hold next week's posts. Its <a href="https://recurpost.com/features/schedule/">scheduling documentation</a> distinguishes recurring libraries, one-time libraries and seasonal libraries that run inside annual date windows. Those rules describe when content returns and when it stops. If that is the work you rely on, a plain publishing calendar only replaces part of the system.</p>
+    <p>Separate three questions before making a shortlist: how reusable content is selected, who reviews it, and how automation creates or schedules posts. RecurPost already documents both a <a href="https://developers.recurpost.com/">public API</a> and an <a href="https://recurpost.com/features/schedule/mcp/">official MCP server on every plan</a>. There is no need to leave simply to connect an assistant. Instead, compare the particular library, scheduling and history actions your process needs.</p>
+  </Fragment>
+
+  <h2>Four alternatives, chosen by the job</h2>
+  <h3>Publer: distinguish recycling from bulk scheduling</h3>
+  <p><a href="https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/">Publer's plan guide</a> puts RSS and bulk scheduling on Professional, while Business adds automatic recycling and recurring posts. Business is therefore the relevant comparison for a reusable queue. Write down the repeat intervals, stop conditions and account-specific variants you expect first. A similar feature label does not establish that your existing library structure transfers.</p>
+  <h3>Buffer: size the queue you actually need</h3>
+  <p><a href="https://buffer.com/pricing">Buffer Free</a> covers three channels, one user and ten queued posts per channel at a time. That can suit a small supply of original posts that someone refreshes regularly. A short queue allowance is different from an evergreen archive. Buffer also includes MCP on Free, so compare queue management and collaboration needs before paying for a broader workflow.</p>
+  <h3>Planable: make review the deciding factor</h3>
+  <p><a href="https://planable.io/pricing/">Planable</a> charges per workspace with unlimited users on paid plans. Basic offers optional approvals; Pro adds required approvals; Enterprise adds multi-level approvals. It deserves attention when review handoffs are the problem. Its <a href="https://planable.io/guides/planable-mcp/">MCP connector</a> can work with drafts and approvals but cannot publish directly, a meaningful distinction for an assistant-driven process.</p>
+  <h3>Metricool: organize the comparison around brands</h3>
+  <p><a href="https://metricool.com/pricing/">Metricool</a> is useful to evaluate when reporting across brands has become the main job. A brand allows one profile per network, rather than an interchangeable pool of accounts. Team access starts on Advanced. Its <a href="https://help.metricool.com/mcp-limits-and-plan-requirements-h72jg">MCP limits</a> exclude autolists, so do not assume assistant access recreates evergreen controls.</p>
+
+  <h2>When staying with RecurPost makes sense</h2>
+  <p>Stay when recurring and seasonal libraries already maintain the right cadence without repeated manual work. RecurPost's <a href="https://recurpost.com/features/collaborate/">collaboration documentation</a> also describes client workspaces, shareable calendars and Agency approval stages. Rebuilding a working client review process has a cost even if another entry price looks lower. Its <a href="https://recurpost.com/plans-and-pricing/">pricing page</a> lists an X Wallet charge for X posts containing links; include that usage in your own budget instead of comparing subscription prices alone.</p>
+
+  <p>Make the library inventory concrete: for each reusable item, record its intended audience, the destination account and the last date it should remain relevant. A seasonal promotion may need a different return window from an evergreen tutorial. Keep those editorial decisions alongside the text and media, so a replacement queue can be checked against your intent. Saving the post content alone is not enough to show that a future repeat will still be appropriate.</p>
+
+  <h2>A controlled migration checklist</h2>
+  <ol>
+    <li>Inventory recurring, one-time and seasonal libraries, including annual windows, stop dates and variants for each account.</li>
+    <li>Record who can edit and approve each client's posts; test the replacement roles before handing over access.</li>
+    <li>Move a small sample, verify timezone and media behavior, and compare the next several scheduled dates with the original queue.</li>
+    <li>Pause overlapping schedules before switching publication ownership. Keep a reference copy of the original rules and upcoming posts.</li>
+  </ol>
+  <p>If PostDelegate is on the shortlist, check <a href="/docs/channels/coming-soon">network status</a> first: Instagram, Threads, LinkedIn company Pages and Pinterest are waiting on approval; X is unavailable. Its <a href="/docs/bulk-import">CSV importer</a> accepts up to 200 posts per file, not an evergreen-library definition. This comparison uses public documentation checked for this batch, not hands-on product trials.</p>
+</Alternatives>

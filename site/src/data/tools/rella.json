@@ -1,0 +1,68 @@
+{
+  "name": "Rella",
+  "slug": "rella",
+  "site": "https://getrella.com",
+  "pricingUrl": "https://getrella.com/pricing",
+  "checked": "2026-11-15",
+  "kind": {
+    "value": "Social media project management with a calendar, Kanban boards, tasks, approvals, publishing and analytics",
+    "src": "https://getrella.com/"
+  },
+  "hosting": {
+    "value": "Hosted web app",
+    "src": "https://getrella.com/pricing"
+  },
+  "pricingModel": {
+    "value": "Per creator/editor seat, with unlimited social profiles and Social Spaces; external reviewers do not need paid seats",
+    "src": "https://getrella.com/pricing"
+  },
+  "freeOption": {
+    "value": "14-day trial; a permanent free plan is not listed",
+    "src": "https://getrella.com/pricing"
+  },
+  "trial": {
+    "value": "14 days on every tier; pricing says charges begin after the trial unless canceled",
+    "src": "https://getrella.com/pricing"
+  },
+  "entryPaid": {
+    "value": "Pro $30/seat/month billed monthly, or $24/seat/month billed annually ($288/year)",
+    "src": "https://getrella.com/blog/rella-pricing-explained-which-plan-is-right-for-your-social-media-team",
+    "note": "Monthly rate is from the official pricing guide labeled October 2026; no checkout or billing toggle was tested."
+  },
+  "plans": {
+    "value": "Monthly per seat: Pro $30, Premium $59, Premium Plus $79. Annual monthly equivalents: $24, $48, $64. All include unlimited profiles and posts",
+    "note": "Monthly figures are from the official pricing guide labeled October 2026; current pricing's annual figures agree.",
+    "src": [
+      "https://getrella.com/pricing",
+      "https://getrella.com/blog/rella-pricing-explained-which-plan-is-right-for-your-social-media-team"
+    ]
+  },
+  "networks": {
+    "value": "Instagram, Facebook, TikTok, YouTube, LinkedIn, Pinterest, Threads, X and Google Business Profile",
+    "src": "https://getrella.com/blog/rella-pricing-explained-which-plan-is-right-for-your-social-media-team"
+  },
+  "api": {
+    "value": "Public API endpoint documentation and plan entitlement not listed in the checked integration documentation",
+    "note": "Rella's fair-use policy mentions its API; this is not evidence that Rella lacks an API.",
+    "src": [
+      "https://support.getrella.com/collections/2560478961-integrations",
+      "https://getrella.com/fair-use-policy"
+    ]
+  },
+  "mcp": {
+    "value": "Official MCP on Premium/Premium Plus for drafting, scheduling, tasks, media and analytics",
+    "note": "The connector cannot enable auto-posting; publication remains under the user's control. External assistant use does not consume Ella credits.",
+    "src": "https://support.getrella.com/articles/2582931593-rella-connector-guide"
+  },
+  "ai": {
+    "value": "Ella is not on Pro. Premium has monthly credits and optional paid overage; Premium Plus advertises unlimited usage subject to fair use",
+    "src": [
+      "https://getrella.com/pricing",
+      "https://getrella.com/fair-use-policy"
+    ]
+  },
+  "teams": {
+    "value": "Pro has public feedback links but no assigned approvers. Premium includes one assigned approver; Premium Plus unlimited assigned approvers and white labeling. Only creators/editors need seats",
+    "src": "https://getrella.com/pricing"
+  }
+}

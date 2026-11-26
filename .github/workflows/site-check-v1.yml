@@ -1,0 +1,125 @@
+name: Site check v1
+
+on:
+  pull_request:
+    paths: ['site/**', '.github/workflows/site-check-v1.yml']
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/site-check-v1.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-check-v1-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.6.1'
+          run_install: false
+      - name: Synthetic acceptance and archive fault checks
+        run: PYTHONDONTWRITEBYTECODE=1 python3 site/scripts/test-public-payload.py -v
+      - name: Comparison cost-label regression
+        run: node site/scripts/test-comparison-cost-labels.mjs
+      - name: Synthetic runtime diagnostic checks (no native spawn)
+        run: node site/scripts/test-preview-runtime-diagnostics.mjs
+      - name: Raw worker staging and non-executing syntax checks
+        run: node site/scripts/test-stage-pages-worker.mjs
+      - name: Install standalone site
+        working-directory: site
+        run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Full site build (including OG generation)
+        working-directory: site
+        run: pnpm build
+      - name: Install isolated pinned preview CLI (hosted only)
+        run: |
+          mkdir -p "$RUNNER_TEMP/site-cli"
+          cd "$RUNNER_TEMP/site-cli"
+          pnpm --ignore-workspace add wrangler@4.162.0 --save-exact
+      - name: Compile existing Pages Functions
+        run: |
+          compiled="$(mktemp -d "$RUNNER_TEMP/site-functions.XXXXXX")"
+          # In pinned Wrangler, --outfile serializes multipart upload bytes, not raw Module JS.
+          "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages functions build site/functions --outdir="$compiled"
+          node site/scripts/stage-pages-worker.mjs "$compiled" site/dist/_worker.js "$RUNNER_TEMP/site-worker-format.json"
+          # A generated routes default must never overwrite the reviewed public contract.
+          for file in _routes.json _headers _redirects; do
+            cmp "site/public/$file" "site/dist/$file"
+          done
+      - name: Preview and accept disposable public payload
+        id: accept
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="$(mktemp -d "$RUNNER_TEMP/site-preview.XXXXXX")"
+          mkdir "$stage/payload" "$stage/evidence" "$stage/diagnostics"
+          echo "diagnostics=$stage/diagnostics/*.json" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          cp -R site/dist/. "$stage/payload/"
+          cp "$RUNNER_TEMP/site-worker-format.json" "$stage/evidence/worker-format.json"
+          # No repository/config/functions discovery or production bindings in preview.
+          # Pinned Wrangler's `pages dev --no-bundle` injects dev middleware imports it never
+          # resolves, so workerd cannot start; preview bundles the already-checked raw module.
+          node --version > "$stage/evidence/node-version.txt"
+          pnpm --version > "$stage/evidence/pnpm-version.txt"
+          "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" --version > "$stage/evidence/wrangler-version.txt"
+          node "$GITHUB_WORKSPACE/site/scripts/preview-runtime-diagnostics.mjs" \
+            "$RUNNER_TEMP/site-cli" "$stage/diagnostics/runtime-diagnostics.json"
+          cd "$stage"
+          setsid "$RUNNER_TEMP/site-cli/node_modules/.bin/wrangler" pages dev "$stage/payload" --ip 127.0.0.1 --port 8789 --compatibility-date 2026-09-08 > "$stage/preview.log" 2>&1 &
+          preview_pid=$!
+          cleanup() {
+            kill -- -"$preview_pid" 2>/dev/null || true
+            timeout 10s tail --pid="$preview_pid" -f /dev/null || kill -KILL -- -"$preview_pid" 2>/dev/null || true
+            wait "$preview_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          acceptance_exit=0
+          python3 "$GITHUB_WORKSPACE/site/scripts/accept-public-payload.py" \
+            --payload "$stage/payload" --base http://127.0.0.1:8789 \
+            --source "$GITHUB_WORKSPACE" --output "$stage/evidence" \
+            --diagnostics "$stage/diagnostics/preview-diagnostics.json" || acceptance_exit=$?
+          preview_state=running
+          preview_exit=''
+          if ! kill -0 "$preview_pid" 2>/dev/null; then
+            preview_state=exited
+            preview_exit=0
+            wait "$preview_pid" || preview_exit=$?
+          fi
+          python3 "$GITHUB_WORKSPACE/site/scripts/accept-public-payload.py" \
+            --finalize-diagnostics "$stage/diagnostics/preview-diagnostics.json" \
+            --process-state "$preview_state" --process-exit "$preview_exit" \
+            --acceptance-exit "$acceptance_exit" --version-dir "$stage/evidence"
+          if [ "$acceptance_exit" -ne 0 ]; then exit "$acceptance_exit"; fi
+          echo "path=$stage/evidence" >> "$GITHUB_OUTPUT"
+      - name: Upload failure-only structured preview diagnostics (never a release payload)
+        if: ${{ failure() && steps.accept.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview-diagnostics-${{ steps.accept.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.accept.outputs.diagnostics }}
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload checked source-bound bundle and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-public-${{ steps.accept.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.accept.outputs.path }}/
+          if-no-files-found: error
+          retention-days: 7
