@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.postdelegate/postdelegate",
   "title": "PostDelegate",
-  "description": "Schedule and manage social posts on your connected channels through MCP. Sign in with OAuth.",
-  "version": "1.0.0",
+  "description": "Schedule, draft and publish social posts from Claude, ChatGPT or any MCP client, with approvals.",
+  "version": "1.1.0",
   "websiteUrl": "https://postdelegate.com",
   "repository": {
     "url": "https://github.com/khanjer496-alt/postdelegate-app",
@@ -13,7 +13,9 @@
     {
       "src": "https://postdelegate.com/postdelegate-icon-512.png",
       "mimeType": "image/png",
-      "sizes": ["512x512"]
+      "sizes": [
+        "512x512"
+      ]
     }
   ],
   "remotes": [
