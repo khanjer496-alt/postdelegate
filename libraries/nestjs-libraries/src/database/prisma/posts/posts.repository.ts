@@ -1470,7 +1470,9 @@ export class PostsRepository {
     await this.writeMcpFence(tx, orgId, posts);
     await this.recordAgentWrites(tx, orgId, admissionOwner, posts);
     return { previousPost, posts };
-    }, serializable ? { isolationLevel: 'Serializable' as const } : undefined)).catch(error => {
+    // a thread with media and tags runs past Prisma's 5s default, which
+    // fails the save with P2028 (not retried); 15s like the other long saves
+    }, { timeout: 15000, ...(serializable ? { isolationLevel: 'Serializable' as const } : {}) })).catch(error => {
       if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft) && ['P2025', 'P2034'].includes((error as any)?.code)) throw new BadRequestException('The draft changed. Refresh before editing.');
       throw error;
     });

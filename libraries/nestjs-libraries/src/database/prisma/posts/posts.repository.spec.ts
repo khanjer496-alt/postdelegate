@@ -854,12 +854,18 @@ describe('PostsRepository.createOrUpdatePost transaction isolation and retry', (
   it('keeps Serializable for MCP saves and edits of a fenced post', async () => {
     const mcp = make();
     await mcp.repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'MCP' as any);
-    expect(mcp.$transaction.mock.calls.at(-1)![1]).toEqual({ isolationLevel: 'Serializable' });
+    expect(mcp.$transaction.mock.calls.at(-1)![1]).toEqual({ timeout: 15000, isolationLevel: 'Serializable' });
 
     const fenced = make({ postId: 'p-1', organizationId: 'org-A' });
     fenced.post.findFirst.mockResolvedValue({ state: 'QUEUE' });
     await fenced.repo.createOrUpdatePost('update', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
-    expect(fenced.$transaction.mock.calls.at(-1)![1]).toEqual({ isolationLevel: 'Serializable' });
+    expect(fenced.$transaction.mock.calls.at(-1)![1]).toEqual({ timeout: 15000, isolationLevel: 'Serializable' });
+  });
+
+  it('gives every save 15s instead of the 5s Prisma default', async () => {
+    const { repo, $transaction } = make();
+    await repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
+    expect($transaction.mock.calls.at(-1)![1]).toEqual({ timeout: 15000 });
   });
 
   it('runs a save again after a serialization failure instead of failing it', async () => {
