@@ -26,7 +26,7 @@ import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorato
 const instagramProvider = new InstagramProvider();
 
 // pages of 50 comments read per post (the comments view and auto-replies)
-const COMMENT_PAGES = 10;
+const COMMENT_PAGES = 4;
 
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
@@ -49,6 +49,11 @@ export class InstagramStandaloneProvider
     );
   }
   override get plugsAvailable() {
+    return this.scopes.includes('instagram_business_manage_comments');
+  }
+  // the comments view needs instagram_business_manage_comments, which is only
+  // requested when INSTAGRAM_STANDALONE_OPTIONAL_SCOPES lists it
+  override get commentsAvailable() {
     return this.scopes.includes('instagram_business_manage_comments');
   }
   get scopes() {

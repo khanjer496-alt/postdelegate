@@ -48,7 +48,7 @@ export class CommentsRepository {
     });
   }
 
-  updateRule(orgId: string, id: string, data: { active: boolean }) {
+  updateRule(orgId: string, id: string, data: { active: boolean; activeSince?: Date }) {
     return this._rule.model.commentReplyRule.updateMany({
       where: { id, organizationId: orgId },
       data,

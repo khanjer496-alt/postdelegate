@@ -454,6 +454,7 @@ export interface SocialProvider
   scopes: string[];
   analyticsAvailable?: boolean;
   plugsAvailable?: boolean;
+  commentsAvailable?: boolean; // false when the permission the comments view needs is not requested (PD_FF_COMMENTS)
   externalUrl?: (
     url: string
   ) => Promise<{ client_id: string; client_secret: string }>;

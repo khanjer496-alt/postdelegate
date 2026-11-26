@@ -383,7 +383,7 @@ export const CommentsV2: FC = () => {
                 title={t('comments_rules', 'Keyword auto-replies')}
                 subtitle={t(
                   'comments_rules_hint',
-                  'A new comment on this post that contains the keyword gets the reply, once, within about 30 seconds.'
+                  'A new comment on this post that contains the keyword gets the reply, once, usually within a minute.'
                 )}
               >
                 {!!data?.rules.length && (

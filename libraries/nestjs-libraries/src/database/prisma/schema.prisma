@@ -2435,6 +2435,9 @@ model CommentReplyRule {
   keyword        String
   reply          String
   active         Boolean            @default(true)
+  // when the rule was last turned on: only comments written after it are
+  // answered, so turning a rule back on never answers a backlog
+  activeSince    DateTime           @default(now())
   answered       CommentAutoReply[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
@@ -2447,8 +2450,10 @@ model CommentReplyRule {
 // is answered once, even when the poller and the open comments view race
 model CommentAutoReply {
   id            String           @id @default(cuid())
-  ruleId        String
-  rule          CommentReplyRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  // kept (null) when the rule is deleted, so another rule never answers the
+  // same comment again
+  ruleId        String?
+  rule          CommentReplyRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
   integrationId String
   commentId     String
   // the platform's id of the reply, once it went out

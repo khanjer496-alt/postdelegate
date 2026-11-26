@@ -24,7 +24,12 @@ export const commentsEnabled = () =>
 
 export const COMMENT_POSTS_LIMIT = 12;
 // a burst of matching comments is answered over several runs
-const MAX_AUTO_REPLIES_PER_RUN = 20;
+const MAX_AUTO_REPLIES_PER_RUN = 10;
+// older comments are never auto-answered, so a poller that was stopped for a
+// while (channel off, flag off) never sends a backlog of replies
+export const MAX_COMMENT_AGE_MS = 60 * 60 * 1000;
+// a poller whose channel token stays expired this long stops
+const STALE_TOKEN_MS = 24 * 60 * 60 * 1000;
 // the poller checks every 10 seconds for this long after a rule is saved,
 // then every minute (see commentRulesWorkflowV1)
 const FAST_POLLING_MS = 2 * 60 * 60 * 1000;
@@ -35,26 +40,30 @@ interface RuleLike {
   keyword: string;
   active: boolean;
   createdAt: Date;
+  activeSince?: Date | null;
 }
 
 // The rule a comment triggers: on the rule's post, written after the rule
-// was saved (Instagram timestamps have no milliseconds), not by the channel
-// itself, and containing the keyword in any case
+// was last turned on (Instagram timestamps have no milliseconds) and within
+// the last hour, not by the channel itself, and containing the keyword in
+// any case
 export const matchingRule = <T extends RuleLike>(
   rules: T[],
   postId: string,
-  comment: PostComment
+  comment: PostComment,
+  now = Date.now()
 ) => {
   if (comment.own) return undefined;
   const text = (comment.text || '').toLowerCase();
   const written = new Date(comment.createdAt).getTime();
+  if (!(written >= now - MAX_COMMENT_AGE_MS)) return undefined;
   return rules.find((rule) => {
     const keyword = rule.keyword.trim().toLowerCase();
     return (
       rule.active &&
       rule.postId === postId &&
       !!keyword &&
-      written >= dayjs(rule.createdAt).startOf('second').valueOf() &&
+      written >= dayjs(rule.activeSince || rule.createdAt).startOf('second').valueOf() &&
       text.includes(keyword)
     );
   });
@@ -81,7 +90,9 @@ export class CommentsService {
     const provider = this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
-    return provider?.postComments && provider?.replyToComment
+    return provider?.postComments &&
+      provider?.replyToComment &&
+      provider.commentsAvailable !== false
       ? provider
       : undefined;
   }
@@ -218,7 +229,10 @@ export class CommentsService {
   async setRuleActive(orgId: string, id: string, active: boolean) {
     const rule = await this._commentsRepository.getRule(orgId, id);
     if (!rule) throw new NotFoundException('Rule not found');
-    await this._commentsRepository.updateRule(orgId, id, { active });
+    await this._commentsRepository.updateRule(orgId, id, {
+      active,
+      ...(active ? { activeSince: new Date(Date.now()) } : {}),
+    });
     if (active) await this.startPoller(orgId, rule.integrationId);
     return { ...rule, active };
   }
@@ -243,8 +257,16 @@ export class CommentsService {
     } catch (err) {
       // gone, off or waiting for a reconnect: saving a rule starts it again.
       // A token refresh that failed (409) may be a passing outage, so the
-      // poller keeps going and tries again on its next run.
-      return !(err instanceof NotFoundException);
+      // poller keeps going, until the token has been expired for a day.
+      if (err instanceof NotFoundException) return false;
+      const stored = await this._integrationService.getIntegrationById(
+        rules[0].organizationId,
+        integrationId
+      );
+      return (
+        !!stored &&
+        dayjs(stored.tokenExpiration).valueOf() > Date.now() - STALE_TOKEN_MS
+      );
     }
     const { integration, provider } = channel;
     let budget = MAX_AUTO_REPLIES_PER_RUN;

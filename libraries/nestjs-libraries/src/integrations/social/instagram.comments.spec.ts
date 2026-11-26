@@ -167,7 +167,7 @@ describe('InstagramStandaloneProvider comment management', () => {
     ]);
   });
 
-  it('follows the comment pages Instagram returns, up to ten', async () => {
+  it('follows the comment pages Instagram returns, up to four', async () => {
     const page = (n: number) => ({
       data: [{ id: `c-${n}`, text: 'hi', username: 'fan', timestamp: '2026-11-26T09:00:00+0000' }],
       paging: { next: `https://graph.instagram.com/next-${n + 1}` },
@@ -178,10 +178,10 @@ describe('InstagramStandaloneProvider comment management', () => {
 
     const comments = await instance.postComments('ig-1', 'token', 'media-1');
 
-    expect(fetched).toHaveLength(10);
+    expect(fetched).toHaveLength(4);
     expect(fetched[1].url).toBe('https://graph.instagram.com/next-2');
     expect(comments.map((c) => c.id)).toEqual(
-      Array.from({ length: 10 }, (_, i) => `c-${i + 1}`)
+      Array.from({ length: 4 }, (_, i) => `c-${i + 1}`)
     );
   });
 

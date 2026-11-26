@@ -12,6 +12,11 @@ import { ApiTags } from '@nestjs/swagger';
 import { Organization } from '@prisma/client';
 import { IsBoolean, IsString, MaxLength, MinLength } from 'class-validator';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import {
   commentsEnabled,
   CommentsService,
@@ -85,6 +90,8 @@ export class CommentsController {
   }
 
   @Post('/:integration/comments/:comment/reply')
+  // replying, hiding, deleting and auto-replies speak for the brand: admins only
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   reply(
     @GetOrgFromRequest() org: Organization,
     @Param('integration') integration: string,
@@ -96,6 +103,7 @@ export class CommentsController {
   }
 
   @Put('/:integration/comments/:comment/hide')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   hide(
     @GetOrgFromRequest() org: Organization,
     @Param('integration') integration: string,
@@ -107,6 +115,7 @@ export class CommentsController {
   }
 
   @Delete('/:integration/comments/:comment')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   remove(
     @GetOrgFromRequest() org: Organization,
     @Param('integration') integration: string,
@@ -117,6 +126,7 @@ export class CommentsController {
   }
 
   @Post('/:integration/posts/:post/rules')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   createRule(
     @GetOrgFromRequest() org: Organization,
     @Param('integration') integration: string,
@@ -128,6 +138,7 @@ export class CommentsController {
   }
 
   @Put('/rules/:id')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   setRuleActive(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -138,6 +149,7 @@ export class CommentsController {
   }
 
   @Delete('/rules/:id')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   deleteRule(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string

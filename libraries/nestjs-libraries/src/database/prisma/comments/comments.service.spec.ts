@@ -9,6 +9,13 @@ import {
 } from '@gitroom/nestjs-libraries/database/prisma/comments/comments.service';
 
 const ruleCreated = new Date('2026-11-26T09:00:00.000Z');
+const now = new Date('2026-11-26T09:01:00.000Z').getTime();
+beforeEach(() => {
+  jest.spyOn(Date, 'now').mockReturnValue(now);
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 const rule = (over: any = {}) => ({
   id: 'rule-1',
   organizationId: 'org-1',
@@ -106,6 +113,18 @@ describe('matchingRule', () => {
       )?.id
     ).toBe('rule-1');
   });
+  it('only counts comments written after the rule was last turned on', () => {
+    const resumed = rule({ activeSince: new Date('2026-11-26T09:00:45.000Z') });
+    expect(matchingRule([resumed], 'media-1', comment())).toBeUndefined();
+    expect(
+      matchingRule([resumed], 'media-1', comment({ createdAt: '2026-11-26T09:00:50+0000' }))?.id
+    ).toBe('rule-1');
+  });
+  it('never answers comments older than an hour', () => {
+    expect(
+      matchingRule([rule()], 'media-1', comment(), now + 61 * 60 * 1000)
+    ).toBeUndefined();
+  });
   it('skips inactive and blank keyword rules', () => {
     expect(matchingRule([rule({ active: false })], 'media-1', comment())).toBeUndefined();
     expect(matchingRule([rule({ keyword: '  ' })], 'media-1', comment())).toBeUndefined();
@@ -132,11 +151,28 @@ describe('CommentsService auto-replies', () => {
     const { service, integrationService, refresh, provider } = setup();
     integrationService.getIntegrationById.mockResolvedValue({
       ...(await integrationService.getIntegrationById()),
-      tokenExpiration: new Date(Date.now() - 1000),
+      tokenExpiration: new Date(now - 1000),
     });
     refresh.refresh.mockResolvedValue(false);
     expect(await service.runRules('int-1')).toBe(true);
     expect(provider.postComments).not.toHaveBeenCalled();
+  });
+
+  it('stops polling once the token has been expired for a day', async () => {
+    const { service, integrationService, refresh } = setup();
+    integrationService.getIntegrationById.mockResolvedValue({
+      ...(await integrationService.getIntegrationById()),
+      tokenExpiration: new Date(now - 25 * 60 * 60 * 1000),
+    });
+    refresh.refresh.mockResolvedValue(false);
+    expect(await service.runRules('int-1')).toBe(false);
+  });
+
+  it('hides channels whose provider lacks the comments permission', async () => {
+    const { service, provider } = setup();
+    (provider as any).commentsAvailable = false;
+    expect(await service.channels('org-1')).toEqual([]);
+    expect(await service.runRules('int-1')).toBe(false);
   });
 
   it('answers a new matching comment once, through the provider', async () => {
@@ -245,5 +281,22 @@ describe('CommentsService rules', () => {
     await expect(
       service.createRule('org-1', 'int-1', 'media-1', { keyword: 'a', reply: 'b' })
     ).rejects.toThrow();
+  });
+});
+
+describe('CommentsService turning a rule back on', () => {
+  it('restarts the rule clock so it never answers the backlog', async () => {
+    const { service, repository, start } = setup();
+    await service.setRuleActive('org-1', 'rule-1', true);
+    expect(repository.updateRule).toHaveBeenCalledWith('org-1', 'rule-1', {
+      active: true,
+      activeSince: new Date(now),
+    });
+    expect(start).toHaveBeenCalled();
+  });
+  it('leaves the clock alone when a rule is paused', async () => {
+    const { service, repository } = setup();
+    await service.setRuleActive('org-1', 'rule-1', false);
+    expect(repository.updateRule).toHaveBeenCalledWith('org-1', 'rule-1', { active: false });
   });
 });

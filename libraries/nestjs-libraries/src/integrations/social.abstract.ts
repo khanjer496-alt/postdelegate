@@ -804,6 +804,9 @@ export abstract class SocialAbstract {
   get plugsAvailable() {
     return true;
   }
+  get commentsAvailable() {
+    return true;
+  }
 
   // Explicit allowlist: an env typo must never request an unreviewed permission.
   requestedScopes(minimum: string[]) {
