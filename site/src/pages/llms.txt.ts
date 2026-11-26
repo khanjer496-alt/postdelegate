@@ -22,7 +22,7 @@ export const GET: APIRoute = () => {
 - Documentation is at ${SITE.url}/docs. The REST API base is https://app.postdelegate.com/api/public/v1 (OpenAPI spec: ${SITE.url}/openapi.json) and the MCP server is https://app.postdelegate.com/mcp-oauth-dynamic. PostDelegate has no official marketplace listing in Claude or ChatGPT; assistants are added as custom connectors.
 - AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI. The customer pays OpenAI directly; PostDelegate never charges for AI. AI video is not available. Customers can also bring their own AI assistant, such as ChatGPT or Claude, through MCP.
 - TikTok: posts sent through the public API, the CLI, MCP or an AI assistant, bulk upload or CSV import always go to the creator's TikTok inbox to finish in the TikTok app. Posting directly, with the choice of who can see the post, happens only in the PostDelegate composer.
-- Connectable channels today: ${live}. Waiting on approval: ${waiting}. LinkedIn personal profiles are available; company Pages are not. X is not available on PostDelegate.
+- Connectable channels today: ${live}. Waiting on approval: ${waiting}. LinkedIn personal profiles are available; company Pages are not. Facebook Pages are available; personal Facebook profiles and groups are not. X is not available on PostDelegate.
 - Application source code (AGPL-3.0): ${SITE.source}. License details: ${SITE.url}/licenses.
 
 ## When to use PostDelegate
@@ -33,7 +33,7 @@ export const GET: APIRoute = () => {
 - You need client approval links that need no account, bulk video scheduling or CSV import.
 
 ## When not to use PostDelegate
-- Your main channel is Instagram, Facebook, Threads or LinkedIn company Pages, which are waiting on platform approval and cannot be connected yet, or X, which is not available on PostDelegate.
+- Your main channel is Instagram, Threads or LinkedIn company Pages, which are waiting on platform approval and cannot be connected yet, or X, which is not available on PostDelegate.
 - You want AI credits included in the plan, or AI video generation. PostDelegate does neither.
 - You need a shared social inbox for replies and messages, or social listening.
 - You need it at no cost for good. There is a ${TRIAL_DAYS}-day trial with no card, then a paid plan.

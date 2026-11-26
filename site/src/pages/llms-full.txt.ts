@@ -36,7 +36,7 @@ Bulk video scheduling takes up to 50 MP4 videos (up to 1 GB each), one post per 
 PostDelegate has a REST API (base https://app.postdelegate.com/api/public/v1, workspace API key sent as the Authorization header without a Bearer prefix) and an MCP server (https://app.postdelegate.com/mcp-oauth-dynamic for sign in with PostDelegate; https://app.postdelegate.com/api/mcp for an API key sent as a Bearer token). Both are documented at ${SITE.url}/docs and included on every plan. AI writing, the Agent and AI images inside the app run on the workspace's own OpenAI API key, added by an admin in Settings → AI; the customer pays OpenAI directly, PostDelegate never charges for AI, and AI video is not available. Customers can also bring their own assistant through MCP. Assistants are added as custom connectors. PostDelegate does not claim an official listing in a Claude or ChatGPT directory, and endpoints of other services are not PostDelegate connections.
 
 ## Channels available to connect today
-${live}. Waiting on platform approval: ${waiting}. LinkedIn personal profiles are available; company Pages are not. X is not available on PostDelegate.
+${live}. Waiting on platform approval: ${waiting}. LinkedIn personal profiles are available; company Pages are not. Facebook Pages are available; personal Facebook profiles and groups are not. X is not available on PostDelegate.
 
 ## Documentation
 Markdown version of each docs page (drop the .md for the HTML page):
