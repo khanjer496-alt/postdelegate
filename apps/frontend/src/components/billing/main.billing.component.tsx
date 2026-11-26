@@ -156,9 +156,9 @@ const useCredits = (type: (typeof creditTypes)[number]) => {
 
 const BillingCycle: FC<{
   tier: string;
-  canceled: boolean;
+  cancelAt?: Date | null;
 }> = (props) => {
-  const { tier, canceled } = props;
+  const { tier, cancelAt } = props;
   const t = useT();
   const { data: renewal } = useRenewal();
   const { data: images } = useCredits('ai_images');
@@ -206,7 +206,21 @@ const BillingCycle: FC<{
           {t('billing_cycle', 'Billing cycle')}
         </div>
         <div className="text-[14px] text-textItemBlur">
-          {!canceled && !!renewal?.renewsAt && (
+          {!!cancelAt && (
+            <>
+              {t('billing_plan_ends_on', 'Your plan ends on')}{' '}
+              <bdi className="font-[600] text-newTextColor">
+                {fromUtc(cancelAt).format('D MMM, YYYY')}
+              </bdi>
+              {'. '}
+              {t(
+                'you_will_never_be_charged_again',
+                'You will never be charged again'
+              )}
+              {'. '}
+            </>
+          )}
+          {!cancelAt && !!renewal?.renewsAt && (
             <>
               {renewal.needsPaymentMethod
                 ? t(
@@ -578,6 +592,14 @@ export const MainBillingComponent: FC<{
       );
       mutate('/billing/renewal');
     }
+  }, []);
+
+  // everything the page shows that ending the trial changes
+  const refreshAfterTrial = useCallback(() => {
+    mutate('/user/self');
+    mutate('/user/subscription');
+    mutate('/billing/invoices');
+    mutate('/billing/renewal');
   }, []);
 
   const finishTrialNow = useCallback(async () => {
@@ -1106,12 +1128,11 @@ export const MainBillingComponent: FC<{
       {finishTrial && !!renewal && renewal.needsPaymentMethod !== true && (
         <FinishTrial
           confirmed={finishTrialConfirmed}
+          onDone={refreshAfterTrial}
           close={() => {
             setFinishTrial(false);
             setFinishTrialConfirmed(false);
-            mutate('/user/self');
-            mutate('/billing/invoices');
-            mutate('/billing/renewal');
+            refreshAfterTrial();
           }}
         />
       )}
@@ -1229,7 +1250,7 @@ export const MainBillingComponent: FC<{
       {!!subscription?.id && (
         <BillingCycle
           tier={sub?.subscriptionTier || subscription.subscriptionTier}
-          canceled={!!subscription.cancelAt}
+          cancelAt={subscription.cancelAt}
         />
       )}
       {!!subscription?.id &&
