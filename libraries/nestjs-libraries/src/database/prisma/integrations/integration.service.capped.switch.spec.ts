@@ -224,6 +224,18 @@ describe('IntegrationService.enableChannel', () => {
     expect(comments.restartPollers).toHaveBeenCalledWith('org', 'i9');
   });
 
+  it('never waits for Temporal to turn a channel back on', async () => {
+    const { service, repository, comments } = makeEnableService(1);
+    comments.restartPollers.mockReturnValue(new Promise(() => undefined));
+    await expect(service.enableChannel('org', 3, 'i9')).resolves.toEqual({});
+
+    repository.enablePlanLockedIntegrations.mockResolvedValue({ count: 2 });
+    await expect(service.enablePlanLockedIntegrations('org', 2)).resolves.toEqual({
+      count: 2,
+    });
+    expect(comments.restartPollers).toHaveBeenCalledWith('org');
+  });
+
   it('starts the comment rules of the workspace when an upgrade turns channels back on', async () => {
     const { service, repository, comments } = makeEnableService(1);
     await service.enablePlanLockedIntegrations('org', 2);
@@ -360,14 +372,17 @@ describe('IntegrationService.changeActiveCron', () => {
 });
 
 describe('IntegrationService.createOrUpdateIntegration comment rules', () => {
-  const connect = async (oneTimeToken: boolean) => {
+  const connect = async (
+    oneTimeToken: boolean,
+    restarted: Promise<void> = Promise.resolve()
+  ) => {
     const repository = {
       createOrUpdateIntegration: jest
         .fn()
         .mockResolvedValue({ id: 'int-1', organizationId: 'org' }),
     };
     const manager = { getSocialIntegration: jest.fn().mockReturnValue({}) };
-    const comments = { restartPollers: jest.fn().mockResolvedValue(undefined) };
+    const comments = { restartPollers: jest.fn().mockReturnValue(restarted) };
     const service = new IntegrationService(
       repository as any,
       {} as any,
@@ -406,5 +421,10 @@ describe('IntegrationService.createOrUpdateIntegration comment rules', () => {
   it('starts every channel of the workspace when the token is shared', async () => {
     const { comments } = await connect(true);
     expect(comments.restartPollers).toHaveBeenCalledWith('org', undefined);
+  });
+
+  it('never waits for Temporal to finish a connect', async () => {
+    const { saved } = await connect(false, new Promise(() => undefined));
+    expect(saved).toEqual({ id: 'int-1', organizationId: 'org' });
   });
 });

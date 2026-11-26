@@ -260,11 +260,13 @@ export class IntegrationService {
     );
 
     // a reconnect brings the channel's comment rules back (a one time token
-    // also reconnects the channels that share it)
-    await this._commentsService.restartPollers(
-      org,
-      oneTimeToken ? undefined : integration.id
-    );
+    // also reconnects the channels that share it); Temporal is not awaited,
+    // like startRefreshWorkflow after a connect
+    this._commentsService
+      .restartPollers(org, oneTimeToken ? undefined : integration.id)
+      .catch((err) => {
+        console.log(err);
+      });
 
     return integration;
   }
@@ -579,7 +581,9 @@ export class IntegrationService {
     }
 
     const enabled = await this._integrationRepository.enableChannel(org, id);
-    await this._commentsService.restartPollers(org, id);
+    this._commentsService.restartPollers(org, id).catch((err) => {
+      console.log(err);
+    });
     return enabled;
   }
 
@@ -600,9 +604,12 @@ export class IntegrationService {
       org,
       room
     );
-    // reached from billing webhooks: restartPollers never throws
+    // reached from billing webhooks: not awaited, and restartPollers never
+    // throws
     if (enabled.count) {
-      await this._commentsService.restartPollers(org);
+      this._commentsService.restartPollers(org).catch((err) => {
+        console.log(err);
+      });
     }
     return enabled;
   }

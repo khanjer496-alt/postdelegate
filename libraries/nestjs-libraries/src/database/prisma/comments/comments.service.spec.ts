@@ -308,6 +308,8 @@ describe('CommentsService rules', () => {
         workflowId: 'comment-rules-int-1',
         taskQueue: 'main',
         workflowIdConflictPolicy: 'TERMINATE_EXISTING',
+        // saving a rule opens the 2 hour fast-polling window
+        args: [{ integrationId: 'int-1', fastUntil: now + 2 * 60 * 60 * 1000 }],
       })
     );
   });

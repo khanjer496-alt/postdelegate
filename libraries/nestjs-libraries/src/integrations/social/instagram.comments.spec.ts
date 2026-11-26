@@ -172,6 +172,8 @@ describe('InstagramStandaloneProvider comment management', () => {
     expect(post.mock.calls[0][0]).toMatch(
       /^https:\/\/graph\.instagram\.com\/v[\d.]+\/c-1\/replies\?message=Hi%20%26%20thanks!&access_token=token$/
     );
+    // a hung POST gives up instead of holding the claim
+    expect(post.mock.calls[0][2]).toEqual({ timeout: 30_000 });
     // nothing to check before the first send
     expect(fetched).toEqual([]);
   });
@@ -205,6 +207,43 @@ describe('InstagramStandaloneProvider comment management', () => {
     const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi');
 
     expect(reply).toEqual({ id: 'reply-2' });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('sends a reply again after a 5xx when the lookup itself fails', async () => {
+    const { instance, fetched } = provider(() => {
+      throw new Error('lookup failed');
+    });
+    const post = replies(instance, [{ status: 500 }, { data: { id: 'reply-3' } }]);
+
+    const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi');
+
+    expect(reply).toEqual({ id: 'reply-3' });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(fetched).toHaveLength(1);
+  });
+
+  it('gives up after the usual retries when the lookup keeps failing', async () => {
+    const { instance } = provider(() => {
+      throw new Error('lookup failed');
+    });
+    const post = replies(instance, Array.from({ length: 5 }, () => ({ status: 500 })));
+
+    await expect(
+      instance.replyToComment('ig-1', 'token', 'c-1', 'Hi')
+    ).rejects.toBeTruthy();
+    // the first send and three retries, like this.fetch
+    expect(post).toHaveBeenCalledTimes(4);
+  });
+
+  it('sends a reply again after a 429, once nothing is under the comment', async () => {
+    const { instance, fetched } = provider(() => ({ data: [] }));
+    const post = replies(instance, [{ status: 429 }, { data: { id: 'reply-4' } }]);
+
+    const reply = await instance.replyToComment('ig-1', 'token', 'c-1', 'Hi');
+
+    expect(reply).toEqual({ id: 'reply-4' });
     expect(post).toHaveBeenCalledTimes(2);
     expect(fetched).toHaveLength(1);
   });

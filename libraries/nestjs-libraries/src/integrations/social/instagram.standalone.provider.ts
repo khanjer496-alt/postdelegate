@@ -371,7 +371,8 @@ export class InstagramStandaloneProvider
   // the reply, and this.fetch would send the same POST again. The POST runs
   // through runStreamedUpload instead (the same retry and error rules), which
   // calls the factory again for a retry, and every attempt after the first
-  // looks for the reply under the comment before sending it again.
+  // looks for the reply under the comment before sending it again. A lookup
+  // that fails counts as no reply, so the retry still sends it.
   async replyToComment(
     id: string,
     accessToken: string,
@@ -382,7 +383,12 @@ export class InstagramStandaloneProvider
     let sent = false;
     return this.runStreamedUpload(async () => {
       if (sent) {
-        const existing = await this.commentReply(id, accessToken, commentId, message);
+        const existing = await this.commentReply(
+          id,
+          accessToken,
+          commentId,
+          message
+        ).catch(() => undefined);
         if (existing) return existing;
       }
       sent = true;
@@ -390,12 +396,16 @@ export class InstagramStandaloneProvider
         .post(
           `https://graph.instagram.com/${META_GRAPH_API_VERSION}/${commentId}/replies?message=${encodeURIComponent(
             message
-          )}&access_token=${token}`
+          )}&access_token=${token}`,
+          undefined,
+          // a hung POST fails like a dropped connection instead of holding
+          // the claim until the activity times out
+          { timeout: 30_000 }
         )
         .catch((err) => {
           // runStreamedUpload turns an answer into BadBody / RefreshToken; a
-          // dropped connection is not retried, and its axios error (which
-          // carries the URL, so the token) never travels on
+          // dropped connection or a timeout is not retried, and its axios
+          // error (which carries the URL, so the token) never travels on
           if (err?.response) throw err;
           throw new Error('Instagram did not answer the reply');
         });
