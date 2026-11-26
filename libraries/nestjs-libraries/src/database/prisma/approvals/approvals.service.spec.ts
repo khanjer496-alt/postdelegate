@@ -98,6 +98,7 @@ const makeService = (opts: { post?: any; settings?: any; link?: any } = {}) => {
     latestForPosts: jest.fn().mockResolvedValue([]),
   };
   const posts = {
+    activateApprovedMcp: jest.fn().mockResolvedValue(undefined),
     startWorkflow: jest.fn().mockResolvedValue(undefined),
     addReviewComment: jest.fn().mockResolvedValue({}),
     getPostsRecursively: jest.fn().mockResolvedValue([]),
@@ -376,10 +377,11 @@ describe('ApprovalsService stale reads and channels', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('keeps approving without a version, for API callers', async () => {
-    const { service, repository } = makeService();
+  it('binds API approval without a supplied version to the revision checked by the service', async () => {
+    const seen = new Date('2026-11-15T12:00:00Z');
+    const { service, repository } = makeService({ post: makePost({ updatedAt: seen }) });
     await service.approve(ORG, 'p-1', admin);
-    expect(moved(repository).expected).not.toHaveProperty('updatedAt');
+    expect(moved(repository).expected).toHaveProperty('updatedAt', seen);
   });
 
   it('sending back claims the post only while it is not going out', async () => {

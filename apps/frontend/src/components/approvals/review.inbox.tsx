@@ -132,6 +132,7 @@ const ReviewCard: FC<{
 
   return (
     <li className="rounded-[12px] border border-newTableBorder bg-newBgColorInner p-[16px] mobile:p-[12px] flex gap-[12px]">
+      {item.remainingThreadReview && <p className="text-sm">{t('approval_remaining_only', 'Review the unpublished remainder. Published segments stay live.')}</p>}
       {canApprove && (
         <input
           type="checkbox"
@@ -244,7 +245,7 @@ const ReviewCard: FC<{
                 'bg-btnCta text-btnCtaText hover:bg-btnCtaHover'
               )}
             >
-              {t('approval_approve', 'Approve')}
+              {item.remainingThreadReview ? t('approval_approve_remaining', 'Approve remaining segments') : t('approval_approve', 'Approve')}
             </button>
           )}
           <button

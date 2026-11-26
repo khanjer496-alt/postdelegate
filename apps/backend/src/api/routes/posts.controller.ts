@@ -270,6 +270,8 @@ export class PostsController {
       'WEB',
       false,
       userActor(user, org as any),
+      undefined,
+      undefined,
       // the composer itself
       true
     );
@@ -318,7 +320,7 @@ export class PostsController {
     @GetOrgFromRequest() org: Organization,
     @Param('group') group: string
   ) {
-    return this._postsService.deletePost(org.id, group);
+    return this._postsService.deletePost(org.id, group, true);
   }
 
   @Put('/:id/date')

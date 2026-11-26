@@ -8,7 +8,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AgentCredentialRole {
+  ANALYST
+  DRAFT_ONLY
+  PUBLISHER
+}
+
+model AgentCredential {
+  id String @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name String
+  secretHash String @unique
+  role AgentCredentialRole @default(DRAFT_ONLY)
+  // null = all channels; [] = no channels. Never collapse these states.
+  channelIds Json?
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([organizationId, createdAt])
+}
+
 model Organization {
+  mcpAdmissions McpAgentAdmission[]
+  mcpAdmissionRecoveries McpAgentAdmissionRecovery[]
+  mcpFences McpPublishFence[]
+  mcpAttempts McpPublishAttempt[]
+  agentCredentials AgentCredential[]
   id                  String               @id @default(uuid())
   name                String
   description         String?
@@ -617,6 +643,7 @@ model Post {
   approvalStatus             ApprovalStatus            @default(NONE)
   // Set when an AI agent created the post (MCP, public API, CLI, in-app
   // agent): the MCP client, OAuth app or "API key" it came from
+  mcpWorkflowVersion         Int?
   agentSource                String?
   lastMessageId              String?
   intervalInDays             Int?
@@ -2420,6 +2447,68 @@ model SmartLinkStat {
 
   @@unique([pageId, itemId, date])
   @@index([pageId, date])
+}
+
+// New MCP jobs only. Abandoned admission is released by an admin, by a later save
+// after a 10 minute lease (AGENT_ADMISSION_LEASE_MS) or when the backend restarts.
+model McpAgentAdmission {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String @id
+  owner String
+  instanceId String @default("unknown")
+  host String @default("unknown")
+  processId Int @default(0)
+  writtenPostIds Json @default("[]")
+  createdAt DateTime @default(now())
+}
+
+model McpAgentAdmissionRecovery {
+  id String @id @default(uuid())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  owner String
+  auditId String
+  writtenPostIds Json
+  createdAt DateTime @default(now())
+  @@index([organizationId])
+}
+
+model McpPublishFence {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  postId String @id
+  organizationId String
+  integrationId String
+  revisionHash String
+  state String @default("ACTIVE")
+  generation Int @default(0)
+  dispatchState String @default("PENDING")
+  dispatchAttempts Int @default(0)
+  dispatchNotBefore DateTime @default(now())
+  dispatchConfirmedAt DateTime?
+  dispatchErrorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([organizationId])
+  @@index([state, dispatchState, dispatchNotBefore])
+}
+
+model McpPublishAttempt {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+  rootPostId String
+  segmentPostId String
+  organizationId String
+  revisionHash String
+  generation Int
+  status String
+  receipt Json?
+  providerPayload Json?
+  providerPayloadHash String?
+  followUpWarning String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([rootPostId, segmentPostId, revisionHash, generation])
+  @@index([organizationId, rootPostId])
 }
 
 // Keyword auto-replies on one post of a channel (PD_FF_COMMENTS): a new

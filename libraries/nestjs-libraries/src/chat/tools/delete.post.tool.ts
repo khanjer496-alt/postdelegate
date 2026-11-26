@@ -1,7 +1,7 @@
 import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException } from '@nestjs/common';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 
@@ -69,7 +69,8 @@ If the post cannot be deleted, the result contains output.errors explaining why.
           };
         }
 
-        await this._postsService.deletePost(organizationId, post.group);
+        try { await this._postsService.deletePost(organizationId, post.group); }
+        catch (error) { if (error instanceof HttpException) return { output: { errors: error.message } }; throw error; }
 
         return { output: { postId: post.id } };
       },

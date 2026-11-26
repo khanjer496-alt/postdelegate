@@ -22,6 +22,7 @@ import { PostValidationExceptionFilter } from '@gitroom/backend/api/routes/posts
 import { HttpExceptionFilter } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { ConfigurationChecker } from '@gitroom/helpers/configuration/configuration.checker';
 import { startMcp } from '@gitroom/nestjs-libraries/chat/start.mcp';
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 
 async function start() {
   const app = await NestFactory.create(AppModule, {
@@ -63,6 +64,15 @@ async function start() {
   });
 
   await startMcp(app);
+
+  // agent saves that a restart or a deploy interrupted would keep their
+  // workspace locked; this single backend process owns every admission
+  await app
+    .get(PostsService, { strict: false })
+    .releaseAbandonedAgentAdmissions()
+    .catch((err) =>
+      Logger.warn(`Could not release interrupted agent saves: ${err?.message}`)
+    );
 
   app.useGlobalPipes(
     new ValidationPipe({

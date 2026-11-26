@@ -23,6 +23,8 @@ import {
   RefreshToken,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TokenEncryptionError } from '@gitroom/nestjs-libraries/database/prisma/integrations/token.encryption';
+import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { countLength } from '@gitroom/helpers/utils/count.length';
 
 describe('PostActivity posting limits backstop', () => {
   const integration = {
@@ -374,7 +376,8 @@ describe('PostActivity state writes for postWorkflowV113', () => {
     const signalWithStart = jest.fn().mockResolvedValue(undefined);
     const activity = make(
       {
-        searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
+        recoverMissingMcpJob: jest.fn().mockResolvedValue(false),
+      searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
           {
             id: 'p-1',
             organizationId: 'org-1',
@@ -396,5 +399,120 @@ describe('PostActivity state writes for postWorkflowV113', () => {
         workflowIdConflictPolicy: 'USE_EXISTING',
       })
     );
+  });
+});
+
+describe('the missing-posts sweep with a failing MCP recovery', () => {
+  it('logs it and still starts the legacy posts after it', async () => {
+    const signalWithStart = jest.fn().mockResolvedValue(undefined);
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const recoverMissingMcpJob = jest.fn(async (_org: string, id: string) => {
+      if (id === 'mcp-1') throw new Error('fence unavailable');
+      return false;
+    });
+    const activity = new PostActivity(
+      {
+        recoverMissingMcpJob,
+        searchForMissingThreeHoursPosts: jest.fn().mockResolvedValue([
+          { id: 'mcp-1', organizationId: 'org-1', integration: { providerIdentifier: 'x' } },
+          { id: 'legacy-1', organizationId: 'org-1', integration: { providerIdentifier: 'x' } },
+        ]),
+      } as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any,
+      { client: { getRawClient: () => ({ workflow: { signalWithStart } }) } } as any,
+      {} as any
+    );
+
+    await expect(activity.searchForMissingThreeHoursPosts()).resolves.toBeUndefined();
+
+    expect(signalWithStart).toHaveBeenCalledTimes(1);
+    expect(signalWithStart).toHaveBeenCalledWith('postWorkflowV113', expect.objectContaining({ workflowId: 'post_legacy-1' }));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('mcp-1'));
+    error.mockRestore();
+  });
+});
+
+describe('MCP final transformed payload validation', () => {
+  const activity = (provider: any) => new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any, { getSocialIntegration: () => provider } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const channel = { id: 'c', organizationId: 'o', providerIdentifier: 'fixture', additionalSettings: '[]' } as any;
+  it('rejects a link/mention expansion over the limit before any provider publication', async () => {
+    const publish = jest.fn();
+    const worker = activity({ maxLength: () => 5, checkValidity: jest.fn().mockResolvedValue(true), post: publish });
+    await expect((worker as any).assertMcpFinalPayload(channel, [{ message: 'expanded-long-url', media: [], settings: {} }])).rejects.toThrow('limit');
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('checks provider rules using the exact final messages and resolved media paths', async () => {
+    const checkValidity = jest.fn().mockResolvedValue(true);
+    const worker = activity({ maxLength: () => 100, checkValidity });
+    await (worker as any).assertMcpFinalPayload(channel, [{ message: 'ready', media: [{ path: '/local/file', url: 'https://media.test/file.png' }], settings: {} }]);
+    expect(checkValidity).toHaveBeenCalledWith([[expect.objectContaining({ path: 'https://media.test/file.png' })]], {}, [], ['ready']);
+  });
+});
+
+describe('MCP final payload length of an X post', () => {
+  // X receives the composer HTML; its limit is on the visible text
+  const xPost = (n: number) =>
+    `<p>${'a'.repeat(n)} <strong>bold</strong></p><p>Read <a href="https://example.com/a/very/long/path">example.com/a/very/long/path</a></p>`;
+  const worker = new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any,
+    { getSocialIntegration: () => ({ editor: 'html', maxLength: () => 280, checkValidity: jest.fn().mockResolvedValue(true) }) } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const x = { id: 'c', organizationId: 'o', providerIdentifier: 'x', additionalSettings: '[]' } as any;
+  it('accepts 279 visible characters with paragraph, bold and link markup', async () => {
+    await expect((worker as any).assertMcpFinalPayload(x, [{ message: xPost(241), media: [], settings: {} }])).resolves.toBeUndefined();
+  });
+  it('refuses 281 visible characters', async () => {
+    await expect((worker as any).assertMcpFinalPayload(x, [{ message: xPost(243), media: [], settings: {} }])).rejects.toThrow('limit');
+  });
+});
+
+describe('MCP final payload length of a markdown post', () => {
+  // Discord and dev.to receive markdown; the limit is on the visible text the
+  // composer counted (a link counts as its address)
+  const html = (n: number) =>
+    `<p>${'a'.repeat(n)} <strong>bold</strong></p><p>Read <a href="https://e.co">the documentation page</a></p>`;
+  const message = (n: number) => stripHtmlValidation('markdown', html(n), true);
+  const worker = new PostActivity(
+    { validatePosts: jest.fn().mockResolvedValue([{ valid: true, errors: true }]) } as any,
+    {} as any,
+    { getSocialIntegration: () => ({ editor: 'markdown', maxLength: () => 100, checkValidity: jest.fn().mockResolvedValue(true) }) } as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any
+  );
+  const discord = { id: 'c', organizationId: 'o', providerIdentifier: 'discord', additionalSettings: '[]' } as any;
+  it('accepts a post the composer counted under the limit', async () => {
+    expect(countLength('discord', stripHtmlValidation('normal', html(70), true))).toBeLessThanOrEqual(100);
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: message(70), media: [], settings: {} }])).resolves.toBeUndefined();
+  });
+  it('refuses one over the limit', async () => {
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: message(90), media: [], settings: {} }])).rejects.toThrow('limit');
+  });
+  it('accepts a plain post exactly at the limit the composer counted', async () => {
+    const plain = `<p>${'a'.repeat(100)}</p>`;
+    expect(countLength('discord', stripHtmlValidation('normal', plain, true))).toBe(100);
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: stripHtmlValidation('markdown', plain, true), media: [], settings: {} }])).resolves.toBeUndefined();
+    await expect((worker as any).assertMcpFinalPayload(discord, [{ message: stripHtmlValidation('markdown', `<p>${'a'.repeat(101)}</p>`, true), media: [], settings: {} }])).rejects.toThrow('limit');
+  });
+});
+
+describe('V114 known published follow-up failures', () => {
+  it('preserves the verified typed receipt before the legacy release writer, while legacy behavior stays unchanged', async () => {
+    const { PublishedWithError } = require('@gitroom/nestjs-libraries/integrations/social.abstract');
+    const integration: any = { id: 'c', organizationId: 'org', providerIdentifier: 'fixture', internalId: 'i', token: 'fixture', disabled: false, inBetweenSteps: false, refreshNeeded: false };
+    const legacyRelease = jest.fn().mockResolvedValue({});
+    const integrations = { getIntegrationById: jest.fn().mockResolvedValue(integration) };
+    const activity = new PostActivity({ updateResolvedRelease: legacyRelease } as any, {} as any, {} as any, integrations as any, {} as any, {} as any, {} as any, {} as any);
+    const error = new PublishedWithError('fixture', 'post', 'video', 'https://fixture.invalid/video', 'thumbnail failed');
+    const result = await (activity as any).handleDisconnect(integration, async () => { throw error; }, true);
+    expect(result).toEqual([expect.objectContaining({ id: 'post', postId: 'video', status: 'published', warning: expect.any(String) })]);
+    expect(legacyRelease).not.toHaveBeenCalled();
+    expect(integrations.getIntegrationById).not.toHaveBeenCalled();
+    await expect((activity as any).handleDisconnect(integration, async () => { throw error; })).rejects.toBeInstanceOf(BadBody);
+    expect(legacyRelease).toHaveBeenCalledTimes(1);
   });
 });

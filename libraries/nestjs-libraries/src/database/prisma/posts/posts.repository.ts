@@ -1,3 +1,6 @@
+import { agentAdmissionContext, AgentSaveRecovered } from './agent-admission.context';
+import { createHash } from 'crypto';
+import { agentDraftOnly, assertAgentPostWrite } from '../../../chat/agent-credential.policy';
 import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Post as PostBody } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
@@ -27,6 +30,11 @@ dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
 dayjs.extend(utc);
 
+// An agent save that holds its workspace admission longer than this is taken
+// to be abandoned (its process died mid-save). A later save takes it over;
+// the old owner's remaining writes are fenced out like after a recovery.
+export const AGENT_ADMISSION_LEASE_MS = 10 * 60 * 1000;
+
 // Who a post read is for. A real organization id scopes the read to that
 // tenant; PUBLIC_PREVIEW is the one deliberate exception - the shared preview
 // page, which anyone holding the link may open. It is a visible argument rather
@@ -39,6 +47,11 @@ export type OrgScope = string | typeof PUBLIC_PREVIEW;
 
 export const orgFilter = (scope: OrgScope) =>
   scope === PUBLIC_PREVIEW ? {} : { organizationId: scope };
+
+export const mcpPayloadRevision = (posts: Array<any>) => createHash('sha256').update(JSON.stringify(posts.map(p => ({
+  id: p.id, integrationId: p.integrationId, content: p.content, settings: p.settings,
+  image: p.image, delay: p.delay, publishDate: new Date(p.publishDate).toISOString(), parentPostId: p.parentPostId,
+})))).digest('hex');
 
 @Injectable()
 export class PostsRepository {
@@ -108,6 +121,326 @@ export class PostsRepository {
       }
       return { ...updated!, integration };
     });
+  }
+
+  private async assertSaveAdmission(tx: Prisma.TransactionClient, orgId: string) {
+    const admission = agentAdmissionContext.getStore();
+    if (!admission) return;
+    if (admission.orgId !== orgId || typeof admission.owner !== 'string' || !admission.owner) throw new AgentSaveRecovered();
+    const owned = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner: admission.owner }, data: { owner: admission.owner } });
+    if (!owned.count) throw new AgentSaveRecovered();
+  }
+
+  // PostgreSQL aborts a Serializable transaction that raced another one with
+  // P2034. It rolled back entirely, so running it again is safe.
+  private async retrySerializable<T>(run: () => Promise<T>, attempts = 3): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await run();
+      } catch (error) {
+        if ((error as any)?.code !== 'P2034' || attempt >= attempts) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+      }
+    }
+  }
+
+  // Fences an abandoned owner out like recoverAgentAdmission: its saved post
+  // IDs stay readable through the recovery row, its later writes throw.
+  private async expireAgentAdmission(tx: Prisma.TransactionClient, orgId: string, owner: string, where: Prisma.McpAgentAdmissionWhereInput, reason: string) {
+    const locked = await tx.mcpAgentAdmission.updateMany({ where: { ...where, organizationId: orgId, owner }, data: { owner } });
+    if (!locked.count) return false;
+    const admission = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: orgId } });
+    const ids = admission.writtenPostIds as string[];
+    const audit = await tx.activityLog.create({ data: { organizationId: orgId, action: 'GUARDRAIL_BLOCKED', actorType: 'SYSTEM', comment: `${reason} ${owner}; preserved post IDs: ${ids.join(', ') || 'none'}.` }, select: { id: true } });
+    await tx.mcpAgentAdmissionRecovery.create({ data: { organizationId: orgId, owner, auditId: audit.id, writtenPostIds: ids } });
+    await tx.mcpAgentAdmission.delete({ where: { organizationId: orgId, owner } });
+    return true;
+  }
+
+  async acquireAgentAdmission(orgId: string, owner: string, metadata: { instanceId: string; host: string; processId: number } = { instanceId: 'unknown', host: 'unknown', processId: 0 }) {
+    // a second live save still fails with the unique violation (P2002)
+    return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
+      const held = await tx.mcpAgentAdmission.findUnique({ where: { organizationId: orgId }, select: { owner: true } });
+      if (held) await this.expireAgentAdmission(tx, orgId, held.owner, { createdAt: { lt: new Date(Date.now() - AGENT_ADMISSION_LEASE_MS) } }, `Expired agent save after its ${AGENT_ADMISSION_LEASE_MS / 60000} minute lease`);
+      return tx.mcpAgentAdmission.create({ data: { organizationId: orgId, owner, ...metadata } });
+    }, { isolationLevel: 'Serializable' }));
+  }
+
+  // Admissions taken by another backend process, which a restart or a deploy
+  // ended mid-save. See PostsService.releaseAbandonedAgentAdmissions for why
+  // this is only safe at backend boot.
+  async releaseAgentAdmissionsOfOtherInstances(instanceId: string) {
+    const stale = await this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.findMany({ where: { instanceId: { not: instanceId } }, select: { organizationId: true, owner: true } }));
+    let released = 0;
+    for (const row of stale) {
+      const expired = await this.retrySerializable(() => this._transaction.model.$transaction(
+        tx => this.expireAgentAdmission(tx, row.organizationId, row.owner, { instanceId: { not: instanceId } }, 'Released agent save of a stopped server'),
+        { isolationLevel: 'Serializable' }
+      ));
+      if (expired) released++;
+    }
+    return released;
+  }
+  async agentAdmissionStatus(orgId: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.findUnique({ where: { organizationId: orgId }, select: { owner: true, instanceId: true, host: true, processId: true, writtenPostIds: true, createdAt: true } }));
+  }
+
+  // Recovery fences every later write by this exact owner: PostgreSQL
+  // establishes quiescence. Admins can do it at once; the lease
+  // (AGENT_ADMISSION_LEASE_MS) and the backend boot do it on their own.
+  async recoverAgentAdmission(orgId: string, expectedOwner: string, actorId: string) {
+    return this._transaction.model.$transaction(async tx => {
+      const locked = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner: expectedOwner }, data: { owner: expectedOwner } });
+      if (!locked.count) throw new BadRequestException('The active save changed. Refresh before recovering it.');
+      const admission = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: orgId } });
+      const ids = admission.writtenPostIds as string[];
+      const persisted = await tx.post.findMany({ where: { organizationId: orgId, id: { in: ids } }, select: { id: true, state: true } });
+      const audit = await tx.activityLog.create({ data: { organizationId: orgId, action: 'GUARDRAIL_BLOCKED', actorType: 'USER', actorUserId: actorId, comment: `Recovered agent save ${expectedOwner}; preserved post IDs: ${ids.join(', ') || 'none'}.` }, select: { id: true } });
+      await tx.mcpAgentAdmissionRecovery.create({ data: { organizationId: orgId, owner: expectedOwner, auditId: audit.id, writtenPostIds: ids } });
+      await tx.mcpAgentAdmission.delete({ where: { organizationId: orgId, owner: expectedOwner } });
+      return { status: 'RECOVERED', persistedPosts: persisted, missingPostIds: ids.filter(id => !persisted.some(p => p.id === id)) };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  private async recordAgentWrites(tx: Prisma.TransactionClient, orgId: string, owner: string | undefined, posts: Post[]) {
+    if (!owner) return;
+    const admission = await tx.mcpAgentAdmission.findFirst({ where: { organizationId: orgId, owner } });
+    if (!admission) throw new AgentSaveRecovered();
+    const ids = [...new Set([...(admission.writtenPostIds as string[]), ...posts.map(p => p.id)])];
+    await tx.mcpAgentAdmission.update({ where: { organizationId: orgId, owner }, data: { writtenPostIds: ids } });
+  }
+
+  // refused: the save failed on an ordinary refusal (validation, plan), which
+  // is recorded as a stopped save only when it already wrote posts
+  async releaseAgentAdmission(orgId: string, owner: string, failed = false, refused = false) {
+    // a release lost to a serialization race would leave the workspace locked
+    return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
+      const locked = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner }, data: { owner } });
+      if (!locked.count) {
+        const recovered = await tx.mcpAgentAdmissionRecovery.findFirst({ where: { organizationId: orgId, owner }, orderBy: { createdAt: 'desc' } });
+        return { count: 0, writtenPostIds: (recovered?.writtenPostIds || []) as string[] };
+      }
+      const admission = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: orgId } });
+      const writtenPostIds = admission.writtenPostIds as string[];
+      if (failed && (!refused || writtenPostIds.length)) {
+        const audit = await tx.activityLog.create({ data: { organizationId: orgId, action: 'GUARDRAIL_BLOCKED', actorType: 'SYSTEM', comment: `Stopped failed agent save ${owner}; preserved post IDs: ${writtenPostIds.join(', ') || 'none'}.` }, select: { id: true } });
+        await tx.mcpAgentAdmissionRecovery.create({ data: { organizationId: orgId, owner, auditId: audit.id, writtenPostIds } });
+      }
+      const result = await tx.mcpAgentAdmission.deleteMany({ where: { organizationId: orgId, owner } });
+      return { ...result, writtenPostIds };
+    }, { isolationLevel: 'Serializable' }));
+  }
+
+  async holdRemainingMcp(orgId: string, rootId: string, status: 'CHANGES_REQUESTED' | 'REJECTED', updatedAt: Date) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      const locked = await tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId }, data: { updatedAt: new Date() } });
+      if (!locked.count || await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } })) throw new BadRequestException('The remaining thread is publishing or uncertain.');
+      const root = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId, state: 'PUBLISHED', mcpWorkflowVersion: 114, updatedAt, deletedAt: null } });
+      if (!root) throw new BadRequestException('The remaining thread changed. Refresh before reviewing.');
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
+      await tx.post.update({ where: { id: rootId }, data: { approvalStatus: status } });
+      await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { not: 'PUBLISHED' }, deletedAt: null, releaseId: null, releaseURL: null }, data: { state: 'DRAFT', approvalStatus: status } });
+      return { id: rootId, state: 'PUBLISHED', approvalStatus: status, remainingHeld: true };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async approveRemainingMcp(orgId: string, rootId: string, updatedAt: Date) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      const fence = await tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId, state: 'CANCELLED' }, data: { updatedAt: new Date() } });
+      if (!fence.count) throw new BadRequestException('The remaining thread changed. Refresh before approving.');
+      const root = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId, state: 'PUBLISHED', mcpWorkflowVersion: 114, approvalStatus: { in: ['IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'] }, updatedAt, deletedAt: null } });
+      if (!root || await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } })) throw new BadRequestException('The remaining thread changed or has an uncertain attempt.');
+      await tx.post.update({ where: { id: rootId }, data: { approvalStatus: 'APPROVED' } });
+      await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, state: 'DRAFT', releaseId: null, releaseURL: null }, data: { state: 'QUEUE', approvalStatus: 'APPROVED' } });
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'ACTIVE', generation: { increment: 1 }, dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } });
+      return { id: rootId, state: 'PUBLISHED', approvalStatus: 'APPROVED', remainingScheduled: true };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async activateApprovedMcp(orgId: string, postId: string) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      const root = await tx.post.findFirst({ where: { id: postId, organizationId: orgId, state: 'QUEUE', approvalStatus: 'APPROVED', deletedAt: null } });
+      if (!root) throw new BadRequestException('Approved revision is no longer queued.');
+      await tx.mcpPublishFence.updateMany({ where: { postId, organizationId: orgId, state: 'CANCELLED' }, data: { state: 'ACTIVE', generation: { increment: 1 }, dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } });
+    }, { isolationLevel: 'Serializable' });
+  }
+  async mcpFence(orgId: string, rootId: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findFirst({ where: { postId: rootId, organizationId: orgId } }));
+  }
+  // err: the workflow failure of the segment. Only its curated provider
+  // message is kept, after the note, stored in the shape curatedPostError
+  // reads so the calendar and the MCP tools show both.
+  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, err?: any) {
+    const reason = err ? curatedPostError(typeof err === 'string' ? err : JSON.stringify(err)) : null;
+    const message = ['Publication outcome needs reconciliation before retry.', reason].filter(Boolean).join(' ');
+    return this._transaction.model.$transaction(async tx => {
+      const current = await tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId, generation, revisionHash, state: 'ACTIVE' }, data: { updatedAt: new Date() } });
+      if (!current.count) return;
+      await tx.post.updateMany({ where: { id: segmentId, organizationId: orgId, state: 'QUEUE', deletedAt: null }, data: { state: 'ERROR', error: JSON.stringify({ cause: { type: 'bad_body', failure: { message } } }) } });
+    }, { isolationLevel: 'Serializable' });
+  }
+  async mcpWarnings(orgId: string, postIds: string[]) {
+    if (!postIds.length) return [];
+    return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.findMany({ where: { organizationId: orgId, segmentPostId: { in: postIds }, status: 'CONFIRMED', followUpWarning: { not: null } }, select: { segmentPostId: true, followUpWarning: true } }));
+  }
+
+  async mcpDispatchStatuses(orgId: string, postIds: string[]) {
+    if (!postIds.length) return [];
+    return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findMany({ where: { organizationId: orgId, postId: { in: postIds } }, select: { postId: true, generation: true, dispatchState: true, dispatchErrorCode: true } }));
+  }
+
+  async mcpAttempts(orgId: string, rootId: string) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishAttempt.findMany({ where: { organizationId: orgId, rootPostId: rootId }, orderBy: { generation: 'asc' } }));
+  }
+  async reconcileMcpAttempt(orgId: string, id: string, outcome: 'FAILED' | 'CONFIRMED', receipt?: any) {
+    return this._transaction.model.$transaction(async tx => {
+      const attempt = await tx.mcpPublishAttempt.findFirst({ where: { id, organizationId: orgId, status: { in: ['STARTED', 'UNKNOWN'] } } });
+      if (!attempt) return { count: 0 };
+      const locked = await tx.mcpPublishFence.updateMany({ where: { postId: attempt.rootPostId, organizationId: orgId, state: 'ACTIVE', generation: attempt.generation, revisionHash: attempt.revisionHash }, data: { updatedAt: new Date() } });
+      if (!locked.count) throw new BadRequestException('The attempt fence changed.');
+      if (outcome === 'CONFIRMED') {
+        if (!attempt.providerPayloadHash || !receipt?.[0]?.postId || receipt[0].id !== attempt.segmentPostId) throw new BadRequestException('Receipt identity mismatch.');
+        await tx.post.update({ where: { id: attempt.segmentPostId, organizationId: orgId, deletedAt: null }, data: { state: 'PUBLISHED', releaseId: String(receipt[0].postId), releaseURL: String(receipt[0].releaseURL || ''), error: null } });
+      }
+      return tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: { in: ['STARTED', 'UNKNOWN'] } }, data: { status: outcome, ...(receipt ? { receipt } : {}) } });
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async resumeMcp(orgId: string, rootId: string, revisionHash: string, closedGeneration?: number) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootId } });
+      if (!fence || fence.organizationId !== orgId || fence.revisionHash !== revisionHash) throw new BadRequestException('Legacy or changed revision cannot resume.');
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { updatedAt: new Date() } });
+      const attempts = await tx.mcpPublishAttempt.findMany({ where: { rootPostId: rootId } });
+      if (attempts.some(a => !['FAILED', 'CONFIRMED'].includes(a.status))) return { status: 'OUTCOME_UNKNOWN' };
+      if (fence.state === 'ACTIVE' && !attempts.some(a => a.status === 'FAILED' && a.generation === fence.generation) && closedGeneration !== fence.generation) return { status: 'ALREADY_ACTIVE' };
+      const root = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId, deletedAt: null } });
+      if (!root || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) return { status: 'BLOCKED', reason: 'Human review is required.' };
+      const remaining = await tx.post.count({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, state: { not: 'PUBLISHED' } } });
+      if (!remaining) return { status: 'ALREADY_PUBLISHED' };
+      await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { generation: { increment: 1 }, state: 'ACTIVE', dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } });
+      await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, deletedAt: null, releaseId: null, releaseURL: null, state: { not: 'PUBLISHED' } }, data: { state: 'QUEUE' } });
+      return { status: 'RESUMED' };
+    }, { isolationLevel: 'Serializable' }).catch(error => { if (error instanceof AgentSaveRecovered) throw error; return ({ status: error instanceof BadRequestException || (error as any)?.code === 'P2034' ? 'BLOCKED' : 'OUTCOME_UNKNOWN', reason: 'The publication state changed or could not be confirmed. Inspect the post before retrying.' }); });
+  }
+
+  async pendingMcpDispatches(limit = 16) {
+    return this._transaction.model.$transaction(tx => tx.mcpPublishFence.findMany({ where: { state: 'ACTIVE', dispatchState: { in: ['PENDING', 'UNKNOWN'] }, dispatchNotBefore: { lte: new Date() } }, orderBy: [{ dispatchNotBefore: 'asc' }, { createdAt: 'asc' }], take: Math.max(1, Math.min(limit, 16)) }));
+  }
+
+  async recordMcpDispatch(orgId: string, rootId: string, generation: number, revisionHash: string, status: 'CONFIRMED' | 'UNKNOWN' | 'HELD' | 'NONE', code: string | null = null, sent = false) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      return tx.mcpPublishFence.updateMany({ where: { postId: rootId, organizationId: orgId, state: 'ACTIVE', generation, revisionHash }, data: { dispatchState: status, dispatchErrorCode: code, dispatchNotBefore: new Date(Date.now() + 30000), ...(sent ? { dispatchAttempts: { increment: 1 } } : {}), ...(status === 'CONFIRMED' ? { dispatchConfirmedAt: new Date() } : {}) } });
+    });
+  }
+
+  async mcpWorkflowVersion(orgId: string, postId: string) {
+    return (await this._post.model.post.findFirst({ where: { id: postId, organizationId: orgId }, select: { mcpWorkflowVersion: true } }))?.mcpWorkflowVersion;
+  }
+
+  // The transaction locks the same fence for API transitions and worker admission.
+  // STARTED is durable before external I/O; an interrupted caller cannot infer failure.
+  private async writeMcpFence(tx: Prisma.TransactionClient, orgId: string, posts: Post[]) {
+    const root = posts[0];
+    if (!root || root.mcpWorkflowVersion !== 114) return;
+    const revisionHash = mcpPayloadRevision(posts);
+    const previous = await tx.mcpPublishFence.findUnique({ where: { postId: root.id } });
+    await tx.mcpPublishFence.upsert({ where: { postId: root.id }, create: { postId: root.id, organizationId: orgId, integrationId: root.integrationId, revisionHash, dispatchState: root.state === 'QUEUE' ? 'PENDING' : 'NONE' }, update: {
+      revisionHash, dispatchState: root.state === 'QUEUE' ? 'PENDING' : 'NONE', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null,
+      ...(previous && previous.revisionHash !== revisionHash ? { generation: { increment: 1 } } : {}),
+      ...(previous?.state === 'EDITING' ? { state: 'ACTIVE' } : {}),
+    } });
+  }
+
+  async registerMcpFence(orgId: string, postId: string, integrationId: string, revisionHash: string) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      const existing = await tx.mcpPublishFence.findUnique({ where: { postId } });
+      if (existing && (existing.organizationId !== orgId || existing.revisionHash !== revisionHash)) {
+        const attempts = await tx.mcpPublishAttempt.count({ where: { rootPostId: postId } });
+        if (attempts) throw new BadRequestException('Publication attempts exist; changing their payload is blocked.');
+      }
+      await tx.mcpPublishFence.upsert({ where: { postId }, create: { postId, organizationId: orgId, integrationId, revisionHash }, update: { revisionHash, ...(existing?.revisionHash !== revisionHash ? { generation: { increment: 1 }, dispatchState: 'PENDING', dispatchNotBefore: new Date(), dispatchConfirmedAt: null, dispatchErrorCode: null } : {}), ...(existing?.state === 'EDITING' ? { state: 'ACTIVE' } : {}) } });
+      await tx.post.update({ where: { id: postId, organizationId: orgId }, data: { mcpWorkflowVersion: 114 } });
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async claimMcpSegment(orgId: string, rootPostId: string, segmentPostId: string, revisionHash: string, generation: number) {
+    return this._transaction.model.$transaction(async tx => {
+      const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootPostId } });
+      if (!fence || fence.organizationId !== orgId || fence.revisionHash !== revisionHash || fence.generation !== generation || fence.state !== 'ACTIVE') throw new BadRequestException('Publication fence is not active for this revision.');
+      // A write takes the shared lock, so a simultaneous cancellation cannot pass.
+      const locked = await tx.mcpPublishFence.updateMany({ where: { postId: rootPostId, organizationId: orgId, state: 'ACTIVE', revisionHash, generation: fence.generation }, data: { updatedAt: new Date() } });
+      if (!locked.count) throw new BadRequestException('Publication fence changed.');
+      const prior = await tx.mcpPublishAttempt.findMany({ where: { rootPostId, segmentPostId }, orderBy: { generation: 'desc' } });
+      if (prior.some(a => a.revisionHash !== revisionHash)) throw new BadRequestException('Attempt identity has a different payload.');
+      const confirmed = prior.find(a => a.status === 'CONFIRMED');
+      if (confirmed) return { replay: true as const, receipt: confirmed.receipt, id: confirmed.id };
+      if (prior.some(a => a.status !== 'FAILED')) throw new BadRequestException('OUTCOME_UNKNOWN: reconcile the earlier attempt before retry.');
+      const segment = await tx.post.findFirst({ where: { id: segmentPostId, organizationId: orgId, state: 'QUEUE', deletedAt: null, releaseId: null, releaseURL: null, integration: { deletedAt: null, disabled: false } } });
+      if (!segment) throw new BadRequestException('Segment is not eligible for a new publication.');
+      const row = await tx.mcpPublishAttempt.create({ data: { rootPostId, segmentPostId, organizationId: orgId, revisionHash, generation: fence.generation, status: 'STARTED' } });
+      return { replay: false as const, receipt: null, id: row.id };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async bindMcpProviderPayload(orgId: string, attemptId: string, payload: any) {
+    const providerPayloadHash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    return this._transaction.model.$transaction(async tx => {
+      const attempt = await tx.mcpPublishAttempt.findFirst({ where: { id: attemptId, organizationId: orgId, status: 'STARTED' } });
+      if (!attempt) throw new BadRequestException('Publication attempt is not admitted.');
+      const fence = await tx.mcpPublishFence.updateMany({ where: { postId: attempt.rootPostId, organizationId: orgId, revisionHash: attempt.revisionHash, generation: attempt.generation, state: 'ACTIVE' }, data: { updatedAt: new Date() } });
+      if (!fence.count || (attempt.providerPayloadHash && attempt.providerPayloadHash !== providerPayloadHash)) throw new BadRequestException('The immutable provider payload changed.');
+      await tx.mcpPublishAttempt.update({ where: { id: attemptId }, data: { providerPayloadHash, providerPayload: payload } });
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async finishMcpSegment(orgId: string, id: string, receipt: any) {
+    return this._transaction.model.$transaction(async tx => {
+      const row = await tx.mcpPublishAttempt.findFirst({ where: { id, organizationId: orgId, status: 'STARTED' } });
+      if (!row) throw new BadRequestException('OUTCOME_UNKNOWN: attempt ownership lost.');
+      const fence = await tx.mcpPublishFence.updateMany({ where: { postId: row.rootPostId, organizationId: orgId, revisionHash: row.revisionHash, generation: row.generation, state: 'ACTIVE' }, data: { updatedAt: new Date() } });
+      if (!fence.count || !row.providerPayloadHash || !receipt?.[0]?.postId || receipt[0].id !== row.segmentPostId) throw new BadRequestException('OUTCOME_UNKNOWN: receipt/fence mismatch.');
+      await tx.post.update({ where: { id: row.segmentPostId, organizationId: orgId, deletedAt: null }, data: { state: 'PUBLISHED', releaseId: String(receipt[0].postId), releaseURL: String(receipt[0].releaseURL || ''), error: null } });
+      await tx.mcpPublishAttempt.update({ where: { id }, data: { status: 'CONFIRMED', receipt, followUpWarning: receipt[0].warning || null } });
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  // The activity binds the provider payload right before it calls the
+  // provider, so an attempt that stopped with no bound payload sent nothing:
+  // it FAILED and may be retried. With a bound payload it may have been
+  // published, so its outcome is UNKNOWN until it is reconciled.
+  async markMcpUnfinished(orgId: string, id: string): Promise<'FAILED' | 'UNKNOWN' | null> {
+    return this.retrySerializable(() => this._transaction.model.$transaction(async (tx): Promise<'FAILED' | 'UNKNOWN' | null> => {
+      const failed = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED', providerPayloadHash: null }, data: { status: 'FAILED' } });
+      if (failed.count) return 'FAILED';
+      const unknown = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED' }, data: { status: 'UNKNOWN' } });
+      return unknown.count ? 'UNKNOWN' : null;
+    }, { isolationLevel: 'Serializable' }));
+  }
+
+  async unscheduleMcp(orgId: string, rootPostId: string, preserveApproval = false, requireReview = false) {
+    return this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootPostId } });
+      if (!fence || fence.organizationId !== orgId) return { status: 'BLOCKED', reason: 'Legacy job has no shared publication fence.' };
+      await tx.mcpPublishFence.update({ where: { postId: rootPostId }, data: { updatedAt: new Date() } });
+      const attempts = await tx.mcpPublishAttempt.findMany({ where: { rootPostId } });
+      if (attempts.some(a => ['STARTED', 'UNKNOWN', 'PENDING'].includes(a.status))) return { status: 'OUTCOME_UNKNOWN', reason: 'An admitted attempt must be reconciled before cancellation.' };
+      const root = await tx.post.findFirst({ where: { id: rootPostId, organizationId: orgId, deletedAt: null, parentPostId: null } });
+      if (!root) throw new BadRequestException('Post not found.');
+      await tx.mcpPublishFence.update({ where: { postId: rootPostId }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
+      const remaining = await tx.post.count({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { not: 'PUBLISHED' }, deletedAt: null } });
+      if (remaining && root.state === 'PUBLISHED' && (requireReview || ['APPROVED', 'IN_REVIEW'].includes(root.approvalStatus))) await tx.post.update({ where: { id: rootPostId }, data: { approvalStatus: 'IN_REVIEW' } });
+      await tx.post.updateMany({ where: { organizationId: orgId, integrationId: root.integrationId, group: root.group, state: { in: ['QUEUE', 'DRAFT', 'ERROR'] }, deletedAt: null, releaseId: null, releaseURL: null }, data: { state: 'DRAFT', ...(preserveApproval ? {} : { approvalStatus: (requireReview || ['APPROVED', 'IN_REVIEW'].includes(root.approvalStatus)) ? 'IN_REVIEW' : 'NONE' }) } });
+      const published = attempts.filter(a => a.status === 'CONFIRMED').map(a => a.segmentPostId);
+      return { status: published.length ? (remaining ? 'PARTIALLY_UNSCHEDULED' : 'ALREADY_PUBLISHED') : 'UNSCHEDULED', postId: rootPostId, publishedSegmentIds: published };
+    }, { isolationLevel: 'Serializable' }).catch(error => { if (error instanceof AgentSaveRecovered) throw error; return ({ status: error instanceof BadRequestException || (error as any)?.code === 'P2034' ? 'BLOCKED' : 'OUTCOME_UNKNOWN', reason: 'The publication state changed or could not be confirmed. Inspect the post before retrying.' }); });
   }
 
   searchForMissingThreeHoursPosts() {
@@ -423,7 +756,22 @@ export class PostsRepository {
     };
   }
 
-  async deletePost(orgId: string, group: string) {
+  // failedRootIds: tracked roots a person may delete although an attempt is
+  // uncertain, because their thread failed and no workflow runs for them (see
+  // PostsService.deletePost). A row of the thread must still be in ERROR here.
+  async deletePost(orgId: string, group: string, failedRootIds: string[] = []) {
+    const tracked = await this._post.model.post.findMany({ where: { organizationId: orgId, group, parentPostId: null, mcpWorkflowVersion: 114, deletedAt: null }, select: { id: true, integrationId: true } });
+    if (tracked.length) return this._transaction.model.$transaction(async tx => {
+      for (const root of [...tracked].sort((a, b) => a.id.localeCompare(b.id))) {
+        const fence = await tx.mcpPublishFence.updateMany({ where: { postId: root.id, organizationId: orgId }, data: { updatedAt: new Date() } });
+        const uncertain = await tx.mcpPublishAttempt.count({ where: { rootPostId: root.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } });
+        const failedByPerson = failedRootIds.includes(root.id) && !!(await tx.post.findFirst({ where: { organizationId: orgId, group, integrationId: root.integrationId, state: 'ERROR', deletedAt: null }, select: { id: true } }));
+        if (!fence.count || (uncertain && !failedByPerson)) throw new BadRequestException('This publication is active or uncertain. Reconcile it before deleting; deletion cannot prove it was cancelled.');
+        await tx.mcpPublishFence.update({ where: { postId: root.id }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
+      }
+      await tx.post.updateMany({ where: { organizationId: orgId, group, deletedAt: null }, data: { deletedAt: new Date() } });
+      return { id: tracked[0].id };
+    }, { isolationLevel: 'Serializable' });
     await this._post.model.post.updateMany({
       where: {
         organizationId: orgId,
@@ -817,6 +1165,47 @@ export class PostsRepository {
     });
   }
 
+  // Existing draft threads never use upsert: a missed conditional update
+  // must conflict, rather than create a new default-QUEUE replacement.
+  private async updateAgentDraftThread(tx: Prisma.TransactionClient, orgId: string, date: string, body: PostBody, approvalStatus?: ApprovalStatus, expectedDraftUpdatedAt?: Date) {
+      const root = await tx.post.findFirst({ where: {
+        id: body.value[0]?.id || '', organizationId: orgId, integrationId: body.integration.id,
+        parentPostId: null, deletedAt: null, state: 'DRAFT', releaseId: null,
+        ...(expectedDraftUpdatedAt ? { updatedAt: expectedDraftUpdatedAt } : {}),
+      } });
+      if (!root) throw new BadRequestException('The draft changed. Refresh before editing.');
+      const thread = await tx.post.findMany({ where: { organizationId: orgId, integrationId: body.integration.id, group: root.group, deletedAt: null } });
+      const ids = body.value.map(value => value.id);
+      if (new Set(ids).size !== ids.length || thread.length !== ids.length ||
+          thread.some(post => !ids.includes(post.id) || post.state !== 'DRAFT' || post.releaseId)) {
+        throw new BadRequestException('The draft thread changed. Refresh before editing.');
+      }
+      const posts: Post[] = [];
+      for (const [index, value] of body.value.entries()) {
+        const stored = thread.find(post => post.id === value.id);
+        if (!stored || stored.parentPostId !== (index ? body.value[index - 1].id : null)) {
+          throw new BadRequestException('The draft thread changed. Refresh before editing.');
+        }
+        // Updating the root first claims its version and locks it until the
+        // entire thread commits. A concurrent approval/schedule cannot cover
+        // a partially edited payload; any child failure rolls everything back.
+        posts.push(await tx.post.update({ where: {
+          id: stored.id, organizationId: orgId, integrationId: body.integration.id,
+          deletedAt: null, state: 'DRAFT', releaseId: null, updatedAt: stored.updatedAt,
+          parentPostId: stored.parentPostId,
+        }, data: {
+          publishDate: dayjs(date).toDate(), content: value.content, delay: value.delay || 0,
+          image: JSON.stringify(value.image), settings: JSON.stringify(body.settings),
+          approvalStatus: ['APPROVED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'].includes(root.approvalStatus)
+            ? 'IN_REVIEW' : approvalStatus || root.approvalStatus,
+        } }));
+      }
+      // In-place edits retain the exact stored thread membership and tags.
+      // There is no group sweep that could delete an independently scheduled row.
+      await this.writeMcpFence(tx, orgId, posts);
+      return { previousPost: root.id, posts };
+  }
+
   async createOrUpdatePost(
     state: 'draft' | 'schedule' | 'now' | 'update',
     orgId: string,
@@ -834,15 +1223,46 @@ export class PostsRepository {
     batchId?: string,
     // the review state to store (undefined keeps it) and, on create, the
     // agent that created the post
-    approval: { approvalStatus?: ApprovalStatus; agentSource?: string } = {}
+    approval: { approvalStatus?: ApprovalStatus; agentSource?: string; requireExistingDraft?: boolean; expectedDraftUpdatedAt?: Date } = {}
   ) {
+    assertAgentPostWrite(orgId, body.integration.id, state);
+    const admissionOwner = agentAdmissionContext.getStore()?.orgId === orgId ? agentAdmissionContext.getStore()!.owner : undefined;
+    // Serializable only where an agent admission or an MCP publication fence
+    // is involved (a fence exists from a tracked post's first save on).
+    // Every other save (web, autopost, import, bulk, public API) keeps the
+    // default isolation, so it never fails on a serialization race.
+    const editedId = body.value?.[0]?.id;
+    const serializable = !!admissionOwner || creationMethod === 'MCP' ||
+      (!!editedId && !!(await this._transaction.model.$transaction(tx => tx.mcpPublishFence.findUnique({ where: { postId: editedId }, select: { postId: true } }))));
+    return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
+      await this.assertSaveAdmission(tx, orgId);
+      if (admissionOwner) {
+        const live = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner: admissionOwner }, data: { owner: admissionOwner } });
+        if (!live.count) throw new AgentSaveRecovered();
+      }
+      const rootId = body.value?.[0]?.id;
+      if (rootId) {
+        const fence = await tx.mcpPublishFence.findUnique({ where: { postId: rootId } });
+        if (fence) {
+          if (fence.organizationId !== orgId) throw new BadRequestException('Post not found.');
+          const current = await tx.post.findFirst({ where: { id: rootId, organizationId: orgId }, select: { state: true } });
+          if (!current || !['DRAFT', 'QUEUE'].includes(current.state)) throw new BadRequestException('This tracked MCP revision cannot be edited.');
+          await tx.mcpPublishFence.update({ where: { postId: rootId }, data: { state: 'EDITING' } });
+          if (await tx.mcpPublishAttempt.count({ where: { rootPostId: rootId } })) throw new BadRequestException('A publication attempt exists. Preserve this revision and prepare a new reviewed draft instead.');
+        }
+      }
+    if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft)) {
+      const result = await this.updateAgentDraftThread(tx, orgId, date, body, approval.approvalStatus, approval.expectedDraftUpdatedAt);
+      await this.recordAgentWrites(tx, orgId, admissionOwner, result.posts);
+      return result;
+    }
     const posts: Post[] = [];
     const uuid = uuidv4();
     // keepGroup reuses the client-supplied group only when it already belongs
     // to this organization, so a foreign group id can never be adopted
     const ownsGroup =
       keepGroup && body.group
-        ? !!(await this._post.model.post.findFirst({
+        ? !!(await tx.post.findFirst({
             where: {
               group: body.group,
               organizationId: orgId,
@@ -860,7 +1280,7 @@ export class PostsRepository {
     const existingBatchId =
       body.group || ids.length
         ? (
-            await this._post.model.post.findFirst({
+            await tx.post.findFirst({
               where: {
                 organizationId: orgId,
                 deletedAt: null,
@@ -909,7 +1329,7 @@ export class PostsRepository {
         batchId: existingBatchId || batchId,
         intervalInDays: inter ? +inter : null,
         approvedSubmitForOrder: APPROVED_SUBMIT_FOR_ORDER.NO,
-        ...(type === 'create' ? { creationMethod } : {}),
+        ...(type === 'create' ? { creationMethod, ...(creationMethod === 'MCP' ? { mcpWorkflowVersion: 114 } : {}) } : {}),
         ...(approval.approvalStatus
           ? { approvalStatus: approval.approvalStatus }
           : {}),
@@ -939,7 +1359,7 @@ export class PostsRepository {
       });
 
       posts.push(
-        await this._post.model.post.upsert({
+        await tx.post.upsert({
           where: {
             id: value.id || uuidv4(),
             organizationId: orgId,
@@ -959,7 +1379,7 @@ export class PostsRepository {
       );
 
       if (posts.length === 1) {
-        await this._tagsPosts.model.tagsPosts.deleteMany({
+        await tx.tagsPosts.deleteMany({
           where: {
             post: {
               id: posts[0].id,
@@ -968,7 +1388,7 @@ export class PostsRepository {
         });
 
         if (tags.length) {
-          const tagsList = await this._tags.model.tags.findMany({
+          const tagsList = await tx.tags.findMany({
             where: {
               orgId: orgId,
               deletedAt: null,
@@ -979,7 +1399,7 @@ export class PostsRepository {
           });
 
           if (tagsList.length) {
-            await this._post.model.post.update({
+            await tx.post.update({
               where: {
                 id: posts[posts.length - 1].id,
               },
@@ -1000,7 +1420,7 @@ export class PostsRepository {
 
     const previousPost = body.group
       ? (
-          await this._post.model.post.findFirst({
+          await tx.post.findFirst({
             where: {
               group: body.group,
               organizationId: orgId,
@@ -1015,7 +1435,7 @@ export class PostsRepository {
       : undefined;
 
     if (body.group && !keepGroup) {
-      await this._post.model.post.updateMany({
+      await tx.post.updateMany({
         where: {
           group: body.group,
           organizationId: orgId,
@@ -1031,7 +1451,7 @@ export class PostsRepository {
     // keepGroup: the updated rows still carry the old group, so sweep only the
     // rows dropped from it (removed comments) by id instead of by group.
     if (body.group && keepGroup) {
-      await this._post.model.post.updateMany({
+      await tx.post.updateMany({
         where: {
           group: body.group,
           organizationId: orgId,
@@ -1047,9 +1467,16 @@ export class PostsRepository {
       });
     }
 
+    await this.writeMcpFence(tx, orgId, posts);
+    await this.recordAgentWrites(tx, orgId, admissionOwner, posts);
     return { previousPost, posts };
+    // a thread with media and tags runs past Prisma's 5s default, which
+    // fails the save with P2028 (not retried); 15s like the other long saves
+    }, { timeout: 15000, ...(serializable ? { isolationLevel: 'Serializable' as const } : {}) })).catch(error => {
+      if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft) && ['P2025', 'P2034'].includes((error as any)?.code)) throw new BadRequestException('The draft changed. Refresh before editing.');
+      throw error;
+    });
   }
-
   // Keeps a post and its comments as a draft until an approver approves it.
   // A failed post held this way is no longer failed, its old error goes.
   holdForReview(orgId: string, group: string) {

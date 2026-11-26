@@ -1,9 +1,13 @@
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { AgentCredentialService } from '@gitroom/nestjs-libraries/chat/agent-credential.service';
+import { CreateAgentCredentialDto } from '@gitroom/nestjs-libraries/dtos/settings/agent.credential.dto';
 import {
   Body,
   Controller,
   Delete,
   Get,
   HttpException,
+  Header,
   Param,
   Post,
   Put,
@@ -24,8 +28,40 @@ import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/p
 @Controller('/settings')
 export class SettingsController {
   constructor(
-    private _organizationService: OrganizationService
+    private _organizationService: OrganizationService,
+    private _agentCredentials: AgentCredentialService,
+    private _posts: PostsService
   ) {}
+
+  @Get('/agent-admission')
+  @Header('Cache-Control', 'no-store')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  agentAdmission(@GetOrgFromRequest() org: Organization) { return this._posts.agentAdmissionStatus(org.id); }
+
+  @Post('/agent-admission/:owner/recover')
+  @Header('Cache-Control', 'no-store')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  recoverAgentAdmission(@GetOrgFromRequest() org: Organization, @GetUserFromRequest() user: User, @Param('owner') owner: string) { return this._posts.recoverAgentAdmission(org.id, owner, user.id); }
+
+  @Get('/agent-credentials')
+  @Header('Cache-Control', 'no-store')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  listAgentCredentials(@GetOrgFromRequest() org: Organization) {
+    return this._agentCredentials.list(org.id);
+  }
+
+  @Post('/agent-credentials')
+  @Header('Cache-Control', 'no-store')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  createAgentCredential(@GetOrgFromRequest() org: Organization, @Body() body: CreateAgentCredentialDto) {
+    return this._agentCredentials.create(org.id, body);
+  }
+
+  @Delete('/agent-credentials/:id')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  revokeAgentCredential(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+    return this._agentCredentials.revoke(org.id, id);
+  }
 
   @Get('/team')
   @CheckPolicies(

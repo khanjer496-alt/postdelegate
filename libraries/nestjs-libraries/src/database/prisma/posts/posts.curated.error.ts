@@ -14,6 +14,8 @@
 // disabled channel, and a channel needing a reconnect is in the "needs
 // attention" list - and the calendar has a translated fallback for a post that
 // failed with no reason to show.
+// One string of ours is shown on purpose: a failed tracked MCP segment stores
+// its reconciliation note in the bad_body shape (see failMcpSegment).
 export const curatedPostError = (error?: string | null): string | null => {
   if (!error) {
     return null;
