@@ -752,15 +752,15 @@ export class PostsRepository {
   }
 
   // failedRootIds: tracked roots a person may delete although an attempt is
-  // uncertain, because they failed and no workflow runs for them (see
-  // PostsService.deletePost). They must still be in ERROR here.
+  // uncertain, because their thread failed and no workflow runs for them (see
+  // PostsService.deletePost). A row of the thread must still be in ERROR here.
   async deletePost(orgId: string, group: string, failedRootIds: string[] = []) {
-    const tracked = await this._post.model.post.findMany({ where: { organizationId: orgId, group, parentPostId: null, mcpWorkflowVersion: 114, deletedAt: null }, select: { id: true } });
+    const tracked = await this._post.model.post.findMany({ where: { organizationId: orgId, group, parentPostId: null, mcpWorkflowVersion: 114, deletedAt: null }, select: { id: true, integrationId: true } });
     if (tracked.length) return this._transaction.model.$transaction(async tx => {
       for (const root of [...tracked].sort((a, b) => a.id.localeCompare(b.id))) {
         const fence = await tx.mcpPublishFence.updateMany({ where: { postId: root.id, organizationId: orgId }, data: { updatedAt: new Date() } });
         const uncertain = await tx.mcpPublishAttempt.count({ where: { rootPostId: root.id, status: { in: ['STARTED', 'UNKNOWN', 'PENDING'] } } });
-        const failedByPerson = failedRootIds.includes(root.id) && !!(await tx.post.findFirst({ where: { id: root.id, organizationId: orgId, state: 'ERROR', deletedAt: null }, select: { id: true } }));
+        const failedByPerson = failedRootIds.includes(root.id) && !!(await tx.post.findFirst({ where: { organizationId: orgId, group, integrationId: root.integrationId, state: 'ERROR', deletedAt: null }, select: { id: true } }));
         if (!fence.count || (uncertain && !failedByPerson)) throw new BadRequestException('This publication is active or uncertain. Reconcile it before deleting; deletion cannot prove it was cancelled.');
         await tx.mcpPublishFence.update({ where: { postId: root.id }, data: { state: 'CANCELLED', dispatchState: 'CANCELLED' } });
       }

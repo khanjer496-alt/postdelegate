@@ -1209,16 +1209,20 @@ export class PostsService {
   }
 
   // Deleting it only drops the post here, it never claims the uncertain
-  // attempt was not published.
+  // attempt was not published. A thread failed when any of its rows did (a
+  // comment can fail after the root went out), and nothing of the group may
+  // still run or be unknown.
   private async failedMcpRootsWithoutWorkflow(orgId: string, group: string) {
-    const roots = (await this._postRepository.getPostsByGroup(orgId, group)).filter(
-      (p) => !p.parentPostId && p.mcpWorkflowVersion === 114 && p.state === 'ERROR'
+    const rows = await this._postRepository.getPostsByGroup(orgId, group);
+    const roots = rows.filter((p) => !p.parentPostId && p.mcpWorkflowVersion === 114);
+    const failed = roots.filter((root) =>
+      rows.some((p) => p.state === 'ERROR' && p.integrationId === root.integrationId)
     );
-    const ids: string[] = [];
+    if (!failed.length) return [];
     for (const root of roots) {
-      if (!(await this.hasRunningWorkflow(root.id))) ids.push(root.id);
+      if (await this.hasRunningWorkflow(root.id)) return [];
     }
-    return ids;
+    return failed.map((root) => root.id);
   }
 
   // unknown counts as running: the caller then keeps the post

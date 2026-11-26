@@ -873,3 +873,34 @@ describe('PostsRepository.createOrUpdatePost transaction isolation and retry', (
     expect($transaction).toHaveBeenCalledTimes(3); // the fence lookup, then two save attempts
   });
 });
+
+describe('PostsRepository.deletePost of a failed tracked MCP thread', () => {
+  const make = (errorRow: any) => {
+    const post = {
+      findMany: jest.fn().mockResolvedValue([{ id: 'root', integrationId: 'channel' }]),
+      findFirst: jest.fn().mockResolvedValue(errorRow),
+      updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+    };
+    const tx = {
+      post,
+      mcpPublishFence: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), update: jest.fn() },
+      // the root went out, its comment's attempt stayed uncertain
+      mcpPublishAttempt: { count: jest.fn().mockResolvedValue(1) },
+    };
+    const repo = new PostsRepository({ model: { post } } as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction: (run: any) => run(tx) } } as any, {} as any);
+    return { repo, post, tx };
+  };
+
+  it('deletes it when a comment of the thread failed, not only the root', async () => {
+    const { repo, post } = make({ id: 'child' });
+    await expect(repo.deletePost('org', 'group', ['root'])).resolves.toEqual({ id: 'root' });
+    expect(post.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: 'org', group: 'group', integrationId: 'channel', state: 'ERROR', deletedAt: null } }));
+    expect(post.updateMany).toHaveBeenCalled();
+  });
+
+  it('still refuses while no row of the thread failed', async () => {
+    const { repo, post } = make(null);
+    await expect(repo.deletePost('org', 'group', ['root'])).rejects.toThrow('active or uncertain');
+    expect(post.updateMany).not.toHaveBeenCalled();
+  });
+});

@@ -2870,6 +2870,28 @@ describe('PostsService.deletePost of a failed tracked MCP post', () => {
     expect(postRepository.deletePost).toHaveBeenCalledWith('org', 'group', []);
   });
 
+  it('lets a person delete a thread whose comment failed after the root went out', async () => {
+    const { service, postRepository } = make(false);
+    postRepository.getPostsByGroup.mockResolvedValue([
+      { id: 'root', parentPostId: null, mcpWorkflowVersion: 114, state: 'PUBLISHED', integrationId: 'channel' },
+      { id: 'child', parentPostId: 'root', mcpWorkflowVersion: 114, state: 'ERROR', integrationId: 'channel' },
+    ]);
+    await service.deletePost('org', 'group', true);
+    expect(postRepository.deletePost).toHaveBeenCalledWith('org', 'group', ['root']);
+  });
+
+  it('keeps the guard while a workflow of another channel of the group runs', async () => {
+    const { service, postRepository } = make(false);
+    postRepository.getPostsByGroup.mockResolvedValue([
+      { id: 'root', parentPostId: null, mcpWorkflowVersion: 114, state: 'PUBLISHED', integrationId: 'channel' },
+      { id: 'child', parentPostId: 'root', mcpWorkflowVersion: 114, state: 'ERROR', integrationId: 'channel' },
+      { id: 'other', parentPostId: null, mcpWorkflowVersion: 114, state: 'QUEUE', integrationId: 'second' },
+    ]);
+    (service as any)._temporalService.client.getRawClient = () => ({ workflow: { list: ({ query }: any) => (async function* () { if (query.includes('"other"')) yield { workflowId: 'post_other' }; })() } });
+    await service.deletePost('org', 'group', true);
+    expect(postRepository.deletePost).toHaveBeenCalledWith('org', 'group', []);
+  });
+
   it('keeps the guard for the public API and other callers', async () => {
     const { service, postRepository, list } = make(false);
     await service.deletePost('org', 'group');
