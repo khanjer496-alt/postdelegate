@@ -94,6 +94,7 @@ export class BillingController {
   @Post('/finish-trial')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async finishTrial(@GetOrgFromRequest() org: Organization) {
+    await this._paymentService.assertCanFinishTrial(org.id);
     const provider = await this.provider(org);
     try {
       const action = await provider.finishTrial(org);

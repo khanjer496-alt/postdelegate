@@ -144,6 +144,22 @@ export class PaymentService {
     );
   }
 
+  // A trial set to cancel ends on its own without a charge, so it cannot be
+  // ended early and charged; the subscription has to be reactivated first.
+  async assertCanFinishTrial(organizationId: string) {
+    const subscription =
+      await this._subscriptionService.getSubscriptionByOrganizationId(
+        organizationId
+      );
+
+    if (subscription?.cancelAt) {
+      throw new HttpException(
+        'Your subscription is set to cancel, so your trial cannot be ended early. Reactivate your subscription first.',
+        400
+      );
+    }
+  }
+
   // Account deletion: the provider owning the org's subscription, or - when
   // there is no row (missed webhook, cleaned up) - every provider, so nothing
   // keeps charging a deleted account. Providers no-op when they own nothing.
