@@ -461,8 +461,7 @@ export const decideApproval = (
   const waiting = !!previous && AWAITING.includes(previous);
   const hold =
     actor.type === 'agent'
-      ? previous === 'APPROVED' ||
-        (settings.requireAgentApproval &&
+      ? (settings.requireAgentApproval &&
           (!actor.viaApi || settings.requireApiApproval)) ||
         waiting
       : !canApprove && (settings.requireApproval || waiting);
