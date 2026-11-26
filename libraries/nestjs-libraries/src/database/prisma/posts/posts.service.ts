@@ -2115,8 +2115,11 @@ export class PostsService {
 
       // Materialized links can grow. Validate the exact transformed text before
       // enqueueing; a preflight snapshot never authorizes this payload.
-      const [finalValidation] = await this.validatePosts(orgId, [post], validationIntent === 'review' ? 'schedule' : body.type, false, post.date || body.date);
-      this.assertFinalPayload(finalValidation, body.type, validationIntent);
+      // an in-place update of a draft is checked like the draft it stays: on
+      // main the settings of an incomplete draft could still be updated
+      const checkedAs = body.type === 'update' && existing?.state === 'DRAFT' ? 'draft' : body.type;
+      const [finalValidation] = await this.validatePosts(orgId, [post], validationIntent === 'review' ? 'schedule' : checkedAs, false, post.date || body.date);
+      this.assertFinalPayload(finalValidation, checkedAs, validationIntent);
 
       const { posts } = await this._postRepository.createOrUpdatePost(
         // a post that waits for an approver is kept as a draft until approved

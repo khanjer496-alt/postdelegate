@@ -2905,6 +2905,21 @@ describe('final payload check before a save', () => {
     expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
   });
 
+  it('still updates the settings of an incomplete draft in place, as on main', async () => {
+    const { service, postRepository, body } = fixture({ valid: false, settingsError: 'Pick a board' });
+    postRepository.getPostById.mockResolvedValue({ id: 'saved', state: 'DRAFT', approvalStatus: 'NONE', publishDate: new Date('2030-01-01T00:00:00Z') });
+    postRepository.createOrUpdatePost.mockResolvedValue({ posts: [{ id: 'saved', state: 'DRAFT', content: 'saved' }] });
+    await service.createPost('org', body('update'), 'API');
+    expect(service.validatePosts).toHaveBeenCalledWith('org', expect.any(Array), 'draft', false, expect.anything());
+    expect(postRepository.createOrUpdatePost).toHaveBeenCalled();
+  });
+
+  it('refuses an in-place update of a queued post with invalid settings', async () => {
+    const { service, postRepository, body } = fixture({ valid: false, settingsError: 'Pick a board' });
+    await expect(service.createPost('org', body('update'), 'API')).rejects.toThrow('My channel: Pick a board');
+    expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
+  });
+
   it('reports a too long post as too long', async () => {
     const { service, body } = fixture({ tooLong: true });
     await expect(service.createPost('org', body('schedule'), 'API')).rejects.toThrow('My channel: The maximum characters is 280');
