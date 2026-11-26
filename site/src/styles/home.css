@@ -104,7 +104,7 @@
 .networks-section{padding-top:100px}
 
 /* ---------- Features ---------- */
-.features-section{padding-top:40px}
+.features-section{padding-top:40px;padding-bottom:40px}
 .feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .feature-card{position:relative;isolation:isolate;display:flex;flex-direction:column;gap:12px;padding:30px 30px 34px;border:1px solid #27242f;border-radius:26px;background:radial-gradient(80% 70% at 100% 0%,#7357ff1f,transparent 60%),#111014;transition:border-color .25s,transform .25s}
 .feature-card:hover{border-color:#7357ff99;transform:translateY(-3px)}
@@ -212,7 +212,7 @@
  .relay-step h3{font-size:24px}
  .networks-section{padding-top:72px}
  .section-head{margin-bottom:32px}
- .features-section{padding-top:20px}
+ .features-section{padding-top:20px;padding-bottom:24px}
  .feature-grid{grid-template-columns:1fr;gap:12px}
  .feature-card{padding:24px 22px 26px;border-radius:22px}
  .feature-card h3{font-size:20px}
