@@ -210,7 +210,9 @@ export class PostsRepository {
     await tx.mcpAgentAdmission.update({ where: { organizationId: orgId, owner }, data: { writtenPostIds: ids } });
   }
 
-  async releaseAgentAdmission(orgId: string, owner: string, failed = false) {
+  // refused: the save failed on an ordinary refusal (validation, plan), which
+  // is recorded as a stopped save only when it already wrote posts
+  async releaseAgentAdmission(orgId: string, owner: string, failed = false, refused = false) {
     // a release lost to a serialization race would leave the workspace locked
     return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
       const locked = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner }, data: { owner } });
@@ -220,7 +222,7 @@ export class PostsRepository {
       }
       const admission = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: orgId } });
       const writtenPostIds = admission.writtenPostIds as string[];
-      if (failed) {
+      if (failed && (!refused || writtenPostIds.length)) {
         const audit = await tx.activityLog.create({ data: { organizationId: orgId, action: 'GUARDRAIL_BLOCKED', actorType: 'SYSTEM', comment: `Stopped failed agent save ${owner}; preserved post IDs: ${writtenPostIds.join(', ') || 'none'}.` }, select: { id: true } });
         await tx.mcpAgentAdmissionRecovery.create({ data: { organizationId: orgId, owner, auditId: audit.id, writtenPostIds } });
       }

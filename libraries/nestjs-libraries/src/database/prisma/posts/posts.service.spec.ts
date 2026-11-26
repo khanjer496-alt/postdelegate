@@ -2915,3 +2915,14 @@ describe('final payload check before a save', () => {
     await expect(service.createPost('org', body('draft'), 'API')).rejects.toThrow('at least one character or one image');
   });
 });
+
+describe('releasing the admission of a refused MCP save', () => {
+  it('tells the repository a 400 was a plain refusal, and a crash was not', async () => {
+    const { service, postRepository } = makeService();
+    postRepository.releaseAgentAdmission.mockResolvedValue({ count: 1, writtenPostIds: [] });
+    await expect(service.withAgentAdmission('org', async () => { throw new BadRequestException('too long'); })).rejects.toThrow('too long');
+    expect(postRepository.releaseAgentAdmission).toHaveBeenLastCalledWith('org', expect.any(String), true, true);
+    await expect(service.withAgentAdmission('org', async () => { throw new Error('crash'); })).rejects.toThrow();
+    expect(postRepository.releaseAgentAdmission).toHaveBeenLastCalledWith('org', expect.any(String), true, false);
+  });
+});

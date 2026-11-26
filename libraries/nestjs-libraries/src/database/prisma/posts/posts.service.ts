@@ -1983,7 +1983,10 @@ export class PostsService {
     catch (error) { failed = true; failure = error; }
     let persistedIds = scope.persistedIds;
     try {
-      const settlement = await this._postRepository.releaseAgentAdmission(orgId, owner, failed);
+      // a plain refusal (validation 400, plan 402) is no stopped save: unless
+      // it wrote something, nothing is recorded for an admin to recover
+      const refused = failure instanceof HttpException && [400, 402].includes(failure.getStatus());
+      const settlement = await this._postRepository.releaseAgentAdmission(orgId, owner, failed, refused);
       persistedIds = settlement?.writtenPostIds?.length ? settlement.writtenPostIds : persistedIds;
     } catch {
       throw new BadRequestException(`Save cleanup is unconfirmed. ${persistedIds.length ? `Already saved post IDs: ${persistedIds.join(', ')}. ` : ''}Do not recreate blindly; a workspace admin can inspect Settings > Agent access.`);

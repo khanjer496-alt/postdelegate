@@ -800,6 +800,25 @@ describe('agent save admission lease, release retry and boot release', () => {
     expect($transaction).toHaveBeenCalledTimes(3);
   });
 
+  it('records no stopped save for a plain refusal that wrote nothing', async () => {
+    const { repo, rows, recoveries, audits } = makeAdmissions([
+      { organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: [], createdAt: new Date() },
+    ]);
+    await repo.releaseAgentAdmission('org', 'mine', true, true);
+    expect(rows).toHaveLength(0);
+    expect(recoveries).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it('still records a refused save that had written posts, and any other failure', async () => {
+    const written = makeAdmissions([{ organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: ['p-1'], createdAt: new Date() }]);
+    await written.repo.releaseAgentAdmission('org', 'mine', true, true);
+    expect(written.recoveries).toEqual([expect.objectContaining({ writtenPostIds: ['p-1'] })]);
+    const crashed = makeAdmissions([{ organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: [], createdAt: new Date() }]);
+    await crashed.repo.releaseAgentAdmission('org', 'mine', true);
+    expect(crashed.audits).toHaveLength(1);
+  });
+
   it('at boot releases the admissions of other server instances only', async () => {
     const { repo, rows, recoveries } = makeAdmissions([
       { organizationId: 'org-a', owner: 'gone', instanceId: 'previous-boot', writtenPostIds: ['p-9'], createdAt: new Date() },
