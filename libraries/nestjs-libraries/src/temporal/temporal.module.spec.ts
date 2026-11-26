@@ -36,9 +36,13 @@ describe('provider-wide activity capacity registration', () => {
     expect(pool.tryReserveSlot(context('mcp-v114-fixture'))).toBeTruthy();
     expect(pool.tryReserveSlot(context('fixture'))).toBeNull();
   });
-  it('fails closed rather than rounding a zero share up to one', () => {
+  it('keeps a share of one for a cap below the divider, as on main', () => {
     delete process.env.EXCLUDE_QUEUE; process.env.WORKER_CONCURRENCY_DIVIDER = '2';
-    expect(() => pair()).toThrow('pin');
+    expect(pair().legacy.workerOptions.tuner.activityTaskSlotSupplier.capacity).toBe(1);
+  });
+  it('boots with a divider of 1 when the variable is not a number', () => {
+    delete process.env.EXCLUDE_QUEUE; process.env.WORKER_CONCURRENCY_DIVIDER = 'two';
+    expect(pair('fixture').legacy.workerOptions.tuner.activityTaskSlotSupplier.capacity).toBe(4);
   });
   it('does not apply worker-allocation validation to an API-only module', () => {
     process.env.WORKER_CONCURRENCY_DIVIDER = 'invalid';

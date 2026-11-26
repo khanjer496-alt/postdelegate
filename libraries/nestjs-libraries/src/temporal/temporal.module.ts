@@ -21,7 +21,10 @@ export const getTemporalModule = (
   // allocation is divided by this ONCE and shared across both queues. RE must
   // verify the number of eligible processes/pinning; this is not membership discovery.
   // 1 server => 1 (full), 2 servers => 2 (half each), 3 servers => 3, etc.
-  const divider = process.env.WORKER_CONCURRENCY_DIVIDER ? Number(process.env.WORKER_CONCURRENCY_DIVIDER) : 1;
+  const divider = Math.max(
+    1,
+    Number(process.env.WORKER_CONCURRENCY_DIVIDER) || 1
+  );
   const providerWorkers = isWorkers ? socialIntegrationList
     .filter(provider => !provider.identifier.includes('-') && !excludeQueues.includes(provider.identifier))
     .flatMap(provider => {

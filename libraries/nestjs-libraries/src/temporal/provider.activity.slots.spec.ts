@@ -60,8 +60,18 @@ describe('provider activity slot ownership', () => {
     expect(a.activityTaskSlotSupplier.tryReserveSlot(ctx('a'))).toBeTruthy();
     expect(b.activityTaskSlotSupplier.tryReserveSlot(ctx('b'))).toBeTruthy();
   });
-  it.each([0, -1, 1.5, NaN, Infinity])('refuses invalid capacity/divider %s before worker startup', value => {
+  it.each([0, -1, 1.5, NaN, Infinity])('refuses invalid capacity %s before worker startup', value => {
     expect(() => new ProviderActivitySlots(value)).toThrow();
-    expect(() => providerActivityOptions('provider', 4, value)).toThrow();
+  });
+  const capacityOf = (maximum: number, divider: number) =>
+    (providerActivityOptions('provider', maximum, divider).tuner as any).activityTaskSlotSupplier.capacity;
+  it('never gives a provider share below one, like before the shared pool', () => {
+    // Reddit allows 1 at a time: with 2 servers each still gets 1
+    expect(capacityOf(1, 2)).toBe(1);
+    expect(capacityOf(4, 2)).toBe(2);
+    expect(capacityOf(5, 2)).toBe(2);
+  });
+  it.each([NaN, 0, -1, Infinity])('counts a divider that is not a usable number (%s) as 1', value => {
+    expect(capacityOf(4, value)).toBe(4);
   });
 });
