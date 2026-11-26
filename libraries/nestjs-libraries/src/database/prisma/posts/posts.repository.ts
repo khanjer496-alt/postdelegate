@@ -28,12 +28,12 @@ import { CHANNEL_READY } from '@gitroom/nestjs-libraries/database/prisma/integra
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
+dayjs.extend(utc);
 
 // An agent save that holds its workspace admission longer than this is taken
 // to be abandoned (its process died mid-save). A later save takes it over;
 // the old owner's remaining writes are fenced out like after a recovery.
 export const AGENT_ADMISSION_LEASE_MS = 10 * 60 * 1000;
-dayjs.extend(utc);
 
 // Who a post read is for. A real organization id scopes the read to that
 // tenant; PUBLIC_PREVIEW is the one deliberate exception - the shared preview
@@ -161,7 +161,7 @@ export class PostsRepository {
     // a second live save still fails with the unique violation (P2002)
     return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
       const held = await tx.mcpAgentAdmission.findUnique({ where: { organizationId: orgId }, select: { owner: true } });
-      if (held) await this.expireAgentAdmission(tx, orgId, held.owner, { createdAt: { lt: new Date(Date.now() - AGENT_ADMISSION_LEASE_MS) } }, 'Expired agent save after its 10 minute lease');
+      if (held) await this.expireAgentAdmission(tx, orgId, held.owner, { createdAt: { lt: new Date(Date.now() - AGENT_ADMISSION_LEASE_MS) } }, `Expired agent save after its ${AGENT_ADMISSION_LEASE_MS / 60000} minute lease`);
       return tx.mcpAgentAdmission.create({ data: { organizationId: orgId, owner, ...metadata } });
     }, { isolationLevel: 'Serializable' }));
   }
@@ -411,12 +411,12 @@ export class PostsRepository {
   // it FAILED and may be retried. With a bound payload it may have been
   // published, so its outcome is UNKNOWN until it is reconciled.
   async markMcpUnfinished(orgId: string, id: string): Promise<'FAILED' | 'UNKNOWN' | null> {
-    return this._transaction.model.$transaction(async (tx): Promise<'FAILED' | 'UNKNOWN' | null> => {
+    return this.retrySerializable(() => this._transaction.model.$transaction(async (tx): Promise<'FAILED' | 'UNKNOWN' | null> => {
       const failed = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED', providerPayloadHash: null }, data: { status: 'FAILED' } });
       if (failed.count) return 'FAILED';
       const unknown = await tx.mcpPublishAttempt.updateMany({ where: { id, organizationId: orgId, status: 'STARTED' }, data: { status: 'UNKNOWN' } });
       return unknown.count ? 'UNKNOWN' : null;
-    }, { isolationLevel: 'Serializable' });
+    }, { isolationLevel: 'Serializable' }));
   }
 
   async unscheduleMcp(orgId: string, rootPostId: string, preserveApproval = false, requireReview = false) {
@@ -1465,7 +1465,7 @@ export class PostsRepository {
     await this.writeMcpFence(tx, orgId, posts);
     await this.recordAgentWrites(tx, orgId, admissionOwner, posts);
     return { previousPost, posts };
-    }, serializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined)).catch(error => {
+    }, serializable ? { isolationLevel: 'Serializable' as const } : undefined)).catch(error => {
       if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft) && ['P2025', 'P2034'].includes((error as any)?.code)) throw new BadRequestException('The draft changed. Refresh before editing.');
       throw error;
     });
