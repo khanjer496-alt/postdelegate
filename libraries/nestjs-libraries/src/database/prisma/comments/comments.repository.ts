@@ -69,10 +69,10 @@ export class CommentsRepository {
   }
 
   // null when another run already claimed the comment
-  async claim(integrationId: string, ruleId: string, commentId: string) {
+  async claim(orgId: string, integrationId: string, ruleId: string, commentId: string) {
     try {
       return await this._autoReply.model.commentAutoReply.create({
-        data: { integrationId, ruleId, commentId },
+        data: { organizationId: orgId, integrationId, ruleId, commentId },
         select: { id: true },
       });
     } catch (err) {

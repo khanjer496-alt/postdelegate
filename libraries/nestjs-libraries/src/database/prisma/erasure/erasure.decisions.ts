@@ -241,6 +241,6 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
   },
   CommentAutoReply: {
     scope: 'org',
-    note: 'deleted before the rules, comment and reply ids only',
+    note: 'deleted by workspace, also claims of deleted rules; comment and reply ids only',
   },
 };

@@ -186,7 +186,7 @@ describe('CommentsService auto-replies', () => {
 
     expect(provider.postComments).toHaveBeenCalledWith('ig-1', 'token', 'media-1');
     expect(repository.claim).toHaveBeenCalledTimes(1);
-    expect(repository.claim).toHaveBeenCalledWith('int-1', 'rule-1', 'c-1');
+    expect(repository.claim).toHaveBeenCalledWith('org-1', 'int-1', 'rule-1', 'c-1');
     expect(provider.replyToComment).toHaveBeenCalledWith(
       'ig-1',
       'token',

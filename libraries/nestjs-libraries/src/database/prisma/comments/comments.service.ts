@@ -301,7 +301,12 @@ export class CommentsService {
       if (answered >= budget) break;
       const rule = matchingRule(rules, postId, comment);
       if (!rule) continue;
-      const claim = await this._commentsRepository.claim(integration.id, rule.id, comment.id);
+      const claim = await this._commentsRepository.claim(
+        integration.organizationId,
+        integration.id,
+        rule.id,
+        comment.id
+      );
       if (!claim) continue;
       answered++;
       try {

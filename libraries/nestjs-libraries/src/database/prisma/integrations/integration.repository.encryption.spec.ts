@@ -80,6 +80,7 @@ const makeStore = (initial: any[]) => {
     exisingPlugData: { deleteMany: jest.fn() },
     plugs: { updateMany: jest.fn() },
     commentReplyRule: { deleteMany: jest.fn() },
+    commentAutoReply: { deleteMany: jest.fn() },
   };
   const repo = new IntegrationRepository(
     { model: { integration } } as any,
@@ -474,6 +475,10 @@ describe('IntegrationRepository token encryption', () => {
       expect(rows[0]).toMatchObject({ token: '', refreshToken: null, internalId: 'erased_int-1' });
       // the channel's comment auto-reply rules go with its authorization
       expect(tx.commentReplyRule.deleteMany).toHaveBeenCalledWith({
+        where: { integrationId: 'int-1', organizationId: 'org-1' },
+      });
+      // and the comment ids its auto-replies answered, which outlive their rule
+      expect(tx.commentAutoReply.deleteMany).toHaveBeenCalledWith({
         where: { integrationId: 'int-1', organizationId: 'org-1' },
       });
     });

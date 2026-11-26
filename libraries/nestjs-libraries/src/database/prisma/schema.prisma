@@ -2454,6 +2454,8 @@ model CommentAutoReply {
   // same comment again
   ruleId        String?
   rule          CommentReplyRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  // erasure deletes a workspace's claims by this, also after their rule is gone
+  organizationId String
   integrationId String
   commentId     String
   // the platform's id of the reply, once it went out
@@ -2465,4 +2467,5 @@ model CommentAutoReply {
 
   @@unique([integrationId, commentId])
   @@index([ruleId])
+  @@index([organizationId])
 }
