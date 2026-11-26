@@ -14,10 +14,13 @@ const MAX_CHECKS = 30;
 // Ending the trial charges the plan's first payment, so nothing is sent
 // before the person clicks to confirm it here: a link or a reload of
 // /billing?finishTrial=true only opens this window. `confirmed`: the person
-// already confirmed in the app, the charge starts right away
-export const FinishTrial: FC<{ close: () => void; confirmed?: boolean }> = (
-  props
-) => {
+// already confirmed in the app, the charge starts right away. `onDone`:
+// called once the plan shows up, so the page behind updates right away
+export const FinishTrial: FC<{
+  close: () => void;
+  confirmed?: boolean;
+  onDone?: () => void;
+}> = (props) => {
   const [started, setStarted] = useState(!!props.confirmed);
   const [finished, setFinished] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -51,6 +54,7 @@ export const FinishTrial: FC<{ close: () => void; confirmed?: boolean }> = (
           if (open.current) {
             setFailed(false);
             setFinished(true);
+            props.onDone?.();
           }
           return;
         }
