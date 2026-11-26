@@ -2877,3 +2877,41 @@ describe('PostsService.deletePost of a failed tracked MCP post', () => {
     expect(list).toHaveBeenCalledTimes(1); // only the termination sweep after the delete
   });
 });
+
+describe('final payload check before a save', () => {
+  const fixture = (invalid: any) => {
+    const { service, postRepository } = makeService({ getSocialIntegration: () => ({}) });
+    Object.assign(postRepository, { getPostById: jest.fn().mockResolvedValue({ id: 'saved', state: 'QUEUE', approvalStatus: 'NONE', publishDate: new Date('2030-01-01T00:00:00Z') }), createOrUpdatePost: jest.fn().mockResolvedValue({ posts: [{ id: 'saved', state: 'QUEUE', content: 'saved' }] }) });
+    (service as any)._approvalPolicyService = { assertAgentGuardrails: jest.fn(), decide: jest.fn().mockResolvedValue({ hold: false }), afterSave: jest.fn().mockResolvedValue({ submitted: false }), notifyApprovers: jest.fn() };
+    jest.spyOn(service, 'applyOutsideComposerRules').mockImplementation(async (_org, posts) => posts as any);
+    jest.spyOn(service, 'checkProviderPostsLimit').mockResolvedValue(new Set());
+    jest.spyOn(service, 'checkPostingLimits').mockResolvedValue(undefined);
+    jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
+    jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+    jest.spyOn(service, 'validatePosts').mockResolvedValue([{ name: 'My channel', valid: true, errors: true, tooLong: false, emptyContent: false, disabled: false, maximumCharacters: 280, ...invalid }] as any);
+    const body = (type: string) => ({ type, date: '2030-01-01T00:00:00Z', shortLink: false, tags: [], posts: [{ integration: { id: 'channel' }, settings: { __type: 'fixture' }, value: [{ id: 'saved', content: 'hello', image: [] }] }] }) as any;
+    return { service, postRepository, body };
+  };
+
+  it.each(['update', 'draft'])('still saves an %s on a turned off channel, as on main', async (type) => {
+    const { service, postRepository, body } = fixture({ disabled: true });
+    await service.createPost('org', body(type), 'API');
+    expect(postRepository.createOrUpdatePost).toHaveBeenCalled();
+  });
+
+  it.each(['schedule', 'now'])('refuses to %s on a turned off channel, saying so', async (type) => {
+    const { service, postRepository, body } = fixture({ disabled: true });
+    await expect(service.createPost('org', body(type), 'API')).rejects.toThrow('My channel is turned off');
+    expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
+  });
+
+  it('reports a too long post as too long', async () => {
+    const { service, body } = fixture({ tooLong: true });
+    await expect(service.createPost('org', body('schedule'), 'API')).rejects.toThrow('My channel: The maximum characters is 280');
+  });
+
+  it('reports an empty post as empty', async () => {
+    const { service, body } = fixture({ emptyContent: true });
+    await expect(service.createPost('org', body('draft'), 'API')).rejects.toThrow('at least one character or one image');
+  });
+});

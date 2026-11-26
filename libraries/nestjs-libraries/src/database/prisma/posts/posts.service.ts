@@ -1997,6 +1997,35 @@ export class PostsService {
     return result as T;
   }
 
+  // Same messages as updatePostSettings and the public API. A draft is only
+  // checked for content; a turned off channel is refused only for what
+  // publishes (schedule, now, or a draft sent for review), as on main an
+  // update or a draft may still be saved on it.
+  private assertFinalPayload(
+    validation: Awaited<ReturnType<PostsService['validatePosts']>>[number],
+    type: CreatePostDto['type'],
+    validationIntent?: 'review'
+  ) {
+    const name = validation.name;
+    if (validation.emptyContent) {
+      throw new BadRequestException(`${name}: Your post should have at least one character or one image.`);
+    }
+    if (type !== 'draft' || validationIntent === 'review') {
+      if (!validation.valid) {
+        throw new BadRequestException(`${name}: ${validation.settingsError || 'Please fix your settings'}`);
+      }
+      if (validation.errors !== true) {
+        throw new BadRequestException(`${name}: ${validation.errors}`);
+      }
+      if (validation.tooLong) {
+        throw new BadRequestException(`${name}: The maximum characters is ${validation.maximumCharacters}`);
+      }
+    }
+    if (validation.disabled && (type === 'schedule' || type === 'now' || validationIntent === 'review')) {
+      throw new BadRequestException(`${name} is turned off. Turn it on from the channel menu in the calendar, or pick another channel.`);
+    }
+  }
+
   private async createPostAdmitted(
     orgId: string, body: CreatePostDto, creationMethod: CreationMethod,
     keepGroup = false, actor?: ApprovalActor, expectedDraftUpdatedAt?: Date, validationIntent?: 'review'
@@ -2084,12 +2113,7 @@ export class PostsService {
       // Materialized links can grow. Validate the exact transformed text before
       // enqueueing; a preflight snapshot never authorizes this payload.
       const [finalValidation] = await this.validatePosts(orgId, [post], validationIntent === 'review' ? 'schedule' : body.type, false, post.date || body.date);
-      if (finalValidation.emptyContent || ((body.type !== 'draft' || validationIntent === 'review') &&
-        (!finalValidation.valid || finalValidation.errors !== true || finalValidation.tooLong || finalValidation.disabled))) {
-        throw new BadRequestException(finalValidation.settingsError ||
-          (finalValidation.errors !== true ? String(finalValidation.errors) :
-            `The final post payload is invalid (maximum ${finalValidation.maximumCharacters} characters).`));
-      }
+      this.assertFinalPayload(finalValidation, body.type, validationIntent);
 
       const { posts } = await this._postRepository.createOrUpdatePost(
         // a post that waits for an approver is kept as a draft until approved
