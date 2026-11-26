@@ -311,6 +311,29 @@ pg('MCP durable publication fence (PostgreSQL)', () => {
     await repo.releaseAgentAdmission(org, 'replacement-owner');
   });
 
+  it('an admission past its lease is taken over and fences the abandoned owner', async () => {
+    await db.mcpAgentAdmission.create({ data: { organizationId: org, owner: 'lease-expired', createdAt: new Date(Date.now() - 11 * 60 * 1000) } });
+    await repo.acquireAgentAdmission(org, 'lease-successor');
+    expect((await db.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: org } })).owner).toBe('lease-successor');
+    expect(await db.mcpAgentAdmissionRecovery.count({ where: { organizationId: org, owner: 'lease-expired' } })).toBe(1);
+    const late = agentAdmissionContext.run({ orgId: org, owner: 'lease-expired', persistedIds: [] }, () =>
+      repo.createOrUpdatePost('draft', org, '2030-01-01T00:00:00Z', { integration: { id: integration }, settings: { __type: 'fixture' }, value: [{ content: 'late write', image: [] }] } as any, [], 'MCP'));
+    await expect(late).rejects.toThrow('recovered');
+    await expect(repo.acquireAgentAdmission(org, 'third')).rejects.toMatchObject({ code: 'P2002' });
+    await repo.releaseAgentAdmission(org, 'lease-successor');
+  });
+
+  it('backend boot releases only admissions of another server instance', async () => {
+    await db.mcpAgentAdmission.create({ data: { organizationId: org, owner: 'before-restart', instanceId: 'previous-boot' } });
+    expect(await repo.releaseAgentAdmissionsOfOtherInstances('this-boot')).toBeGreaterThanOrEqual(1);
+    expect(await db.mcpAgentAdmission.count({ where: { organizationId: org } })).toBe(0);
+    expect(await db.mcpAgentAdmissionRecovery.count({ where: { organizationId: org, owner: 'before-restart' } })).toBe(1);
+    await repo.acquireAgentAdmission(org, 'after-restart', { instanceId: 'this-boot', host: 'fixture', processId: 1 });
+    await repo.releaseAgentAdmissionsOfOtherInstances('this-boot');
+    expect((await db.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: org } })).owner).toBe('after-restart');
+    await repo.releaseAgentAdmission(org, 'after-restart');
+  });
+
   it('receipt and published state are one transaction; cancel cannot claim to undo that segment', async () => {
     const admission = await repo.claimMcpSegment(org, root, root, revision, 0);
     const receipt = [

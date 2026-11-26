@@ -2449,7 +2449,8 @@ model SmartLinkStat {
   @@index([pageId, date])
 }
 
-// New MCP jobs only. No lease timeout: abandoned admission is held for explicit recovery.
+// New MCP jobs only. Abandoned admission is released by an admin, by a later save
+// after a 10 minute lease (AGENT_ADMISSION_LEASE_MS) or when the backend restarts.
 model McpAgentAdmission {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String @id

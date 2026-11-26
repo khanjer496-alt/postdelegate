@@ -1919,6 +1919,14 @@ export class PostsService {
     return false;
   }
 
+  // Called once when the backend starts, from its main.ts. Only the backend
+  // takes agent save admissions, and the deployment runs ONE backend process
+  // per database (a single container), so a row of another instance id
+  // belongs to a process that is gone. Never call it from the orchestrator or
+  // from a second backend sharing the database: their instance ids differ and
+  // they would release saves that are still running.
+  releaseAbandonedAgentAdmissions() { return this._postRepository.releaseAgentAdmissionsOfOtherInstances(agentInstanceId); }
+
   agentAdmissionStatus(orgId: string) { return this._postRepository.agentAdmissionStatus(orgId); }
   recoverAgentAdmission(orgId: string, owner: string, actorId: string) { return this._postRepository.recoverAgentAdmission(orgId, owner, actorId); }
 

@@ -28,6 +28,11 @@ import { CHANNEL_READY } from '@gitroom/nestjs-libraries/database/prisma/integra
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
+
+// An agent save that holds its workspace admission longer than this is taken
+// to be abandoned (its process died mid-save). A later save takes it over;
+// the old owner's remaining writes are fenced out like after a recovery.
+export const AGENT_ADMISSION_LEASE_MS = 10 * 60 * 1000;
 dayjs.extend(utc);
 
 // Who a post read is for. A real organization id scopes the read to that
@@ -126,15 +131,63 @@ export class PostsRepository {
     if (!owned.count) throw new AgentSaveRecovered();
   }
 
+  // PostgreSQL aborts a Serializable transaction that raced another one with
+  // P2034. It rolled back entirely, so running it again is safe.
+  private async retrySerializable<T>(run: () => Promise<T>, attempts = 3): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await run();
+      } catch (error) {
+        if ((error as any)?.code !== 'P2034' || attempt >= attempts) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+      }
+    }
+  }
+
+  // Fences an abandoned owner out like recoverAgentAdmission: its saved post
+  // IDs stay readable through the recovery row, its later writes throw.
+  private async expireAgentAdmission(tx: Prisma.TransactionClient, orgId: string, owner: string, where: Prisma.McpAgentAdmissionWhereInput, reason: string) {
+    const locked = await tx.mcpAgentAdmission.updateMany({ where: { ...where, organizationId: orgId, owner }, data: { owner } });
+    if (!locked.count) return false;
+    const admission = await tx.mcpAgentAdmission.findUniqueOrThrow({ where: { organizationId: orgId } });
+    const ids = admission.writtenPostIds as string[];
+    const audit = await tx.activityLog.create({ data: { organizationId: orgId, action: 'GUARDRAIL_BLOCKED', actorType: 'SYSTEM', comment: `${reason} ${owner}; preserved post IDs: ${ids.join(', ') || 'none'}.` }, select: { id: true } });
+    await tx.mcpAgentAdmissionRecovery.create({ data: { organizationId: orgId, owner, auditId: audit.id, writtenPostIds: ids } });
+    await tx.mcpAgentAdmission.delete({ where: { organizationId: orgId, owner } });
+    return true;
+  }
+
   async acquireAgentAdmission(orgId: string, owner: string, metadata: { instanceId: string; host: string; processId: number } = { instanceId: 'unknown', host: 'unknown', processId: 0 }) {
-    return this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.create({ data: { organizationId: orgId, owner, ...metadata } }));
+    // a second live save still fails with the unique violation (P2002)
+    return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
+      const held = await tx.mcpAgentAdmission.findUnique({ where: { organizationId: orgId }, select: { owner: true } });
+      if (held) await this.expireAgentAdmission(tx, orgId, held.owner, { createdAt: { lt: new Date(Date.now() - AGENT_ADMISSION_LEASE_MS) } }, 'Expired agent save after its 10 minute lease');
+      return tx.mcpAgentAdmission.create({ data: { organizationId: orgId, owner, ...metadata } });
+    }, { isolationLevel: 'Serializable' }));
+  }
+
+  // Admissions taken by another backend process, which a restart or a deploy
+  // ended mid-save. See PostsService.releaseAbandonedAgentAdmissions for why
+  // this is only safe at backend boot.
+  async releaseAgentAdmissionsOfOtherInstances(instanceId: string) {
+    const stale = await this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.findMany({ where: { instanceId: { not: instanceId } }, select: { organizationId: true, owner: true } }));
+    let released = 0;
+    for (const row of stale) {
+      const expired = await this.retrySerializable(() => this._transaction.model.$transaction(
+        tx => this.expireAgentAdmission(tx, row.organizationId, row.owner, { instanceId: { not: instanceId } }, 'Released agent save of a stopped server'),
+        { isolationLevel: 'Serializable' }
+      ));
+      if (expired) released++;
+    }
+    return released;
   }
   async agentAdmissionStatus(orgId: string) {
     return this._transaction.model.$transaction(tx => tx.mcpAgentAdmission.findUnique({ where: { organizationId: orgId }, select: { owner: true, instanceId: true, host: true, processId: true, writtenPostIds: true, createdAt: true } }));
   }
 
-  // Recovery fences every later write by this exact owner. No clock expiry or
-  // inference about OS/process death is needed: PostgreSQL establishes quiescence.
+  // Recovery fences every later write by this exact owner: PostgreSQL
+  // establishes quiescence. Admins can do it at once; the lease
+  // (AGENT_ADMISSION_LEASE_MS) and the backend boot do it on their own.
   async recoverAgentAdmission(orgId: string, expectedOwner: string, actorId: string) {
     return this._transaction.model.$transaction(async tx => {
       const locked = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner: expectedOwner }, data: { owner: expectedOwner } });
@@ -158,7 +211,8 @@ export class PostsRepository {
   }
 
   async releaseAgentAdmission(orgId: string, owner: string, failed = false) {
-    return this._transaction.model.$transaction(async tx => {
+    // a release lost to a serialization race would leave the workspace locked
+    return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
       const locked = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner }, data: { owner } });
       if (!locked.count) {
         const recovered = await tx.mcpAgentAdmissionRecovery.findFirst({ where: { organizationId: orgId, owner }, orderBy: { createdAt: 'desc' } });
@@ -172,7 +226,7 @@ export class PostsRepository {
       }
       const result = await tx.mcpAgentAdmission.deleteMany({ where: { organizationId: orgId, owner } });
       return { ...result, writtenPostIds };
-    }, { isolationLevel: 'Serializable' });
+    }, { isolationLevel: 'Serializable' }));
   }
 
   async holdRemainingMcp(orgId: string, rootId: string, status: 'CHANGES_REQUESTED' | 'REJECTED', updatedAt: Date) {

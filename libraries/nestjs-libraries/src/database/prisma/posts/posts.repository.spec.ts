@@ -718,3 +718,95 @@ describe('MCP version stamp before enqueue', () => {
     expect(args.update).not.toHaveProperty('mcpWorkflowVersion');
   });
 });
+
+describe('agent save admission lease, release retry and boot release', () => {
+  type Row = { organizationId: string; owner: string; instanceId: string; writtenPostIds: string[]; createdAt: Date };
+  // the admission table, one row per workspace, with the filters it is read by
+  const makeAdmissions = (rows: Row[]) => {
+    const matches = (row: Row, where: any = {}) =>
+      (where.organizationId === undefined || row.organizationId === where.organizationId) &&
+      (where.owner === undefined || row.owner === where.owner) &&
+      (where.createdAt?.lt === undefined || row.createdAt < where.createdAt.lt) &&
+      (where.instanceId?.not === undefined || row.instanceId !== where.instanceId.not);
+    const recoveries: any[] = [];
+    const audits: any[] = [];
+    const tx = {
+      mcpAgentAdmission: {
+        findUnique: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where)) || null),
+        findUniqueOrThrow: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where))!),
+        findFirst: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where)) || null),
+        findMany: jest.fn(async ({ where }: any) => rows.filter((r) => matches(r, where))),
+        updateMany: jest.fn(async ({ where }: any) => ({ count: rows.filter((r) => matches(r, where)).length })),
+        create: jest.fn(async ({ data }: any) => {
+          if (rows.some((r) => r.organizationId === data.organizationId)) throw Object.assign(new Error('unique'), { code: 'P2002' });
+          const row = { writtenPostIds: [], createdAt: new Date(), ...data };
+          rows.push(row);
+          return row;
+        }),
+        delete: jest.fn(async ({ where }: any) => rows.splice(rows.findIndex((r) => matches(r, where)), 1)[0]),
+        deleteMany: jest.fn(async ({ where }: any) => {
+          const before = rows.length;
+          for (let i = rows.length - 1; i >= 0; i--) if (matches(rows[i], where)) rows.splice(i, 1);
+          return { count: before - rows.length };
+        }),
+      },
+      mcpAgentAdmissionRecovery: {
+        create: jest.fn(async ({ data }: any) => recoveries.push(data)),
+        findFirst: jest.fn(async ({ where }: any) => recoveries.find((r) => r.owner === where.owner) || null),
+      },
+      activityLog: { create: jest.fn(async ({ data }: any) => (audits.push(data), { id: `audit-${audits.length}` })) },
+    };
+    const $transaction = jest.fn((run: any) => run(tx));
+    const repo = new PostsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction } } as any, {} as any);
+    return { repo, rows, recoveries, audits, $transaction };
+  };
+  const minutesAgo = (n: number) => new Date(Date.now() - n * 60 * 1000);
+
+  it('takes over an admission older than the 10 minute lease and keeps its saved post IDs', async () => {
+    const { repo, rows, recoveries, audits } = makeAdmissions([
+      { organizationId: 'org', owner: 'stale', instanceId: 'old', writtenPostIds: ['p-1'], createdAt: minutesAgo(11) },
+    ]);
+    await repo.acquireAgentAdmission('org', 'next', { instanceId: 'now', host: 'h', processId: 1 });
+    expect(rows).toEqual([expect.objectContaining({ organizationId: 'org', owner: 'next' })]);
+    expect(recoveries).toEqual([expect.objectContaining({ organizationId: 'org', owner: 'stale', writtenPostIds: ['p-1'] })]);
+    expect(audits[0].comment).toContain('p-1');
+    // the old owner learns its save was stopped, with what it had saved
+    await expect(repo.releaseAgentAdmission('org', 'stale')).resolves.toEqual({ count: 0, writtenPostIds: ['p-1'] });
+  });
+
+  it('still refuses a second save while a live admission is within its lease', async () => {
+    const { repo, rows, recoveries } = makeAdmissions([
+      { organizationId: 'org', owner: 'live', instanceId: 'now', writtenPostIds: [], createdAt: minutesAgo(9) },
+    ]);
+    await expect(repo.acquireAgentAdmission('org', 'next')).rejects.toMatchObject({ code: 'P2002' });
+    expect(rows.map((r) => r.owner)).toEqual(['live']);
+    expect(recoveries).toHaveLength(0);
+  });
+
+  it('retries a release that lost a serialization race instead of leaving the workspace locked', async () => {
+    const { repo, rows, $transaction } = makeAdmissions([
+      { organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: [], createdAt: new Date() },
+    ]);
+    $transaction.mockImplementationOnce(async () => { throw Object.assign(new Error('serialization'), { code: 'P2034' }); });
+    await expect(repo.releaseAgentAdmission('org', 'mine')).resolves.toMatchObject({ count: 1 });
+    expect(rows).toHaveLength(0);
+    expect($transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up a release after three serialization failures', async () => {
+    const { repo, $transaction } = makeAdmissions([]);
+    $transaction.mockImplementation(async () => { throw Object.assign(new Error('serialization'), { code: 'P2034' }); });
+    await expect(repo.releaseAgentAdmission('org', 'mine')).rejects.toMatchObject({ code: 'P2034' });
+    expect($transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it('at boot releases the admissions of other server instances only', async () => {
+    const { repo, rows, recoveries } = makeAdmissions([
+      { organizationId: 'org-a', owner: 'gone', instanceId: 'previous-boot', writtenPostIds: ['p-9'], createdAt: new Date() },
+      { organizationId: 'org-b', owner: 'mine', instanceId: 'this-boot', writtenPostIds: [], createdAt: new Date() },
+    ]);
+    await expect(repo.releaseAgentAdmissionsOfOtherInstances('this-boot')).resolves.toBe(1);
+    expect(rows.map((r) => r.owner)).toEqual(['mine']);
+    expect(recoveries).toEqual([expect.objectContaining({ organizationId: 'org-a', owner: 'gone', writtenPostIds: ['p-9'] })]);
+  });
+});
