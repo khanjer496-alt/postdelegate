@@ -39,6 +39,44 @@ describe('PaymentService.isTrialing', () => {
   });
 });
 
+describe('PaymentService.assertCanFinishTrial', () => {
+  const subscriptions = { getSubscriptionByOrganizationId: jest.fn() };
+  const service = new PaymentService({} as any, subscriptions as any);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // a trial set to cancel ends without a charge, ending it early would charge
+  it('refuses a subscription that is set to cancel', async () => {
+    subscriptions.getSubscriptionByOrganizationId.mockResolvedValue({
+      provider: 'stripe',
+      cancelAt: new Date('2026-12-01'),
+    });
+    await expect(service.assertCanFinishTrial('org_1')).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining('set to cancel'),
+    });
+  });
+
+  it('lets an active trial finish', async () => {
+    subscriptions.getSubscriptionByOrganizationId.mockResolvedValue({
+      provider: 'stripe',
+      cancelAt: null,
+    });
+    await expect(
+      service.assertCanFinishTrial('org_1')
+    ).resolves.toBeUndefined();
+  });
+
+  it('leaves an org without a subscription to the provider', async () => {
+    subscriptions.getSubscriptionByOrganizationId.mockResolvedValue(null);
+    await expect(
+      service.assertCanFinishTrial('org_1')
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('PaymentService.getGrowthStats', () => {
   const stats = (overrides: Record<string, any> = {}) => ({
     supported: true,
