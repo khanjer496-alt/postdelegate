@@ -2070,6 +2070,10 @@ export class PostsService {
     // posts sent for review in this save, the approvers hear about them once
     const submitted: { id: string; content: string; integrationName?: string; provider?: string }[] = [];
     const batchId = uuidv4();
+    // Every channel is prepared and checked before the first one is saved: a
+    // refusal of a later channel must not leave the earlier ones saved (and
+    // dispatched), which a retry would then save twice.
+    const checked: { post: (typeof body.posts)[number]; existing: Awaited<ReturnType<PostsRepository['getPostById']>> | null; decision?: ApprovalDecision }[] = [];
     for (const post of body.posts) {
       // Defensive boundary for internal callers that skip mapTypeToPost.
       post.settings = { ...post.settings };
@@ -2129,7 +2133,10 @@ export class PostsService {
       const checkedAs = body.type === 'update' && existing?.state === 'DRAFT' ? 'draft' : body.type;
       const [finalValidation] = await this.validatePosts(orgId, [post], validationIntent === 'review' ? 'schedule' : checkedAs, false, post.date || body.date);
       this.assertFinalPayload(finalValidation, checkedAs, validationIntent);
+      checked.push({ post, existing, decision });
+    }
 
+    for (const { post, existing, decision } of checked) {
       const { posts } = await this._postRepository.createOrUpdatePost(
         // a post that waits for an approver is kept as a draft until approved
         decision?.hold ? 'draft' : body.type,

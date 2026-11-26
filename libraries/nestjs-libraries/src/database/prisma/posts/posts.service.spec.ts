@@ -2963,6 +2963,18 @@ describe('final payload check before a save', () => {
     expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
   });
 
+  it('saves no channel when a later channel of the same save is refused', async () => {
+    const { service, postRepository, body } = fixture({});
+    const save = body('schedule');
+    save.posts.push({ integration: { id: 'second' }, settings: { __type: 'fixture' }, value: [{ id: 'other', content: 'hello', image: [] }] });
+    (service.validatePosts as jest.Mock)
+      .mockResolvedValueOnce([{ name: 'My channel', valid: true, errors: true, tooLong: false, emptyContent: false, disabled: false, maximumCharacters: 280 }])
+      .mockResolvedValueOnce([{ name: 'Second channel', valid: true, errors: true, tooLong: true, emptyContent: false, disabled: false, maximumCharacters: 280 }]);
+    await expect(service.createPost('org', save, 'API')).rejects.toThrow('Second channel: The maximum characters is 280');
+    expect(postRepository.createOrUpdatePost).not.toHaveBeenCalled();
+    expect(service.startWorkflow).not.toHaveBeenCalled();
+  });
+
   it('reports a too long post as too long', async () => {
     const { service, body } = fixture({ tooLong: true });
     await expect(service.createPost('org', body('schedule'), 'API')).rejects.toThrow('My channel: The maximum characters is 280');
