@@ -401,6 +401,7 @@ describe('PostsService TikTok Direct Post outside the composer', () => {
       }),
       acquireAgentAdmission: jest.fn().mockResolvedValue({}),
       releaseAgentAdmission: jest.fn().mockResolvedValue({ count: 1 }),
+      mcpWorkflowVersion: jest.fn().mockResolvedValue(null),
     };
     const integrationService = {
       getIntegrationById: jest.fn(async (_org: string, id: string) =>
@@ -2762,5 +2763,66 @@ describe('durable exact-generation MCP dispatch', () => {
     repo.pendingMcpDispatches.mockResolvedValue([fence, { ...fence, postId: 'next' }]);
     jest.spyOn(service, 'reconcileMcpDispatch').mockRejectedValueOnce(new Error('DB unavailable')).mockResolvedValueOnce(undefined);
     expect(await service.recoverPendingMcpDispatches()).toEqual({ examined: 2, confirmed: 1, unconfirmed: 1 });
+  });
+});
+
+describe('agent save admission is for MCP saves only', () => {
+  // one admission row per workspace: a second holder gets a unique violation
+  const lockedRepository = () => {
+    const { service, postRepository } = makeService();
+    let holder: string | null = null;
+    postRepository.acquireAgentAdmission.mockImplementation(async (_org: string, owner: string) => {
+      if (holder) throw Object.assign(new Error('unique'), { code: 'P2002' });
+      holder = owner;
+      return {};
+    });
+    postRepository.releaseAgentAdmission.mockImplementation(async (_org: string, owner: string) => {
+      if (holder === owner) holder = null;
+      return { count: 1, writtenPostIds: [] };
+    });
+    jest.spyOn(service, 'applyOutsideComposerRules').mockImplementation(async (_org, posts) => posts as any);
+    // both saves are in flight at the same time
+    let finish!: () => void;
+    const inFlight = new Promise<void>((resolve) => (finish = resolve));
+    const saved = jest.spyOn(service as any, 'createPostAdmitted').mockImplementation(async () => {
+      await inFlight;
+      return [{ postId: 'saved' }];
+    });
+    return { service, postRepository, finish, saved };
+  };
+  const body = { type: 'schedule', date: '2030-01-01T00:00:00', shortLink: false, tags: [], posts: [{ integration: { id: 'channel' }, value: [{ content: 'hi', image: [] }], settings: {} }] } as any;
+  const apiActor = { type: 'agent' as const, viaApi: true, source: 'Public API key' };
+
+  it('lets two concurrent public API saves of one workspace both succeed', async () => {
+    const { service, postRepository, finish, saved } = lockedRepository();
+    const first = service.createPost('org', body, 'API', false, apiActor);
+    const second = service.createPost('org', body, 'CLI', false, apiActor);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(saved).toHaveBeenCalledTimes(2);
+    finish();
+    await expect(Promise.all([first, second])).resolves.toEqual([[{ postId: 'saved' }], [{ postId: 'saved' }]]);
+    expect(postRepository.acquireAgentAdmission).not.toHaveBeenCalled();
+  });
+
+  it('still admits one MCP save at a time', async () => {
+    const { service, finish } = lockedRepository();
+    const mcpActor = { type: 'agent' as const, source: 'MCP client' };
+    const first = service.createPost('org', body, 'MCP', false, mcpActor);
+    await new Promise((resolve) => setImmediate(resolve));
+    await expect(service.createPost('org', body, 'MCP', false, mcpActor)).rejects.toThrow('Another agent save is active');
+    finish();
+    await expect(first).resolves.toEqual([{ postId: 'saved' }]);
+  });
+
+  it('admits a public API edit of a tracked MCP post like an MCP save', async () => {
+    const { service, postRepository, finish } = lockedRepository();
+    postRepository.mcpWorkflowVersion.mockResolvedValue(114);
+    const edit = { ...body, type: 'update', posts: [{ ...body.posts[0], value: [{ id: 'tracked', content: 'hi', image: [] }] }] };
+    const first = service.createPost('org', edit, 'API', false, apiActor);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(postRepository.mcpWorkflowVersion).toHaveBeenCalledWith('org', 'tracked');
+    expect(postRepository.acquireAgentAdmission).toHaveBeenCalledTimes(1);
+    finish();
+    await first;
   });
 });

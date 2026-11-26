@@ -1894,7 +1894,10 @@ export class PostsService {
       };
     }
 
-    return actor?.type === 'agent'
+    // One agent save at a time per workspace, for MCP saves only (new ones, or
+    // edits of a tracked MCP post). The public API and the CLI are agent
+    // actors too, but save concurrently as they always did.
+    return actor?.type === 'agent' && await this.isMcpSave(orgId, body, creationMethod)
       ? this.withAgentAdmission(orgId, async () => {
           try { return await this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent); }
           catch (error) {
@@ -1905,6 +1908,15 @@ export class PostsService {
           }
         })
       : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent);
+  }
+
+  private async isMcpSave(orgId: string, body: CreatePostDto, creationMethod: CreationMethod) {
+    if (creationMethod === 'MCP') return true;
+    for (const post of body.posts) {
+      const id = post.value?.[0]?.id;
+      if (id && await this._postRepository.mcpWorkflowVersion(orgId, id) === 114) return true;
+    }
+    return false;
   }
 
   agentAdmissionStatus(orgId: string) { return this._postRepository.agentAdmissionStatus(orgId); }
