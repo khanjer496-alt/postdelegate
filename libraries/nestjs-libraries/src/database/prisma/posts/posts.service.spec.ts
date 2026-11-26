@@ -2664,6 +2664,20 @@ describe('MCP producer rollout gate', () => {
       expect(postRepository.acquireAgentAdmission).not.toHaveBeenCalled();
     } finally { process.env.MCP_V114_ADMISSION_ENABLED = before; }
   });
+
+  it('refuses an agent edit of a tracked MCP post before taking an admission', async () => {
+    const { service, postRepository } = makeService();
+    postRepository.mcpWorkflowVersion.mockResolvedValue(114);
+    jest.spyOn(service, 'applyOutsideComposerRules').mockImplementation(async (_org, posts) => posts as any);
+    const before = process.env.MCP_V114_ADMISSION_ENABLED;
+    process.env.MCP_V114_ADMISSION_ENABLED = 'false';
+    try {
+      const edit = service.createPost('org', { type: 'update', posts: [{ integration: { id: 'channel' }, value: [{ id: 'tracked', content: 'hi', image: [] }], settings: {} }] } as any, 'API', false, { type: 'agent', viaApi: true, source: 'Public API key' } as any);
+      await expect(edit).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(postRepository.acquireAgentAdmission).not.toHaveBeenCalled();
+      expect(postRepository.releaseAgentAdmission).not.toHaveBeenCalled();
+    } finally { process.env.MCP_V114_ADMISSION_ENABLED = before; }
+  });
 });
 
 

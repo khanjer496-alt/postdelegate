@@ -206,6 +206,8 @@ If validation fails, or the workspace limits what agents can do (allowed channel
     const organizationId = JSON.parse(
       (context?.requestContext as any)?.get('organization') as string
     ).id;
+    // a closed rollout refuses before the admission, it is no stopped save
+    this._postsService.assertMcpAdmissionReady();
     return this._postsService.withAgentAdmission(organizationId, () => this.scheduleAdmitted(inputData, context, options, organizationId));
   }
 

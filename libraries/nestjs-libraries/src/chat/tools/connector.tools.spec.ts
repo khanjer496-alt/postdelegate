@@ -81,7 +81,8 @@ const socialPost = (type = 'draft') => ({
 describe('createPostForReviewTool', () => {
   const build = () => {
     const postsService = {
-      withAgentAdmission: (_org: string, action: () => unknown) => action(),
+      assertMcpAdmissionReady: jest.fn(),
+      withAgentAdmission: jest.fn((_org: string, action: () => unknown) => action()),
       // the network rules outside the composer leave these posts as they are
       applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
       validatePosts: jest.fn().mockResolvedValue([
@@ -119,6 +120,15 @@ describe('createPostForReviewTool', () => {
     const closed = new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
     postsService.createPost.mockRejectedValue(closed);
     await expect(call(tool, socialPost('draft'))).rejects.toBe(closed);
+    expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
+
+  it('refuses a closed rollout before taking the save admission', async () => {
+    const { tool, postsService, approvals } = build();
+    const closed = new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
+    postsService.assertMcpAdmissionReady.mockImplementation(() => { throw closed; });
+    await expect(call(tool, socialPost('draft'))).rejects.toBe(closed);
+    expect(postsService.withAgentAdmission).not.toHaveBeenCalled();
     expect(approvals.submitAsAgent).not.toHaveBeenCalled();
   });
 

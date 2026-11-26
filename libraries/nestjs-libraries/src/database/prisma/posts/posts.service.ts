@@ -1944,7 +1944,10 @@ export class PostsService {
     // One agent save at a time per workspace, for MCP saves only (new ones, or
     // edits of a tracked MCP post). The public API and the CLI are agent
     // actors too, but save concurrently as they always did.
-    return actor?.type === 'agent' && await this.isMcpSave(orgId, body, creationMethod)
+    const mcpSave = actor?.type === 'agent' && await this.isMcpSave(orgId, body, creationMethod);
+    // a closed rollout refuses before the admission, it is no stopped save
+    if (mcpSave) this.assertMcpAdmissionReady();
+    return mcpSave
       ? this.withAgentAdmission(orgId, async () => {
           try { return await this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent); }
           catch (error) {

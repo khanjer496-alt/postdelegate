@@ -1651,6 +1651,7 @@ pg(
       });
       const delegated = {
         validatePosts: posts.validatePosts.bind(posts),
+        assertMcpAdmissionReady: posts.assertMcpAdmissionReady.bind(posts),
         withAgentAdmission: posts.withAgentAdmission.bind(posts),
         applyOutsideComposerRules: posts.applyOutsideComposerRules.bind(posts),
         createPost: async (...args: any[]) => {
