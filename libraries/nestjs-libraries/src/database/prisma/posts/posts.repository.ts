@@ -1220,7 +1220,14 @@ export class PostsRepository {
   ) {
     assertAgentPostWrite(orgId, body.integration.id, state);
     const admissionOwner = agentAdmissionContext.getStore()?.orgId === orgId ? agentAdmissionContext.getStore()!.owner : undefined;
-    return this._transaction.model.$transaction(async tx => {
+    // Serializable only where an agent admission or an MCP publication fence
+    // is involved (a fence exists from a tracked post's first save on).
+    // Every other save (web, autopost, import, bulk, public API) keeps the
+    // default isolation, so it never fails on a serialization race.
+    const editedId = body.value?.[0]?.id;
+    const serializable = !!admissionOwner || creationMethod === 'MCP' ||
+      (!!editedId && !!(await this._transaction.model.$transaction(tx => tx.mcpPublishFence.findUnique({ where: { postId: editedId }, select: { postId: true } }))));
+    return this.retrySerializable(() => this._transaction.model.$transaction(async tx => {
       await this.assertSaveAdmission(tx, orgId);
       if (admissionOwner) {
         const live = await tx.mcpAgentAdmission.updateMany({ where: { organizationId: orgId, owner: admissionOwner }, data: { owner: admissionOwner } });
@@ -1456,7 +1463,7 @@ export class PostsRepository {
     await this.writeMcpFence(tx, orgId, posts);
     await this.recordAgentWrites(tx, orgId, admissionOwner, posts);
     return { previousPost, posts };
-    }, { isolationLevel: 'Serializable' }).catch(error => {
+    }, serializable ? { isolationLevel: 'Serializable' } : undefined)).catch(error => {
       if (agentDraftOnly() && (state === 'update' || approval.requireExistingDraft) && ['P2025', 'P2034'].includes((error as any)?.code)) throw new BadRequestException('The draft changed. Refresh before editing.');
       throw error;
     });

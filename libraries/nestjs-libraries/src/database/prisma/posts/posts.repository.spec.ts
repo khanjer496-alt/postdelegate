@@ -810,3 +810,47 @@ describe('agent save admission lease, release retry and boot release', () => {
     expect(recoveries).toEqual([expect.objectContaining({ organizationId: 'org-a', owner: 'gone', writtenPostIds: ['p-9'] })]);
   });
 });
+
+describe('PostsRepository.createOrUpdatePost transaction isolation and retry', () => {
+  const make = (fence: any = null) => {
+    const post = {
+      findFirst: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockImplementation(async ({ where }: any) => ({ id: where.id })),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+    const tx = { post, tags: { findMany: jest.fn() }, tagsPosts: { deleteMany: jest.fn() }, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(fence), update: jest.fn(), upsert: jest.fn() }, mcpPublishAttempt: { count: jest.fn().mockResolvedValue(0) } };
+    const $transaction = jest.fn((run: any) => run(tx));
+    const repo = new PostsRepository({ model: { post } } as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction } } as any, {} as any);
+    return { repo, $transaction, post };
+  };
+
+  it('saves a web, import or public API post with the default isolation, as before', async () => {
+    const { repo, $transaction } = make();
+    await repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
+    const options = $transaction.mock.calls.map(([, options]: any[]) => options);
+    expect(options.every((o: any) => o?.isolationLevel !== 'Serializable')).toBe(true);
+  });
+
+  it('keeps Serializable for MCP saves and edits of a fenced post', async () => {
+    const mcp = make();
+    await mcp.repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'MCP' as any);
+    expect(mcp.$transaction.mock.calls.at(-1)![1]).toEqual({ isolationLevel: 'Serializable' });
+
+    const fenced = make({ postId: 'p-1', organizationId: 'org-A' });
+    fenced.post.findFirst.mockResolvedValue({ state: 'QUEUE' });
+    await fenced.repo.createOrUpdatePost('update', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
+    expect(fenced.$transaction.mock.calls.at(-1)![1]).toEqual({ isolationLevel: 'Serializable' });
+  });
+
+  it('runs a save again after a serialization failure instead of failing it', async () => {
+    const { repo, $transaction, post } = make();
+    let failed = false;
+    post.upsert.mockImplementation(async ({ where }: any) => {
+      if (!failed) { failed = true; throw Object.assign(new Error('could not serialize'), { code: 'P2034' }); }
+      return { id: where.id };
+    });
+    await expect(repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any)).resolves.toMatchObject({ posts: [{ id: 'p-1' }] });
+    expect(post.upsert).toHaveBeenCalledTimes(2);
+    expect($transaction).toHaveBeenCalledTimes(3); // the fence lookup, then two save attempts
+  });
+});
