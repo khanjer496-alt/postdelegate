@@ -46,6 +46,9 @@ const make = (
     canAddChannel: jest.fn(async () => limits.canAdd ?? true),
     channelLimitMessage: jest.fn(async (): Promise<string | undefined> => undefined),
   };
+  const measurement = {
+    channelConnectFailed: jest.fn(async () => undefined),
+  };
   const integrationService = {
     getIntegrationByInternalId: jest.fn(async () => limits.existing ?? null),
     createOrUpdateIntegration: jest.fn(async () => ({ id: 'int-1', name: 'x' })),
@@ -77,9 +80,10 @@ const make = (
         lastName: 'Doe',
         email: 'jane@acme.com',
       })),
-    } as any
+    } as any,
+    measurement as any
   );
-  return { controller, integrationService, permissions };
+  return { controller, integrationService, permissions, measurement };
 };
 
 const authenticated = {
@@ -133,6 +137,48 @@ describe('NoAuthIntegrationsController state keys', () => {
       expect(log).toHaveBeenCalledWith('Authentication failed for demo:', 'Unknown provider error');
       expect(JSON.stringify(log.mock.calls)).not.toContain('EXAMPLE-non-error-secret');
     } finally { log.mockRestore(); }
+  });
+
+  it('records why a connect came back without a channel, a category only', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const cases: [object, string][] = [
+        [{ authenticate: jest.fn(async () => { throw new Error('boom'); }) }, 'token_exchange'],
+        [{ authenticate: jest.fn(async () => 'The account has no pages') }, 'provider_error'],
+        [{ authenticate: jest.fn(async () => { const { NotEnoughScopes } = jest.requireMock('@gitroom/nestjs-libraries/integrations/social.abstract'); throw new NotEnoughScopes('Missing scopes'); }) }, 'missing_permissions'],
+        [{ authenticate: jest.fn(async () => ({ ...(await authenticated.authenticate()), id: '' })) }, 'no_account'],
+      ];
+      for (const [override, reason] of cases) {
+        redis.data.set('login:s1', 'verifier');
+        redis.data.set('organization:s1', 'org-1');
+        const { controller, measurement } = make({ ...authenticated, ...override });
+        await expect(
+          controller.connectSocialMedia('demo', { state: 's1', code: 'c', timezone: 0 } as any)
+        ).rejects.toBeDefined();
+        expect(measurement.channelConnectFailed).toHaveBeenCalledWith('org-1', 'demo', reason, 's1');
+      }
+    } finally { log.mockRestore(); }
+  });
+
+  it('records nothing for a connect that saved a channel', async () => {
+    const { controller, measurement } = make({ ...authenticated });
+    await controller.connectSocialMedia('demo', { state: 's1', code: 'c', timezone: 0 } as any);
+    expect(measurement.channelConnectFailed).not.toHaveBeenCalled();
+  });
+
+  it('records a cancelled connect for the workspace of the state, without spending it', async () => {
+    const { controller, measurement } = make({ ...authenticated });
+    expect(await controller.declinedConnect('demo', { state: 's1' })).toEqual({ recorded: true });
+    expect(measurement.channelConnectFailed).toHaveBeenCalledWith('org-1', 'demo', 'cancelled', 's1');
+    expect(redis.data.get('organization:s1')).toBe('org-1');
+    expect(redis.data.get('login:s1')).toBe('verifier');
+
+    measurement.channelConnectFailed.mockClear();
+    expect(await controller.declinedConnect('demo', { state: 'unknown' })).toEqual({ recorded: false });
+    expect(measurement.channelConnectFailed).not.toHaveBeenCalled();
+
+    await expect(controller.declinedConnect('other', { state: 's1' })).rejects.toThrow('Integration not allowed');
+    expect(measurement.channelConnectFailed).not.toHaveBeenCalled();
   });
 
   it('keeps it for the page picking step of a two step provider, then spends it', async () => {

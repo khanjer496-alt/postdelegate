@@ -8,6 +8,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useReviewPrompt } from '@gitroom/frontend/components/reviews/reviews.hooks';
 import { openReviewModal } from '@gitroom/frontend/components/reviews/review.form';
+import { useFeedbackQuestion } from '@gitroom/frontend/components/feedback/feedback.hooks';
 
 // A small card in the corner, never a blocker. The server decides when a
 // person is asked (account age, published posts, earlier answers).
@@ -17,11 +18,14 @@ export const ReviewPrompt: FC = () => {
   const user = useUser();
   const modals = useModals();
   const { data, mutate } = useReviewPrompt();
+  // the one-question survey takes the same corner, it goes first
+  const { data: feedback } = useFeedbackQuestion();
   const [hidden, setHidden] = useState(false);
   const reported = useRef(false);
 
   // an admin looking at a customer's workspace must not answer for them
-  const show = !!data?.eligible && !hidden && !user?.impersonate;
+  const show =
+    !!data?.eligible && !hidden && !user?.impersonate && !feedback?.question;
 
   useEffect(() => {
     if (show && !reported.current) {

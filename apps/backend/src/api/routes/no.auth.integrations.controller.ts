@@ -12,6 +12,7 @@ import {
 import { Request, Response } from 'express';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { ConnectIntegrationDto } from '@gitroom/nestjs-libraries/dtos/integrations/connect.integration.dto';
+import { DeclinedIntegrationDto } from '@gitroom/nestjs-libraries/dtos/integrations/declined.integration.dto';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
@@ -38,6 +39,10 @@ import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
 import { isCrossSiteCookieRequest } from '@gitroom/backend/services/auth/csrf';
 import { Organization } from '@prisma/client';
 import {
+  ChannelConnectFailure,
+  MeasurementService,
+} from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
+import {
   ConnectBinding,
   CONNECT_OTHER_BROWSER_MESSAGE,
   confirmConnectBinding,
@@ -61,7 +66,8 @@ export class NoAuthIntegrationsController {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _organizationService: OrganizationService,
     private _permissionsService: PermissionsService,
-    private _usersService: UsersService
+    private _usersService: UsersService,
+    private _measurementService: MeasurementService
   ) {}
 
   // The id of the member signed in on this request, by the auth header or by
@@ -289,6 +295,8 @@ export class NoAuthIntegrationsController {
       refresh || undefined
     );
 
+    // what went wrong, recorded below when no channel came back
+    let failure: ChannelConnectFailure = 'provider_error';
     const {
       error,
       accessToken,
@@ -313,6 +321,7 @@ export class NoAuthIntegrationsController {
         );
 
         if (typeof auth === 'string') {
+          failure = 'provider_error';
           return res({
             error: auth,
             accessToken: '',
@@ -342,6 +351,7 @@ export class NoAuthIntegrationsController {
               expiresIn: auth.expiresIn,
             });
           } catch (err: any) {
+            failure = 'provider_error';
             return res({
               error: err.message,
               accessToken: '',
@@ -357,6 +367,7 @@ export class NoAuthIntegrationsController {
         return res(auth);
       } catch (err) {
         if (err instanceof NotEnoughScopes) {
+          failure = 'missing_permissions';
           return res({
             error: err.message,
             accessToken: '',
@@ -369,6 +380,7 @@ export class NoAuthIntegrationsController {
         }
 
         console.log(`Authentication failed for ${integration}:`, err instanceof Error ? err.message : 'Unknown provider error');
+        failure = 'token_exchange';
         return res({
           error: 'Authentication failed',
           accessToken: '',
@@ -380,6 +392,15 @@ export class NoAuthIntegrationsController {
         });
       }
     });
+
+    if (error || !id) {
+      await this._measurementService.channelConnectFailed(
+        org.id,
+        integration,
+        error ? failure : 'no_account',
+        body.state
+      );
+    }
 
     if (error) {
       throw new NotEnoughScopes(error);
@@ -600,6 +621,33 @@ export class NoAuthIntegrationsController {
       ...(returnURL ? { returnURL } : {}),
       ...(extensionToken ? { extensionToken } : {}),
     };
+  }
+
+  // The network sent the person back without a code: they cancelled on its
+  // page or it refused before asking. Nothing of the state is spent, the
+  // failure is only recorded for the workspace that started the connect
+  @Post('/social-connect/:integration/declined')
+  async declinedConnect(
+    @Param('integration') integration: string,
+    @Body() body: DeclinedIntegrationDto
+  ) {
+    if (
+      !this._integrationManager
+        .getAllowedSocialsIntegrations()
+        .includes(integration)
+    ) {
+      throw new HttpException('Integration not allowed', 400);
+    }
+    const organization = await ioRedis.get(`organization:${body.state}`);
+    if (organization) {
+      await this._measurementService.channelConnectFailed(
+        organization,
+        integration,
+        'cancelled',
+        body.state
+      );
+    }
+    return { recorded: !!organization };
   }
 
   // "Cancel" on the confirmation of a shared link: the state is dropped so

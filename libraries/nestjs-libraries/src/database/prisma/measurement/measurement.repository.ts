@@ -4,6 +4,13 @@ import { MeasurementEvent, Prisma } from '@prisma/client';
 import { chunk, uniq } from 'lodash';
 
 export const MEASUREMENT_EXPORT_CAP = 100000;
+// Recorded for the owner's alerts, digest and trials table, never funnel
+// milestones: the export leaves them out so its totals keep their meaning
+export const OPERATIONAL_KINDS = [
+  'channel_connect_failed',
+  'publish_failed',
+  'subscription_ended',
+];
 
 @Injectable()
 export class MeasurementRepository {
@@ -15,6 +22,12 @@ export class MeasurementRepository {
       where: { key: data.key },
       create: data,
       update: replay ? { duplicates: { increment: 1 } } : {},
+      select: { key: true },
+    });
+  }
+  exists(key: string) {
+    return this.prisma.measurementEvent.findUnique({
+      where: { key },
       select: { key: true },
     });
   }
@@ -73,6 +86,18 @@ export class MeasurementRepository {
       },
     });
   }
+  // any post of a thread can fail, a comment as well as the main post; only
+  // one that is in ERROR now and not deleted counts
+  failedPost(id: string) {
+    return this.prisma.post.findFirst({
+      where: { id, state: 'ERROR', deletedAt: null },
+      select: {
+        organizationId: true,
+        parentPostId: true,
+        integration: { select: { providerIdentifier: true } },
+      },
+    });
+  }
   rootPost(id: string) {
     return this.prisma.post.findFirst({
       where: { id, parentPostId: null },
@@ -84,7 +109,10 @@ export class MeasurementRepository {
   // returns a deceptively complete export.
   async rows(from: Date, to: Date, asOf: Date) {
     const window = await this.prisma.measurementEvent.findMany({
-      where: { occurredAt: { gte: from, lt: to } },
+      where: {
+        occurredAt: { gte: from, lt: to },
+        kind: { notIn: OPERATIONAL_KINDS },
+      },
       orderBy: [{ occurredAt: 'asc' }, { key: 'asc' }],
       take: MEASUREMENT_EXPORT_CAP + 1,
     });

@@ -34,3 +34,4 @@ export * from './studio.render.workflow.v2';
 
 export * from './post-workflows/post.workflow.v1.1.4';
 export * from './comment.rules.workflow.v1';
+export * from './owner.digest.workflow.v1';

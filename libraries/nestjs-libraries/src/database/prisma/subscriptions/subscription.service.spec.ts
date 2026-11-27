@@ -204,6 +204,27 @@ describe('SubscriptionService plan writes', () => {
     expect(repository.createOrUpdateSubscription).toHaveBeenCalled();
   });
 
+  it('records an ended trial or plan, and keeps the removal when telemetry fails', async () => {
+    const { service } = make({
+      id: 'sub_row',
+      organizationId: 'org_1',
+      provider: 'stripe',
+      subscriptionTier: 'STANDARD',
+      status: 'trialing',
+      identifier: 'standard_monthly',
+      totalChannels: 5,
+    });
+    const subscriptionEnded = jest.fn(async () => undefined);
+    (service as any)._measurementService = { subscriptionEnded };
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({ count: 1 });
+    expect(subscriptionEnded).toHaveBeenCalledWith('org_1', true, 'standard_monthly', 'STANDARD');
+
+    subscriptionEnded.mockRejectedValue(new Error('telemetry down'));
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({ count: 1 });
+    error.mockRestore();
+  });
+
   it('counts only connected channels when a plan shrinks', async () => {
     const { service, integrations } = make(
       { provider: 'stripe', subscriptionTier: 'PRO', totalChannels: 30 },

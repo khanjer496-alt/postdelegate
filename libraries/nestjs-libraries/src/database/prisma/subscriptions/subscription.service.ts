@@ -107,10 +107,15 @@ export class SubscriptionService {
         freeChannels(),
         'FREE'
       );
-      return await this._subscriptionRepository.deleteSubscriptionByCustomerId(
-        customerId,
-        provider
-      );
+      const deleted =
+        await this._subscriptionRepository.deleteSubscriptionByCustomerId(
+          customerId,
+          provider
+        );
+      if (deleted.count && current) {
+        await this.measureEnded(current);
+      }
+      return deleted;
     } catch (err) {
       console.error('Error deleting subscription:', err);
       return { count: 0, retry: true };
@@ -131,10 +136,34 @@ export class SubscriptionService {
       freeChannels(),
       'FREE'
     );
-    return this._subscriptionRepository.deleteSubscriptionByOrgId(
+    const deleted = await this._subscriptionRepository.deleteSubscriptionByOrgId(
       organizationId,
       provider
     );
+    if (deleted.count) {
+      await this.measureEnded(current);
+    }
+    return deleted;
+  }
+
+  // The plan is removed already: a measurement failure never undoes it
+  private async measureEnded(current: {
+    id: string;
+    organizationId: string;
+    status: string | null;
+    identifier: string | null;
+    subscriptionTier: string;
+  }) {
+    try {
+      await this._measurementService.subscriptionEnded(
+        current.organizationId,
+        current.status === 'trialing',
+        current.identifier || current.id,
+        current.subscriptionTier
+      );
+    } catch {
+      console.error('measurement_write_failed; plan removed successfully');
+    }
   }
 
   updateCustomerId(organizationId: string, customerId: string) {
