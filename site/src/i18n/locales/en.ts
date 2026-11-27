@@ -58,7 +58,7 @@ const mcpBody = `<h2>What an MCP server does for your social calendar</h2>
 <pre><code>claude mcp add postdelegate --transport http "https://app.postdelegate.com/mcp-oauth-dynamic"</code></pre>
 <p>Cursor takes the same address in <code>.cursor/mcp.json</code> under <code>mcpServers</code>, or through a one-click install link on the <a href="/docs/mcp/clients">clients page</a>. That page also has copy-paste configuration for Claude Desktop, VS Code, Codex, Windsurf and other clients, using either sign in with PostDelegate or an API key.</p>
 
-<h2>Server addresses and the two ways to sign in</h2>
+<h2>Server addresses and the ways to sign in</h2>
 <p>The MCP server uses the streamable HTTP transport. Three addresses cover every kind of client:</p>
 <table>
 <thead><tr><th>Address</th><th>Sign-in</th><th>Use it for</th></tr></thead>
@@ -69,10 +69,10 @@ const mcpBody = `<h2>What an MCP server does for your social calendar</h2>
 </tbody>
 </table>
 <p>With sign in with PostDelegate, the client registers itself using dynamic client registration and PKCE, and asks for the scopes <code>mcp:read</code> and <code>mcp:write</code>. Approvals appear under Settings, then Apps, then Approved Apps, where you can choose Revoke to cut an assistant off. These tokens do not expire on their own, so revoking is how you end access.</p>
-<p>The alternative is your workspace API key from Settings, then Agents / Dev. It works anywhere, but the key is as powerful as your account, so prefer OAuth where the client supports it. Rotating the key invalidates it everywhere. MCP directories and clients that discover servers on their own can read the server card at <code>https://app.postdelegate.com/.well-known/mcp/server-card.json</code>.</p>
+<p>The alternative is your workspace API key from Settings, then Agents / Dev. It works anywhere, but the key is as powerful as your account, so prefer OAuth where the client supports it. Rotating the key invalidates it everywhere. For an assistant that runs on its own, the safer choice is a scoped agent credential: a workspace admin creates one in Settings, then Global Settings, then Agent access, gives it the role Analyst, Draft-only or Publisher, an expiry (30 days by default) and the channels it may use, and can revoke it there at any time. It is sent as a Bearer header to <code>https://app.postdelegate.com/api/mcp</code>. See <a href="/docs/mcp#scoped-agent-credentials">scoped agent credentials</a>. MCP directories and clients that discover servers on their own can read the server card at <code>https://app.postdelegate.com/.well-known/mcp/server-card.json</code>.</p>
 
 <h2>What your assistant can do: the tools</h2>
-<p>Your assistant discovers these tools by itself when it connects, and you do not call them directly. Tool names are shown exactly as the server reports them. The <a href="/docs/mcp/tools">tools reference</a> has the full detail.</p>
+<p>The server card lists 29 tools. Your assistant discovers them by itself when it connects, and you do not call them directly. Tool names are shown exactly as the server reports them. The <a href="/docs/mcp/tools">tools reference</a> has the full detail.</p>
 <h3>Channels and settings</h3>
 <ul>
 <li><code>integrationList</code> lists your connected channels, and <code>groupList</code> lists your customers. Neither changes anything.</li>
@@ -91,6 +91,13 @@ const mcpBody = `<h2>What an MCP server does for your social calendar</h2>
 <li><code>uploadFromUrlTool</code> adds an image or video from a public URL to your media library, and can resize and re-encode it for the networks.</li>
 <li><code>mediaListTool</code> and <code>mediaStatusTool</code> let an assistant reuse a file and check whether an adjusted upload is ready or still processing.</li>
 <li>Assistants that support interactive MCP apps can show an upload widget so you can add a file from your own device. An assistant cannot read files on your computer.</li>
+</ul>
+<h3>Analytics, review and recovery</h3>
+<ul>
+<li><code>analyticsMetricsTool</code>, <code>analyticsTopPostsTool</code>, <code>bestTimeToPostTool</code> and <code>channelAnalyticsTool</code> read your analytics and the best time to post. None of them changes anything.</li>
+<li><code>postPreflightTool</code> checks a post before it is saved, and <code>resultsToReviewedDraftsTool</code> gives the assistant a step-by-step plan for turning recent results into drafts for review.</li>
+<li><code>createPostForReviewTool</code> and <code>sendPostForReviewTool</code> save or submit a draft for a person to review, and <code>postUpdateTool</code> edits a post that has not published.</li>
+<li><code>postUnscheduleTool</code> and <code>postResumeTool</code> stop or recover a scheduled post.</li>
 </ul>
 <h3>Studio and AI media</h3>
 <p>Studio renders vertical 1080×1920 videos from the videos in your media library. An assistant can list the templates, start a render, check its status and cancel it. The seven templates are Hook over clip, Talking head + captions, Image slideshow, Before/after, Top-N list, Quote card and AI UGC. A render only saves a new video to your media library. It never creates, schedules or publishes a post.</p>
@@ -158,7 +165,7 @@ const en = {
     skipToContent: 'Skip to content',
     homeLabel: 'PostDelegate home',
     // alt text of /og.png, the share image of the pages with no card of their own (src/data/og-cards.mjs)
-    ogImageAlt: 'PostDelegate logo and the line “Your social media, all in one place.” on a dark background',
+    ogImageAlt: 'PostDelegate logo and the line “Your AI drafts. You approve.” on a dark background',
   },
   header: {
     mainNav: 'Main navigation',
@@ -251,7 +258,7 @@ const en = {
   planTaglines: Object.fromEntries(PLANS.map((plan) => [plan.slug, plan.tagline])) as Record<string, string>,
   perks: {
     team: 'Unlimited team members',
-    solo: 'Just you', soloNote: 'No team seats on this plan',
+    solo: 'Just you', soloNote: 'No team members on this plan',
     posts: 'Unlimited posts per month',
     agent: 'Claude, ChatGPT and scripts', agentNote: 'MCP server and public REST API',
     webhooks: (count: string) => `${count} webhooks`, webhooksNote: 'Tell your own tools when a post goes out',
@@ -261,7 +268,7 @@ const en = {
   pricing: {
     eyebrow: 'Plans',
     heading: (lowest: number) => `From $${lowest} a month. API, MCP and Studio on every plan.`,
-    intro: (days: number) => `Plans differ by channels, team seats and webhooks. Try any of them for ${days} days with no credit card, and add one before the trial ends to keep your plan.`,
+    intro: (days: number) => `Plans differ by channels, team members and webhooks. Try any of them for ${days} days with no credit card, and add one before the trial ends to keep your plan.`,
     billingPeriod: 'Billing period',
     monthly: 'Monthly',
     yearly: 'Yearly',
@@ -358,11 +365,13 @@ const en = {
     description: (price: number, days: number) => `PostDelegate plans start at $${price} a month, with channels, team members and webhooks compared by plan. Every plan has a ${days}-day free trial, no credit card needed.`,
     eyebrow: 'Plans',
     h1: (price: number, days: number) => `Plans from $${price}. Try any of them free for ${days} days.`,
-    lead: 'Pay for channels, team seats and webhooks. The calendar, MCP server, REST API and Content Studio come with every plan.',
+    lead: 'Pick a plan by how many channels you need. Team, Pro and Ultimate include unlimited team members with no per-seat price, and the calendar, MCP server, REST API and Content Studio come with every plan.',
     billingGuide: 'Read the billing guide',
     trialNote: (note: string) => `${note} · One trial per email`,
     heroNetworks: (count: number) => `Publish to <b>${count} live networks</b> on every plan`,
     compareTitle: 'Compare plans',
+    // above the plan table on phones, where it scrolls sideways
+    compareScrollHint: 'Swipe sideways to see every plan',
     feature: 'Feature', yes: 'Yes', no: 'No',
     rowMonthly: 'Monthly price',
     rowYearly: 'Yearly price',

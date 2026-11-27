@@ -23,7 +23,7 @@ const dict: Dict = {
     skipToContent: 'تخطَّ إلى المحتوى',
     homeLabel: 'الصفحة الرئيسية لـ PostDelegate',
     // alt text of /og.png, the share image of the pages with no card of their own (src/data/og-cards.mjs)
-    ogImageAlt: 'شعار PostDelegate وعبارة “Your social media, all in one place.” على خلفية داكنة',
+    ogImageAlt: 'شعار PostDelegate وعبارة “Your AI drafts. You approve.” على خلفية داكنة',
   },
   header: {
     mainNav: 'التنقل الرئيسي',
@@ -138,7 +138,7 @@ const dict: Dict = {
   },
   perks: {
     team: 'أعضاء فريق بلا حدود',
-    solo: 'أنت فقط', soloNote: 'لا مقاعد للفريق في هذه الخطة',
+    solo: 'أنت فقط', soloNote: 'لا أعضاء فريق في هذه الخطة',
     posts: 'منشورات غير محدودة شهريًا',
     agent: 'Claude وChatGPT والسكربتات', agentNote: 'خادم MCP وREST API عامة',
     webhooks: (count: string) => `عدد Webhooks: ${count}`, webhooksNote: 'أبلِغ أدواتك الخاصة عند نشر أي منشور',
@@ -148,7 +148,7 @@ const dict: Dict = {
   pricing: {
     eyebrow: 'الخطط',
     heading: (lowest: number) => `ابتداءً من $${lowest} شهريًا. API وMCP وStudio في كل خطة.`,
-    intro: (days: number) => `تختلف الخطط في عدد القنوات ومقاعد الفريق وWebhooks. جرّب أيًّا منها لمدة ${days} أيام بلا بطاقة ائتمان، وأضف بطاقة قبل انتهاء التجربة للاحتفاظ بخطتك.`,
+    intro: (days: number) => `تختلف الخطط في عدد القنوات وأعضاء الفريق وWebhooks. جرّب أيًّا منها لمدة ${days} أيام بلا بطاقة ائتمان، وأضف بطاقة قبل انتهاء التجربة للاحتفاظ بخطتك.`,
     billingPeriod: 'دورة الفوترة',
     monthly: 'شهري',
     yearly: 'سنوي',
@@ -249,11 +249,12 @@ const dict: Dict = {
     description: (price: number, days: number) => `تبدأ خطط PostDelegate من $${price} شهريًا، مع مقارنة القنوات وأعضاء الفريق وWebhooks حسب الخطة. تجربة مجانية ${days} أيام في كل خطة، بلا بطاقة ائتمان.`,
     eyebrow: 'الخطط',
     h1: (price: number, days: number) => `خطط من $${price}. جرّب أيًّا منها مجانًا لمدة ${days} أيام.`,
-    lead: 'تدفع مقابل القنوات ومقاعد الفريق وWebhooks. أما التقويم وخادم MCP وREST API وContent Studio فتأتي مع كل خطة.',
+    lead: 'اختر الخطة حسب عدد القنوات التي تحتاجها. تشمل خطط Team وPro وUltimate أعضاء فريق بلا حدود دون سعر لكل مستخدم، ويأتي التقويم وخادم MCP وREST API وContent Studio مع كل خطة.',
     billingGuide: 'اقرأ دليل الفوترة',
     trialNote: (note: string) => `${note} · تجربة واحدة لكل بريد إلكتروني`,
     heroNetworks: (count: number) => `انشر على <b>${count} شبكة متاحة</b> في كل خطة`,
     compareTitle: 'قارن الخطط',
+    compareScrollHint: 'اسحب جانبيًا لرؤية كل الخطط',
     feature: 'الميزة', yes: 'نعم', no: 'لا',
     rowMonthly: 'السعر الشهري',
     rowYearly: 'السعر السنوي',
@@ -352,7 +353,7 @@ const dict: Dict = {
     body: '<h2>منشور الإطلاق مهمة أولى مناسبة</h2><p>اطلب من أداة البرمجة تجهيز إعلان إطلاق قصير وأي وسائط داعمة. راجع الصياغة في PostDelegate واختر بنفسك قناة متاحة وموعدًا.</p><h2>بعد ربط وكيلك</h2><p>ابدأ باستكشاف مساحة العمل والحسابات المربوطة، ثم أنشئ مسودة واحدة. تأكّد من وصول المسودة قبل السماح لأي سير عمل بجدولة المحتوى.</p><h2>استخدم تعليمات الربط الصحيحة</h2><p>يتصل Codex وCursor وClaude Code وأدوات البرمجة الأخرى بـ PostDelegate عبر MCP، أو تستدعي REST API مباشرةً. يحتوي <a href="/docs/mcp/clients">دليل إعداد العملاء</a> على إعدادات كل أداة باستخدام عنوان خادم PostDelegate. الأدوات ونقاط النهاية التابعة لخدمات أخرى غير مربوطة بـ PostDelegate.</p><p>راجع <a href="/agents">نظرة عامة على الوكلاء</a> و<a href="/mcp">MCP</a> و<a href="/api">REST API</a>.</p>',
   },
   apiPage: {
-    title: 'REST API — PostDelegate',
+    title: 'واجهة REST API لجدولة المنشورات — PostDelegate',
     description: 'واجهة REST API من PostDelegate للقنوات والمنشورات والوسائط. صادِق بمفتاح API، وجدوِل المنشورات من شيفرتك، واطّلع على حدود المعدل والأمثلة.',
     eyebrow: 'REST API',
     h1: 'ابنِ حول سير عمل النشر الخاص بك.',

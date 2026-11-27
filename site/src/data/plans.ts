@@ -52,7 +52,7 @@ export const planChannels = (plan: Plan) =>
 
 export const planFeatures = (plan: Plan) => [
   planChannels(plan),
-  plan.teamMembers ? 'Unlimited team members' : 'Just you, no team seats',
+  plan.teamMembers ? 'Unlimited team members' : 'Just you, no team members',
   'Unlimited posts per month',
   'Public API and MCP',
   `${plan.webhooks.toLocaleString('en-US')} webhooks`,

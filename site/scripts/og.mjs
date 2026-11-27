@@ -83,8 +83,10 @@ const SPARK = `<path d="M1067 222q4 45 45 49-41 4-45 49-4-45-45-49 41-4 45-49" f
 // the empty bottom right instead of sitting under the words
 const SPARK_LOW = `<g transform="translate(0 248)">${SPARK}</g>`;
 
-// The brand card, unchanged: the default for every page without one of its own.
-const brand = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#0d0d0d"/>${MARK}<text x="185" y="121" fill="white" font-family="sans-serif" font-size="36" font-weight="700">PostDelegate</text><text x="74" y="280" fill="white" font-family="sans-serif" font-size="80" font-weight="800">Your social media,</text><text x="74" y="380" fill="white" font-family="sans-serif" font-size="80" font-weight="800">all in one place.</text><path d="M322 400q210-22 418-6" stroke="#b799ff" stroke-width="5" stroke-linecap="round" fill="none"/><text x="74" y="480" fill="#bbb" font-family="sans-serif" font-size="28">Your ideas. Your content. Your calendar.</text><text x="74" y="565" fill="#fff" font-family="sans-serif" font-size="24">postdelegate.com</text>${SPARK}</svg>`;
+// The brand card: the default for every page without one of its own, the home
+// page included, so its headline is the home page's (h1 and h1Mark of `home` in
+// src/i18n/locales/en.ts), with the arc under "approve." like the mark on the page.
+const brand = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#0d0d0d"/>${MARK}<text x="185" y="121" fill="white" font-family="sans-serif" font-size="36" font-weight="700">PostDelegate</text><text x="74" y="280" fill="white" font-family="sans-serif" font-size="80" font-weight="800">Your AI drafts.</text><text x="74" y="380" fill="white" font-family="sans-serif" font-size="80" font-weight="800">You approve.</text><path d="M246 400q160-18 318-4" stroke="#b799ff" stroke-width="5" stroke-linecap="round" fill="none"/><text x="74" y="480" fill="#bbb" font-family="sans-serif" font-size="28">Claude or ChatGPT drafts over MCP. PostDelegate posts on time.</text><text x="74" y="565" fill="#fff" font-family="sans-serif" font-size="24">postdelegate.com</text>${SPARK}</svg>`;
 
 export const cardSvg = ({ kicker, title }) => {
   const { size, lines } = layout(title);

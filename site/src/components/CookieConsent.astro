@@ -4,9 +4,11 @@ import { SITE } from '../data/site';
 // ("v1|ref:1|analytics:0", 6 months, on .postdelegate.com; the "yes" / "no" of
 // the first version still counts as the referral answer). Two optional
 // categories: referral and campaign attribution, the first-touch pd_ref cookie
-// ("<code>.<ms>", 60 days) that the app reads at sign-up (without it, ?ref= and
-// utm_* ride along in the links of this visit and the sign-up form sends them
-// to the app); and analytics, which lets Pulse (our own analytics, loaded in
+// ("<code>.<ms>", 60 days) that the app reads at sign-up, plus the landing
+// page's utm_* values, kept in sessionStorage (pd_utm) for the rest of the
+// visit and added to every link to the app (without it, ?ref= and utm_* only
+// ride along in the links of this visit and the sign-up form sends them to the
+// app; nothing is stored); and analytics, which lets Pulse (our own analytics, loaded in
 // Base.astro) set its one pulse_vid cookie. Without analytics consent Pulse
 // still counts visits, cookie-free.
 // The footer's Cookie settings button reopens it.
@@ -64,6 +66,11 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     return value ? [[name, value] as const] : [];
   });
 
+  // the campaign part of what the landing page carried, without the referral code
+  const UTM_KEY = 'pd_utm';
+  const UTM_NAMES = CARRIED.filter((name) => name !== 'ref');
+  const landingUtm = carried.filter(([name]) => name !== 'ref');
+
   const cookie = (name: string) => document.cookie.split('; ').find((row) => row.startsWith(`${name}=`))?.slice(name.length + 1);
   const domain = /(^|\.)postdelegate\.com$/.test(location.hostname) ? '; domain=.postdelegate.com' : '';
   const write = (name: string, value: string, days: number) => {
@@ -86,8 +93,35 @@ const privacy = `${SITE.legal.privacy}#cookies`;
     stub(...args);
     w.pulse = stub;
   };
+  // With the referral and campaign attribution answer, the first utm_* values of
+  // the visit are kept in sessionStorage and added to every link to the app on
+  // this and later pages. Without it nothing is stored and an earlier copy is
+  // removed. Storage can be missing or throw (private windows, blocked site
+  // data): the links then stay as they are.
+  const applyCampaign = (choices: Choices | undefined) => {
+    try {
+      if (!choices) return;
+      if (!choices.ref) return sessionStorage.removeItem(UTM_KEY);
+      if (landingUtm.length && !sessionStorage.getItem(UTM_KEY)) sessionStorage.setItem(UTM_KEY, JSON.stringify(landingUtm));
+      const saved: unknown = JSON.parse(sessionStorage.getItem(UTM_KEY) || '[]');
+      const utm = (Array.isArray(saved) ? saved : []).filter((entry): entry is [string, string] =>
+        Array.isArray(entry) && UTM_NAMES.includes(entry[0]) && typeof entry[1] === 'string' && entry[1].length > 0 && entry[1].length <= 200);
+      if (!utm.length) return;
+      document.querySelectorAll<HTMLAnchorElement>('a[href]:not([href^="#"])').forEach((link) => {
+        const url = new URL(link.href, location.href);
+        // a link that already carries campaign values (this page's own, added
+        // above) keeps them whole, so two campaigns never mix in one link
+        if (url.origin !== app || UTM_NAMES.some((name) => url.searchParams.has(name))) return;
+        utm.forEach(([name, value]) => url.searchParams.set(name, value));
+        link.href = url.href;
+      });
+    } catch {
+      // no storage: the links of this visit still carry the landing values above
+    }
+  };
   // first touch: a referral already remembered is never replaced
   const applyChoices = (choices: Choices | undefined) => {
+    applyCampaign(choices);
     // no answer yet: Pulse stays cookie-free; "no" also deletes its cookie
     if (choices) pulse('consent', choices.analytics);
     if (choices?.ref && ref && !cookie('pd_ref')) write('pd_ref', `${ref}.${Date.now()}`, 60);
@@ -118,6 +152,34 @@ const privacy = `${SITE.legal.privacy}#cookies`;
   }
 
   applyChoices(readChoices());
+
+  // Signed first touch (pd_touch) for sign-up measurement: with the referral
+  // and campaign attribution answer, and no GPC/DNT, a click on a sign-up link
+  // asks Pulse for a short-lived signed token and adds it to that one link.
+  // Nothing is stored. If Pulse is slow or blocked, the click goes on without it.
+  const privacyOptOut = () =>
+    (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true ||
+    navigator.doNotTrack === '1';
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!link || (link.target && link.target !== '_self')) return;
+    const url = new URL(link.href, location.href);
+    const signup = url.origin === app && (url.pathname === '/' || url.pathname.startsWith('/auth'));
+    if (!signup || url.searchParams.has('pd_touch') || !readChoices()?.ref || privacyOptOut()) return;
+    const touch = (window as unknown as { pulse?: { acquisitionTouch?: () => Promise<string> } }).pulse?.acquisitionTouch;
+    if (typeof touch !== 'function') return;
+    event.preventDefault();
+    let gone = false;
+    const go = (token?: string) => {
+      if (gone) return;
+      gone = true;
+      if (token && token.length <= 2000) url.searchParams.set('pd_touch', token);
+      location.assign(url.href);
+    };
+    setTimeout(() => go(), 1500);
+    touch().then((token) => go(token), () => go());
+  });
 
   const banner = document.querySelector<HTMLElement>('[data-cc]');
   if (banner) {
