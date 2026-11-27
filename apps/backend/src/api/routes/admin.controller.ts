@@ -17,6 +17,7 @@ import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affi
 import { MarkAffiliatePaidDto } from '@gitroom/nestjs-libraries/dtos/affiliates/mark.affiliate.paid.dto';
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
 import { UpdateReviewStatusDto } from '@gitroom/nestjs-libraries/dtos/reviews/update.review.status.dto';
+import { MeasurementExportDto } from '@gitroom/nestjs-libraries/dtos/measurement/measurement.export.dto';
 import dayjs from 'dayjs';
 
 @ApiTags('Admin')
@@ -27,7 +28,7 @@ export class AdminController {
     private _adminStatsService: AdminStatsService,
     private _affiliateService: AffiliateService,
     private _reviewService: ReviewService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
 
   private assertSuperAdmin(user: User) {
@@ -64,15 +65,12 @@ export class AdminController {
   @Get('/measurement')
   async measurement(
     @GetUserFromRequest() user: User,
-    @Query('from') from?: string,
-    @Query('to') to?: string
+    @Query() query: MeasurementExportDto
   ) {
     this.assertSuperAdmin(user);
-    const start = new Date(from || '');
-    const end = new Date(to || '');
+    const start = new Date(query.from);
+    const end = new Date(query.to);
     if (
-      !Number.isFinite(start.getTime()) ||
-      !Number.isFinite(end.getTime()) ||
       start >= end ||
       end.getTime() > Date.now() + 60000 ||
       end.getTime() - start.getTime() > 93 * 86400000
@@ -81,7 +79,7 @@ export class AdminController {
         'Supply [from,to) ISO instants spanning at most 93 days',
         400
       );
-    return this._measurement!.export(start, end);
+    return this._measurementService.export(start, end);
   }
 
   @Get('/stats')

@@ -84,8 +84,8 @@ export class AuthService {
         }
 
         if (!(await this.canRegister(provider))) {
-      throw new Error('Registration is disabled');
-    }
+          throw new Error('Registration is disabled');
+        }
 
         const create = await this._organizationService.createOrgAndUser(
           body,
