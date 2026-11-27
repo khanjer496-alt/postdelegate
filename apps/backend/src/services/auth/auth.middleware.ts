@@ -178,6 +178,9 @@ export class AuthMiddleware implements NestMiddleware {
         await this._organizationService.updateApiKey(setOrg.id);
       }
 
+      // the user's own session (never while an admin views as them)
+      this._userService.updateLastOnline(user);
+
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       req.user = user;

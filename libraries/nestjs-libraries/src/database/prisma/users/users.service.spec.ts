@@ -85,3 +85,45 @@ describe('UsersService.deleteAccount', () => {
     expect(users.deleteAccount).toHaveBeenCalledWith('me');
   });
 });
+
+describe('UsersService.updateLastOnline', () => {
+  const make = (write: jest.Mock) =>
+    new UsersService(
+      { updateLastOnline: write } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+  it('writes a last activity older than 15 minutes, only if still older', () => {
+    const write = jest.fn(async () => ({ count: 1 }));
+    make(write).updateLastOnline({
+      id: 'u1',
+      lastOnline: new Date(Date.now() - 16 * 60 * 1000),
+    });
+    expect(write).toHaveBeenCalledTimes(1);
+    const [id, before] = write.mock.calls[0] as unknown as [string, Date];
+    expect(id).toBe('u1');
+    expect(Date.now() - before.getTime()).toBeGreaterThanOrEqual(15 * 60 * 1000 - 50);
+  });
+
+  it('skips a recent one', () => {
+    const write = jest.fn(async () => ({ count: 1 }));
+    make(write).updateLastOnline({
+      id: 'u1',
+      lastOnline: new Date(Date.now() - 60 * 1000),
+    });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('never fails or waits on a failed write', async () => {
+    const write = jest.fn(() => Promise.reject(new Error('db down')));
+    expect(
+      make(write).updateLastOnline({ id: 'u1', lastOnline: new Date(0) })
+    ).toBeUndefined();
+    // the rejection is handled: no unhandled rejection reaches the process
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+});

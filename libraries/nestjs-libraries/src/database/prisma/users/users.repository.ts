@@ -115,6 +115,20 @@ export class UsersRepository {
     });
   }
 
+  // Only a lastOnline older than `before` is written, so requests racing each
+  // other write it once
+  updateLastOnline(id: string, before: Date) {
+    return this._user.model.user.updateMany({
+      where: {
+        id,
+        lastOnline: { lt: before },
+      },
+      data: {
+        lastOnline: new Date(),
+      },
+    });
+  }
+
   getUserByEmail(email: string) {
     return this._user.model.user.findFirst({
       where: {
