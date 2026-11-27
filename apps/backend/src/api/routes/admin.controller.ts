@@ -13,6 +13,7 @@ import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
+import { AdminUsersDto } from '@gitroom/nestjs-libraries/dtos/users/admin.users.dto';
 import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affiliates/affiliate.service';
 import { MarkAffiliatePaidDto } from '@gitroom/nestjs-libraries/dtos/affiliates/mark.affiliate.paid.dto';
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
@@ -190,5 +191,19 @@ export class AdminController {
   ) {
     this.assertSuperAdmin(user);
     return this._reviewService.setStatus(id, body.status);
+  }
+
+  // The Users page: every user, newest first, 50 a page, filtered by email or
+  // workspace name
+  @Get('/users')
+  async listUsers(
+    @GetUserFromRequest() user: User,
+    @Query() query: AdminUsersDto
+  ) {
+    this.assertSuperAdmin(user);
+    return this._adminStatsService.listUsers({
+      page: query.page || 0,
+      q: query.q || undefined,
+    });
   }
 }

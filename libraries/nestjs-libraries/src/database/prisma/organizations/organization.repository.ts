@@ -303,6 +303,8 @@ export class OrganizationRepository {
                 isLifetime: true,
                 period: true,
                 cancelAt: true,
+                // the admin search shows a trial as a trial
+                status: true,
               },
             },
           },
