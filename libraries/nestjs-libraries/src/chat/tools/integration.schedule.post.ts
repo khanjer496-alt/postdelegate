@@ -1,3 +1,5 @@
+import { McpDispatchUnconfirmed } from '../../database/prisma/posts/mcp.dispatch.status';
+import { AgentSaveRecovered } from '../../database/prisma/posts/agent-admission.context';
 import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
@@ -139,7 +141,7 @@ export const schedulePostOutputSchema = z.object({
           ),
       })
     )
-    .or(z.object({ errors: z.string() })),
+    .or(z.object({ errors: z.string(), code: z.literal('DISPATCH_UNCONFIRMED').optional(), savedPostIds: z.array(z.string()).optional() })),
 });
 
 @Injectable()
@@ -204,6 +206,14 @@ If validation fails, or the workspace limits what agents can do (allowed channel
     const organizationId = JSON.parse(
       (context?.requestContext as any)?.get('organization') as string
     ).id;
+    // a closed rollout refuses before the admission, it is no stopped save
+    this._postsService.assertMcpAdmissionReady();
+    return this._postsService.withAgentAdmission(organizationId, () => this.scheduleAdmitted(inputData, context, options, organizationId));
+  }
+
+  private async scheduleAdmitted(inputData: any, context: any, options: { forReview?: boolean; tool?: string }, organizationId: string): Promise<{ output: any }> {
+    const toolName = options.tool || 'integrationSchedulePostTool';
+    const checkedType = (type: 'draft' | 'schedule' | 'now') => options.forReview && type === 'draft' ? 'schedule' : type;
     const finalOutput = [];
     // the in-app agent runs with ui on, MCP clients carry their own name
     const actor: ApprovalActor = {
@@ -224,13 +234,31 @@ If validation fails, or the workspace limits what agents can do (allowed channel
 
       // Same server-side validation as the dashboard / public API
       // (settings DTO + media checkValidity + empty / too-long content).
-      const settings = platform.settings.reduce(
-        (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
-          ...acc,
-          [s.key]: s.value,
-        }),
-        {} as AllProvidersSettings
-      );
+      let settings = {
+        ...platform.settings.reduce(
+          (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
+            ...acc,
+            [s.key]: s.value,
+          }),
+          {} as AllProvidersSettings
+        ),
+        // always the channel's network, never a passed key
+        __type: integrations[platform.integrationId]?.providerIdentifier,
+      } as AllProvidersSettings;
+
+      // settings only the composer can take (TikTok Direct Post) are refused
+      // or replaced here too; createPost applies the same rule when it saves
+      try {
+        [{ settings }] = await this._postsService.applyOutsideComposerRules(
+          organizationId,
+          [{ integration: { id: platform.integrationId }, settings }]
+        );
+      } catch (err) {
+        if (err instanceof BadRequestException) {
+          return { output: { errors: err.message } };
+        }
+        throw err;
+      }
 
       const [validation] = await this._postsService.validatePosts(
         organizationId,
@@ -330,15 +358,18 @@ If validation fails, or the workspace limits what agents can do (allowed channel
           {
             integration,
             group: makeId(10),
-            settings: post.settings.reduce(
-              (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
-                ...acc,
-                [s.key]: s.value,
-              }),
-              {
-                __type: integration.providerIdentifier,
-              } as AllProvidersSettings
-            ),
+            settings: {
+              ...post.settings.reduce(
+                (acc: AllProvidersSettings, s: { key: string; value: any }) => ({
+                  ...acc,
+                  [s.key]: s.value,
+                }),
+                {} as AllProvidersSettings
+              ),
+              // always the channel's network, never a passed key: createPost
+              // picks the provider (and its rules) from it
+              __type: integration.providerIdentifier,
+            } as AllProvidersSettings,
             value: post.postsAndComments.map((p: any) => ({
               content: p.content,
               id: makeId(10),
@@ -359,15 +390,17 @@ If validation fails, or the workspace limits what agents can do (allowed channel
           body as any,
           'MCP',
           false,
-          actor
+          actor,
+          ...((options.forReview ? [undefined, 'review'] : []) as [undefined?, 'review'?])
         );
       } catch (err) {
+        if (err instanceof McpDispatchUnconfirmed) return { output: { errors: err.message, code: err.code, savedPostIds: [...new Set([...finalOutput.map(post => post.postId), ...err.savedPostIds])] } };
         // a plan limit (402) carries the message written for the customer
         if (
           err instanceof BadRequestException ||
           (err instanceof HttpException && err.getStatus() === 402)
         ) {
-          return { output: { errors: err.message } };
+          return { output: { errors: err.message + (finalOutput.length ? ` Already created post IDs (do not recreate): ${finalOutput.map(p => p.postId).join(', ')}. Remaining channels were not created.` : '') } };
         }
         throw err;
       }
@@ -380,6 +413,10 @@ If validation fails, or the workspace limits what agents can do (allowed channel
               actor as Extract<ApprovalActor, { type: 'agent' }>
             );
           } catch (err) {
+            if (err instanceof AgentSaveRecovered) {
+              const createdIds = [...finalOutput.map(p => p.postId), ...output.map(p => p.postId)];
+              return { output: { errors: `This save was recovered; its remaining review submission was stopped. Already created IDs (do not recreate): ${createdIds.join(', ')}. Inspect their current state before continuing; another authorized action may have changed it.` } };
+            }
             // the posts so far exist: say which, so the client does not
             // create them again
             if (!(err instanceof HttpException)) {

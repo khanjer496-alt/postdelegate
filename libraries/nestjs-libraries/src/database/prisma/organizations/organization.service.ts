@@ -80,6 +80,7 @@ export class OrganizationService {
   }
 
   getOrgByApiKey(api: string) {
+    if (api?.startsWith('mca_')) return Promise.resolve(null);
     return this._organizationRepository.getOrgByApiKey(api);
   }
 

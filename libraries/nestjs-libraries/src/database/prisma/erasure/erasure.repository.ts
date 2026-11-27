@@ -203,8 +203,33 @@ const organizationSteps = (org: string): Step[] => [
     where: { organizationId: org },
   },
   {
+    table: 'SmartLinkStat',
+    model: 'smartLinkStat',
+    where: { page: { organizationId: org } },
+  },
+  {
+    table: 'SmartLinkItem',
+    model: 'smartLinkItem',
+    where: { page: { organizationId: org } },
+  },
+  {
+    table: 'SmartLinkPage',
+    model: 'smartLinkPage',
+    where: { organizationId: org },
+  },
+  {
     table: 'AnalyticsReportSettings',
     model: 'analyticsReportSettings',
+    where: { organizationId: org },
+  },
+  {
+    table: 'CommentAutoReply',
+    model: 'commentAutoReply',
+    where: { organizationId: org },
+  },
+  {
+    table: 'CommentReplyRule',
+    model: 'commentReplyRule',
     where: { organizationId: org },
   },
   {

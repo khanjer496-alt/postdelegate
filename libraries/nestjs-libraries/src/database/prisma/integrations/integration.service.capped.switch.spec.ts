@@ -143,7 +143,9 @@ describe('IntegrationService.enableChannel', () => {
         ]),
       enableChannel: jest.fn().mockResolvedValue({}),
       disableChannel: jest.fn().mockResolvedValue({ id: 'i0' }),
+      enablePlanLockedIntegrations: jest.fn().mockResolvedValue({ count: 0 }),
     };
+    const comments = { restartPollers: jest.fn().mockResolvedValue(undefined) };
     const service = new IntegrationService(
       repository as any,
       {} as any,
@@ -151,9 +153,10 @@ describe('IntegrationService.enableChannel', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      comments as any
     );
-    return { service, repository };
+    return { service, repository, comments };
   };
 
   it('answers 400 with a readable message at the plan limit', async () => {
@@ -209,9 +212,38 @@ describe('IntegrationService.enableChannel', () => {
 
   it('leaves a channel that is already on alone, even at the limit', async () => {
     process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_x';
-    const { service, repository } = makeEnableService(3);
+    const { service, repository, comments } = makeEnableService(3);
     await service.enableChannel('org', 3, 'i0');
     expect(repository.enableChannel).not.toHaveBeenCalled();
+    expect(comments.restartPollers).not.toHaveBeenCalled();
+  });
+
+  it('starts the comment rules of a channel that is turned back on', async () => {
+    const { service, comments } = makeEnableService(1);
+    await service.enableChannel('org', 3, 'i9');
+    expect(comments.restartPollers).toHaveBeenCalledWith('org', 'i9');
+  });
+
+  it('never waits for Temporal to turn a channel back on', async () => {
+    const { service, repository, comments } = makeEnableService(1);
+    comments.restartPollers.mockReturnValue(new Promise(() => undefined));
+    await expect(service.enableChannel('org', 3, 'i9')).resolves.toEqual({});
+
+    repository.enablePlanLockedIntegrations.mockResolvedValue({ count: 2 });
+    await expect(service.enablePlanLockedIntegrations('org', 2)).resolves.toEqual({
+      count: 2,
+    });
+    expect(comments.restartPollers).toHaveBeenCalledWith('org');
+  });
+
+  it('starts the comment rules of the workspace when an upgrade turns channels back on', async () => {
+    const { service, repository, comments } = makeEnableService(1);
+    await service.enablePlanLockedIntegrations('org', 2);
+    expect(comments.restartPollers).not.toHaveBeenCalled();
+
+    repository.enablePlanLockedIntegrations.mockResolvedValue({ count: 2 });
+    expect(await service.enablePlanLockedIntegrations('org', 2)).toEqual({ count: 2 });
+    expect(comments.restartPollers).toHaveBeenCalledWith('org');
   });
 });
 
@@ -336,5 +368,63 @@ describe('IntegrationService.changeActiveCron', () => {
       {} as any
     );
     expect(await service.changeActiveCron('org')).toBe(false);
+  });
+});
+
+describe('IntegrationService.createOrUpdateIntegration comment rules', () => {
+  const connect = async (
+    oneTimeToken: boolean,
+    restarted: Promise<void> = Promise.resolve()
+  ) => {
+    const repository = {
+      createOrUpdateIntegration: jest
+        .fn()
+        .mockResolvedValue({ id: 'int-1', organizationId: 'org' }),
+    };
+    const manager = { getSocialIntegration: jest.fn().mockReturnValue({}) };
+    const comments = { restartPollers: jest.fn().mockReturnValue(restarted) };
+    const service = new IntegrationService(
+      repository as any,
+      {} as any,
+      manager as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      comments as any
+    );
+    const saved = await service.createOrUpdateIntegration(
+      undefined,
+      oneTimeToken,
+      'org',
+      'Brand',
+      undefined,
+      'social',
+      'ig-1',
+      'instagram-standalone',
+      'token',
+      '',
+      3600,
+      'brand',
+      false,
+      'int-1'
+    );
+    return { saved, comments };
+  };
+
+  it('starts the comment rules of a reconnected channel', async () => {
+    const { saved, comments } = await connect(false);
+    expect(saved).toEqual({ id: 'int-1', organizationId: 'org' });
+    expect(comments.restartPollers).toHaveBeenCalledWith('org', 'int-1');
+  });
+
+  it('starts every channel of the workspace when the token is shared', async () => {
+    const { comments } = await connect(true);
+    expect(comments.restartPollers).toHaveBeenCalledWith('org', undefined);
+  });
+
+  it('never waits for Temporal to finish a connect', async () => {
+    const { saved } = await connect(false, new Promise(() => undefined));
+    expect(saved).toEqual({ id: 'int-1', organizationId: 'org' });
   });
 });

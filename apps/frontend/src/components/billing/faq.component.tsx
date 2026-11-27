@@ -39,7 +39,7 @@ const useFaqList = () => {
         'faq_postiz_gitroom_allows_you_to_schedule_posts',
         `PostDelegate allows you to schedule your posts between different channels.
 A channel is a publishing platform where you can schedule your posts.
-For example, you can schedule your posts on X, Facebook, Instagram, TikTok, YouTube, Reddit, Linkedin, Dribbble, Threads and Pinterest.`
+For example, you can schedule your posts on Facebook, TikTok, YouTube, LinkedIn, Bluesky, Telegram and Discord.`
       ),
     },
     {

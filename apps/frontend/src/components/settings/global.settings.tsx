@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import AgentCredentials from './agent-credentials.component';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import dynamic from 'next/dynamic';
 import AuthenticationComponent from '@gitroom/frontend/components/settings/authentication.component';
@@ -22,6 +23,7 @@ export const GlobalSettings = () => {
     <div className="flex flex-col">
       <h3 className="text-[20px]">{t('global_settings', 'Global Settings')}</h3>
       <AuthenticationComponent />
+      <AgentCredentials />
       <nav aria-label={t('legal_information', 'Legal information')} className="flex flex-wrap gap-[16px] text-[14px] mb-[16px]">
         <a className="underline hover:text-textItemFocused" href="/legal/privacy/" target="_blank" rel="noopener noreferrer">
           {t('privacy_policy', 'Privacy Policy')}

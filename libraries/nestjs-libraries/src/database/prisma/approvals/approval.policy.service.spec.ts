@@ -1,3 +1,4 @@
+import { runWithContext } from '../../../chat/async.storage';
 import { BadRequestException } from '@nestjs/common';
 
 // the notification service pulls in temporal and every provider
@@ -481,5 +482,40 @@ describe('ApprovalPolicyService.afterSave', () => {
       'Your post was approved',
       expect.any(String)
     );
+  });
+});
+
+describe('agent credential approval revision', () => {
+  it.each(['APPROVED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'])('keeps an edited %s draft held even with workspace approval switched off', async approvalStatus => {
+    const { service } = makeService();
+    const result = await runWithContext({ requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key', agentPrincipal: { id: 'key', organizationId: 'org', role: 'DRAFT_ONLY', channelIds: null } }, () => service.decide('org', agent, 'update', { id: 'post', state: 'DRAFT', approvalStatus } as any));
+    expect(result).toMatchObject({ hold: true, approvalStatus: 'IN_REVIEW' });
+  });
+});
+
+describe('credential policy denial metadata', () => {
+  it('does not disclose other workspace channel names through guardrail errors', async () => {
+    const { service } = makeService(settings({ agentIntegrationIds: ['excluded-A'] }), { getIntegrationNames: jest.fn(async () => [{ id: 'excluded-A', name: 'PRIVATE EXCLUDED CHANNEL' }, { id: 'key-B', name: 'Key channel' }]) });
+    await runWithContext({ requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key', agentPrincipal: { id: 'key', organizationId: 'org', role: 'PUBLISHER', channelIds: ['key-B'] } }, async () => {
+      try { await service.assertAgentGuardrails('org', agent, ['key-B'], { countsTowardLimit: false }); throw new Error('Expected denial'); }
+      catch (err) { expect((err as Error).message).toContain('workspace posting policy'); expect((err as Error).message).not.toContain('PRIVATE EXCLUDED CHANNEL'); }
+    });
+  });
+});
+
+describe('agent edits of an approved post', () => {
+  const approved = { id: 'post', state: 'QUEUE', approvalStatus: 'APPROVED' } as any;
+  it.each([['the public API', apiAgent], ['a legacy MCP session', agent]])('keep the approval from %s when the workspace asks for none, as on main', async (_name, actor) => {
+    const { service } = makeService();
+    await expect(service.decide('org', actor as any, 'update', approved)).resolves.toEqual({ hold: false, previous: 'APPROVED' });
+  });
+  it('send it back to review when the workspace asks for agent approval', async () => {
+    const { service } = makeService(settings({ requireAgentApproval: true }));
+    await expect(service.decide('org', agent, 'update', approved)).resolves.toMatchObject({ hold: true, approvalStatus: 'IN_REVIEW' });
+  });
+  it('send it back to review from a scoped agent credential', async () => {
+    const { service } = makeService();
+    const result = await runWithContext({ requestId: 'key', auth: { id: 'org' }, agentCredentialId: 'key', agentPrincipal: { id: 'key', organizationId: 'org', role: 'PUBLISHER', channelIds: null } } as any, () => service.decide('org', agent, 'update', approved));
+    expect(result).toMatchObject({ hold: true, approvalStatus: 'IN_REVIEW' });
   });
 });

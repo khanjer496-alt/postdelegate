@@ -7,7 +7,7 @@
 //   that a function parameter already gives you.
 // - Brand, product and network names stay as they are: PostDelegate, Claude, ChatGPT, MCP, API,
 //   Content Studio, the plan names and every network name.
-import { SITE, CTA_LABEL, CTA_SHORT, CTA_NOTE } from '../../data/site';
+import { SITE, CTA_LABEL, CTA_SHORT, CTA_NOTE, CTA_PAY } from '../../data/site';
 import { BUYER_FAQ } from '../../data/faq';
 import { PLANS, TRIAL_DAYS, planChannels } from '../../data/plans';
 import { AVAILABLE_NETWORKS } from '../../data/networks';
@@ -142,12 +142,13 @@ const en = {
   numberLocale: 'en-US',
   launch: {
     available: (count: number) => `${count} networks available today`,
-    examples: 'Including YouTube, Bluesky, Slack and LinkedIn personal profiles. Publish to connected channels.',
+    examples: 'Including YouTube, Facebook Pages, Bluesky, Slack, TikTok and LinkedIn personal profiles. Publish to connected channels.',
     pending: 'Coming soon · awaiting platform approval',
     unavailable: 'Not available',
     modes: 'Use AI through MCP, or schedule posts yourself.',
-    trial: (days: number) => `${days} days free · no card · workspace pauses if no plan is chosen`,
+    trial: (days: number, price: number) => `After ${days} days, pick a plan to keep publishing, from $${price}/month. No card needed to start. If no plan is chosen, the workspace pauses and your posts are kept.`,
     compare: 'Compare plans',
+    payNow: CTA_PAY,
     choose: (count: number) => `Choose from ${count} currently available networks`,
   },
   common: {
@@ -294,10 +295,10 @@ const en = {
     description: (days: number, count: number) => `Social media scheduler with an MCP server and REST API on every plan. Claude or ChatGPT drafts, you approve, it posts to ${count} networks. ${days}-day trial, no card.`,
     appDescription: (days: number) => `A social media scheduler with an MCP server and REST API on every plan. Claude, ChatGPT or your own scripts draft posts, you approve them on one visual calendar, and PostDelegate publishes them on time. AI is bring-your-own: connect the assistant you already pay for over MCP, or add your own OpenAI key, and PostDelegate never charges for AI. Includes Content Studio for vertical videos and bulk video scheduling. Every plan starts with a ${days}-day free trial with no credit card needed.`,
     appFeatures: ['Visual content calendar', 'Post composer with per-channel settings', 'Content Studio: vertical 1080×1920 videos with a hook line or word-by-word captions', 'Bulk video scheduling across your posting time slots', 'Bulk post import from CSV', 'Daily views gained analytics for YouTube channels', 'YouTube publish later and AI content label', 'Media library', 'Workspaces and team members', 'MCP server and REST API on every plan', 'Bring your own AI: Claude or ChatGPT over MCP, or your own OpenAI key', 'Agent files for Claude, ChatGPT, Cursor and coding agents'],
-    orbitLabel: (count: number, names: string) => `${count} networks connect today: ${names}. Instagram, LinkedIn company Pages, TikTok and other networks are waiting on approval.`,
-    h1: 'Plan your posts. ',
-    h1Mark: 'Publish on time.',
-    lead: (count: number) => `Claude, ChatGPT or your own scripts draft posts over MCP. You approve them on one calendar. Publish to connected channels when you approve.`,
+    orbitLabel: (count: number, names: string) => `${count} networks connect today: ${names}. Instagram, LinkedIn company Pages and other networks are waiting on approval.`,
+    h1: 'Your AI drafts. ',
+    h1Mark: 'You approve.',
+    lead: (count: number) => `Claude, ChatGPT or your own scripts draft posts over MCP. You approve them on one calendar, then PostDelegate publishes them to your connected channels.`,
     trialNote: (price: number) => `No card needed. Then from $${price}/month.`,
     mcpLink: 'See how MCP works',
     orbitCore: 'Your calendar',
@@ -316,7 +317,7 @@ const en = {
     classicCardDraftSub: 'Waiting on your approval',
     classicSteps: ['You plan it.', 'You or your client approve it.', 'PostDelegate posts it.'],
     channelsEyebrow: 'Live networks',
-    channelsTitle: (count: number) => `Schedule YouTube, Bluesky, Discord and ${count - 3} more.`,
+    channelsTitle: (count: number) => `Schedule YouTube, Facebook, TikTok and ${count - 3} more.`,
     featuresEyebrow: 'Inside PostDelegate',
     featuresTitle: 'One workspace from idea to published post.',
     // same order as the cards in HomePage.astro: calendar, approvals, Content Studio, bulk video
@@ -342,8 +343,8 @@ const en = {
     // p: live network count and names (from networks.ts), trial days and the lowest monthly price (from plans.ts)
     faq: (p: { count: number; live: string; days: number; price: number }) => [
       { q: 'What is PostDelegate?', a: `A social media scheduler your AI can run. Claude or ChatGPT drafts posts over MCP, you approve them on one calendar, and PostDelegate posts them to ${p.count} networks. You can also plan and write everything yourself.` },
-      { q: 'Do I need a credit card for the trial?', a: `No. Every plan starts with a ${p.days}-day free trial with no card. Add one before the trial ends to keep your plan. If you don’t, your workspace pauses and your posts are kept.` },
-      { q: 'Which networks can I connect?', a: `${p.count} today: ${p.live}. Facebook, Instagram, Threads, TikTok, LinkedIn company Pages and Pinterest are coming soon (awaiting platform approval). X is not available. See <a href="/platforms">platform status</a>.` },
+      { q: 'Do I need a credit card for the trial?', a: `No. Every plan starts with a ${p.days}-day free trial with no card. After ${p.days} days, pick a plan to keep publishing, from $${p.price}/month. If you don’t choose a plan, your workspace pauses and your posts are kept.` },
+      { q: 'Which networks can I connect?', a: `${p.count} today: ${p.live}. Instagram, Threads, LinkedIn company Pages and Pinterest are coming soon (awaiting platform approval). X is not available. See <a href="/platforms">platform status</a>.` },
       { q: 'How much does the AI cost?', a: 'Nothing from us. Connect the assistant you already pay for over MCP, or add your own OpenAI key and pay OpenAI directly. There are no AI credits and no markup.' },
       { q: 'Can I cancel anytime?', a: 'Yes. A workspace admin cancels from Billing, and the plan runs to the end of the period you have paid for. See <a href="/docs/billing">plans and billing</a>.' },
     ] as QA[],
@@ -378,7 +379,7 @@ const en = {
     trialQ: 'How does the free trial work?',
     trialA: (days: number) => `Every plan starts with a ${days}-day free trial, and you do not need a credit card to start it. Add a card any time before the trial ends to keep your plan; the first payment is taken when the trial ends. If it ends without a card, your workspace is paused until you choose a plan. Your posts are kept, and your channels and team members are switched back on when you subscribe to a plan that includes them. Each email address gets one free trial.`,
     channelsQ: 'Which channels can I connect?',
-    channelsA: (count: number) => `${count} networks connect today, including YouTube, Bluesky, WordPress and Kick. Facebook, Instagram, Threads, TikTok, LinkedIn company Pages and Pinterest are coming soon (awaiting platform approval), and X is not available. See <a href="/platforms">platform coverage</a>.`,
+    channelsA: (count: number) => `${count} networks connect today, including YouTube, Facebook Pages, Bluesky, Slack, TikTok and LinkedIn personal profiles. Instagram, Threads, LinkedIn company Pages and Pinterest are coming soon (awaiting platform approval), and X is not available. See <a href="/platforms">platform coverage</a>.`,
     extraQ: (channels: number) => `What if I need more than ${channels} channels?`,
     extraA: (p: { plan: string; channels: number; monthly: number; yearly: string; extra: number; max: string }) => `${p.plan} includes ${p.channels} channels, then each extra channel costs $${p.monthly} a month, or $${p.yearly} a year on yearly billing, up to ${p.extra} extra channels (${p.max} in total). A workspace admin adds them under <strong>Extra channels</strong> on the Billing page once the plan is paid. Changes are prorated, and you cannot go below the channels you already have connected.`,
     changeQ: 'Can I change or cancel my plan?',
@@ -392,7 +393,7 @@ const en = {
   },
   platformsPage: {
     title: (count: number) => `Supported Social Networks: ${count} Live Today | PostDelegate`,
-    description: (count: number) => `The ${count} networks you can connect to PostDelegate today, from YouTube and Bluesky to WordPress and Slack, and the ones waiting on platform approval.`,
+    description: (count: number) => `The ${count} networks you can connect to PostDelegate today, from YouTube, Facebook Pages and TikTok to WordPress and Slack, and the ones waiting on platform approval.`,
     eyebrow: 'Platform coverage',
     h1: (count: number) => `Supported social networks: ${count} live today.`,
     lead: "Connect an available network from Add Channel. Coming-soon networks await platform approval. X is not available.",
@@ -529,14 +530,14 @@ const en = {
     postizVsBuffer: 'Postiz vs Buffer',
     postizVsBufferText: 'Worked monthly costs at 3, 10 and 30 accounts, with every price linked to its source.',
     // p: plan prices and channel counts from plans.ts, the live network count and names
-    body: (p: { starter: number; starterChannels: number; team: number; teamChannels: number; pro: number; proChannels: number; ultimate: number; ultimateChannels: number; liveCount: number; live: string; days: number }) => `<p>PostDelegate is open source (AGPL-3.0). See <a href="/licenses">/licenses</a>.</p><p>Competitor details on each page are taken from their own websites in October 2026. Plans change, so check each service’s website before you decide.</p><h2>How to choose a scheduler</h2><p>Most schedulers can put a post on a calendar. The differences that matter show up in four places. First, whether the exact accounts you manage can connect and publish today. Second, how the price is built: per channel, per account, per person or per plan, and what the total comes to for your real numbers. Third, how AI is paid for: an allowance or credits in the plan, or your own key. Fourth, how drafts get reviewed, by your team, your clients and any AI assistant that writes for you.</p><h2>Who PostDelegate suits</h2><ul><li><strong>Teams that work with AI assistants.</strong> The <a href="/mcp">MCP server</a> lets Claude, ChatGPT, Cursor, Claude Code and other MCP clients draft and schedule posts on every plan. Drafts can wait in the AI review inbox until a person approves them. A public <a href="/api">REST API</a> and webhooks are included too.</li><li><strong>Agencies that need client sign-off.</strong> Posts carry statuses, and clients approve posts from a link without creating an account. Customers keep each client’s channels together.</li><li><strong>Anyone watching the budget.</strong> Plans are flat: $${p.starter} a month for ${p.starterChannels} channels, $${p.team} for ${p.teamChannels} with team members, $${p.pro} for ${p.proChannels} and $${p.ultimate} for ${p.ultimateChannels}. They are not priced per person, and AI runs on your own OpenAI API key, so PostDelegate never charges for AI.</li><li><strong>Publishers beyond the big feeds.</strong> ${p.liveCount} networks connect today: ${p.live}.</li></ul><h2>Who should look elsewhere for now</h2><p>Instagram, Facebook, LinkedIn company Pages, TikTok, Threads and Pinterest are waiting on each platform’s approval and cannot be connected yet, and X is not available on PostDelegate. If one of those is your main channel, Buffer, Hootsuite, Later, Sprout Social or Publer will serve you better today. The same goes if you need a shared inbox for replying to comments and messages, or social listening, which PostDelegate does not offer.</p><h2>Try it with your own content</h2><p>Every PostDelegate plan starts with a ${p.days}-day free trial that needs no credit card. Connect an account you manage, prepare a representative post, send it for approval and schedule it. Then compare that with the trial of any service above.</p>`,
+    body: (p: { starter: number; starterChannels: number; team: number; teamChannels: number; pro: number; proChannels: number; ultimate: number; ultimateChannels: number; liveCount: number; live: string; days: number }) => `<p>PostDelegate is open source (AGPL-3.0). See <a href="/licenses">/licenses</a>.</p><p>Competitor details on each page are taken from their own websites in October 2026. Plans change, so check each service’s website before you decide.</p><h2>How to choose a scheduler</h2><p>Most schedulers can put a post on a calendar. The differences that matter show up in four places. First, whether the exact accounts you manage can connect and publish today. Second, how the price is built: per channel, per account, per person or per plan, and what the total comes to for your real numbers. Third, how AI is paid for: an allowance or credits in the plan, or your own key. Fourth, how drafts get reviewed, by your team, your clients and any AI assistant that writes for you.</p><h2>Who PostDelegate suits</h2><ul><li><strong>Teams that work with AI assistants.</strong> The <a href="/mcp">MCP server</a> lets Claude, ChatGPT, Cursor, Claude Code and other MCP clients draft and schedule posts on every plan. Drafts can wait in the AI review inbox until a person approves them. A public <a href="/api">REST API</a> and webhooks are included too.</li><li><strong>Agencies that need client sign-off.</strong> Posts carry statuses, and clients approve posts from a link without creating an account. Customers keep each client’s channels together.</li><li><strong>Anyone watching the budget.</strong> Plans are flat: $${p.starter} a month for ${p.starterChannels} channels, $${p.team} for ${p.teamChannels} with team members, $${p.pro} for ${p.proChannels} and $${p.ultimate} for ${p.ultimateChannels}. They are not priced per person, and AI runs on your own OpenAI API key, so PostDelegate never charges for AI.</li><li><strong>Publishers beyond the big feeds.</strong> ${p.liveCount} networks connect today: ${p.live}.</li></ul><h2>Who should look elsewhere for now</h2><p>Instagram, LinkedIn company Pages, Threads and Pinterest are waiting on each platform’s approval and cannot be connected yet, and X is not available on PostDelegate. If one of those is your main channel, Buffer, Hootsuite, Later, Sprout Social or Publer will serve you better today. The same goes if you need a shared inbox for replying to comments and messages, or social listening, which PostDelegate does not offer.</p><h2>Try it with your own content</h2><p>Every PostDelegate plan starts with a ${p.days}-day free trial that needs no credit card. Connect an account you manage, prepare a representative post, send it for approval and schedule it. Then compare that with the trial of any service above.</p>`,
     questionsTitle: 'Questions',
     faqBufferQ: 'What is a cheaper alternative to Buffer?',
     faqBufferA: (p: { starter: number; starterChannels: number; team: number; teamChannels: number }) => `For five or more channels, PostDelegate usually costs less than Buffer: $${p.starter} a month for ${p.starterChannels} channels and $${p.team} for ${p.teamChannels} channels with team members, where Buffer charges per channel. Check that the networks you need can connect today.`,
     faqAiQ: 'Which social media scheduler works with Claude or ChatGPT?',
     faqAiA: 'Several now do. PostDelegate has an MCP server on every plan, so Claude, ChatGPT, Cursor, Claude Code and other MCP clients can draft and schedule posts, and drafts can wait in an AI review inbox for a person to approve. Buffer, Hootsuite and Publer also offer MCP connections, on different plans.',
     faqMetaQ: 'Can PostDelegate post to Instagram, Facebook, LinkedIn company Pages or TikTok?',
-    faqMetaA: (live: string) => `Not yet. Those networks, along with Threads and Pinterest, are waiting on each platform’s approval, and X is not available on PostDelegate. Today you can connect ${live}.`,
+    faqMetaA: (live: string) => `Facebook Pages are available to connect today. Instagram and LinkedIn company Pages, along with Threads and Pinterest, are waiting on each platform’s approval, and X is not available on PostDelegate. TikTok is available to connect today; until TikTok finishes its Direct Post audit, posts sent straight to TikTok go out as private, and you can also send a video to the TikTok inbox to finish there. Today you can also connect ${live}.`,
     independent: (operator: string) => `PostDelegate is operated independently by ${operator} and is not affiliated with or endorsed by any of the services compared here. Their names belong to their owners.`,
   },
   aboutPage: {
@@ -612,7 +613,7 @@ export const SCHEDULER_SOON = {
   faq: (name: string, pending: string, open: number, days: number) => [
     { q: `Can I schedule ${name} posts with PostDelegate today?`, a: `Not yet. ${name} cannot be connected on PostDelegate today. It opens once ${pending}, and a network that is not marked available in the [platform directory](/platforms) does not work.` },
     { q: `When will ${name} be available?`, a: 'We do not give dates, because platform review timelines are outside our control. When a connection opens it will appear under Add Channel in the app and get its own guide in the documentation. [Contact support](/support) to tell us you need it.' },
-    { q: 'What can I do on PostDelegate while I wait?', a: `Start the ${days}-day free trial, with no credit card, and connect any of the ${open} networks open today, such as YouTube, Bluesky, WordPress and Slack. The calendar, composer and media library work the same way for every channel.` },
+    { q: 'What can I do on PostDelegate while I wait?', a: `Start the ${days}-day free trial, with no credit card, and connect any of the ${open} networks open today, such as YouTube, Facebook Pages, Bluesky and TikTok. The calendar, composer and media library work the same way for every channel.` },
     { q: `Can Claude or ChatGPT post to ${name}?`, a: `Not yet. An assistant connected over MCP can only work with channels that are connected in PostDelegate, so it cannot publish to ${name} until that connection exists. You can still use Claude or ChatGPT to draft the text, then bring it into PostDelegate. See the [MCP guide](/docs/mcp).` },
   ],
 };

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseTikTokCreatorInfo,
+  parseTikTokProfileInfo,
   getTikTokCheckboxError,
   getTikTokDirectPostState,
   getTikTokFieldsToValidate,
@@ -133,7 +134,7 @@ test('a brand choice re-validates the disclosure, so its error clears at once', 
 
 test('the missing brand choice is shown once, not again under the checkbox', () => {
   assert.equal(getTikTokCheckboxError(TIKTOK_COMMERCIAL_SELECTION_REQUIRED), undefined);
-  assert.equal(getTikTokCheckboxError('Accept TikTok Music Usage Confirmation before posting.'), 'Accept TikTok Music Usage Confirmation before posting.');
+  assert.equal(getTikTokCheckboxError('Confirm that PostDelegate can upload and publish this content to TikTok.'), 'Confirm that PostDelegate can upload and publish this content to TikTok.');
   assert.equal(getTikTokCheckboxError(undefined), undefined);
 });
 
@@ -163,4 +164,16 @@ test('a creator that cannot post right now stops publishing with a try again lat
 test('privacy and consent remain required', () => {
   assert.match(blockedReason({ privacyLevel: '' })!, /who can see/i);
   assert.match(blockedReason({}, { musicUsageConsent: false })!, /upload and publish/);
+});
+
+test('the TikTok profile link is shown only when it opens on TikTok', () => {
+  assert.deepEqual(
+    parseTikTokProfileInfo({ username: 'review_account', profileUrl: 'https://www.tiktok.com/@review_account', bioDescription: 'Baker', isVerified: true }),
+    { username: 'review_account', profileUrl: 'https://www.tiktok.com/@review_account', bioDescription: 'Baker', isVerified: true }
+  );
+  assert.deepEqual(parseTikTokProfileInfo({ profileUrl: 'javascript:alert(1)' }), {});
+  assert.deepEqual(parseTikTokProfileInfo({ profileUrl: 'http://www.tiktok.com/@a' }), {});
+  assert.deepEqual(parseTikTokProfileInfo({ profileUrl: 'https://tiktok.com.evil.example/@a' }), {});
+  assert.deepEqual(parseTikTokProfileInfo({ statusCode: 500 }), {});
+  assert.deepEqual(parseTikTokProfileInfo(undefined), {});
 });

@@ -16,6 +16,11 @@ import {
   UI_FLAG_ENV,
   UI_FLAG_QUERY,
 } from '@gitroom/frontend/components/new-layout/v2/ui.flag';
+import {
+  FEATURE_COOKIE,
+  FEATURE_QUERY,
+  nextFeatureCookie,
+} from '@gitroom/frontend/components/features/feature.flags';
 acceptLanguage.languages(languages);
 
 // This function can be marked `async` if using `await` inside
@@ -61,6 +66,8 @@ export async function proxy(request: NextRequest) {
     nextUrl.pathname.startsWith('/p/') ||
     // client approval links are opened without an account
     nextUrl.pathname.startsWith('/approve/') ||
+    // public link-in-bio pages (PD_FF_SMARTLINKS)
+    nextUrl.pathname.startsWith('/bio/') ||
     nextUrl.pathname.startsWith('/provider/') ||
     nextUrl.pathname.startsWith('/icons/') ||
     // the consent screen of MCP / OAuth clients handles signed-out visitors
@@ -241,6 +248,20 @@ export async function proxy(request: NextRequest) {
         maxAge: UI_FLAG_COOKIE_MAX_AGE,
         sameSite: 'lax',
       });
+      return redirect;
+    }
+    // ?pd_ff=<key> opts this browser into a parity feature whose flag is
+    // optin (?pd_ff=off clears them), the same redirect way as ?pd_ui
+    const featureQuery = nextUrl.searchParams.get(FEATURE_QUERY);
+    if (featureQuery !== null) {
+      const target = new URL(nextUrl.href);
+      target.searchParams.delete(FEATURE_QUERY);
+      const redirect = NextResponse.redirect(target);
+      redirect.cookies.set(
+        FEATURE_COOKIE,
+        nextFeatureCookie(request.cookies.get(FEATURE_COOKIE)?.value, featureQuery),
+        { path: '/', maxAge: UI_FLAG_COOKIE_MAX_AGE, sameSite: 'lax' }
+      );
       return redirect;
     }
     if (nextUrl.pathname === '/') {

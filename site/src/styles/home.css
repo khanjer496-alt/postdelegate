@@ -104,7 +104,7 @@
 .networks-section{padding-top:100px}
 
 /* ---------- Features ---------- */
-.features-section{padding-top:40px}
+.features-section{padding-top:40px;padding-bottom:40px}
 .feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .feature-card{position:relative;isolation:isolate;display:flex;flex-direction:column;gap:12px;padding:30px 30px 34px;border:1px solid #27242f;border-radius:26px;background:radial-gradient(80% 70% at 100% 0%,#7357ff1f,transparent 60%),#111014;transition:border-color .25s,transform .25s}
 .feature-card:hover{border-color:#7357ff99;transform:translateY(-3px)}
@@ -192,7 +192,7 @@
  .hero-actions{margin-top:28px}
  .mode-toggle{max-width:100%}
  .mode-toggle label{min-height:36px;padding:0 12px;font-size:13px;white-space:normal;text-align:center;line-height:1.25}
- .hero-cta{width:100%;justify-content:space-between;font-size:16px;min-height:58px;padding:9px 9px 9px 24px;gap:10px}
+ .hero-cta{width:auto;max-width:100%;flex:none;justify-content:center;margin-inline:auto;font-size:16px;min-height:58px;padding:9px 12px 9px 22px;gap:12px}
  .cta-orb{width:40px;height:40px}
  .hero-trial-note{font-size:13px}
  .home-hero .hero-star-one{width:38px;right:10px;top:4px;opacity:.6}
@@ -212,7 +212,7 @@
  .relay-step h3{font-size:24px}
  .networks-section{padding-top:72px}
  .section-head{margin-bottom:32px}
- .features-section{padding-top:20px}
+ .features-section{padding-top:20px;padding-bottom:24px}
  .feature-grid{grid-template-columns:1fr;gap:12px}
  .feature-card{padding:24px 22px 26px;border-radius:22px}
  .feature-card h3{font-size:20px}
@@ -303,9 +303,26 @@
 @media(max-width:1023px){[dir=rtl] .hero-copy{padding-right:0}}
 @media(max-width:767px){[dir=rtl] .support-bubble{left:13px}[dir=rtl] .demo-address{margin-right:8px}[dir=rtl] .relay-track{left:auto;right:30px}}
 
-.hero-workflows{max-width:520px;margin:0 0 18px;color:#d6d6d6;font-size:15px;line-height:1.6}.hero-compare{min-height:44px;display:inline-flex;align-items:center}.hero-trial-note{flex-basis:100%;max-width:520px;line-height:1.6}.hero-trial-note .note-dot{flex-shrink:0}
+.hero-workflows{max-width:520px;margin:0 0 18px;color:#d6d6d6;font-size:15px;line-height:1.6}.hero-compare,.hero-pay{min-height:44px;display:inline-flex;align-items:center}.hero-trial-note{flex-basis:100%;max-width:520px;line-height:1.6}.hero-trial-note .note-dot{flex-shrink:0}
 
-.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}.hero-trial-note{margin-top:4px}.hero-cta-short{display:none}.hero-workflows{margin-inline:auto}.hero-mcp{margin-top:0}
-@media(max-width:767px){.hero-actions{justify-content:center;gap:12px}.hero-cta{width:auto;flex:1;font-size:14px;padding-inline:18px 9px}.hero-cta-long{display:none}.hero-cta-short{display:inline}.hero-compare{font-size:14px}.hero-trial-note{margin-top:4px}}
+.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}.hero-secondary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px}.hero-trial-note{margin-top:4px}.hero-cta-short{display:none}.hero-workflows{margin-inline:auto}.hero-mcp{margin-top:0}
+@media(max-width:1023px){
+  .hero-actions{flex-direction:column;align-items:center;justify-content:center;width:100%}
+  .hero-secondary{justify-content:center}
+  .hero-trial-note{text-align:center;margin-inline:auto}
+}
+@media(max-width:767px){
+  .hero-actions{gap:14px}
+  .hero-cta{width:auto;max-width:min(100%,360px);flex:none;justify-content:center;margin-inline:auto;font-size:15px;padding-inline:20px 10px}
+  .hero-cta-long{display:none}
+  .hero-cta-short{display:inline}
+  .hero-compare,.hero-pay{font-size:14px}
+  .hero-trial-note{margin-top:2px;font-size:13px;max-width:34em}
+}
+@media(max-width:430px){
+  .hero-actions{align-items:center}
+  .hero-cta{width:auto;max-width:100%}
+  .hero-description{margin-inline:auto}
+}
 
 .hero-availability{display:flex;flex-wrap:wrap;gap:3px 12px;margin:18px 0 0;font-size:14px;line-height:1.6;color:#bdbdbd}.hero-availability strong{color:#c8ff4d}.hero-trial-note{display:block}.hero-availability+.hero-actions{margin-top:24px}@media(max-width:1023px){.hero-availability{justify-content:center}}

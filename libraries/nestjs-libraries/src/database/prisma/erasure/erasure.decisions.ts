@@ -27,6 +27,11 @@ const FRAMEWORK =
 export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
   MeasurementEvent: { scope: 'org', note: 'deleted only by the existing explicit permanent workspace erasure flow; no measurement maintenance deletes source events' },
   MeasurementHandoff: { scope: 'none', note: 'no user/workspace id; OAuth nonce hash and signed source dimensions only; unusable after ten minutes and expired continuations pruned on handoff reads/writes' },
+  McpAgentAdmissionRecovery: { scope: 'org', note: 'admission recovery audit deleted by organization cascade' },
+  McpAgentAdmission: { scope: 'org', note: 'durable admission metadata deleted by organization cascade' },
+  McpPublishFence: { scope: 'org', note: 'publication fence metadata deleted by organization cascade' },
+  McpPublishAttempt: { scope: 'org', note: 'provider receipt and attempt metadata deleted by organization cascade' },
+  AgentCredential: { scope: 'org', note: 'hash verifier and metadata deleted by organization foreign-key cascade; no recoverable secret' },
   Organization: {
     scope: 'org',
     note: 'row deleted last; apiKey, paymentId and the affiliate referral fields (referredByAffiliateId, referralCode, referredAt, referralFirstPaidAt) go with it',
@@ -224,8 +229,25 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     note: 'deleted, post titles, links and metrics',
   },
   AnalyticsPostSnapshot: { scope: 'org', note: 'deleted, daily post metrics' },
+  SmartLinkPage: {
+    scope: 'org',
+    note: 'deleted, the public link-in-bio page (title, bio, avatar URL)',
+  },
+  SmartLinkItem: { scope: 'org', note: 'deleted before the page' },
+  SmartLinkStat: {
+    scope: 'org',
+    note: 'deleted before the page, daily view and click counts only',
+  },
   AnalyticsReportSettings: {
     scope: 'org',
     note: 'deleted, recipient user ids and branding',
+  },
+  CommentReplyRule: {
+    scope: 'org',
+    note: 'deleted, keyword auto-reply rules (keyword and reply text)',
+  },
+  CommentAutoReply: {
+    scope: 'org',
+    note: 'deleted by workspace, also claims of deleted rules; comment and reply ids only',
   },
 };

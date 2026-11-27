@@ -30,7 +30,9 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { writeCustomInstanceDetails } from '@gitroom/nestjs-libraries/database/prisma/integrations/custom.instance.details';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  freeChannels,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
 import { isCrossSiteCookieRequest } from '@gitroom/backend/services/auth/csrf';
@@ -663,7 +665,7 @@ export class NoAuthIntegrationsController {
       org.id,
       id,
       body,
-      org.subscription?.totalChannels || pricing.FREE.channel!
+      org.subscription?.totalChannels || freeChannels()
     );
     await ioRedis.del(`organization:${body.state}`);
     await this.spendConnectBinding(res, body.state, binding);

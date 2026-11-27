@@ -1,3 +1,4 @@
+import { getContext } from '../../../chat/async.storage';
 import { Injectable } from '@nestjs/common';
 import { Organization, State } from '@prisma/client';
 import dayjs from 'dayjs';
@@ -180,6 +181,12 @@ export interface TopPostRow {
   engagement: number | null;
   // engagement per view in percent, null without views
   engagementRate: number | null;
+}
+
+export interface TopPostGalleryRow extends TopPostRow {
+  thumbnail: string | null;
+  mediaType: 'video' | 'carousel' | 'image' | 'text';
+  excerpt: string;
 }
 
 export interface BestTimesResponse {
@@ -939,10 +946,13 @@ export class AnalyticsService {
       offset?: number;
     }
   ) {
-    const [channels, posts] = await Promise.all([
+    const [allChannels, allPosts] = await Promise.all([
       this._analyticsRepository.getOverviewChannels(orgId),
       this._analyticsRepository.getAnalyticsPosts(orgId, from, to),
     ]);
+    const permitted = getContext()?.agentPrincipal?.channelIds;
+    const channels = permitted ? allChannels.filter(channel => permitted.includes(channel.id)) : allChannels;
+    const posts = permitted ? allPosts.filter(post => permitted.includes(post.integrationId)) : allPosts;
     const rows = this.buildTopPosts(channels, posts, options);
     const offset = Math.max(0, options.offset || 0);
     const limit = Math.max(1, options.limit || 50);
@@ -956,6 +966,75 @@ export class AnalyticsService {
         .sort((a, b) => a.name.localeCompare(b.name)),
       posts: rows.slice(offset, offset + limit),
     };
+  }
+
+  // The top posts with a thumbnail and an excerpt of their content, for the
+  // v2 Analytics gallery (PD_FF_ANALYTICS_V2). Same ranking as /top-posts.
+  async getTopPostsGallery(
+    orgId: string,
+    days: number,
+    options: { sort?: TopPostsSort; integrations?: string[]; limit?: number },
+    now = new Date()
+  ): Promise<{ total: number; posts: TopPostGalleryRow[] }> {
+    const { from, to } = this.historyRange(days, now);
+    const top = await this.topPostsFor(orgId, from, to, {
+      sort: options.sort || 'engagement',
+      order: 'desc',
+      integrations: options.integrations,
+      limit: Math.min(24, Math.max(1, options.limit || 12)),
+    });
+    const contents = await this._analyticsRepository.getPostsContent(
+      orgId,
+      [
+        ...new Set(
+          top.posts
+            .map((post) => post.postId)
+            .filter((id): id is string => !!id)
+        ),
+      ]
+    );
+    const byId = new Map(contents.map((content) => [content.id, content]));
+    return {
+      total: top.total,
+      posts: top.posts.map((post) => {
+        const content = post.postId ? byId.get(post.postId) : undefined;
+        const media = this.galleryMediaOf(content?.image ?? null);
+        const text = content ? this.plainText(content.content) : '';
+        return {
+          ...post,
+          thumbnail: media.thumbnail,
+          mediaType: content ? media.type : 'text',
+          excerpt: text.length > 140 ? `${text.slice(0, 139)}…` : text,
+        };
+      }),
+    };
+  }
+
+  // the first picture of a post (a video has none we can show) and its type
+  galleryMediaOf(image: string | null): {
+    thumbnail: string | null;
+    type: 'video' | 'carousel' | 'image' | 'text';
+  } {
+    const type = this.contentTypeOf(image);
+    let media: Array<{ path?: string; thumbnail?: string }> = [];
+    try {
+      const parsed = JSON.parse(image || '[]');
+      media = Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      media = [];
+    }
+    const isVideo = (path: string) =>
+      ['mp4', 'mov', 'webm', 'm4v'].some((ext) => hasExtension(path, ext));
+    const picture = media
+      .map((item) =>
+        item?.path && !isVideo(item.path)
+          ? item.path
+          : item?.thumbnail && !isVideo(item.thumbnail)
+          ? item.thumbnail
+          : ''
+      )
+      .find((path) => /^(https?:\/\/|\/)/i.test(path));
+    return { thumbnail: picture || null, type };
   }
 
   buildTopPosts(

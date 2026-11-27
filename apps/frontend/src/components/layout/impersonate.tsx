@@ -889,6 +889,7 @@ const SwitchUser = () => {
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<{
     id: string;
+    userId: string;
     name: string;
     email: string;
   } | null>(null);
@@ -898,7 +899,9 @@ const SwitchUser = () => {
     if (!name) {
       return [];
     }
-    return await (await fetch(`/user/impersonate?name=${name}`)).json();
+    return await (
+      await fetch(`/user/impersonate?name=${encodeURIComponent(name)}`)
+    ).json();
   }, [name]);
 
   const { data } = useSWR(`/switch-search-${name}`, load, {
@@ -912,38 +915,28 @@ const SwitchUser = () => {
   });
 
   const mapData = useMemo(() => {
-    // one row per user-organization: dedupe by user id, drop the impersonated user
-    const seen = new Set<string>();
+    // one row per user-organization, like the impersonate list: the id, email,
+    // org and role of a row all come from the same membership, the switch uses
+    // that membership's user. The impersonated user is left out
     return (data || [])
       .filter((curr: any) => curr?.user?.id !== currentUser?.id)
-      .filter((curr: any) => {
-        if (seen.has(curr?.user?.id)) {
-          return false;
-        }
-        seen.add(curr?.user?.id);
-        return true;
-      })
       .map((curr: any) => ({
-        id: curr?.user?.id,
+        id: curr?.id,
+        userId: curr?.user?.id,
         name: curr?.user?.name,
         email: curr?.user?.email,
-        orgs: (data || [])
-          .filter((org: any) => org?.user?.id === curr?.user?.id)
-          .map(
-            (org: any) =>
-              `${org?.organization?.name} (${org?.role} / ${
-                org?.organization?.subscription?.subscriptionTier || 'FREE'
-              })`
-          )
-          .join(', '),
+        orgName: curr?.organization?.name,
+        role: curr?.role,
+        tier: curr?.organization?.subscription?.subscriptionTier || 'FREE',
       }));
   }, [data, currentUser?.id]);
 
   const pick = useCallback(
-    (item: { id: string; name: string; email: string }) => () => {
-      setSelected(item);
-      setName('');
-    },
+    (item: { id: string; userId: string; name: string; email: string }) =>
+      () => {
+        setSelected(item);
+        setName('');
+      },
     []
   );
 
@@ -951,15 +944,23 @@ const SwitchUser = () => {
     if (!selected) {
       return;
     }
+    // this trades the two accounts' logins, it is not "view as" (that is the
+    // impersonation box), so the dialog says exactly what changes
     if (
       !(await deleteDialog(
         t(
-          'switch_user_confirm',
-          `This will replace the current account's login with ${selected.email}. All data and the subscription stay with the account — only the login changes, and the new login gains its full access. Switch back to revert.`
+          'swap_logins_confirm',
+          "{{current}} will sign in to {{target}}'s account, and {{target}} will sign in to {{current}}'s account. Their email addresses and passwords trade places, and the billing customer emails update to match. This is not \"view as\": use the impersonation box for that. You can undo it by swapping again.",
+          {
+            current: currentUser?.email,
+            target: selected.email,
+            interpolation: { escapeValue: false },
+          }
         ),
-        t('yes_switch', 'Yes, switch'),
-        t('switch_user_title', 'Switch User?'),
-        t('no_cancel', 'No, cancel')
+        t('swap_logins', 'Swap logins'),
+        t('swap_logins_title', 'Swap logins?'),
+        t('no_cancel', 'No, cancel'),
+        true
       ))
     ) {
       return;
@@ -968,7 +969,7 @@ const SwitchUser = () => {
     try {
       const res = await fetch('/user/switch', {
         method: 'POST',
-        body: JSON.stringify({ id: selected.id }),
+        body: JSON.stringify({ id: selected.userId }),
       });
       // customFetch does not throw on HTTP errors
       if (!res.ok) {
@@ -982,14 +983,17 @@ const SwitchUser = () => {
         'warning'
       );
     }
-  }, [selected]);
+  }, [selected, currentUser?.email]);
 
   return (
     <div className="relative flex items-center gap-[10px]">
       <div className="flex-1 min-w-[220px]">
         <Input
           autoComplete="off"
-          placeholder={t('select_user_to_switch_to', 'Select user to switch to')}
+          placeholder={t(
+            'select_user_to_swap_logins_with',
+            'Select user to swap logins with'
+          )}
           name="switchUser"
           disableForm={true}
           label=""
@@ -1011,7 +1015,7 @@ const SwitchUser = () => {
         disabled={!selected}
         className="rounded-[4px] whitespace-nowrap"
       >
-        {t('switch_user', 'Switch User')}
+        {t('swap_logins', 'Swap logins')}
       </Button>
       {!!mapData?.length && !selected && (
         <>
@@ -1029,8 +1033,7 @@ const SwitchUser = () => {
                 {t('user_1', 'user:')}
                 {item?.id?.split('-')?.at(-1)} -{' '}
                 {item?.name ? `${item?.name} - ` : ''}
-                {item?.email}
-                {item?.orgs ? ` - ${item?.orgs}` : ''}
+                {item?.email} - {item?.orgName} ({item?.role} / {item?.tier})
               </div>
             ))}
           </div>
@@ -1049,7 +1052,9 @@ export const Impersonate = () => {
     if (!name) {
       return [];
     }
-    const value = await (await fetch(`/user/impersonate?name=${name}`)).json();
+    const value = await (
+      await fetch(`/user/impersonate?name=${encodeURIComponent(name)}`)
+    ).json();
     return value;
   }, [name]);
   const stopImpersonating = useCallback(async () => {

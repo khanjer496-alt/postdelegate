@@ -18,11 +18,14 @@ import { Onboarding } from '@gitroom/frontend/components/onboarding/onboarding';
 import { ChannelsAfterPayment } from '@gitroom/frontend/components/layout/check.payment';
 import { NeedsAttention } from '@gitroom/frontend/components/activation/needs.attention';
 import { FirstRunChecklist } from '@gitroom/frontend/components/activation/first.run.checklist';
+import { OnboardingCardV2 } from '@gitroom/frontend/components/features/onboarding/onboarding.card.v2';
+import { useFeature } from '@gitroom/frontend/components/features/feature.flags.client';
 import { useChannelsV2 } from './use.channels.v2';
 import { ToolbarV2 } from './toolbar.v2';
 import { ChannelStripV2 } from './channel.strip.v2';
 import { CalendarV2 } from './views.v2';
 import { WeekPanelV2 } from './week.panel.v2';
+import { CalendarFiltersV2 } from '@gitroom/frontend/components/features/calendar-filters/calendar.filters.v2';
 
 // import, bulk videos and the generator: the classic channel column's tools
 const ToolsMenu: FC = () => {
@@ -71,6 +74,8 @@ const ToolsSlot: FC<{ children: ReactNode }> = ({ children }) => {
 };
 
 export const LaunchesComponentV2: FC = () => {
+  // the 4-step v2 card replaces the classic checklist (PD_FF_ONBOARDING_V2)
+  const onboardingV2 = useFeature('onboarding_v2');
   const {
     isLoading,
     reload,
@@ -120,9 +125,11 @@ export const LaunchesComponentV2: FC = () => {
                 refreshChannel={refreshChannel}
                 continueIntegration={continueIntegration}
               />
-              <FirstRunChecklist />
+              {onboardingV2 ? <OnboardingCardV2 /> : <FirstRunChecklist />}
             </div>
-            <CalendarV2 />
+            <CalendarFiltersV2>
+              <CalendarV2 />
+            </CalendarFiltersV2>
           </div>
           <WeekPanelV2
             refreshChannel={refreshChannel}

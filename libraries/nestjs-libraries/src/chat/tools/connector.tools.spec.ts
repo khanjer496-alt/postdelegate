@@ -24,7 +24,10 @@ jest.mock(
 );
 
 import 'reflect-metadata';
-import { BadRequestException } from '@nestjs/common';
+import { McpDispatchUnconfirmed } from '../../database/prisma/posts/mcp.dispatch.status';
+import { PostsListTool } from './posts.list.tool';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { PostResumeTool } from './post.lifecycle.tools';
 import { runWithContext } from '@gitroom/nestjs-libraries/chat/async.storage';
 import { IntegrationSchedulePostTool } from '@gitroom/nestjs-libraries/chat/tools/integration.schedule.post';
 import {
@@ -78,6 +81,10 @@ const socialPost = (type = 'draft') => ({
 describe('createPostForReviewTool', () => {
   const build = () => {
     const postsService = {
+      assertMcpAdmissionReady: jest.fn(),
+      withAgentAdmission: jest.fn((_org: string, action: () => unknown) => action()),
+      // the network rules outside the composer leave these posts as they are
+      applyOutsideComposerRules: jest.fn(async (_org: string, posts: any[]) => posts),
       validatePosts: jest.fn().mockResolvedValue([
         { name: 'QA LinkedIn', valid: true, errors: true, tooLong: false },
       ]),
@@ -108,6 +115,23 @@ describe('createPostForReviewTool', () => {
     };
   };
 
+  it('propagates a closed save as a tool execution error rather than a successful output', async () => {
+    const { tool, postsService, approvals } = build();
+    const closed = new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
+    postsService.createPost.mockRejectedValue(closed);
+    await expect(call(tool, socialPost('draft'))).rejects.toBe(closed);
+    expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
+
+  it('refuses a closed rollout before taking the save admission', async () => {
+    const { tool, postsService, approvals } = build();
+    const closed = new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
+    postsService.assertMcpAdmissionReady.mockImplementation(() => { throw closed; });
+    await expect(call(tool, socialPost('draft'))).rejects.toBe(closed);
+    expect(postsService.withAgentAdmission).not.toHaveBeenCalled();
+    expect(approvals.submitAsAgent).not.toHaveBeenCalled();
+  });
+
   it('saves a draft, checks it like a scheduled post and sends it for review', async () => {
     const { tool, postsService, approvals } = build();
 
@@ -129,6 +153,32 @@ describe('createPostForReviewTool', () => {
       approvalStatus: 'IN_REVIEW',
       previewUrl: expect.stringContaining('/p/post-1'),
     });
+  });
+
+  it('keeps review validation intent separate from draft storage', async () => {
+    const { tool, postsService } = build();
+    await call(tool, socialPost('draft'));
+    expect(postsService.createPost.mock.calls[0][6]).toBe('review');
+  });
+
+  it('returns actual already-created IDs if a later channel fails final preparation', async () => {
+    const { tool, postsService } = build();
+    postsService.createPost.mockResolvedValueOnce([{ postId: 'saved-one', integration: 'int-1' }]).mockRejectedValueOnce(new BadRequestException('Final transformed payload too long'));
+    const input = socialPost('draft');
+    input.socialPost.push({ ...input.socialPost[0] });
+    const result = await call(tool, input);
+    expect(result.output.errors).toContain('saved-one');
+    expect(result.output.errors).toContain('do not recreate');
+  });
+
+  it('returns dispatch uncertainty and all saved IDs without recreating a later failed batch item', async () => {
+    const { schedule, postsService } = build();
+    postsService.createPost.mockResolvedValueOnce([{ postId: 'saved-first', integration: 'int-1' }]).mockRejectedValueOnce(new McpDispatchUnconfirmed('saved-second', 2));
+    const input = socialPost('schedule');
+    input.socialPost.push({ ...input.socialPost[0] });
+    const result = await call(schedule, input);
+    expect(result.output).toMatchObject({ code: 'DISPATCH_UNCONFIRMED', savedPostIds: ['saved-first', 'saved-second'] });
+    expect(postsService.createPost).toHaveBeenCalledTimes(2);
   });
 
   it('never publishes "now" posts directly', async () => {
@@ -250,6 +300,7 @@ describe('sendPostForReviewTool', () => {
 describe('postUpdateTool', () => {
   const build = () => {
     const postsService = {
+      withAgentAdmission: (_org: string, action: () => unknown) => action(),
       updatePostInPlace: jest.fn().mockResolvedValue({
         postId: 'post-1',
         publishDate: '2030-01-02T10:00:00',
@@ -480,5 +531,30 @@ describe('analytics tools', () => {
     ]) {
       expect(requiredMcpScope(name)).toBe('mcp:write');
     }
+  });
+});
+
+
+describe('tracked dispatch read receipt', () => {
+  it('looks up only returned post IDs and adds no dispatch object to legacy rows', async () => {
+    const posts = { getPosts: jest.fn().mockResolvedValue([
+      { id: 'tracked', state: 'QUEUE', group: 'group', publishDate: new Date(), integration: { id: 'channel', providerIdentifier: 'fixture', name: 'Fixture' } },
+      { id: 'legacy', state: 'DRAFT', group: 'group', publishDate: new Date(), integration: { id: 'channel', providerIdentifier: 'fixture', name: 'Fixture' } },
+    ]), getMcpWarnings: jest.fn().mockResolvedValue([]), getMcpDispatchStatuses: jest.fn().mockResolvedValue([{ postId: 'tracked', generation: 2, dispatchState: 'UNKNOWN', dispatchErrorCode: 'START_UNCONFIRMED' }]) };
+    const result = await call(new PostsListTool(posts as any), { startDate: '2026-01-01', endDate: '2027-01-01' });
+    expect(posts.getMcpDispatchStatuses).toHaveBeenCalledWith('org-1', ['tracked', 'legacy']);
+    expect(result.output.posts[0].dispatch).toEqual({ generation: 2, status: 'UNKNOWN', code: 'START_UNCONFIRMED' });
+    expect(result.output.posts[1]).not.toHaveProperty('dispatch');
+  });
+});
+
+
+describe('closed tracked MCP resume tool result', () => {
+  it('preserves BLOCKED and its reason under output instead of throwing or claiming resumed', async () => {
+    const blocked = { status: 'BLOCKED', reason: 'Assistant post saves are temporarily unavailable while the service updates.' };
+    const posts = { resumeMcp: jest.fn().mockResolvedValue(blocked) };
+    const result = await call(new PostResumeTool(posts as any), { postId: 'root' });
+    expect(result).toEqual({ output: blocked });
+    expect(posts.resumeMcp).toHaveBeenCalledWith('org-1', 'root');
   });
 });

@@ -1,3 +1,4 @@
+import { countLength } from '@gitroom/helpers/utils/count.length';
 import { Injectable } from '@nestjs/common';
 import {
   Activity,
@@ -12,6 +13,7 @@ import {
 import { Integration, Post, State } from '@prisma/client';
 import { applyEvergreen } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.evergreen.schedule';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { removeMarkdown } from '@gitroom/helpers/utils/remove.markdown';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { AuthTokenDetails } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -111,6 +113,26 @@ export class PostActivity {
     private _subscriptionService: SubscriptionService
   ) {}
 
+  @ActivityMethod()
+  async mcpFailSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, err?: any) {
+    await this._postService.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash, err);
+  }
+
+  @ActivityMethod()
+  async mcpThreadPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
+    return this._postService.mcpPlan(orgId, rootId, generation, revisionHash);
+  }
+
+  @ActivityMethod()
+  async mcpPublishSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, parent?: string, previous?: string) {
+    return this._postService.runMcpSegment(orgId, rootId, segmentId, generation, revisionHash, async (integration, post, predecessors, attemptId) => {
+      parent = predecessors.parent; previous = predecessors.previous;
+      if (segmentId === rootId) return this.postSocialInternal(integration, [post], false, { attemptId });
+      if (!parent) throw new Error('A confirmed predecessor receipt is required.');
+      return this.postCommentInternal(parent, previous === parent ? undefined : previous, integration, [post], { attemptId });
+    });
+  }
+
   private async activeIntegration(
     integration: Integration,
     posts?: Post[],
@@ -153,6 +175,14 @@ export class PostActivity {
   async searchForMissingThreeHoursPosts() {
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
+      // one tracked MCP post that cannot be recovered must not stop the sweep
+      // for the posts after it. It is never handed to the legacy workflow.
+      try {
+        if (await this._postService.recoverMissingMcpJob(post.organizationId, post.id)) continue;
+      } catch (err) {
+        console.error(`Missing post sweep could not recover MCP post ${post.id}: ${(err as Error)?.message}`);
+        continue;
+      }
       await this._temporalService.client
         .getRawClient()
         .workflow.signalWithStart('postWorkflowV113', {
@@ -253,6 +283,10 @@ export class PostActivity {
     integration: Integration,
     posts: Post[]
   ) {
+    return this.postCommentInternal(postId, lastPostId, integration, posts, false);
+  }
+
+  private async postCommentInternal(postId: string, lastPostId: string | undefined, integration: Integration, posts: Post[], verifyFinal: boolean | { attemptId: string }) {
     // kept only for in-flight postWorkflowV108 runs, which set a
     // heartbeatTimeout on this activity - removing the sender would kill
     // them. Under V109+ (no heartbeatTimeout) this is a no-op and can be
@@ -285,10 +319,18 @@ export class PostActivity {
               p.id,
               p.organizationId,
               JSON.parse(p.image || '[]'),
-              getIntegration?.convertToJPEG || false
+              getIntegration?.convertToJPEG || false,
+              !verifyFinal
             ),
           }))
         );
+        if (verifyFinal) {
+          await this.assertMcpFinalPayload(integration, mappedPosts);
+          if (typeof verifyFinal === 'object') {
+            mappedPosts.forEach(p => Object.assign(p, { clientReference: { attemptId: verifyFinal.attemptId } }));
+            await this._postService.bindMcpProviderPayload(integration.organizationId, verifyFinal.attemptId, mappedPosts);
+          }
+        }
         integration = await this.activeIntegration(integration, posts);
         const result = await getIntegration.comment(
           integration.internalId,
@@ -301,7 +343,7 @@ export class PostActivity {
         await this.recordPublished(integration, posts);
         await this.activeIntegration(integration, posts, false);
         return result;
-      });
+      }, !!verifyFinal);
     });
   }
 
@@ -340,11 +382,19 @@ export class PostActivity {
   // a terminal error without needing a new workflow.
   private async handleDisconnect<T>(
     integration: Integration,
-    func: () => Promise<T>
+    func: () => Promise<T>,
+    preservePublishedReceipt = false
   ): Promise<T> {
     try {
       return await func();
     } catch (err) {
+      if (preservePublishedReceipt && err instanceof PublishedWithError) {
+        // This exception is raised only after the provider confirmed publication.
+        // V114 returns the receipt to its atomic projection, never the legacy
+        // out-of-fence release writer or the unknown-outcome retry path.
+        return [{ id: err.postDbId, postId: err.releaseId, releaseURL: err.releaseURL,
+          status: 'published', publicationAccountingPending: true, warning: 'Published successfully, but a follow-up change failed. Inspect the post in the provider.' }] as unknown as T;
+      }
       // Do not serialize a late provider error after its connection was
       // removed. The replacement failure contains no provider payload.
       await this.activeIntegration(integration, undefined, false);
@@ -394,10 +444,31 @@ export class PostActivity {
     }
   }
 
+  private async assertMcpFinalPayload(integration: Integration, payload: Array<any>) {
+    const provider = this._integrationManager.getSocialIntegration(integration.providerIdentifier);
+    const additional = JSON.parse(integration.additionalSettings || '[]');
+    const settings = payload[0]?.settings || {};
+    const limit = provider.maxLength(additional, settings) || 1000000;
+    // counted like validatePosts and the composer: the visible text, not the
+    // markup an html editor provider (X, Telegram) or a markdown editor one
+    // (Discord, dev.to) receives. The composer counts a link as its address,
+    // and not the line break a markdown message ends its last paragraph with.
+    const visibleText = (message: string) => provider.editor === 'markdown'
+      ? removeMarkdown({ text: (message || '').replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '$2') }).trimEnd()
+      : stripHtmlValidation('normal', message || '', true);
+    const visible = (message: string) => countLength(integration.providerIdentifier, visibleText(message));
+    if (!payload.length || payload.some(p => visible(p.message) > limit || (!visible(p.message) && !p.media?.length))) throw new Error('Final transformed content is empty or over the provider limit.');
+    const valid = await provider.checkValidity(payload.map(p => p.media.map((m: any) => ({ ...m, path: m.url || m.path }))), settings, additional, payload.map(p => p.message));
+    if (valid !== true) throw new Error('Final transformed media or provider settings are invalid.');
+    const [validation] = await this._postService.validatePosts(integration.organizationId, [{ integration: { id: integration.id }, settings, value: payload.map(p => ({ content: p.message, image: p.media.map((m: any) => ({ ...m, path: m.url || m.path })) })) }], 'now');
+    if (!validation.valid || validation.errors !== true || validation.disabled) throw new Error('Final provider settings are invalid.');
+  }
+
   private async postSocialInternal(
     integration: Integration,
     posts: Post[],
-    allowPending: boolean
+    allowPending: boolean,
+    verifyFinal: boolean | { attemptId: string } = false
   ) {
     integration = await this.activeIntegration(integration, posts);
     // kept only for in-flight postWorkflowV108 runs, which set a
@@ -406,7 +477,7 @@ export class PostActivity {
     // dropped once all V108 executions have drained
     return withHeartbeat(() =>
       this.handleDisconnect(integration, () =>
-        this.postSocialBody(integration, posts, allowPending)
+        this.postSocialBody(integration, posts, allowPending, verifyFinal), !!verifyFinal
       )
     );
   }
@@ -414,7 +485,8 @@ export class PostActivity {
   private async postSocialBody(
     integration: Integration,
     posts: Post[],
-    allowPending: boolean
+    allowPending: boolean,
+    verifyFinal: boolean | { attemptId: string } = false
   ) {
     // Stage markers: whatever ran last is what a timed-out activity reports.
     // Providers that go through this.fetch overwrite these with the exact URL;
@@ -495,11 +567,19 @@ export class PostActivity {
           p.id,
           p.organizationId,
           JSON.parse(p.image || '[]'),
-          getIntegration?.convertToJPEG || false
+          getIntegration?.convertToJPEG || false,
+          !verifyFinal
         ),
       }))
     );
 
+    if (verifyFinal) {
+          await this.assertMcpFinalPayload(integration, mappedPosts);
+          if (typeof verifyFinal === 'object') {
+            mappedPosts.forEach(p => Object.assign(p, { clientReference: { attemptId: verifyFinal.attemptId } }));
+            await this._postService.bindMcpProviderPayload(integration.organizationId, verifyFinal.attemptId, mappedPosts);
+          }
+        }
     setHeartbeatDetails(`${integration.providerIdentifier}: publish`);
     integration = await this.activeIntegration(integration, posts);
     const postNow =

@@ -10,8 +10,36 @@ export class ActivationRepository {
   constructor(
     private _integration: PrismaRepository<'integration'>,
     private _post: PrismaRepository<'post'>,
-    private _userOrganization: PrismaRepository<'userOrganization'>
+    private _userOrganization: PrismaRepository<'userOrganization'>,
+    private _oauthAuthorization: PrismaRepository<'oAuthAuthorization'>,
+    private _approvalSettings: PrismaRepository<'approvalSettings'>,
+    private _approvalLink: PrismaRepository<'approvalLink'>
   ) {}
+
+  // An AI client (Claude, ChatGPT, Cursor...) holds a live OAuth grant to the
+  // workspace's MCP server
+  async hasAiConnection(organizationId: string) {
+    return !!(await this._oauthAuthorization.model.oAuthAuthorization.findFirst({
+      where: { organizationId, revokedAt: null, accessToken: { not: null } },
+      select: { id: true },
+    }));
+  }
+
+  // Someone besides the admins can approve, or a client approval link was
+  // shared
+  async hasApprover(organizationId: string) {
+    const [settings, link] = await Promise.all([
+      this._approvalSettings.model.approvalSettings.findUnique({
+        where: { organizationId },
+        select: { approverIds: true },
+      }),
+      this._approvalLink.model.approvalLink.findFirst({
+        where: { organizationId },
+        select: { id: true },
+      }),
+    ]);
+    return !!settings?.approverIds?.length || !!link;
+  }
 
   async hasChannel(organizationId: string) {
     return !!(await this._integration.model.integration.findFirst({

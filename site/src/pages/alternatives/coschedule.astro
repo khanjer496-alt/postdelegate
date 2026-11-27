@@ -1,0 +1,57 @@
+---
+import Alternatives from '../../components/Alternatives.astro';
+const faq = [
+  { q: 'Can CoSchedule MCP create or reschedule posts?', a: 'No. Its official MCP is read-only on Free, Starter, Professional and Suite. It can read permitted calendars, tasks and social results, but cannot create, move, complete or delete items. Compare write-capable integrations separately if an assistant needs to change the schedule.' },
+  { q: 'Is X included in CoSchedule pricing?', a: 'The official sources conflict. The current pricing page says X is included, while the plan support article still describes a separate paid add-on. Confirm the applicable quote with CoSchedule before budgeting X; this comparison does not assume either universal inclusion or a fixed surcharge.' },
+  { q: 'Can a social scheduler replace CoSchedule Suite?', a: 'Only if the tasks you use are covered elsewhere. Inventory campaign planning, task approvals, guest access, permissions and reporting before replacing the publishing calendar. A smaller scheduler may cover distribution without replacing the broader coordination workflow.' },
+];
+const links = [
+  { href: '/alternatives', label: 'All scheduler alternatives' },
+  { href: '/alternatives/rella', label: 'Rella alternatives: production and review roles' },
+  { href: '/docs/mcp', label: 'PostDelegate MCP capabilities' },
+  { href: '/docs/approvals', label: 'PostDelegate approvals and agent controls' },
+  { href: '/docs/channels/coming-soon', label: 'Networks waiting on approval' },
+];
+---
+<Alternatives
+  subject="coschedule" alternatives={['planable', 'publer', 'metricool', 'buffer']} published="2026-11-15"
+  title="CoSchedule Alternatives: Marketing Calendar or Scheduler?"
+  description="Compare CoSchedule alternatives for approvals, automation and reporting. Understand read-only MCP, broader project work and unresolved X billing before moving."
+  h1="CoSchedule alternatives: marketing calendar or scheduler?"
+  shortAnswer="Choose Planable to evaluate content review, Publer for RSS and bulk scheduling, Metricool for reporting across brands, or Buffer for a smaller queue. Stay with CoSchedule when campaign coordination and ReQueue are part of the job, rather than publishing alone."
+  fitIntro="PostDelegate is our product. Consider it for a publishing workflow with API/MCP access and configurable approvals on live channels. Do not treat its publishing calendar as a verified replacement for CoSchedule Suite's campaign and project coordination."
+  faq={faq} links={links}
+>
+  <Fragment slot="before-table">
+    <h2>Decide what the calendar coordinates</h2>
+    <p>CoSchedule combines publishing with marketing tasks, reporting and ReQueue evergreen automation. Its <a href="https://coschedule.com/support/account-and-billing/plans/what-each-plan-includes">plan documentation</a> distinguishes social approvals on Professional from broader task approvals and guest access on Suite. If your calendar is the team's map of an entire campaign, replacing only its social publishing function may create another place to check rather than remove work.</p>
+    <p>Write down which decisions happen there: who owns the campaign, who finishes an asset, who approves a social message and who checks results. A scheduler can be a good replacement when distribution is the main need. When dependencies and project permissions matter, compare those explicitly before choosing on profile count or subscription price.</p>
+  </Fragment>
+
+  <h2>Four alternatives for specific gaps</h2>
+  <h3>Planable: evaluate the review structure</h3>
+  <p><a href="https://planable.io/pricing/">Planable</a> prices by workspace and includes unlimited users on paid plans. Basic offers optional approvals, Pro required approvals and Enterprise multi-level approvals. This is a useful comparison when content review needs clearer stages. Its workspace and post limits still matter, and analytics, inbox and listening are separate add-ons. Review workflow fit does not establish replacement of your campaign tasks.</p>
+  <h3>Publer: focus on distribution inputs</h3>
+  <p><a href="https://publer.com/help/en/article/what-are-publers-plans-and-pricing-15h4yqh/">Publer Professional</a> includes RSS and bulk scheduling; Business adds recurring posts and automatic recycling. Compare the latter with the ReQueue behavior you actually use. CoSchedule documents five ReQueue groups on Starter and ten on Professional. Group design, repeat rules and publication timing deserve their own migration check instead of being reduced to a generic automation checkbox.</p>
+  <h3>Metricool: compare reporting by brand</h3>
+  <p><a href="https://metricool.com/pricing/">Metricool</a> is a candidate when brand reporting is the priority. It counts brands, with one profile per network in each brand; Advanced unlocks team access and API access. Its <a href="https://help.metricool.com/mcp-limits-and-plan-requirements-h72jg">MCP documentation</a> supports analytics and scheduled-post work but excludes inbox/comments, autolists, Smartlinks and ad-campaign management. Check the reporting and operational scope separately.</p>
+  <h3>Buffer: simplify a smaller publishing queue</h3>
+  <p><a href="https://buffer.com/pricing">Buffer Free</a> allows three channels and ten queued posts per channel for one user. Team adds approval workflows and unlimited users. It merits a look when you primarily need a regularly refreshed queue. Price the channels and collaboration tier you need; do not assume that removing a broader coordination system will also remove the work it organized.</p>
+
+  <h2>Read-only MCP is useful, but it is a different job</h2>
+  <p>CoSchedule already has an <a href="https://coschedule.com/support/integrations/ai-chat-apps/use-claude-and-chatgpt-with-coschedule">official MCP connection for Claude and ChatGPT</a>, including on Free. It reads permitted calendar, task and social-result information. It cannot create or move items. That can be enough for a campaign briefing; an assistant that must write drafts or reschedule posts needs different actions. CoSchedule's <a href="https://coschedule.com/support/integrations/other-tools/use-webhooks">support article</a> explicitly says it has no public API and points to other integrations.</p>
+
+  <h2>When staying is the better fit</h2>
+  <p>Keep CoSchedule when the combination of campaign organization, tasks and ReQueue already reduces handoffs. Also resolve the X quote before making a price-led decision: <a href="https://coschedule.com/pricing">current pricing</a> says X is included, while <a href="https://coschedule.com/support/account-and-billing/plans/what-each-plan-includes">plan support</a> still calls it a paid add-on. Those sources conflict. This page does not turn either statement into a definitive budget assumption.</p>
+
+  <p>For a representative campaign, trace the work from its brief to its final social message. Note the decisions made before the message becomes ready: an asset review, a deadline change or a task assigned to another person. Give each step a home in the replacement process. That exercise makes the tradeoff concrete: a smaller publishing tool can be a good choice when the surrounding work is simple, while a coordinated campaign may still need a shared project system.</p>
+
+  <h2>A migration checklist beyond social posts</h2>
+  <ol>
+    <li>List campaign tasks, owners, deadlines, assets and dependencies alongside scheduled posts.</li>
+    <li>Map social-message approvals separately from task approvals, guest access and custom permissions.</li>
+    <li>Record ReQueue groups and validate a small replacement schedule before stopping the old queue.</li>
+    <li>Test the exact assistant actions and reporting views your team needs, with access limited to the correct workspace.</li>
+  </ol>
+  <p>PostDelegate's <a href="/docs/mcp">MCP documentation</a> covers drafts and scheduling; its <a href="/docs/approvals">approval controls</a> can hold agent-created posts. Channel fit comes first: Instagram, Threads, LinkedIn company Pages and Pinterest are waiting on approval, and X is unavailable. The comparison is documentary research, not a tested Suite migration or a claim of full feature parity.</p>
+</Alternatives>

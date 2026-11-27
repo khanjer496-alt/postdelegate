@@ -114,6 +114,39 @@ export interface IAuthenticator {
     releaseId: string,
     integration: Integration
   ): Promise<string | undefined>; // URL of a post the user connected by hand
+  commentPosts?(
+    id: string,
+    accessToken: string,
+    limit: number
+  ): Promise<CommentPost[]>; // Latest posts of the channel for the comments view (PD_FF_COMMENTS), newest first. Throws when the platform call fails
+  postComments?(
+    id: string,
+    accessToken: string,
+    postId: string
+  ): Promise<PostComment[]>; // Comments on one of the channel's posts, with their replies. Throws when the platform call fails
+  replyToComment?(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    message: string
+  ): Promise<{ id: string }>; // Answers a comment as the channel. A reply is not idempotent: a retry after a failure that may have created it checks commentReply first
+  commentReply?(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    message: string
+  ): Promise<{ id: string } | undefined>; // The channel's own reply with this text under the comment, if there is one. Throws when the platform call fails
+  hideComment?(
+    id: string,
+    accessToken: string,
+    commentId: string,
+    hide: boolean
+  ): Promise<void>;
+  deleteComment?(
+    id: string,
+    accessToken: string,
+    commentId: string
+  ): Promise<void>;
   changeNickname?(
     id: string,
     accessToken: string,
@@ -128,6 +161,28 @@ export interface IAuthenticator {
     id: string,
     accessToken: string
   ): Promise<{ id: string; url: string }[]>;
+}
+
+// A post of the channel in the comments view (PD_FF_COMMENTS)
+export interface CommentPost {
+  id: string;
+  caption: string;
+  permalink?: string;
+  thumbnail?: string;
+  createdAt: string;
+  comments: number;
+}
+
+// A comment read back from the platform. `own` is a comment the channel
+// itself wrote (its replies), which auto-replies never answer.
+export interface PostComment {
+  id: string;
+  text: string;
+  username: string;
+  createdAt: string;
+  hidden: boolean;
+  own: boolean;
+  replies: PostComment[];
 }
 
 export interface AnalyticsData {
@@ -248,6 +303,7 @@ export type PostResponse = {
   postId: string; // The ID of the scheduled post returned by the platform
   releaseURL: string; // The URL of the post on the platform
   status: string; // Status of the operation or initial post status, 'pending' means the workflow must poll checkPostStatus
+  warning?: string; // Confirmed publication with an ancillary follow-up warning
   pendingData?: any; // Opaque provider state used by checkPostStatus / finalizePost, never inspected by generic code
 };
 
@@ -268,6 +324,8 @@ export type PendingCheckResponse =
   | { status: 'completed'; postId: string; releaseURL: string };
 
 export type PostDetails<T = any> = {
+  // Server-owned identity for adapters that explicitly support safe reconciliation.
+  clientReference?: { attemptId: string };
   id: string;
   message: string;
   settings: T;
@@ -299,6 +357,12 @@ export type FetchPageInformationResult = {
 export interface SocialProvider
   extends IAuthenticator,
     ISocialMediaIntegration {
+  /** Read-only terminal reconciliation; UNPUBLISHED proves this attempt was never accepted/published and no in-flight request can later land. A current 404 is insufficient. */
+  reconcileMcpAttempt?(integration: Integration, attempt: { attemptId: string; payloadHash: string; segmentId: string }): Promise<
+    { terminal: true; outcome: 'UNPUBLISHED' } |
+    { terminal: true; outcome: 'PUBLISHED'; receipt: PostResponse } |
+    { terminal: false; outcome: 'UNKNOWN' }
+  >;
   identifier: string;
   authorizationPolicy?: ProviderAuthorizationPolicy;
   checkAuthorization?(
@@ -342,6 +406,13 @@ export interface SocialProvider
   // it from the stored URL and the post's settings only - this runs on an
   // unauthenticated request, so it must do no network call and no token work.
   isPublicReleaseURL?(releaseURL: string, settings: any): boolean;
+  // A post saved anywhere but the signed-in composer (public API, CLI, MCP,
+  // the agent, CSV import, bulk and auto post): the settings it is stored
+  // with instead, or why only the composer can make it - for rules a network
+  // ties to the composer, like TikTok's consent before a Direct Post.
+  settingsOutsideComposer?(settings: any): { settings: any } | { error: string };
+  // auto post (RSS feeds) never creates posts for this network
+  autoPostUnsupported?: boolean;
   // what lifts the plan's monthly cap on this network
   // (provider_posts_per_month), the end of the message shown at the cap
   planLimitHint?: string;
@@ -398,6 +469,7 @@ export interface SocialProvider
   scopes: string[];
   analyticsAvailable?: boolean;
   plugsAvailable?: boolean;
+  commentsAvailable?: boolean; // false when the permission the comments view needs is not requested (PD_FF_COMMENTS)
   externalUrl?: (
     url: string
   ) => Promise<{ client_id: string; client_secret: string }>;

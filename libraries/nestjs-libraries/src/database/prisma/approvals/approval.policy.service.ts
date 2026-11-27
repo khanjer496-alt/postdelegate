@@ -1,3 +1,4 @@
+import { getContext } from '../../../chat/async.storage';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ApprovalStatus } from '@prisma/client';
 import dayjs from 'dayjs';
@@ -134,6 +135,11 @@ export class ApprovalPolicyService {
     existing?: ExistingPost | null
   ): Promise<ApprovalDecision> {
     const previous = existing?.approvalStatus;
+    // A credential can edit held drafts but cannot carry an old approval onto
+    // new content, media, thread, channel or schedule revisions.
+    if (getContext()?.agentPrincipal && existing && ['APPROVED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED'].includes(previous)) {
+      return { hold: true, approvalStatus: 'IN_REVIEW', previous };
+    }
     if (!actor || type === 'draft') {
       return { hold: false, previous };
     }
@@ -172,7 +178,11 @@ export class ApprovalPolicyService {
         actorName: actor.source,
         comment: message,
       });
-      throw new BadRequestException(message);
+      // A key may be restricted to fewer channels than this workspace policy.
+      // Keep detailed channel names in the admin audit, never in its denial.
+      throw new BadRequestException(getContext()?.agentPrincipal
+        ? 'This agent action is blocked by workspace posting policy. Ask an administrator to check channel access and posting limits.'
+        : message);
     };
 
     if (settings.agentIntegrationIds.length) {

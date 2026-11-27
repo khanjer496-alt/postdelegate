@@ -78,6 +78,7 @@ import {
 import { ChannelChecks } from '@gitroom/frontend/components/new-launch/channel.checks.component';
 import { isUiV2Client } from '@gitroom/frontend/components/new-layout/v2/ui.flag.client';
 import { ChannelPickerV2 } from '@gitroom/frontend/components/new-launch/v2/channel.picker.v2';
+import { NextBestTimeButton } from '@gitroom/frontend/components/features/best-times/use.best.times';
 
 // the modifier key of the shortcuts, as the keyboard labels it
 // the validation pipe answers `message` as a list, other errors as a string
@@ -173,6 +174,20 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setDate(newDate);
     },
     [channelDate, current]
+  );
+
+  // the posting slots of the chosen channels (minutes after UTC midnight),
+  // the "Next best time" fallback while there is too little data
+  const postingSlotMinutes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          selectedIntegrations.flatMap(({ integration }: any) =>
+            (integration?.time || []).map((slot: { time: number }) => slot.time)
+          )
+        )
+      ) as number[],
+    [selectedIntegrations]
   );
 
   // the date sheet applies its changes only on save
@@ -1550,6 +1565,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 </div>
                 <div>{t('delete_post', 'Delete Post')}</div>
               </button>
+            )}
+            {uiV2 && !dummy && !channelPublished && (
+              <NextBestTimeButton
+                onPick={setPickerDate}
+                slotMinutesUtc={postingSlotMinutes}
+              />
             )}
             <DatePicker onChange={setPickerDate} date={pickerDate} />
             {!addEditSets && (

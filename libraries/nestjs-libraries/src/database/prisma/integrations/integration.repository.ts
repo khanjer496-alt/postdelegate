@@ -1314,6 +1314,9 @@ export class IntegrationRepository {
       await tx.post.updateMany({ where: { organizationId: org, integrationId: id }, data: { releaseId: null, releaseURL: null, error: null } });
       await tx.exisingPlugData.deleteMany({ where: { integrationId: id } });
       await tx.plugs.updateMany({ where: { integrationId: id, organizationId: org }, data: { activated: false, data: '{}' } });
+      await tx.commentReplyRule.deleteMany({ where: { integrationId: id, organizationId: org } });
+      // claims outlive their rule (so a comment is answered once), so they go separately
+      await tx.commentAutoReply.deleteMany({ where: { integrationId: id, organizationId: org } });
       return tx.integration.updateMany({
         where: { id, organizationId: org, ...CHANNEL_DISCONNECTED },
         data: { token: '', refreshToken: null, tokenExpiration: null, name: 'Disconnected channel', internalId: `erased_${id}`, rootInternalId: null, profile: null, picture: null, additionalSettings: '[]', customInstanceDetails: null },

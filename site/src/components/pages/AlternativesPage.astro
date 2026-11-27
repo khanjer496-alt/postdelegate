@@ -46,6 +46,12 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <div class="document-grid">
     <a href="/alternatives/postiz" class="document-card"><h3>{p.postizAlternatives}</h3><p>{p.postizAlternativesText}</p><span>{p.seeAlternatives}</span></a>
     <a href="/compare/postiz-vs-buffer" class="document-card"><h3>{p.postizVsBuffer}</h3><p>{p.postizVsBufferText}</p><span>{p.seeComparison}</span></a>
+    {lang === 'en' && <>
+      <a href="/alternatives/recurpost" class="document-card"><h3>RecurPost alternatives</h3><p>Compare evergreen libraries, client approvals and the work needed to move recurring content.</p><span>{p.seeAlternatives}</span></a>
+      <a href="/alternatives/post-planner" class="document-card"><h3>Post Planner alternatives</h3><p>Separate content discovery from RSS, bulk scheduling, queue limits and review needs.</p><span>{p.seeAlternatives}</span></a>
+      <a href="/alternatives/coschedule" class="document-card"><h3>CoSchedule alternatives</h3><p>Decide whether you need a marketing coordination system or a publishing scheduler.</p><span>{p.seeAlternatives}</span></a>
+      <a href="/alternatives/rella" class="document-card"><h3>Rella alternatives</h3><p>Count paid creators separately from reviewers, then compare approvals and publishing workflows.</p><span>{p.seeAlternatives}</span></a>
+    </>}
   </div>
   <Fragment set:html={localizeLinks(lang, p.body({ ...plans, liveCount: AVAILABLE_NETWORKS.length, live: available, days: TRIAL_DAYS }))} />
 

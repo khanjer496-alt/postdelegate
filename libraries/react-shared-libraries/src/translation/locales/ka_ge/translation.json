@@ -454,7 +454,7 @@
     "faq_can_i_trust_postiz": "შემიძლია ვენდო PostDelegate-ს?",
     "faq_postiz_gitroom_is_proudly_open_source": "PostDelegate-ს მართავს Nasida Apps LLC. გამჭვირვალე კულტურის გამო აპლიკაციის წყარო კოდი ყველასთვისაა ხელმისაწვდომი AGPL-3.0 ლიცენზიით. მის მისაღებად <a href=\"/source\" target=\"_blank\" style=\"text-decoration: underline;\">დააჭირეთ აქ</a>.",
     "faq_what_are_channels": "რა არის არხები?",
-    "faq_postiz_gitroom_allows_you_to_schedule_posts": "PostDelegate გაძლევთ პოსტების დაგეგმვის საშუალებას სხვადასხვა არხებზე — მაგალითად X, Facebook, Instagram, TikTok, YouTube, Reddit, LinkedIn, Dribbble, Threads და Pinterest.",
+    "faq_postiz_gitroom_allows_you_to_schedule_posts": "PostDelegate გაძლევთ პოსტების დაგეგმვის საშუალებას სხვადასხვა არხებზე — მაგალითად Facebook, TikTok, YouTube, LinkedIn, Bluesky, Telegram და Discord.",
     "faq_what_are_team_members": "რა არის გუნდის წევრები?",
     "faq_if_you_have_a_team_with_multiple_members": "თუ თქვენ ჰყავთ გუნდი რამდენიმე წევრით, შეგიძლიათ მოიწვიოთ ისინი workspace-ში, ითანამშრომლოთ პოსტებზე და დაამატონ თავიანთი არხები",
     "faq_what_is_ai_auto_complete": "რა არის AI auto-complete?",

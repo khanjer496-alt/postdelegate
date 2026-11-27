@@ -1,3 +1,4 @@
+import { AgentCredentialService } from './agent-credential.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Agent } from '@mastra/core/agent';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -27,6 +28,7 @@ const renderArray = (list: string[], show: boolean) => {
 export class LoadToolsService {
   constructor(
     private _moduleRef: ModuleRef,
+    private _agentCredentials: AgentCredentialService,
     private _aiCredentialService: AiCredentialService
   ) {}
 
@@ -42,7 +44,7 @@ export class LoadToolsService {
           .filter((p) => !p.available || p.available())
           .map(async (p) => ({
             name: p.name as string,
-            tool: await p.run(),
+            tool: this._agentCredentials.wrapTool(p.name, await p.run()),
           }))
       )
     ).reduce(
@@ -96,6 +98,8 @@ export class LoadToolsService {
         - List groups (customers) and filter the channels by a group
         - Make vertical videos with Studio templates from videos in the media library (studioTemplatesTool, studioRenderTool, studioRenderStatusTool)
 
+      - To turn results into next week's drafts, read resultsToReviewedDraftsTool. Cite real post IDs/metrics and dates; qualify freshness, weak samples and missing history. No usable history means explicitly proposed experiments, not invented wins. Use postPreflightTool without saving, then createPostForReviewTool and report actual draft IDs and IN_REVIEW receipts. Never substitute schedule-now for human review.
+      - UNKNOWN preflight checks are unresolved. A preflight is not authorization or a durable publishing guarantee; final transformed payload and current policy are checked again when saving/publishing.
       - We schedule posts to different integration like facebook, instagram, etc. but to the user we don't say integrations we say channels as integration is the technical name
       - When scheduling a post, you must follow the social media rules and best practices.
       - When scheduling a post, you can pass an array for list of posts for a social media platform, But it has different behavior depending on the platform.
@@ -135,8 +139,8 @@ export class LoadToolsService {
           | string
           | undefined;
         const orgId =
-          (organization ? JSON.parse(organization)?.id : undefined) ||
-          getAuth()?.id;
+          getAuth()?.id ||
+          (organization ? JSON.parse(organization)?.id : undefined);
         if (!orgId) {
           throw new BadRequestException(MISSING_AI_KEY);
         }

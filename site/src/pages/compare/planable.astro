@@ -48,13 +48,13 @@ const rows = [
   },
   {
     "feature": "Networks",
-    "us": `${AVAILABLE_NETWORKS.length} connect today; Instagram, Facebook, LinkedIn company Pages, TikTok, Threads, and Pinterest are waiting on platform approval; X is not available`,
+    "us": `${AVAILABLE_NETWORKS.length} connect today; Instagram, LinkedIn company Pages, Threads, and Pinterest are waiting on platform approval; X is not available`,
     "them": "Facebook, LinkedIn, Instagram, X, Google Business Profile, YouTube, TikTok, Pinterest and Threads"
   },
   {
     "feature": "API and MCP",
     "us": "Public REST API, webhooks and an MCP server on every plan; the assistant can publish and schedule",
-    "them": "A public API on Pro and Enterprise. An MCP connector on all paid plans that drafts, edits and handles approvals, but cannot publish directly"
+    "them": "A public API on Pro and Enterprise. An MCP connector on every plan, including the free trial, that drafts, edits and handles approvals, but cannot publish directly"
   }
 ];
 const faq = [
@@ -106,14 +106,14 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <p>PostDelegate approaches the same problem from the client's side rather than the team's. Posts have statuses and an approvals inbox, and a client approval link opens the post for review without the client creating an account, which removes the most common piece of friction in agency review. There is also a review inbox specifically for drafts an AI assistant wrote, so an agent can fill a week and a person still signs it off. What PostDelegate does not have is Planable's multi-level chain — if your process is writer to editor to legal to client, Planable models that directly.</p>
   
   <h2>Agents, and the word "publish"</h2>
-  <p>Both tools ship an MCP connector, which is still unusual, and both are honest about what theirs does. Planable's is on all paid plans and its own guide is explicit that it drafts, edits, handles approvals and reads analytics but does not publish posts directly. PostDelegate's is on every plan and does publish and schedule, with the review inbox as the safety step.</p>
+  <p>Both tools ship an MCP connector, which is still unusual, and both are honest about what theirs does. Planable's is on every plan, including the free trial, and its own guide is explicit that it drafts, edits, handles approvals and reads analytics but does not publish posts directly. PostDelegate's is on every plan and does publish and schedule, with the review inbox as the safety step.</p>
   <p>The API story runs the same way: Planable's is on Pro and Enterprise and its comparison table marks it as absent on Basic, while PostDelegate's REST API and webhooks are on every plan. If you intend to drive the calendar from your own code or from an assistant, that is the line to check.</p>
 
   <h2>Where Planable is the better pick</h2>
   <ul>
     <li>Your review process has several layers and lives inside the team: optional, required and multi-level approvals are the point of the product.</li>
     <li>You want unlimited users on the cheapest plan so every reviewer can have an account.</li>
-    <li>You publish to Instagram, Facebook, LinkedIn, TikTok, Threads or X today.</li>
+    <li>You publish to Instagram, LinkedIn, TikTok, Threads or X today.</li>
     <li>You want a free allowance with no clock on it rather than a {TRIAL_DAYS}-day trial.</li>
   </ul>
 

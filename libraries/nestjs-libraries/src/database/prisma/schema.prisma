@@ -8,7 +8,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AgentCredentialRole {
+  ANALYST
+  DRAFT_ONLY
+  PUBLISHER
+}
+
+model AgentCredential {
+  id String @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name String
+  secretHash String @unique
+  role AgentCredentialRole @default(DRAFT_ONLY)
+  // null = all channels; [] = no channels. Never collapse these states.
+  channelIds Json?
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([organizationId, createdAt])
+}
+
 model Organization {
+  mcpAdmissions McpAgentAdmission[]
+  mcpAdmissionRecoveries McpAgentAdmissionRecovery[]
+  mcpFences McpPublishFence[]
+  mcpAttempts McpPublishAttempt[]
+  agentCredentials AgentCredential[]
   id                  String               @id @default(uuid())
   name                String
   description         String?
@@ -63,6 +89,7 @@ model Organization {
   activityLogs        ActivityLog[]
   ideas               Idea[]
   postImports         PostImport[]
+  commentReplyRules     CommentReplyRule[]
   trialOnboardingEmails TrialOnboardingEmail[]
   // Affiliate attribution, set once at registration and never changed
   referredByAffiliateId String?
@@ -526,6 +553,7 @@ model Integration {
   organization          Organization           @relation(fields: [organizationId], references: [id])
   webhooks              IntegrationsWebhooks[]
   orderItems            OrderItems[]
+  commentReplyRules     CommentReplyRule[]
   plugs                 Plugs[]
   posts                 Post[]
 
@@ -615,6 +643,7 @@ model Post {
   approvalStatus             ApprovalStatus            @default(NONE)
   // Set when an AI agent created the post (MCP, public API, CLI, in-app
   // agent): the MCP client, OAuth app or "API key" it came from
+  mcpWorkflowVersion         Int?
   agentSource                String?
   lastMessageId              String?
   intervalInDays             Int?
@@ -2350,6 +2379,11 @@ model AnalyticsReportSettings {
   // shown on the report instead of the workspace name and the PostDelegate logo
   brandName      String?
   logoUrl        String?
+  // report template (PD_FF_REPORT_TEMPLATES): #RRGGBB colors and the layout
+  // of the PDF and PowerPoint report; null keeps the default look
+  brandColor     String?
+  accentColor    String?
+  template       String?
   lastSentAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -2365,6 +2399,164 @@ model PaymentWebhookEvent {
   claimToken String
   claimUntil DateTime?
   @@id([provider, eventId])
+}
+
+// SmartLinks (PD_FF_SMARTLINKS): a workspace's public link-in-bio page at
+// /bio/<slug>, its links and daily view and click counts. No visitor data
+// (addresses, cookies, agents) is stored, only counts per day.
+model SmartLinkPage {
+  id             String          @id @default(cuid())
+  organizationId String          @unique
+  slug           String          @unique
+  title          String
+  bio            String?
+  avatarUrl      String?
+  // #RRGGBB of the buttons
+  accentColor    String?
+  published      Boolean         @default(false)
+  items          SmartLinkItem[]
+  stats          SmartLinkStat[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model SmartLinkItem {
+  id        String        @id @default(cuid())
+  pageId    String
+  page      SmartLinkPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  imageUrl  String?
+  position  Int           @default(0)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([pageId, position])
+}
+
+// itemId '' holds the page views of the day
+model SmartLinkStat {
+  id     String        @id @default(cuid())
+  pageId String
+  page   SmartLinkPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  itemId String        @default("")
+  date   DateTime      @db.Date
+  views  Int           @default(0)
+  clicks Int           @default(0)
+
+  @@unique([pageId, itemId, date])
+  @@index([pageId, date])
+}
+
+// New MCP jobs only. Abandoned admission is released by an admin, by a later save
+// after a 10 minute lease (AGENT_ADMISSION_LEASE_MS) or when the backend restarts.
+model McpAgentAdmission {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String @id
+  owner String
+  instanceId String @default("unknown")
+  host String @default("unknown")
+  processId Int @default(0)
+  writtenPostIds Json @default("[]")
+  createdAt DateTime @default(now())
+}
+
+model McpAgentAdmissionRecovery {
+  id String @id @default(uuid())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  owner String
+  auditId String
+  writtenPostIds Json
+  createdAt DateTime @default(now())
+  @@index([organizationId])
+}
+
+model McpPublishFence {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  postId String @id
+  organizationId String
+  integrationId String
+  revisionHash String
+  state String @default("ACTIVE")
+  generation Int @default(0)
+  dispatchState String @default("PENDING")
+  dispatchAttempts Int @default(0)
+  dispatchNotBefore DateTime @default(now())
+  dispatchConfirmedAt DateTime?
+  dispatchErrorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([organizationId])
+  @@index([state, dispatchState, dispatchNotBefore])
+}
+
+model McpPublishAttempt {
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+  rootPostId String
+  segmentPostId String
+  organizationId String
+  revisionHash String
+  generation Int
+  status String
+  receipt Json?
+  providerPayload Json?
+  providerPayloadHash String?
+  followUpWarning String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([rootPostId, segmentPostId, revisionHash, generation])
+  @@index([organizationId, rootPostId])
+}
+
+// Keyword auto-replies on one post of a channel (PD_FF_COMMENTS): a new
+// comment on postId that contains keyword gets reply, once
+model CommentReplyRule {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  integrationId  String
+  integration    Integration        @relation(fields: [integrationId], references: [id])
+  // the platform's id of the post (Instagram media id)
+  postId         String
+  keyword        String
+  reply          String
+  active         Boolean            @default(true)
+  // when the rule was last turned on: only comments written after it are
+  // answered, so turning a rule back on never answers a backlog
+  activeSince    DateTime           @default(now())
+  answered       CommentAutoReply[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([integrationId, active])
+  @@index([organizationId])
+}
+
+// A comment an auto-reply rule claimed: the unique key makes sure a comment
+// is answered once, even when the poller and the open comments view race
+model CommentAutoReply {
+  id            String           @id @default(cuid())
+  // kept (null) when the rule is deleted, so another rule never answers the
+  // same comment again
+  ruleId        String?
+  rule          CommentReplyRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  // erasure deletes a workspace's claims by this, also after their rule is gone
+  organizationId String
+  integrationId String
+  commentId     String
+  // the platform's id of the reply, once it went out
+  replyId       String?
+  // pending, replied or failed
+  status        String           @default("pending")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([integrationId, commentId])
+  @@index([ruleId])
+  @@index([organizationId])
 }
 
 // Internal measurement ledger. Export only dimension/day/cohort aggregates, never these rows.

@@ -156,9 +156,9 @@ const useCredits = (type: (typeof creditTypes)[number]) => {
 
 const BillingCycle: FC<{
   tier: string;
-  canceled: boolean;
+  cancelAt?: Date | null;
 }> = (props) => {
-  const { tier, canceled } = props;
+  const { tier, cancelAt } = props;
   const t = useT();
   const { data: renewal } = useRenewal();
   const { data: images } = useCredits('ai_images');
@@ -206,7 +206,21 @@ const BillingCycle: FC<{
           {t('billing_cycle', 'Billing cycle')}
         </div>
         <div className="text-[14px] text-textItemBlur">
-          {!canceled && !!renewal?.renewsAt && (
+          {!!cancelAt && (
+            <>
+              {t('billing_plan_ends_on', 'Your plan ends on')}{' '}
+              <bdi className="font-[600] text-newTextColor">
+                {fromUtc(cancelAt).format('D MMM, YYYY')}
+              </bdi>
+              {'. '}
+              {t(
+                'you_will_never_be_charged_again',
+                'You will never be charged again'
+              )}
+              {'. '}
+            </>
+          )}
+          {!cancelAt && !!renewal?.renewsAt && (
             <>
               {renewal.needsPaymentMethod
                 ? t(
@@ -580,6 +594,14 @@ export const MainBillingComponent: FC<{
     }
   }, []);
 
+  // everything the page shows that ending the trial changes
+  const refreshAfterTrial = useCallback(() => {
+    mutate('/user/self');
+    mutate('/user/subscription');
+    mutate('/billing/invoices');
+    mutate('/billing/renewal');
+  }, []);
+
   const finishTrialNow = useCallback(async () => {
     if (
       await deleteDialog(
@@ -630,6 +652,13 @@ export const MainBillingComponent: FC<{
     }
     setSubscription(sub);
   }, [sub]);
+  // a trial set to cancel ends on its own and is never charged, so a link to
+  // end it does nothing; the page already says when it will be canceled
+  useEffect(() => {
+    if (finishTrial && subscription?.cancelAt) {
+      setFinishTrial(false);
+    }
+  }, [finishTrial, subscription?.cancelAt]);
   const loadCredits = useLoadCredits();
   // credits follow the plan stored by the Stripe webhook: wait for it, then
   // show the new plan's totals and credits together
@@ -1103,18 +1132,20 @@ export const MainBillingComponent: FC<{
 
   return (
     <div className="flex flex-col gap-[24px]">
-      {finishTrial && !!renewal && renewal.needsPaymentMethod !== true && (
-        <FinishTrial
-          confirmed={finishTrialConfirmed}
-          close={() => {
-            setFinishTrial(false);
-            setFinishTrialConfirmed(false);
-            mutate('/user/self');
-            mutate('/billing/invoices');
-            mutate('/billing/renewal');
-          }}
-        />
-      )}
+      {finishTrial &&
+        !!renewal &&
+        renewal.needsPaymentMethod !== true &&
+        !subscription?.cancelAt && (
+          <FinishTrial
+            confirmed={finishTrialConfirmed}
+            onDone={refreshAfterTrial}
+            close={() => {
+              setFinishTrial(false);
+              setFinishTrialConfirmed(false);
+              refreshAfterTrial();
+            }}
+          />
+        )}
       <div className="flex items-center gap-[16px] mobile:flex-col mobile:items-stretch">
         <div className="flex-1 flex flex-col gap-[4px]">
           <div className="text-[20px] font-[600]">
@@ -1229,7 +1260,7 @@ export const MainBillingComponent: FC<{
       {!!subscription?.id && (
         <BillingCycle
           tier={sub?.subscriptionTier || subscription.subscriptionTier}
-          canceled={!!subscription.cancelAt}
+          cancelAt={subscription.cancelAt}
         />
       )}
       {!!subscription?.id &&
@@ -1305,15 +1336,18 @@ export const MainBillingComponent: FC<{
                 {t('billing_update_payment_method', 'Update payment method')}
               </button>
             )}
-            {user?.isTrailing && !renewal?.needsPaymentMethod && (
-              <button
-                type="button"
-                onClick={finishTrialNow}
-                className="h-[44px] px-[16px] rounded-[8px] bg-btnSimple text-btnText text-[14px] font-[500] hover:opacity-80 transition-opacity"
-              >
-                {t('finish_trial', 'Finish trial')}
-              </button>
-            )}
+            {/* a trial set to cancel ends on its own, it is never charged */}
+            {user?.isTrailing &&
+              !renewal?.needsPaymentMethod &&
+              !subscription?.cancelAt && (
+                <button
+                  type="button"
+                  onClick={finishTrialNow}
+                  className="h-[44px] px-[16px] rounded-[8px] bg-btnSimple text-btnText text-[14px] font-[500] hover:opacity-80 transition-opacity"
+                >
+                  {t('finish_trial', 'Finish trial')}
+                </button>
+              )}
           </div>
         </div>
       )}

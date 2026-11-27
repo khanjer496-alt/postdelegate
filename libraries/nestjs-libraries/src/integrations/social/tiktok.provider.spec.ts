@@ -1,12 +1,25 @@
 jest.mock('@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator', () => ({
   isSafePublicHttpsUrl: jest.fn(async () => true),
 }));
+// the local test server below is not a public address
+jest.mock('@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher', () => ({
+  getSsrfSafeDispatcher: () => undefined,
+}));
 
 import 'reflect-metadata';
 import { validateSync } from 'class-validator';
-import { TiktokProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
+import {
+  TiktokProvider,
+  TIKTOK_DAILY_APP_LIMIT_MESSAGE,
+} from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
 import { BadBody } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { TikTokDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
+import { execFileSync } from 'child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { createServer, Server } from 'http';
+import { AddressInfo } from 'net';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 const creator = {
   creator_username: 'review_account',
@@ -43,9 +56,13 @@ const post = (overrides: Record<string, unknown> = {}) =>
   } as any);
 
 // Only the TikTok HTTP calls are replaced, the provider logic runs as is.
-const provider = (creatorResponse: any) => {
+const provider = (creatorResponse: any, videoSeconds?: number) => {
   const instance = new TiktokProvider();
   const urls: string[] = [];
+  // the length ffprobe would read from the stored video
+  const probe = jest
+    .spyOn(instance as any, 'videoDurationSeconds')
+    .mockResolvedValue(videoSeconds);
   instance.fetch = jest.fn(async (url: string) => {
     urls.push(url);
     if (typeof creatorResponse === 'function' && url.includes('creator_info')) {
@@ -62,7 +79,7 @@ const provider = (creatorResponse: any) => {
     instance.postPending('channel', 'test-token', [value], {
       profile: 'review_account',
     } as any);
-  return { instance, urls, publish };
+  return { instance, urls, publish, probe };
 };
 
 const initCalls = (urls: string[]) =>
@@ -108,6 +125,36 @@ describe('TiktokProvider creator_info gate', () => {
     expect(initCalls(urls)).toBe(0);
   });
 
+  it("stops with a try-again-later message when the app's daily creator cap is reached", async () => {
+    const { urls, publish } = provider({
+      data: {},
+      error: { code: 'reached_active_user_cap', message: 'cap' },
+    });
+
+    await expect(publish(post())).rejects.toThrow(TIKTOK_DAILY_APP_LIMIT_MESSAGE);
+    expect(initCalls(urls)).toBe(0);
+  });
+
+  it('keeps the channel connected when TikTok rejects a post for the daily creator cap', () => {
+    const result = new TiktokProvider().handleErrors(
+      JSON.stringify({ error: { code: 'reached_active_user_cap' } })
+    );
+
+    expect(result).toEqual({
+      type: 'bad-body',
+      value: "TikTok's daily posting limit for this app has been reached. Try again later.",
+    });
+  });
+
+  it('refuses a Direct Post without the authorization checkbox', async () => {
+    const { urls, publish } = provider({ data: creator, error: { code: 'ok' } });
+
+    await expect(publish(post({ music_usage_consent: false }))).rejects.toThrow(
+      'Confirm that PostDelegate can upload and publish this content to TikTok.'
+    );
+    expect(initCalls(urls)).toBe(0);
+  });
+
   it('starts the publish when creator_info allows the selected settings', async () => {
     const { urls, publish } = provider({ data: creator, error: { code: 'ok' } });
 
@@ -139,6 +186,182 @@ describe('TiktokProvider creator_info gate', () => {
       )
     ).rejects.toThrow('Branded content visibility cannot be set to private.');
     expect(initCalls(urls)).toBe(0);
+  });
+});
+
+describe('TiktokProvider video length at publish time', () => {
+  const ok = { data: creator, error: { code: 'ok' } };
+
+  it('refuses a scheduled Direct Post longer than creator_info allows now', async () => {
+    const { urls, publish, probe } = provider(ok, 61.5);
+    await expect(publish(post())).rejects.toThrow(
+      'This video is too long for this TikTok account. Choose a video no longer than 60 seconds.'
+    );
+    expect(probe).toHaveBeenCalledWith('https://media.example/review.mp4');
+    expect(initCalls(urls)).toBe(0);
+  });
+
+  it('publishes a video within the limit', async () => {
+    const { urls, publish } = provider(ok, 59.9);
+    await publish(post());
+    expect(initCalls(urls)).toBe(1);
+  });
+
+  it('leaves an unreadable length to TikTok instead of failing the post', async () => {
+    const { urls, publish } = provider(ok, undefined);
+    await publish(post());
+    expect(initCalls(urls)).toBe(1);
+  });
+
+  it('does not read the length of an inbox upload or a photo', async () => {
+    const upload = provider(ok, 999);
+    await upload.publish(post({ content_posting_method: 'UPLOAD' }));
+    expect(upload.probe).not.toHaveBeenCalled();
+    expect(initCalls(upload.urls)).toBe(1);
+
+    const photo = provider(ok, 999);
+    await photo.publish({
+      ...post(),
+      media: [{ type: 'image', path: 'https://media.example/review.jpg' }],
+    });
+    expect(photo.probe).not.toHaveBeenCalled();
+  });
+});
+
+// ffprobe ships in the release image; a machine without ffmpeg skips this
+const hasFfmpeg = (() => {
+  try {
+    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+(hasFfmpeg ? describe : describe.skip)('TiktokProvider reads the video length with ffprobe', () => {
+  let dir: string;
+  let server: Server;
+  let base: string;
+  const previousUploads = process.env.UPLOAD_DIRECTORY;
+  const read = (path: string) =>
+    (new TiktokProvider() as any).videoDurationSeconds(path);
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), 'tiktok-length-'));
+    // 3 seconds, the moov atom at the end like a camera file
+    execFileSync('ffmpeg', [
+      '-v', 'error', '-y', '-f', 'lavfi',
+      '-i', 'testsrc=duration=3:size=64x64:rate=10',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', join(dir, 'clip.mp4'),
+    ]);
+    const bytes = readFileSync(join(dir, 'clip.mp4'));
+    server = createServer((req, res) => {
+      if (req.url === '/clip.mp4') {
+        res.writeHead(200, { 'content-type': 'video/mp4' });
+        res.end(bytes);
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    process.env.UPLOAD_DIRECTORY = dir;
+  });
+
+  afterAll(async () => {
+    process.env.UPLOAD_DIRECTORY = previousUploads;
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads a stored file', async () => {
+    expect(Math.round(await read(join(dir, 'clip.mp4')))).toBe(3);
+  });
+
+  it('reads a hosted file through the fetch', async () => {
+    expect(Math.round(await read(`${base}/clip.mp4`))).toBe(3);
+  });
+
+  it('answers undefined for what it cannot read', async () => {
+    expect(await read(`${base}/missing.mp4`)).toBeUndefined();
+    expect(await read(join(dir, 'missing.mp4'))).toBeUndefined();
+    // outside UPLOAD_DIRECTORY nothing is opened
+    expect(await read('/etc/hostname')).toBeUndefined();
+  });
+});
+
+describe('TiktokProvider outside the composer', () => {
+  const instance = new TiktokProvider();
+
+  it('refuses an explicit Direct Post with a readable reason', () => {
+    const result = instance.settingsOutsideComposer(settings());
+    expect(result).toEqual({
+      error: expect.stringContaining(
+        'TikTok Direct Post is only available in the PostDelegate composer'
+      ),
+    });
+  });
+
+  it('sends everything else to the TikTok inbox without the composer acknowledgements', () => {
+    expect(
+      instance.settingsOutsideComposer(
+        settings({ content_posting_method: undefined })
+      )
+    ).toEqual({
+      settings: {
+        __type: 'tiktok',
+        content_posting_method: 'UPLOAD',
+        privacy_level: 'PUBLIC_TO_EVERYONE',
+        duet: false,
+        stitch: false,
+        comment: false,
+        autoAddMusic: 'no',
+        brand_content_toggle: false,
+        brand_organic_toggle: false,
+        disclose: false,
+      },
+    });
+    expect(instance.settingsOutsideComposer(undefined)).toEqual({
+      settings: { content_posting_method: 'UPLOAD' },
+    });
+  });
+
+  it('keeps an inbox upload as it is', () => {
+    expect(
+      instance.settingsOutsideComposer({
+        __type: 'tiktok',
+        content_posting_method: 'UPLOAD',
+        title: 'Photo title',
+      })
+    ).toEqual({
+      settings: {
+        __type: 'tiktok',
+        content_posting_method: 'UPLOAD',
+        title: 'Photo title',
+      },
+    });
+  });
+
+  it('settings it returns from the documented API example pass the DTO of a scheduled post', () => {
+    const result = instance.settingsOutsideComposer({
+      __type: 'tiktok',
+      duet: false,
+      stitch: false,
+      comment: false,
+      autoAddMusic: 'no',
+      brand_content_toggle: false,
+      brand_organic_toggle: false,
+      video_made_with_ai: false,
+    }) as { settings: any };
+    const errors = validateSync(
+      Object.assign(new TikTokDto(), result.settings)
+    ).flatMap((error) => Object.values(error.constraints || {}));
+    expect(errors).toEqual([]);
+  });
+
+  it('takes no auto post (RSS) channel', () => {
+    expect(instance.autoPostUnsupported).toBe(true);
   });
 });
 
@@ -325,5 +548,95 @@ describe('TiktokProvider.publishedLinkLabel', () => {
     expect(
       instance.publishedLinkLabel({ content_posting_method: 'DIRECT_POST' })
     ).toBeUndefined();
+  });
+});
+
+describe('TiktokProvider.profileInfo (user.info.profile)', () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+  const reply = (body: any) => {
+    const mock = jest.fn(async () => ({ json: async () => body }) as any);
+    global.fetch = mock as any;
+    return mock;
+  };
+
+  it('reads the profile link, username, bio and verified badge', async () => {
+    const mock = reply({
+      data: {
+        user: {
+          username: 'review_account',
+          profile_deep_link: 'https://vm.tiktok.com/ZMexample/',
+          bio_description: ' Weekend baker ',
+          is_verified: false,
+        },
+      },
+      error: { code: 'ok' },
+    });
+
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({
+      username: 'review_account',
+      profileUrl: 'https://vm.tiktok.com/ZMexample/',
+      bioDescription: 'Weekend baker',
+      isVerified: false,
+    });
+    const [url, options] = mock.mock.calls[0] as any;
+    expect(url).toBe(
+      'https://open.tiktokapis.com/v2/user/info/?fields=username,profile_deep_link,bio_description,is_verified'
+    );
+    expect(options.headers.Authorization).toBe('Bearer token');
+  });
+
+  it('drops a profile link that does not open on TikTok', async () => {
+    reply({
+      data: { user: { profile_deep_link: 'https://evil.example/tiktok.com' } },
+      error: { code: 'ok' },
+    });
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({});
+  });
+
+  it('shows nothing (and never fails) without the scope or on errors', async () => {
+    reply({ data: {}, error: { code: 'scope_not_authorized' } });
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({});
+
+    global.fetch = jest.fn(async () => {
+      throw new Error('network');
+    }) as any;
+    await expect(new TiktokProvider().profileInfo('token')).resolves.toEqual({});
+  });
+
+  it('can be called from the composer', () => {
+    expect(
+      Reflect.getMetadata(
+        'custom:dashboard_function',
+        TiktokProvider.prototype,
+        'profileInfo'
+      )
+    ).toBe(true);
+  });
+});
+
+describe('TiktokProvider.generateAuthUrl', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it("always shows TikTok's consent page with all requested scopes", async () => {
+    process.env.TIKTOK_CLIENT_ID = 'client-key';
+    process.env.FRONTEND_URL = 'https://app.example.com';
+    const instance = new TiktokProvider();
+    const { url, state } = await instance.generateAuthUrl();
+    const parsed = new URL(url);
+
+    expect(parsed.origin + parsed.pathname).toBe('https://www.tiktok.com/v2/auth/authorize/');
+    expect(parsed.searchParams.get('disable_auto_auth')).toBe('1');
+    expect(parsed.searchParams.get('response_type')).toBe('code');
+    expect(parsed.searchParams.get('state')).toBe(state);
+    expect(parsed.searchParams.get('redirect_uri')).toBe(
+      'https://app.example.com/integrations/social/tiktok'
+    );
+    expect(parsed.searchParams.get('scope')!.split(',')).toEqual(instance.scopes);
   });
 });

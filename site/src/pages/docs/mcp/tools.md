@@ -69,3 +69,28 @@ PostDelegate does not provide AI generation of its own. `generateImageTool` need
 
 - **November 2026:** `ask_postdelegate` now returns only the agent's answer, as `{ "text": "..." }` in structured content. It used to return the agent's whole run (its steps, token usage and messages) serialized as text. Clients that read the answer from that text should read `text` instead.
 - Content from your posts and videos is just data for the assistant to show you. Be wary of any assistant that treats text in a post as instructions.
+
+## Results, review and recovery
+
+| Tool | What it does | Changes data? |
+| --- | --- | --- |
+| `resultsToReviewedDraftsTool` | Gives an evidence-to-review workflow using the existing analytics tools. It does not fetch metrics or invent results. | No |
+| `analyticsMetricsTool`, `analyticsTopPostsTool`, `bestTimeToPostTool`, `channelAnalyticsTool` | Read available metrics; access and filters depend on the credential's permitted channels. Missing or stale data stays qualified. | No provider publication |
+| `postPreflightTool` | Checks the schedule input without saving, importing media, generating links or refreshing credentials. Returns per-check VALID, INVALID or UNKNOWN, input/config hashes and checkedAt. | No product/provider mutations |
+| `postUpdateTool` | Edits permitted unpublished content/media/date; an approved revision may need review again. | Yes |
+| `createPostForReviewTool`, `sendPostForReviewTool` | Save or submit a draft to human review. Verify the returned draft ID and IN_REVIEW receipt. A Draft-only credential cannot submit a scheduled post. | Yes; never a public post by these tools |
+| `postUnscheduleTool` | Fences a new tracked MCP job and keeps its content/attempt history. Legacy or uncertain attempts stay BLOCKED/OUTCOME_UNKNOWN. | Yes |
+| `postResumeTool` | Preserves confirmed receipts and attempts recovery only with terminal adapter proof that failed segments were not published. Unsupported provider reconciliation stays blocked. | Can queue an allowed recovery |
+
+Preflight is a snapshot, not authorization or a durable publishing guarantee. UNKNOWN includes pending media, live provider readiness and short-link transformations whose maximum length is not proven. It creates no short URL and never promises an exact preview for those transformations. Save/send paths validate materialized content again; changing content, channel, media, thread or schedule can invalidate approval.
+
+New MCP jobs use a versioned workflow and durable per-segment admission/receipt records. A started attempt without a stored receipt is uncertain even if the worker timed out or died. An accepted provider request followed by a database failure is not confirmed unpublished. No current production provider advertises the new terminal reconciliation hook: uncertain attempts on those providers stay blocked, rather than being retried. This is not universal exactly-once publication. Legacy jobs keep their existing workflow and cannot gain safe cancellation/recovery proof from an ERROR state alone.
+
+For new per-agent credentials, `channelAnalyticsTool` returns UNKNOWN before any provider call or credential refresh. Use the cached history tools within your permitted channels. Legacy workspace keys/OAuth keep their existing live-read behavior. Partial cancellation returns the preserved published segment IDs; ALREADY_PUBLISHED means there was no unpublished remainder to cancel. A held remainder needs human approval of that current revision, without republishing its parent.
+
+A confirmed publication can have an ancillary warning, such as a video that is live but whose thumbnail change failed. `postsListTool` returns an optional `warning` while keeping state PUBLISHED. This does not authorize a resend.
+
+
+### Saved post with unconfirmed dispatch
+
+A tracked schedule/edit can return `DISPATCH_UNCONFIRMED` with `savedPostIds` if the workflow start cannot be confirmed. Those posts already exist: do not recreate them. PostDelegate keeps the exact generation in its durable dispatch queue and reconciles it automatically when Temporal is reachable. `postsListTool` adds an optional `dispatch` object with its generation, status and curated code for tracked roots. Dispatch `CONFIRMED` means the workflow exists or was accepted; the post state and publication receipt determine whether it actually published. An unknown provider outcome still blocks a fresh send.

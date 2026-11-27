@@ -448,6 +448,11 @@ export class PostsBulkVideosService {
   ) {
     const request = item.request!;
     try {
+      // checked like createPost will save it: bulk is not the composer
+      request.posts = await this._postsService.applyOutsideComposerRules(
+        orgId,
+        request.posts
+      );
       const results = await this._postsService.validatePosts(
         orgId,
         request.posts as any,

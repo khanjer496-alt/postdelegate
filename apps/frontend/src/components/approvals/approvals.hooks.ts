@@ -31,6 +31,7 @@ export interface ApprovalSettings {
 }
 
 export interface ReviewItem {
+  remainingThreadReview?: boolean;
   id: string;
   group: string;
   content: string;

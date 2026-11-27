@@ -1,12 +1,21 @@
 import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
+import { McpDispatchUnconfirmed } from './mcp.dispatch.status';
+import { getContext } from '../../../chat/async.storage';
+import { hostname } from 'os';
+import { readFile } from 'fs/promises';
+import { agentAdmissionContext as agentAdmission, AgentSaveRecovered } from './agent-admission.context';
+import { createHash } from 'crypto';
+import { assertAgentPostWrite, agentDraftOnly } from '../../../chat/agent-credential.policy';
 import {
   BadRequestException,
+  HttpException,
+  ServiceUnavailableException,
   Injectable,
   Logger,
   NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
-import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { PostsRepository, mcpPayloadRevision } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import dayjs from 'dayjs';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
@@ -51,7 +60,7 @@ import {
 import { AnalyticsData } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { BadBody, providerCause, RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
@@ -93,6 +102,8 @@ import {
   OrgScope,
   PUBLIC_PREVIEW,
 } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+
+const agentInstanceId = uuidv4();
 
 type PostWithConditionals = Post & {
   integration?: Integration;
@@ -745,7 +756,8 @@ export class PostsService {
     id: string,
     orgId: string,
     imagesList: any[],
-    convertToJPEG = false
+    convertToJPEG = false,
+    persistImages = true
   ) {
     try {
       let imageUpdateNeeded = false;
@@ -804,11 +816,11 @@ export class PostsService {
               imageUpdateNeeded = true;
               // the media url is user-influenced, so it goes through the same
               // SSRF-safe client as the providers' media reads
-              const response = await getSsrfSafeAxios().get(m.url, {
-                responseType: 'arraybuffer',
-              });
-
-              const imageBuffer = Buffer.from(response.data);
+              // New immutable preparation can read an already validated local
+              // upload directly. Remote assets retain the SSRF-safe transport.
+              const imageBuffer = !persistImages && !/^https?:\/\//.test(m.path)
+                ? await readFile(m.path)
+                : Buffer.from((await getSsrfSafeAxios().get(m.url, { responseType: 'arraybuffer' })).data);
 
               // Use sharp to get the metadata of the image
               const buffer = await sharp(imageBuffer)
@@ -850,7 +862,7 @@ export class PostsService {
           })
       );
 
-      if (imageUpdateNeeded) {
+      if (imageUpdateNeeded && persistImages) {
         await this._postRepository.updateImages(
           id,
           JSON.stringify(getImageList)
@@ -859,6 +871,7 @@ export class PostsService {
 
       return getImageList;
     } catch (err: any) {
+      if (!persistImages) throw new BadRequestException('Media preparation failed; no provider payload was sent.');
       return (imagesList || []).filter((m) =>
         this.isAllowedMediaPath(m?.path)
       );
@@ -1048,6 +1061,13 @@ export class PostsService {
     const ids = (extract || []).map((e) =>
       e.replace('(post:', '').replace(')', '')
     );
+    const principal = getContext()?.agentPrincipal;
+    if (principal) {
+      for (const id of ids) {
+        const referenced = await this._postRepository.getPostById(id, orgId);
+        if (!referenced || principal.organizationId !== orgId || (principal.channelIds !== null && !principal.channelIds.includes(referenced.integrationId))) throw new BadRequestException('A referenced post is not available on this assistant’s permitted channels.');
+      }
+    }
     const urls = await this._postRepository.getPostUrls(orgId, ids);
     const replaceTags = (text: string, escape = (url: string) => url) =>
       ids.reduce((acc, value) => {
@@ -1144,8 +1164,21 @@ export class PostsService {
       });
   }
 
-  async deletePost(orgId: string, group: string) {
-    const post = await this._postRepository.deletePost(orgId, group);
+  // byUser: a signed-in person in the app (not an agent, the public API or
+  // a cleanup), who may delete a tracked MCP post that failed with an
+  // uncertain outcome once no workflow can still send it
+  async deletePost(orgId: string, group: string, byUser = false) {
+    const agent = !!getContext()?.agentPrincipal;
+    if (agent) {
+      const groupPosts = await this._postRepository.getPostsByGroup(orgId, group);
+      for (const post of groupPosts) assertAgentPostWrite(orgId, post.integrationId, 'delete');
+      await this._approvalPolicyService.assertAgentGuardrails(orgId, { type: 'agent', source: 'MCP' }, [...new Set(groupPosts.map(p => p.integrationId))], { countsTowardLimit: false });
+    }
+    const post = await this._postRepository.deletePost(
+      orgId,
+      group,
+      byUser && !agent ? await this.failedMcpRootsWithoutWorkflow(orgId, group) : []
+    );
 
     if (post?.id) {
       try {
@@ -1177,6 +1210,39 @@ export class PostsService {
     return { error: true };
   }
 
+  // Deleting it only drops the post here, it never claims the uncertain
+  // attempt was not published. A thread failed when any of its rows did (a
+  // comment can fail after the root went out), and nothing of the group may
+  // still run or be unknown.
+  private async failedMcpRootsWithoutWorkflow(orgId: string, group: string) {
+    const rows = await this._postRepository.getPostsByGroup(orgId, group);
+    const roots = rows.filter((p) => !p.parentPostId && p.mcpWorkflowVersion === 114);
+    const failed = roots.filter((root) =>
+      rows.some((p) => p.state === 'ERROR' && p.integrationId === root.integrationId)
+    );
+    if (!failed.length) return [];
+    for (const root of roots) {
+      if (await this.hasRunningWorkflow(root.id)) return [];
+    }
+    return failed.map((root) => root.id);
+  }
+
+  // unknown counts as running: the caller then keeps the post
+  private async hasRunningWorkflow(postId: string) {
+    try {
+      const workflows = this._temporalService.client
+        .getRawClient()
+        ?.workflow.list({
+          query: `postId="${postId}" AND ExecutionStatus="Running"`,
+        });
+      if (!workflows) return true;
+      for await (const _ of workflows) return true;
+      return false;
+    } catch (err) {
+      return true;
+    }
+  }
+
   async countPostsFromDay(orgId: string, date: Date) {
     return this._postRepository.countPostsFromDay(orgId, date);
   }
@@ -1185,12 +1251,273 @@ export class PostsService {
     return this._postRepository.getPostByForWebhookId(id, integrationId);
   }
 
+  private mcpRevision(posts: Array<any>) { return mcpPayloadRevision(posts); }
+
+  async recoverMissingMcpJob(orgId: string, rootId: string) {
+    if (await this._postRepository.mcpWorkflowVersion(orgId, rootId) !== 114) return false;
+    const rows = await this.mcpThread(orgId, rootId);
+    await this.startWorkflow(rows[0].integration!.providerIdentifier.split('-')[0].toLowerCase(), rootId, orgId, 'QUEUE');
+    return true;
+  }
+
+  async mcpWorkflowName(orgId: string, postId: string) {
+    return await this._postRepository.mcpWorkflowVersion(orgId, postId) === 114 ? 'postWorkflowV114' : 'postWorkflowV113';
+  }
+
+  async unscheduleMcp(orgId: string, postId: string) {
+    const root = await this.getStoredRootPost(orgId, postId);
+    await this._approvalPolicyService.assertAgentGuardrails(orgId, { type: 'agent', source: 'MCP' }, [root.integrationId], { countsTowardLimit: false });
+    // The fence makes sleeping/racing workers harmless; Temporal termination is
+    // deliberately not used as publication proof.
+    const policy = await this._approvalPolicyService.getSettings(orgId);
+    return this._postRepository.unscheduleMcp(orgId, postId, false, policy.requireAgentApproval);
+  }
+
+  private async mcpRpc<T>(operation: (workflow: any) => Promise<T>): Promise<T> {
+    const raw = this._temporalService.client?.getRawClient();
+    if (!raw?.workflow || typeof raw.connection?.withDeadline !== 'function') throw new Error('Temporal deadline client unavailable.');
+    return raw.connection.withDeadline(Date.now() + 10000, () => operation(raw.workflow));
+  }
+
+  async reconcileMcpDispatch(orgId: string, rootId: string, generation: number, revisionHash: string) {
+    const fence = await this._postRepository.mcpFence(orgId, rootId);
+    if (!fence || fence.state !== 'ACTIVE' || fence.generation !== generation || fence.revisionHash !== revisionHash) throw new McpDispatchUnconfirmed(rootId, generation);
+    let rows: Awaited<ReturnType<PostsService['mcpThread']>>;
+    try { rows = await this.mcpThread(orgId, rootId); }
+    catch (error) {
+      if (error instanceof BadRequestException) {
+        await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'HELD', 'POST_NOT_DISPATCHABLE');
+        throw new McpDispatchUnconfirmed(rootId, generation);
+      }
+      throw error;
+    }
+
+    const workflowId = `post_${rootId}_mcp_${generation}`;
+    const acknowledge = async () => {
+      const marked = await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'CONFIRMED');
+      if (!marked.count) throw new McpDispatchUnconfirmed(rootId, generation);
+    };
+    const describe = async () => {
+      const execution: any = await this.mcpRpc(workflow => workflow.getHandle(workflowId).describe());
+      if (!['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED', 'TERMINATED', 'TIMED_OUT', 'CONTINUED_AS_NEW'].includes(execution?.status?.name)) throw new Error('Unrecognized workflow execution status.');
+    };
+    try {
+      await describe();
+      await acknowledge();
+      return;
+    } catch (error) {
+      if (error instanceof AgentSaveRecovered || error instanceof McpDispatchUnconfirmed) throw error;
+      if ((error as Error)?.name !== 'WorkflowNotFoundError') {
+        await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'UNKNOWN', 'STATUS_UNCONFIRMED');
+        throw new McpDispatchUnconfirmed(rootId, generation);
+      }
+    }
+    if (this.mcpRevision(rows) !== revisionHash || !rows.some(post => post.state === 'QUEUE') || rows.some(post => ['ERROR', 'DRAFT'].includes(post.state))) {
+      await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'HELD', 'POST_NOT_DISPATCHABLE');
+      throw new McpDispatchUnconfirmed(rootId, generation);
+    }
+    // Missing execution is not permission to replay a provider attempt. Only
+    // an unattempted exact generation may enter the deterministic start path.
+    const attempts = await this._postRepository.mcpAttempts(orgId, rootId);
+    if (attempts.some(attempt => attempt.generation === generation)) {
+      await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'HELD', 'PROVIDER_RECONCILIATION_REQUIRED');
+      throw new McpDispatchUnconfirmed(rootId, generation);
+    }
+    const admitted = await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'UNKNOWN', 'START_UNCONFIRMED', true);
+    if (!admitted.count) throw new McpDispatchUnconfirmed(rootId, generation);
+    try {
+      const providerQueue = rows[0].integration!.providerIdentifier.split('-')[0].toLowerCase();
+      await this.mcpRpc(workflow => workflow.start('postWorkflowV114', {
+        workflowId, taskQueue: 'mcp-publish-v114', workflowIdConflictPolicy: 'USE_EXISTING', workflowIdReusePolicy: 'REJECT_DUPLICATE',
+        args: [{ taskQueue: `mcp-v114-${providerQueue}`, postId: rootId, organizationId: orgId, generation, revisionHash }],
+        typedSearchAttributes: new TypedSearchAttributes([{ key: postIdSearchParam, value: rootId }, { key: organizationId, value: orgId }]),
+      }));
+    } catch (error) {
+      if ((error as Error)?.name === 'WorkflowExecutionAlreadyStartedError') {
+        try { await describe(); await acknowledge(); return; }
+        catch (inspection) { if (inspection instanceof AgentSaveRecovered) throw inspection; }
+      }
+      await this._postRepository.recordMcpDispatch(orgId, rootId, generation, revisionHash, 'UNKNOWN', 'START_UNCONFIRMED');
+      throw new McpDispatchUnconfirmed(rootId, generation);
+    }
+    await acknowledge();
+  }
+
+  async recoverPendingMcpDispatches(limit = 16) {
+    const pending = await this._postRepository.pendingMcpDispatches(limit);
+    let confirmed = 0;
+    let unconfirmed = 0;
+    for (const fence of pending) {
+      try { await this.reconcileMcpDispatch(fence.organizationId, fence.postId, fence.generation, fence.revisionHash); confirmed++; }
+      catch { unconfirmed++; } // One unavailable/changed row must not starve the rest.
+    }
+    return { examined: pending.length, confirmed, unconfirmed };
+  }
+
+  async mcpExecutionState(orgId: string, postId: string) {
+    const fence = await this._postRepository.mcpFence(orgId, postId);
+    if (!fence) return { generation: -1, closed: undefined as boolean | undefined };
+    try {
+      const execution: any = await this.mcpRpc(workflow => workflow.getHandle(`post_${postId}_mcp_${fence.generation}`).describe());
+      if (execution.status.name === 'RUNNING') return { generation: fence.generation, closed: false };
+      if (['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED', 'TERMINATED', 'TIMED_OUT'].includes(execution.status.name)) return { generation: fence.generation, closed: true };
+    } catch (error) {
+      if ((error as Error)?.name === 'WorkflowNotFoundError') return { generation: fence.generation, closed: true };
+    }
+    return { generation: fence.generation, closed: undefined as boolean | undefined };
+  }
+
+  async resumeMcp(orgId: string, postId: string) {
+    const rows = await this.mcpThread(orgId, postId);
+    const root = rows[0];
+    if (root.mcpWorkflowVersion !== 114 || !root.integration) return { status: 'BLOCKED', reason: 'Legacy execution has no durable attempt proof.' };
+    if (process.env.MCP_V114_ADMISSION_ENABLED !== 'true') return { status: 'BLOCKED', reason: 'Assistant post saves are temporarily unavailable while the service updates.' };
+    await this._approvalPolicyService.assertAgentGuardrails(orgId, { type: 'agent', source: 'MCP' }, [root.integrationId], { countsTowardLimit: false });
+    const policy = await this._approvalPolicyService.getSettings(orgId);
+    if (rows.some(p => p.state !== 'PUBLISHED' && (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(p.approvalStatus) || (policy.requireAgentApproval && p.approvalStatus !== 'APPROVED'))) || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) return { status: 'BLOCKED', reason: 'Current revision requires human approval.' };
+    const provider = this._integrationManager.getSocialIntegration(root.integration.providerIdentifier);
+    const attempts = await this._postRepository.mcpAttempts(orgId, postId);
+    for (const attempt of attempts.filter(a => ['STARTED', 'UNKNOWN'].includes(a.status))) {
+      if (!provider.reconcileMcpAttempt) return { status: 'OUTCOME_UNKNOWN', reason: 'This provider cannot prove a terminal publication outcome; retry is blocked.' };
+      const result = await provider.reconcileMcpAttempt(root.integration, { attemptId: attempt.id, payloadHash: attempt.providerPayloadHash || attempt.revisionHash, segmentId: attempt.segmentPostId });
+      if (!result || !result.terminal) return { status: 'OUTCOME_UNKNOWN' };
+      if (result.outcome === 'UNPUBLISHED') await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'FAILED');
+      else if (result.outcome === 'PUBLISHED' && result.receipt?.postId && result.receipt.postId !== 'missing' && !['pending', 'unknown', 'error', 'failed', 'processing'].includes(result.receipt.status) && result.receipt.id === attempt.segmentPostId) await this._postRepository.reconcileMcpAttempt(orgId, attempt.id, 'CONFIRMED', [result.receipt]);
+      else return { status: 'OUTCOME_UNKNOWN' };
+    }
+    const materialized = await this.mcpThread(orgId, postId);
+    const confirmed = await this._postRepository.mcpAttempts(orgId, postId);
+    if (materialized.every(post => post.state === 'PUBLISHED' && confirmed.some(attempt => attempt.segmentPostId === post.id && attempt.status === 'CONFIRMED' && (attempt.receipt as any)?.[0]?.postId))) return { status: 'ALREADY_PUBLISHED', warnings: confirmed.filter(attempt => attempt.followUpWarning).map(attempt => ({ segmentId: attempt.segmentPostId, message: attempt.followUpWarning })) };
+    const execution = await this.mcpExecutionState(orgId, postId);
+    if (execution.closed === undefined) return { status: 'OUTCOME_UNKNOWN', reason: 'Current workflow execution could not be confirmed.' };
+    const result = await this._postRepository.resumeMcp(orgId, postId, this.mcpRevision(rows), execution.closed ? execution.generation : undefined);
+    if (result.status === 'RESUMED') await this.startWorkflow(root.integration.providerIdentifier.split('-')[0].toLowerCase(), postId, orgId, 'QUEUE');
+    return result;
+  }
+
+  holdRemainingMcp(orgId: string, rootId: string, status: 'CHANGES_REQUESTED' | 'REJECTED', updatedAt: Date) { return this._postRepository.holdRemainingMcp(orgId, rootId, status, updatedAt); }
+
+  async approveRemainingMcp(orgId: string, postId: string, updatedAt: Date) {
+    const result = await this._postRepository.approveRemainingMcp(orgId, postId, updatedAt);
+    const rows = await this.mcpThread(orgId, postId);
+    await this.startWorkflow(rows[0].integration!.providerIdentifier.split('-')[0].toLowerCase(), postId, orgId, 'QUEUE');
+    return result;
+  }
+
+  async activateApprovedMcp(orgId: string, postId: string) {
+    if (await this._postRepository.mcpWorkflowVersion(orgId, postId) === 114) await this._postRepository.activateApprovedMcp(orgId, postId);
+  }
+
+  async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, err?: any) {
+    return this._postRepository.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash, err);
+  }
+
+  async mcpPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
+    const rows = await this.mcpThread(orgId, rootId);
+    const fence = await this._postRepository.mcpFence(orgId, rootId);
+    if (!fence || fence.state !== 'ACTIVE' || fence.generation !== generation || fence.revisionHash !== revisionHash || this.mcpRevision(rows) !== revisionHash) throw new BadRequestException('Workflow fence or revision changed.');
+    return { publishAt: new Date(rows[0].publishDate).getTime(), segments: rows.map(p => ({ id: p.id, delay: p.delay })) };
+  }
+
+  getMcpDispatchStatuses(orgId: string, postIds: string[]) { return this._postRepository.mcpDispatchStatuses(orgId, postIds); }
+
+  getMcpWarnings(orgId: string, postIds: string[]) { return this._postRepository.mcpWarnings(orgId, postIds); }
+
+  async mcpThread(orgId: string, postId: string) {
+    const rows = await this.getPostsRecursively(postId, true, orgId, true);
+    if (!rows.length || rows[0].parentPostId) throw new BadRequestException('Post not found.');
+    return rows;
+  }
+
+  private mcpReplayReceipt(value: unknown, segmentId: string) {
+    const receipt = Array.isArray(value) && value.length === 1 ? value[0] : undefined;
+    if (!receipt || typeof receipt !== 'object' || receipt.id !== segmentId ||
+      typeof receipt.postId !== 'string' || !receipt.postId || receipt.postId === 'missing' ||
+      typeof receipt.releaseURL !== 'string' || typeof receipt.status !== 'string' ||
+      ['pending', 'unknown', 'error', 'failed', 'processing'].includes(receipt.status))
+      throw new BadRequestException('OUTCOME_UNKNOWN: stored publication receipt is not valid for this segment.');
+    return [{ id: segmentId, postId: receipt.postId, releaseURL: receipt.releaseURL, status: receipt.status,
+      ...(typeof receipt.warning === 'string' ? { warning: receipt.warning } : {}) }];
+  }
+
+  async runMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, expectedRevision: string, send: (integration: Integration, post: Post, predecessors: { parent?: string; previous?: string }, attemptId: string) => Promise<any>) {
+    const rows = await this.mcpThread(orgId, rootId);
+    const root = rows[0];
+    const segment = rows.find(p => p.id === segmentId);
+    if (!segment || !root.integration || root.mcpWorkflowVersion !== 114) throw new BadRequestException('Legacy or missing publication fence.');
+    const actor = { type: 'agent' as const, source: root.agentSource || 'MCP' };
+    await this._approvalPolicyService.assertAgentGuardrails(orgId, actor, [root.integrationId], { countsTowardLimit: false });
+    const policy = await this._approvalPolicyService.getSettings(orgId);
+    if (rows.some(p => p.state !== 'PUBLISHED' && (['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(p.approvalStatus) || (policy.requireAgentApproval && p.approvalStatus !== 'APPROVED'))) || ['IN_REVIEW', 'REJECTED', 'CHANGES_REQUESTED'].includes(root.approvalStatus)) throw new BadRequestException('Current revision requires human approval.');
+    if (!['QUEUE', 'PUBLISHED', 'ERROR'].includes(root.state) || !['QUEUE', 'PUBLISHED', 'ERROR'].includes(segment.state)) throw new BadRequestException('Post is not queued.');
+    const actualRevision = this.mcpRevision(rows);
+    if (actualRevision !== expectedRevision) throw new BadRequestException('Workflow payload revision changed.');
+    const storedAttempts = await this._postRepository.mcpAttempts(orgId, rootId) || [];
+    if (storedAttempts.some(a => a.segmentPostId === segmentId && a.status === 'CONFIRMED' && a.revisionHash === actualRevision)) {
+      const replay = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, actualRevision, generation);
+      if (!replay.replay) throw new BadRequestException('Confirmed receipt changed unexpectedly.');
+      return this.mcpReplayReceipt(replay.receipt, segmentId);
+    }
+    const predecessors: { parent?: string; previous?: string } = {};
+    const priorSegments = rows.slice(0, rows.findIndex(p => p.id === segmentId));
+    if (priorSegments.length) {
+      const attempts = await this._postRepository.mcpAttempts(orgId, rootId);
+      for (const previous of priorSegments) {
+        const attempt = attempts.find(a => a.segmentPostId === previous.id && a.status === 'CONFIRMED' && a.revisionHash === expectedRevision);
+        const receipt = (attempt?.receipt as any)?.[0];
+        if (!receipt?.postId) throw new BadRequestException('A confirmed predecessor receipt is required.');
+        predecessors.parent ||= receipt.postId;
+        predecessors.previous = receipt.postId;
+      }
+    }
+    if (!await this.ownedMcpMedia(orgId, rows.filter(p => p.state !== 'PUBLISHED').flatMap(p => JSON.parse(p.image || '[]')), true)) throw new BadRequestException('Media is not confirmed ready in this workspace.');
+    const problem = await this.getStoredPostProblem(orgId, rootId);
+    if (problem) throw new BadRequestException(problem);
+        const revision = this.mcpRevision(rows);
+    if (revision !== expectedRevision) throw new BadRequestException('Workflow payload revision changed.');
+    const admission = await this._postRepository.claimMcpSegment(orgId, rootId, segmentId, revision, generation);
+    if (admission.replay) return this.mcpReplayReceipt(admission.receipt, segmentId);
+    try {
+      const result = await send(root.integration, segment, predecessors, admission.id);
+      if (!Array.isArray(result) || result.length !== 1 || !result[0]?.postId || result[0].postId === 'missing' || result[0].id !== segmentId || ['pending', 'unknown', 'error', 'failed', 'processing'].includes(result[0].status)) throw new BadRequestException('OUTCOME_UNKNOWN: provider did not return a final receipt.');
+      // Persist before reporting success. A failure here keeps the durable
+      // STARTED/UNKNOWN marker and may never be converted into a fresh send.
+      const receipt = result.map(r => ({ id: r.id, postId: String(r.postId), releaseURL: String(r.releaseURL || ''), status: String(r.status || 'published'), ...(r.warning ? { warning: 'Published successfully, but a follow-up change failed. Inspect the post in the provider.' } : {}) }));
+      if (result[0].publicationAccountingPending) await this.recordProviderPublish(orgId, root.integration.providerIdentifier, [segmentId]).catch(() => undefined);
+      await this._postRepository.finishMcpSegment(orgId, admission.id, receipt);
+      return receipt;
+    } catch (err) {
+      const settled = await this._postRepository.markMcpUnfinished(orgId, admission.id).catch(() => undefined);
+      const outcome = settled === 'FAILED' ? 'FAILED' : 'OUTCOME_UNKNOWN';
+      // a BadBody's message (what the platform said, or a refusal we wrote
+      // for the customer) is carried to the failed segment, which curates it
+      // like any post error; other failures keep the generic outcome
+      const reason = (err as any)?.type === 'bad_body' ? providerCause((err as any)?.message) : undefined;
+      if (reason) throw new BadBody(root.integration.providerIdentifier, JSON.stringify({ outcome }), '{}', reason);
+      if (settled === 'FAILED') throw new BadRequestException('FAILED: publication stopped before anything was sent to the provider.');
+      throw new BadRequestException('OUTCOME_UNKNOWN: publication was admitted; reconcile before retrying.');
+    }
+  }
+
   async startWorkflow(
     taskQueue: string,
     postId: string,
     orgId: string,
     state: State
   ) {
+    if (await this._postRepository.mcpWorkflowVersion(orgId, postId) === 114) {
+      if (state === 'DRAFT') {
+        const result = await this._postRepository.unscheduleMcp(orgId, postId, true);
+        if (result.status !== 'UNSCHEDULED') throw new BadRequestException('OUTCOME_UNKNOWN: cancellation is blocked.');
+        return;
+      }
+      const rows = await this.mcpThread(orgId, postId);
+      await this._postRepository.registerMcpFence(orgId, postId, rows[0].integrationId, this.mcpRevision(rows));
+      const fence = await this._postRepository.mcpFence(orgId, postId);
+      if (!fence || fence.state !== 'ACTIVE') return;
+      await this.reconcileMcpDispatch(orgId, postId, fence.generation, fence.revisionHash);
+      return;
+    }
     try {
       const workflows = this._temporalService.client
         .getRawClient()
@@ -1221,9 +1548,7 @@ export class PostsService {
       );
     }
 
-    if (state === 'DRAFT') {
-      return;
-    }
+    if (state === 'DRAFT') { return; }
 
     try {
       await this._temporalService.client
@@ -1284,11 +1609,12 @@ export class PostsService {
     operation: CreatePostDto['type'] = 'schedule',
     allowPerPostOperation = false,
     // when the post goes out, for the settings that must be checked against it
-    date?: string
+    date?: string,
+    snapshots?: Map<string, Integration>
   ) {
     return Promise.all(
       (posts || []).map(async (post) => {
-        const integration = await this._integrationService.getIntegrationById(
+        const integration = snapshots?.get(post?.integration?.id) || await this._integrationService.getIntegrationById(
           orgId,
           post?.integration?.id
         );
@@ -1351,17 +1677,7 @@ export class PostsService {
             settings,
             additionalSettings,
             // each entry as the provider receives it when it publishes
-            (post.value || []).map((p) =>
-              stripHtmlValidation(
-                provider.editor,
-                p.content || '',
-                true,
-                false,
-                !/<\/?[a-z][\s\S]*>/i.test(p.content || ''),
-                provider.mentionFormat,
-                !!provider.inlineImages?.(settings)
-              )
-            )
+            (post.value || []).map((p) => this.preparedText(provider, p.content || '', settings))
           );
         } catch (err: any) {
           errors = err?.message || 'Invalid media';
@@ -1381,7 +1697,9 @@ export class PostsService {
           settings
         );
 
-        const emptyContent = (post.value || []).some((a) => {
+        // counted like the composer shows it: the visible text, not the
+        // markup the provider receives (an html editor keeps <p>, <a>...)
+        const emptyContent = !(post.value || []).length || (post.value || []).some((a) => {
           const strip = stripHtmlValidation('normal', a.content || '', true);
           const length = countLength(integration.providerIdentifier, strip);
           return length === 0 && (a.image || []).length === 0;
@@ -1408,6 +1726,81 @@ export class PostsService {
         };
       })
     );
+  }
+
+  /** Pure formatting shared by validation and publication preparation. */
+  private preparedText(provider: any, content: string, settings: any) {
+    const text = provider.stripLinks?.() ? stripLinks(content) : content;
+    return stripHtmlValidation(
+      provider.editor, text, true, false,
+      !/<\/?[a-z][\s\S]*>/i.test(text), provider.mentionFormat,
+      !!provider.inlineImages?.(settings)
+    );
+  }
+
+  private async bindOwnedMcpMedia(orgId: string, media: Array<any>, requireReady = true) {
+    const paths = [...new Set(media.flatMap(m => [m.path, ...(m.thumbnail ? [m.thumbnail] : [])]))];
+    if (!paths.length) return media;
+    const records = await this._mediaService.getOrgMediaByPaths(orgId, paths);
+    if (!paths.every(path => records.some(r => r.path === path && (!requireReady || r.status === 'ready')))) throw new BadRequestException('Media is not confirmed ready in this workspace. Reuse a ready library path.');
+    return media.map(m => ({ ...m, id: records.find(r => r.path === m.path)!.id }));
+  }
+
+  bindMcpProviderPayload(orgId: string, attemptId: string, payload: any) { return this._postRepository.bindMcpProviderPayload(orgId, attemptId, payload); }
+
+  async ownedMcpMedia(orgId: string, media: Array<{ id?: string; path: string; thumbnail?: string }>, serverBoundIds = false) {
+    const unresolved = [];
+    for (const item of media) {
+      const record = serverBoundIds && item.id ? await this._mediaService.getOrgMediaById(orgId, item.id) : null;
+      if (!record || record.deletedAt || record.status !== 'ready') unresolved.push({ path: item.path, thumbnail: item.thumbnail });
+      else if (item.thumbnail) unresolved.push({ path: item.thumbnail });
+    }
+    const paths = [...new Set(unresolved.flatMap(m => [m.path, ...(m.thumbnail ? [m.thumbnail] : [])]))];
+    if (!paths.length) return true;
+    const owned = await this._mediaService.getOrgMediaByPaths(orgId, paths);
+    return paths.every(path => owned.some(m => m.path === path && m.status === 'ready'));
+  }
+
+  /** A snapshot, never an authorization or a durable promise to publish. */
+  async preflightPosts(
+    orgId: string,
+    posts: Parameters<PostsService['validatePosts']>[1],
+    operation: CreatePostDto['type'] = 'schedule',
+    date?: string,
+    shortLink = false
+  ) {
+    const output = [];
+    for (const [index, post] of posts.entries()) {
+      if (!await this.ownedMcpMedia(orgId, (post.value || []).flatMap(p => p.image || []))) {
+        output.push({ index, channel: post.integration.id, checkedAt: new Date().toISOString(), status: 'UNKNOWN', checks: [{ field: 'mediaIdentity', status: 'UNKNOWN', message: 'The attachment or thumbnail is not confirmed ready in this workspace media library.', fix: 'Upload it to this workspace or wait for mediaStatusTool; reuse the exact library path.' }] });
+        continue;
+      }
+      const integration = await this._integrationService.getIntegrationById(orgId, post.integration.id);
+      const [validation] = await this.validatePosts(orgId, [post], operation, false, date, new Map([[post.integration.id, integration]]));
+      const checks: Array<{ field: string; status: 'VALID' | 'INVALID' | 'UNKNOWN'; message: string; fix?: string }> = [];
+      const add = (field: string, valid: boolean, message: string, fix: string) =>
+        checks.push({ field, status: valid ? 'VALID' : 'INVALID', message, ...(valid ? {} : { fix }) });
+      add('value', !!post.value?.length && !validation.emptyContent, 'Content or media is required.', 'Add a nonempty post or ready uploaded media.');
+      add('settings', validation.valid, validation.settingsError || 'Settings checked.', 'Read integrationSchema and correct the channel settings.');
+      add('media', validation.errors === true, validation.errors === true ? 'Provider media rules checked.' : String(validation.errors), 'Correct the attachments and channel media settings.');
+      add('integration', !validation.disabled, 'Channel enabled state checked.', 'Enable this channel or choose another.');
+      add('date', operation === 'draft' || Number.isFinite(Date.parse(post.date || date || '')), 'Schedule date checked.', 'Supply an explicit UTC date.');
+      const provider = this._integrationManager.getSocialIntegration(integration.providerIdentifier);
+      for (const [entry, value] of (post.value || []).entries()) {
+        // the same visible-text count the save enforces (validatePosts tooLong)
+        const count = countLength(integration.providerIdentifier, stripHtmlValidation('normal', value.content || '', true));
+        add(`value.${entry}.content.length`, count <= (validation.maximumCharacters || 1000000), `${count}/${validation.maximumCharacters || 1000000} characters under this provider counting rule.`, 'Shorten this entry.');
+        if (value.image?.length) checks.push({ field: `value.${entry}.image`, status: 'UNKNOWN', message: 'File readiness and later media transformations are not proven by URL shape.', fix: 'Wait for mediaStatusTool to report ready, then check the final payload again.' });
+      }
+      if (shortLink && !provider.stripLinks?.() && this._shortLinkService.askShortLinkedin((post.value || []).map(p => p.content || ''))) {
+        checks.push({ field: 'shortLink', status: 'UNKNOWN', message: 'Pending short-link transformation; configured provider supplies no proven maximum URL length. No URL was minted.', fix: 'Disable short links for an exact text check; saving must validate materialized links.' });
+      }
+      if (/\(post:[a-zA-Z0-9_-]+\)/.test(JSON.stringify(post))) checks.push({ field: 'postReferences', status: 'UNKNOWN', message: 'Referenced post URLs are resolved at save time and may change the final length.', fix: 'Wait for referenced posts to publish; saving resolves and validates their URLs before review.' });
+      checks.push({ field: 'providerReadiness', status: 'UNKNOWN', message: 'Live provider authorization/readiness is not checked or refreshed.', fix: 'Reconnect in PostDelegate if required; publication checks current workspace policy.' });
+      const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+      output.push({ index, channel: post.integration.id, checkedAt: new Date().toISOString(), inputHash: hash({ post, operation, date, shortLink }), configHash: hash({ identifier: integration.providerIdentifier, additionalSettings: integration.additionalSettings, disabled: integration.disabled, maximumCharacters: validation.maximumCharacters }), status: checks.some(c => c.status === 'INVALID') ? 'INVALID' : checks.some(c => c.status === 'UNKNOWN') ? 'UNKNOWN' : 'VALID', checks });
+    }
+    return output;
   }
 
   /** Returns the first class-validator message (incl. nested children), or ''. */
@@ -1488,6 +1881,45 @@ export class PostsService {
     return post;
   }
 
+  assertMcpAdmissionReady() {
+    if (process.env.MCP_V114_ADMISSION_ENABLED !== 'true') throw new ServiceUnavailableException('Assistant post saves are temporarily unavailable while the service updates.');
+  }
+
+  // A network can tie some settings to the signed-in composer (TikTok's
+  // Direct Post needs the account check and consent shown there). A post
+  // saved from anywhere else - public API, CLI, MCP, the agent, CSV import,
+  // bulk, clipping or auto post - gets the settings the provider allows
+  // outside it, or a readable error. The provider is the one of __type, which
+  // mapTypeToPost and every internal caller set from the channel (like the
+  // rest of createPost); a request that has none yet is looked up.
+  async applyOutsideComposerRules<
+    T extends { integration: { id: string }; settings?: any }
+  >(orgId: string, posts: T[]): Promise<T[]> {
+    return Promise.all(
+      (posts || []).map(async (post) => {
+        const identifier =
+          post?.settings?.__type ||
+          (
+            await this._integrationService.getIntegrationById(
+              orgId,
+              post?.integration?.id
+            )
+          )?.providerIdentifier;
+        const provider = identifier
+          ? this._integrationManager.getSocialIntegration(identifier)
+          : undefined;
+        if (!provider?.settingsOutsideComposer) {
+          return post;
+        }
+        const result = provider.settingsOutsideComposer(post.settings || {});
+        if ('error' in result) {
+          throw new BadRequestException(`${provider.name}: ${result.error}`);
+        }
+        return { ...post, settings: result.settings };
+      })
+    );
+  }
+
   async createPost(
     orgId: string,
     body: CreatePostDto,
@@ -1495,7 +1927,126 @@ export class PostsService {
     keepGroup = false,
     // who saves the post, decides whether it waits for an approver. Internal
     // callers (auto post, clipping, settings updates) pass nothing.
-    actor?: ApprovalActor
+    actor?: ApprovalActor,
+    // Server-captured revision from the in-place draft editor, never authority.
+    expectedDraftUpdatedAt?: Date,
+    validationIntent?: 'review',
+    // only the signed-in composer (POST /posts) and the drafts it generates
+    // pass true, see applyOutsideComposerRules
+    fromComposer = false
+  ): Promise<any[]> {
+    for (const post of body.posts) assertAgentPostWrite(orgId, post.integration.id, body.type);
+    if (creationMethod === 'MCP') this.assertMcpAdmissionReady();
+    if (!fromComposer) {
+      body = {
+        ...body,
+        posts: await this.applyOutsideComposerRules(orgId, body.posts),
+      };
+    }
+
+    // One agent save at a time per workspace, for MCP saves only (new ones, or
+    // edits of a tracked MCP post). The public API and the CLI are agent
+    // actors too, but save concurrently as they always did.
+    const mcpSave = actor?.type === 'agent' && await this.isMcpSave(orgId, body, creationMethod);
+    // a closed rollout refuses before the admission, it is no stopped save
+    if (mcpSave) this.assertMcpAdmissionReady();
+    return mcpSave
+      ? this.withAgentAdmission(orgId, async () => {
+          try { return await this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent); }
+          catch (error) {
+            if (error instanceof McpDispatchUnconfirmed) throw error;
+            const ids = agentAdmission.getStore()?.persistedIds || [];
+            if (ids.length) throw new BadRequestException(`Save incomplete. Already saved post IDs (do not recreate): ${ids.join(', ')}. Inspect these posts before retrying remaining work.`);
+            throw error;
+          }
+        })
+      : this.createPostAdmitted(orgId, body, creationMethod, keepGroup, actor, expectedDraftUpdatedAt, validationIntent);
+  }
+
+  private async isMcpSave(orgId: string, body: CreatePostDto, creationMethod: CreationMethod) {
+    if (creationMethod === 'MCP') return true;
+    for (const post of body.posts) {
+      const id = post.value?.[0]?.id;
+      if (id && await this._postRepository.mcpWorkflowVersion(orgId, id) === 114) return true;
+    }
+    return false;
+  }
+
+  // Called once when the backend starts, from its main.ts. Only the backend
+  // takes agent save admissions, and the deployment runs ONE backend process
+  // per database (a single container), so a row of another instance id
+  // belongs to a process that is gone. Never call it from the orchestrator or
+  // from a second backend sharing the database: their instance ids differ and
+  // they would release saves that are still running.
+  releaseAbandonedAgentAdmissions() { return this._postRepository.releaseAgentAdmissionsOfOtherInstances(agentInstanceId); }
+
+  agentAdmissionStatus(orgId: string) { return this._postRepository.agentAdmissionStatus(orgId); }
+  recoverAgentAdmission(orgId: string, owner: string, actorId: string) { return this._postRepository.recoverAgentAdmission(orgId, owner, actorId); }
+
+  async withAgentAdmission<T>(orgId: string, action: () => Promise<T>): Promise<T> {
+    if (agentAdmission.getStore()?.orgId === orgId) return action();
+    const owner = uuidv4();
+    try { await this._postRepository.acquireAgentAdmission(orgId, owner, { instanceId: agentInstanceId, host: hostname(), processId: process.pid }); }
+    catch (error) {
+      throw new BadRequestException((error as any)?.code === 'P2002'
+        ? 'Another agent save is active. A workspace admin can inspect or recover it in Settings > Agent access.'
+        : 'A safe save admission could not be confirmed. Inspect the workspace before retrying.');
+    }
+    const scope = { orgId, owner, persistedIds: [] as string[] };
+    let result: T | undefined; let failed = false; let failure: unknown;
+    try { result = await agentAdmission.run(scope, action); }
+    catch (error) { failed = true; failure = error; }
+    let persistedIds = scope.persistedIds;
+    try {
+      // a plain refusal (validation 400, plan 402) is no stopped save: unless
+      // it wrote something, nothing is recorded for an admin to recover
+      const refused = failure instanceof HttpException && [400, 402].includes(failure.getStatus());
+      const settlement = await this._postRepository.releaseAgentAdmission(orgId, owner, failed, refused);
+      persistedIds = settlement?.writtenPostIds?.length ? settlement.writtenPostIds : persistedIds;
+    } catch {
+      throw new BadRequestException(`Save cleanup is unconfirmed. ${persistedIds.length ? `Already saved post IDs: ${persistedIds.join(', ')}. ` : ''}Do not recreate blindly; a workspace admin can inspect Settings > Agent access.`);
+    }
+    if (failed) {
+      if (failure instanceof McpDispatchUnconfirmed) throw new McpDispatchUnconfirmed(failure.rootId, failure.generation, [...new Set([...failure.savedPostIds, ...persistedIds])]);
+      if (persistedIds.length) throw new BadRequestException(`Save incomplete. Already saved post IDs (do not recreate): ${persistedIds.join(', ')}. Inspect these posts before retrying remaining work.`);
+      if (failure instanceof HttpException) throw failure;
+      throw new BadRequestException('The save could not be completed. Inspect the workspace before retrying.');
+    }
+    return result as T;
+  }
+
+  // Same messages as updatePostSettings and the public API. A draft is only
+  // checked for content; a turned off channel is refused only for what
+  // publishes (schedule, now, or a draft sent for review), as on main an
+  // update or a draft may still be saved on it.
+  private assertFinalPayload(
+    validation: Awaited<ReturnType<PostsService['validatePosts']>>[number],
+    type: CreatePostDto['type'],
+    validationIntent?: 'review'
+  ) {
+    const name = validation.name;
+    if (validation.emptyContent) {
+      throw new BadRequestException(`${name}: Your post should have at least one character or one image.`);
+    }
+    if (type !== 'draft' || validationIntent === 'review') {
+      if (!validation.valid) {
+        throw new BadRequestException(`${name}: ${validation.settingsError || 'Please fix your settings'}`);
+      }
+      if (validation.errors !== true) {
+        throw new BadRequestException(`${name}: ${validation.errors}`);
+      }
+      if (validation.tooLong) {
+        throw new BadRequestException(`${name}: The maximum characters is ${validation.maximumCharacters}`);
+      }
+    }
+    if (validation.disabled && (type === 'schedule' || type === 'now' || validationIntent === 'review')) {
+      throw new BadRequestException(`${name} is turned off. Turn it on from the channel menu in the calendar, or pick another channel.`);
+    }
+  }
+
+  private async createPostAdmitted(
+    orgId: string, body: CreatePostDto, creationMethod: CreationMethod,
+    keepGroup = false, actor?: ApprovalActor, expectedDraftUpdatedAt?: Date, validationIntent?: 'review'
   ): Promise<any[]> {
     if (actor?.type === 'agent') {
       // an agent's in-place update must point at posts that exist, it can't
@@ -1525,6 +2076,10 @@ export class PostsService {
     // posts sent for review in this save, the approvers hear about them once
     const submitted: { id: string; content: string; integrationName?: string; provider?: string }[] = [];
     const batchId = uuidv4();
+    // Every channel is prepared and checked before the first one is saved: a
+    // refusal of a later channel must not leave the earlier ones saved (and
+    // dispatched), which a retry would then save twice.
+    const checked: { post: (typeof body.posts)[number]; existing: Awaited<ReturnType<PostsRepository['getPostById']>> | null; decision?: ApprovalDecision }[] = [];
     for (const post of body.posts) {
       // Defensive boundary for internal callers that skip mapTypeToPost.
       post.settings = { ...post.settings };
@@ -1542,6 +2097,7 @@ export class PostsService {
       ) {
         this.guardAgainstRepublish(existing, 'createPost');
       }
+      if (existing?.mcpWorkflowVersion === 114) this.assertMcpAdmissionReady();
       const decision = actor
         ? await this._approvalPolicyService.decide(
             orgId,
@@ -1555,6 +2111,12 @@ export class PostsService {
       );
       const removeLinks = !!provider?.stripLinks?.();
 
+      if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) post.value = await Promise.all(post.value.map(async p => ({ ...p, image: await this.bindOwnedMcpMedia(orgId, p.image || [], body.type !== 'draft' || validationIntent === 'review') })));
+      if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) {
+        const prepared = await this.updateTags(orgId, post.value.map(p => ({ ...p, organizationId: orgId, settings: JSON.stringify(post.settings) })) as any);
+        post.value = post.value.map((p, index) => ({ ...p, content: prepared[index].content }));
+        if (prepared[0]) post.settings = JSON.parse(prepared[0].settings || '{}');
+      }
       const messages = (post.value || []).map((p) => p.content);
       // No point shortlinking links on platforms that strip them out anyway
       const updateContent =
@@ -1570,6 +2132,17 @@ export class PostsService {
         content: removeLinks ? stripLinks(updateContent[i]) : updateContent[i],
       }));
 
+      // Materialized links can grow. Validate the exact transformed text before
+      // enqueueing; a preflight snapshot never authorizes this payload.
+      // an in-place update of a draft is checked like the draft it stays: on
+      // main the settings of an incomplete draft could still be updated
+      const checkedAs = body.type === 'update' && existing?.state === 'DRAFT' ? 'draft' : body.type;
+      const [finalValidation] = await this.validatePosts(orgId, [post], validationIntent === 'review' ? 'schedule' : checkedAs, false, post.date || body.date);
+      this.assertFinalPayload(finalValidation, checkedAs, validationIntent);
+      checked.push({ post, existing, decision });
+    }
+
+    for (const { post, existing, decision } of checked) {
       const { posts } = await this._postRepository.createOrUpdatePost(
         // a post that waits for an approver is kept as a draft until approved
         decision?.hold ? 'draft' : body.type,
@@ -1593,6 +2166,7 @@ export class PostsService {
         keepGroup,
         batchId,
         {
+          ...(agentDraftOnly() && body.type === 'update' ? { requireExistingDraft: true, expectedDraftUpdatedAt } : {}),
           approvalStatus: decision?.approvalStatus,
           agentSource: actor?.type === 'agent' ? actor.source : undefined,
         }
@@ -1601,6 +2175,8 @@ export class PostsService {
       if (!posts?.length) {
         return [] as any[];
       }
+
+      if (agentAdmission.getStore()?.orgId === orgId && posts[0]?.id) agentAdmission.getStore()!.persistedIds.push(posts[0].id);
 
       const existingIds = (post.value || []).map((p) => p.id).filter(Boolean);
       await this.detachStaleAnchors(
@@ -1618,13 +2194,14 @@ export class PostsService {
           dayjs(posts[0].publishDate).valueOf();
 
       // an update held for review must stop the workflow already waiting
-      if (body.type !== 'update' || decision?.hold || movedQueued) {
-        this.startWorkflow(
-          post.settings.__type.split('-')[0].toLowerCase(),
-          posts[0].id,
-          orgId,
-          posts[0].state
-        ).catch((err) => {});
+      if (body.type !== 'update' || decision?.hold || movedQueued || (existing?.mcpWorkflowVersion === 114 && posts[0].state === 'QUEUE')) {
+        const dispatched = this.startWorkflow(
+          post.settings.__type.split('-')[0].toLowerCase(), posts[0].id, orgId, posts[0].state
+        );
+        // A tracked producer must finish its guarded dispatch before its save
+        // admission is settled. Legacy fire-and-forget behavior stays intact.
+        if (creationMethod === 'MCP' || existing?.mcpWorkflowVersion === 114) await dispatched;
+        else dispatched.catch(() => undefined);
       }
 
       if (actor) {
@@ -2416,7 +2993,8 @@ export class PostsService {
       // Keep the group stable: a client may have the calendar open while the
       // post is updated out of band, and the calendar links posts by group.
       true,
-      actor
+      actor,
+      agentDraftOnly() ? root.updatedAt : undefined
     );
 
     if (!output) {
@@ -2446,6 +3024,11 @@ export class PostsService {
     republish = false
   ) {
     const getPostById = await this.getStoredRootPost(orgId, id);
+    if (getPostById.mcpWorkflowVersion === 114) {
+      if (status === 'draft') return this.unscheduleMcp(orgId, id);
+      return this.resumeMcp(orgId, id);
+    }
+
 
     if (!republish) {
       this.guardAgainstRepublish(getPostById, 'changePostStatus');
@@ -2581,6 +3164,8 @@ export class PostsService {
       settings = {};
     }
 
+    if (root.mcpWorkflowVersion === 114 && !await this.ownedMcpMedia(orgId, ordered.filter(p => p.state !== 'PUBLISHED').flatMap(p => JSON.parse(p.image || '[]')), true)) return 'its media is still processing or unavailable in this workspace';
+
     const [validation] = await this.validatePosts(orgId, [
       {
         integration: { id: integration.id },
@@ -2599,6 +3184,7 @@ export class PostsService {
     if (!validation) {
       return null;
     }
+    if (validation.disabled) return 'its channel is disabled';
     if (validation.emptyContent) {
       return 'it needs at least one character or one image';
     }
@@ -2638,6 +3224,8 @@ export class PostsService {
     actor?: ApprovalActor
   ) {
     const getPostById = await this.getStoredRootPost(orgId, id);
+    if (getPostById.mcpWorkflowVersion === 114) throw new BadRequestException('Unschedule this tracked MCP post before changing its schedule; review the new revision before resuming.');
+
 
     // schedule restarts the workflow: refused for a post that went out or is
     // going out, unless asked. update only moves the date, see below.
@@ -2800,7 +3388,13 @@ export class PostsService {
               },
             ],
           },
-          'WEB'
+          'WEB',
+          false,
+          undefined,
+          undefined,
+          undefined,
+          // drafts the dashboard generator opens in the composer
+          true
         );
       }
     }

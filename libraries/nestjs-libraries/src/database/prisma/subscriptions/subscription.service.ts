@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import {
   pricing,
   providerPostsLimitsOf,
+  freeChannels,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import {
   SubscriptionProviderState,
@@ -103,7 +104,7 @@ export class SubscriptionService {
       }
       await this.modifySubscription(
         customerId,
-        pricing.FREE.channel || 0,
+        freeChannels(),
         'FREE'
       );
       return await this._subscriptionRepository.deleteSubscriptionByCustomerId(
@@ -127,7 +128,7 @@ export class SubscriptionService {
 
     await this.modifySubscriptionByOrg(
       organizationId,
-      pricing.FREE.channel || 0,
+      freeChannels(),
       'FREE'
     );
     return this._subscriptionRepository.deleteSubscriptionByOrgId(

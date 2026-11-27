@@ -1,4 +1,5 @@
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { curatedPostError } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.curated.error';
 
 const makeRepo = () => {
   const post = {
@@ -17,7 +18,7 @@ const makeRepo = () => {
     { model: { tags } } as any,
     { model: { tagsPosts: { deleteMany: jest.fn() } } } as any,
     {} as any,
-    {} as any
+    { model: { $transaction: (action: any) => action({ post, tags, tagsPosts: { deleteMany: jest.fn() }, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) } }) } } as any
   );
   return { repo, post, tags };
 };
@@ -545,7 +546,7 @@ describe('PostsRepository state and date of a thread', () => {
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
     };
     const transaction = {
-      model: { $transaction: jest.fn((run: any) => run({ post })) },
+      model: { $transaction: jest.fn((run: any) => run({ post, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(null) }, tagsPosts: { deleteMany: jest.fn() }, tags: { findMany: jest.fn() } })) },
     };
     const repo = new PostsRepository(
       { model: { post } } as any,
@@ -706,5 +707,230 @@ describe('saved sequence permission compatibility boundary', () => {
     post.findFirst.mockResolvedValue({ group: 'saved-group' });
     (post as any).count = jest.fn().mockResolvedValue(1);
     await expect((repo as any).isExistingPostSequence('org-A', 'int-1', ['p-1', 'new-entry'])).resolves.toBe(false);
+  });
+});
+
+describe('MCP version stamp before enqueue', () => {
+  it('stores the new workflow version atomically with new MCP rows, leaving existing update data unstamped', async () => {
+    const { repo, post } = makeRepo();
+    await repo.createOrUpdatePost('schedule', 'org', '2030-01-01T00:00:00Z', body(), [], 'MCP');
+    const args = post.upsert.mock.calls[0][0];
+    expect(args.create).toMatchObject({ creationMethod: 'MCP', mcpWorkflowVersion: 114 });
+    expect(args.update).not.toHaveProperty('mcpWorkflowVersion');
+  });
+});
+
+describe('agent save admission lease, release retry and boot release', () => {
+  type Row = { organizationId: string; owner: string; instanceId: string; writtenPostIds: string[]; createdAt: Date };
+  // the admission table, one row per workspace, with the filters it is read by
+  const makeAdmissions = (rows: Row[]) => {
+    const matches = (row: Row, where: any = {}) =>
+      (where.organizationId === undefined || row.organizationId === where.organizationId) &&
+      (where.owner === undefined || row.owner === where.owner) &&
+      (where.createdAt?.lt === undefined || row.createdAt < where.createdAt.lt) &&
+      (where.instanceId?.not === undefined || row.instanceId !== where.instanceId.not);
+    const recoveries: any[] = [];
+    const audits: any[] = [];
+    const tx = {
+      mcpAgentAdmission: {
+        findUnique: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where)) || null),
+        findUniqueOrThrow: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where))!),
+        findFirst: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where)) || null),
+        findMany: jest.fn(async ({ where }: any) => rows.filter((r) => matches(r, where))),
+        updateMany: jest.fn(async ({ where }: any) => ({ count: rows.filter((r) => matches(r, where)).length })),
+        create: jest.fn(async ({ data }: any) => {
+          if (rows.some((r) => r.organizationId === data.organizationId)) throw Object.assign(new Error('unique'), { code: 'P2002' });
+          const row = { writtenPostIds: [], createdAt: new Date(), ...data };
+          rows.push(row);
+          return row;
+        }),
+        delete: jest.fn(async ({ where }: any) => rows.splice(rows.findIndex((r) => matches(r, where)), 1)[0]),
+        deleteMany: jest.fn(async ({ where }: any) => {
+          const before = rows.length;
+          for (let i = rows.length - 1; i >= 0; i--) if (matches(rows[i], where)) rows.splice(i, 1);
+          return { count: before - rows.length };
+        }),
+      },
+      mcpAgentAdmissionRecovery: {
+        create: jest.fn(async ({ data }: any) => recoveries.push(data)),
+        findFirst: jest.fn(async ({ where }: any) => recoveries.find((r) => r.owner === where.owner) || null),
+      },
+      activityLog: { create: jest.fn(async ({ data }: any) => (audits.push(data), { id: `audit-${audits.length}` })) },
+    };
+    const $transaction = jest.fn((run: any) => run(tx));
+    const repo = new PostsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction } } as any, {} as any);
+    return { repo, rows, recoveries, audits, $transaction };
+  };
+  const minutesAgo = (n: number) => new Date(Date.now() - n * 60 * 1000);
+
+  it('takes over an admission older than the 10 minute lease and keeps its saved post IDs', async () => {
+    const { repo, rows, recoveries, audits } = makeAdmissions([
+      { organizationId: 'org', owner: 'stale', instanceId: 'old', writtenPostIds: ['p-1'], createdAt: minutesAgo(11) },
+    ]);
+    await repo.acquireAgentAdmission('org', 'next', { instanceId: 'now', host: 'h', processId: 1 });
+    expect(rows).toEqual([expect.objectContaining({ organizationId: 'org', owner: 'next' })]);
+    expect(recoveries).toEqual([expect.objectContaining({ organizationId: 'org', owner: 'stale', writtenPostIds: ['p-1'] })]);
+    expect(audits[0].comment).toContain('p-1');
+    // the old owner learns its save was stopped, with what it had saved
+    await expect(repo.releaseAgentAdmission('org', 'stale')).resolves.toEqual({ count: 0, writtenPostIds: ['p-1'] });
+  });
+
+  it('still refuses a second save while a live admission is within its lease', async () => {
+    const { repo, rows, recoveries } = makeAdmissions([
+      { organizationId: 'org', owner: 'live', instanceId: 'now', writtenPostIds: [], createdAt: minutesAgo(9) },
+    ]);
+    await expect(repo.acquireAgentAdmission('org', 'next')).rejects.toMatchObject({ code: 'P2002' });
+    expect(rows.map((r) => r.owner)).toEqual(['live']);
+    expect(recoveries).toHaveLength(0);
+  });
+
+  it('retries a release that lost a serialization race instead of leaving the workspace locked', async () => {
+    const { repo, rows, $transaction } = makeAdmissions([
+      { organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: [], createdAt: new Date() },
+    ]);
+    $transaction.mockImplementationOnce(async () => { throw Object.assign(new Error('serialization'), { code: 'P2034' }); });
+    await expect(repo.releaseAgentAdmission('org', 'mine')).resolves.toMatchObject({ count: 1 });
+    expect(rows).toHaveLength(0);
+    expect($transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up a release after three serialization failures', async () => {
+    const { repo, $transaction } = makeAdmissions([]);
+    $transaction.mockImplementation(async () => { throw Object.assign(new Error('serialization'), { code: 'P2034' }); });
+    await expect(repo.releaseAgentAdmission('org', 'mine')).rejects.toMatchObject({ code: 'P2034' });
+    expect($transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it('records no stopped save for a plain refusal that wrote nothing', async () => {
+    const { repo, rows, recoveries, audits } = makeAdmissions([
+      { organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: [], createdAt: new Date() },
+    ]);
+    await repo.releaseAgentAdmission('org', 'mine', true, true);
+    expect(rows).toHaveLength(0);
+    expect(recoveries).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it('still records a refused save that had written posts, and any other failure', async () => {
+    const written = makeAdmissions([{ organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: ['p-1'], createdAt: new Date() }]);
+    await written.repo.releaseAgentAdmission('org', 'mine', true, true);
+    expect(written.recoveries).toEqual([expect.objectContaining({ writtenPostIds: ['p-1'] })]);
+    const crashed = makeAdmissions([{ organizationId: 'org', owner: 'mine', instanceId: 'now', writtenPostIds: [], createdAt: new Date() }]);
+    await crashed.repo.releaseAgentAdmission('org', 'mine', true);
+    expect(crashed.audits).toHaveLength(1);
+  });
+
+  it('at boot releases the admissions of other server instances only', async () => {
+    const { repo, rows, recoveries } = makeAdmissions([
+      { organizationId: 'org-a', owner: 'gone', instanceId: 'previous-boot', writtenPostIds: ['p-9'], createdAt: new Date() },
+      { organizationId: 'org-b', owner: 'mine', instanceId: 'this-boot', writtenPostIds: [], createdAt: new Date() },
+    ]);
+    await expect(repo.releaseAgentAdmissionsOfOtherInstances('this-boot')).resolves.toBe(1);
+    expect(rows.map((r) => r.owner)).toEqual(['mine']);
+    expect(recoveries).toEqual([expect.objectContaining({ organizationId: 'org-a', owner: 'gone', writtenPostIds: ['p-9'] })]);
+  });
+});
+
+describe('PostsRepository.createOrUpdatePost transaction isolation and retry', () => {
+  const make = (fence: any = null) => {
+    const post = {
+      findFirst: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockImplementation(async ({ where }: any) => ({ id: where.id })),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+    const tx = { post, tags: { findMany: jest.fn() }, tagsPosts: { deleteMany: jest.fn() }, mcpPublishFence: { findUnique: jest.fn().mockResolvedValue(fence), update: jest.fn(), upsert: jest.fn() }, mcpPublishAttempt: { count: jest.fn().mockResolvedValue(0) } };
+    const $transaction = jest.fn((run: any) => run(tx));
+    const repo = new PostsRepository({ model: { post } } as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction } } as any, {} as any);
+    return { repo, $transaction, post };
+  };
+
+  it('saves a web, import or public API post with the default isolation, as before', async () => {
+    const { repo, $transaction } = make();
+    await repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
+    const options = $transaction.mock.calls.map(([, options]: any[]) => options);
+    expect(options.every((o: any) => o?.isolationLevel !== 'Serializable')).toBe(true);
+  });
+
+  it('keeps Serializable for MCP saves and edits of a fenced post', async () => {
+    const mcp = make();
+    await mcp.repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'MCP' as any);
+    expect(mcp.$transaction.mock.calls.at(-1)![1]).toEqual({ timeout: 15000, isolationLevel: 'Serializable' });
+
+    const fenced = make({ postId: 'p-1', organizationId: 'org-A' });
+    fenced.post.findFirst.mockResolvedValue({ state: 'QUEUE' });
+    await fenced.repo.createOrUpdatePost('update', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
+    expect(fenced.$transaction.mock.calls.at(-1)![1]).toEqual({ timeout: 15000, isolationLevel: 'Serializable' });
+  });
+
+  it('gives every save 15s instead of the 5s Prisma default', async () => {
+    const { repo, $transaction } = make();
+    await repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any);
+    expect($transaction.mock.calls.at(-1)![1]).toEqual({ timeout: 15000 });
+  });
+
+  it('runs a save again after a serialization failure instead of failing it', async () => {
+    const { repo, $transaction, post } = make();
+    let failed = false;
+    post.upsert.mockImplementation(async ({ where }: any) => {
+      if (!failed) { failed = true; throw Object.assign(new Error('could not serialize'), { code: 'P2034' }); }
+      return { id: where.id };
+    });
+    await expect(repo.createOrUpdatePost('schedule', 'org-A', '2030-01-01T00:00:00', body(), [], 'API' as any)).resolves.toMatchObject({ posts: [{ id: 'p-1' }] });
+    expect(post.upsert).toHaveBeenCalledTimes(2);
+    expect($transaction).toHaveBeenCalledTimes(3); // the fence lookup, then two save attempts
+  });
+});
+
+describe('PostsRepository.deletePost of a failed tracked MCP thread', () => {
+  const make = (errorRow: any) => {
+    const post = {
+      findMany: jest.fn().mockResolvedValue([{ id: 'root', integrationId: 'channel' }]),
+      findFirst: jest.fn().mockResolvedValue(errorRow),
+      updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+    };
+    const tx = {
+      post,
+      mcpPublishFence: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), update: jest.fn() },
+      // the root went out, its comment's attempt stayed uncertain
+      mcpPublishAttempt: { count: jest.fn().mockResolvedValue(1) },
+    };
+    const repo = new PostsRepository({ model: { post } } as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction: (run: any) => run(tx) } } as any, {} as any);
+    return { repo, post, tx };
+  };
+
+  it('deletes it when a comment of the thread failed, not only the root', async () => {
+    const { repo, post } = make({ id: 'child' });
+    await expect(repo.deletePost('org', 'group', ['root'])).resolves.toEqual({ id: 'root' });
+    expect(post.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: 'org', group: 'group', integrationId: 'channel', state: 'ERROR', deletedAt: null } }));
+    expect(post.updateMany).toHaveBeenCalled();
+  });
+
+  it('still refuses while no row of the thread failed', async () => {
+    const { repo, post } = make(null);
+    await expect(repo.deletePost('org', 'group', ['root'])).rejects.toThrow('active or uncertain');
+    expect(post.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostsRepository.failMcpSegment error', () => {
+  const make = () => {
+    const tx = { mcpPublishFence: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }, post: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+    const repo = new PostsRepository({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, { model: { $transaction: (run: any) => run(tx) } } as any, {} as any);
+    const stored = () => curatedPostError(tx.post.updateMany.mock.calls[0][0].data.error);
+    return { repo, stored };
+  };
+  // the activity failure as the workflow passes it on
+  const failure = (type: string, message: string) => ({ cause: { type, failure: { message } } });
+
+  it('keeps the reconciliation note and adds what the platform said', async () => {
+    const { repo, stored } = make();
+    await repo.failMcpSegment('org', 'root', 'child', 1, 'hash', failure('bad_body', 'Your video is longer than 60 seconds'));
+    expect(stored()).toBe('Publication outcome needs reconciliation before retry. Your video is longer than 60 seconds');
+  });
+
+  it('shows only the note for one of our own failures', async () => {
+    const { repo, stored } = make();
+    await repo.failMcpSegment('org', 'root', 'child', 1, 'hash', failure('BadRequestException', 'Invalid `prisma.post.update()` invocation: https://db.internal/?password=x'));
+    expect(stored()).toBe('Publication outcome needs reconciliation before retry.');
   });
 });
