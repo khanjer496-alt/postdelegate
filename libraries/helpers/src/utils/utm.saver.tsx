@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, useEffect } from 'react';
+import { privacySignalOptOut } from '../consent/acquisition.consent';
 import { useSearchParams } from 'next/navigation';
 import { useLocalStorage } from '@mantine/hooks';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
@@ -55,7 +56,7 @@ const UtmSaver: FC = () => {
   }, []);
 
   useEffect(() => {
-    if (consent && !consent.ref) {
+    if (privacySignalOptOut() || (consent && !consent.ref)) {
       removeValue();
       return;
     }
@@ -67,7 +68,7 @@ const UtmSaver: FC = () => {
   }, [query, value, consent]);
 
   useEffect(() => {
-    if (consent && !consent.ref) {
+    if (privacySignalOptOut() || (consent && !consent.ref)) {
       removePulseVisitor();
       return;
     }
@@ -85,7 +86,7 @@ const UtmSaver: FC = () => {
 export const useUtmUrl = () => {
   const [value] = useLocalStorage({ key: 'utm', defaultValue: '' });
   const query = useSearchParams();
-  return value || getUtmFromQuery(query);
+  return privacySignalOptOut() ? '' : value || getUtmFromQuery(query);
 };
 
 // Without a saved visit, the one in the current address, for this visit only.
@@ -97,6 +98,15 @@ export const usePulseVisitor = () => {
     getInitialValueInEffect: false,
   });
   const query = useSearchParams();
-  return value || getPulseVisitorFromQuery(query);
+  useEffect(() => {
+    if (privacySignalOptOut()) {
+      try {
+        localStorage.removeItem('pulse_vid');
+      } catch {
+        /* storage blocked */
+      }
+    }
+  }, []);
+  return privacySignalOptOut() ? '' : value || getPulseVisitorFromQuery(query);
 };
 export default UtmSaver;

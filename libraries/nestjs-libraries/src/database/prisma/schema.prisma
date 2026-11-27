@@ -2558,3 +2558,41 @@ model CommentAutoReply {
   @@index([ruleId])
   @@index([organizationId])
 }
+
+// Internal measurement ledger. Export only dimension/day/cohort aggregates, never these rows.
+// No FK: measurement failures must not constrain customer writes. No source data backfill/deletion.
+model MeasurementEvent {
+  key             String   @id
+  organizationId  String
+  kind            String
+  occurredAt      DateTime
+  receivedAt      DateTime @default(now())
+  duplicates      Int      @default(0)
+  reference       String   @default("")
+  source          String   @default("unknown")
+  campaign        String   @default("unknown")
+  medium          String   @default("unknown")
+  term            String   @default("unknown")
+  content         String   @default("unknown")
+  entryPage       String   @default("unknown")
+  device          String   @default("unknown")
+  internalOrTest  Boolean  @default(false)
+  touchHash       String?  @unique
+  matchedTouch    Boolean  @default(false)
+  amountMinor     Int      @default(0)
+  currency        String   @default("unknown")
+  trialEndsAt     DateTime?
+  acceptedPublishAt DateTime?
+  humanApproval Boolean @default(false)
+  evidenceType String @default("")
+
+  @@index([occurredAt, kind])
+  @@index([organizationId, kind])
+}
+
+// Short-lived, server-side OAuth continuation. Never set an analytics cookie.
+model MeasurementHandoff {
+  nonceHash String @id
+  token     String
+  expiresAt DateTime
+}

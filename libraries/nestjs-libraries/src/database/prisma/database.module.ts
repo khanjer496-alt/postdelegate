@@ -1,3 +1,5 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
+import { MeasurementRepository } from './measurement/measurement.repository';
 import { AgentCredentialService } from '../../chat/agent-credential.service';
 import { AgentCredentialRepository } from './agent-credentials/agent.credential.repository';
 import { Global, Module } from '@nestjs/common';
@@ -100,6 +102,8 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
   imports: [],
   controllers: [],
   providers: [
+    MeasurementService,
+    MeasurementRepository,
     PrismaService,
     AgentCredentialService,
     AgentCredentialRepository,

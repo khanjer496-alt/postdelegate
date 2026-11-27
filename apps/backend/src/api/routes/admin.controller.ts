@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import {
   Body,
   Controller,
@@ -16,6 +17,7 @@ import { AffiliateService } from '@gitroom/nestjs-libraries/database/prisma/affi
 import { MarkAffiliatePaidDto } from '@gitroom/nestjs-libraries/dtos/affiliates/mark.affiliate.paid.dto';
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
 import { UpdateReviewStatusDto } from '@gitroom/nestjs-libraries/dtos/reviews/update.review.status.dto';
+import { MeasurementExportDto } from '@gitroom/nestjs-libraries/dtos/measurement/measurement.export.dto';
 import dayjs from 'dayjs';
 
 @ApiTags('Admin')
@@ -25,7 +27,8 @@ export class AdminController {
     private _errorsService: ErrorsService,
     private _adminStatsService: AdminStatsService,
     private _affiliateService: AffiliateService,
-    private _reviewService: ReviewService
+    private _reviewService: ReviewService,
+    private _measurementService: MeasurementService
   ) {}
 
   private assertSuperAdmin(user: User) {
@@ -57,6 +60,26 @@ export class AdminController {
   async listPlatforms(@GetUserFromRequest() user: User) {
     this.assertSuperAdmin(user);
     return this._errorsService.listPlatforms();
+  }
+
+  @Get('/measurement')
+  async measurement(
+    @GetUserFromRequest() user: User,
+    @Query() query: MeasurementExportDto
+  ) {
+    this.assertSuperAdmin(user);
+    const start = new Date(query.from);
+    const end = new Date(query.to);
+    if (
+      start >= end ||
+      end.getTime() > Date.now() + 60000 ||
+      end.getTime() - start.getTime() > 93 * 86400000
+    )
+      throw new HttpException(
+        'Supply [from,to) ISO instants spanning at most 93 days',
+        400
+      );
+    return this._measurementService.export(start, end);
   }
 
   @Get('/stats')

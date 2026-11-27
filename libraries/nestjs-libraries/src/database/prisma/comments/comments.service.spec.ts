@@ -53,7 +53,8 @@ const setup = (comments: any[] = [comment()], rules: any[] = [rule()]) => {
     token: 'token',
     type: 'social',
     providerIdentifier: 'instagram-standalone',
-    tokenExpiration: new Date(Date.now() + 86400000),
+    // the expiry check uses dayjs(), which reads the real clock, not the Date.now mock
+    tokenExpiration: new Date(new Date().getTime() + 86400000),
     deletedAt: null,
     disabled: false,
     inBetweenSteps: false,

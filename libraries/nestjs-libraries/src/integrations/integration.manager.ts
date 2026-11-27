@@ -1,3 +1,4 @@
+import { isPubliclyAvailableProvider } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 import 'reflect-metadata';
 
 import { Injectable } from '@nestjs/common';
@@ -96,10 +97,7 @@ export class IntegrationManager {
   // provider through the new provider's OAuth and migrates the channel in
   // place, keeping its id, scheduled posts and settings.
   isHiddenProvider(identifier: string) {
-    return (process.env.HIDDEN_PROVIDERS || '')
-      .split(',')
-      .map((p) => p.trim().toLowerCase())
-      .includes(identifier.toLowerCase());
+    return !isPubliclyAvailableProvider(identifier);
   }
 
   // A provider whose OAuth app is not configured on this instance can only
