@@ -9,6 +9,13 @@ import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/thrott
 import { AuthController } from './auth.controller';
 import { getSessionUser } from '@gitroom/backend/services/auth/auth.middleware';
 
+// MeasurementService never throws; these flows only need it to answer
+const measurement = {
+  signupAttempt: jest.fn(async () => undefined),
+  rememberHandoff: jest.fn(async () => undefined),
+  handoff: jest.fn(async () => undefined),
+};
+
 const proto: any = AuthController.prototype;
 
 const limitOf = (name: string) => ({
@@ -40,7 +47,12 @@ describe('AuthController rate limits', () => {
 
 describe('AuthController account enumeration', () => {
   const make = (service: object) =>
-    new AuthController(service as any, {} as any, {} as any);
+    new AuthController(
+      service as any,
+      {} as any,
+      {} as any,
+      measurement as any
+    );
 
   it('answers /forgot the same for every outcome', async () => {
     for (const forgot of [
@@ -93,7 +105,8 @@ describe('AuthController referral cookie', () => {
           getOrgFromCookie: jest.fn().mockReturnValue(false),
         } as any,
         { hasProvider: () => false } as any,
-        {} as any
+        {} as any,
+        measurement as any
       );
 
       await (controller as any)[name](
@@ -135,7 +148,8 @@ describe('AuthController invite cookie', () => {
         routeAuth: jest.fn(async () => ({ jwt: 'jwt', addedOrg })),
       } as any,
       {} as any,
-      {} as any
+      {} as any,
+      measurement as any
     );
 
   it.each([
@@ -177,7 +191,8 @@ describe('AuthController activate does not switch another signed-in account', ()
     new AuthController(
       { activate: jest.fn(async () => result) } as any,
       {} as any,
-      {} as any
+      {} as any,
+      measurement as any
     );
   const live = getSessionUser as jest.Mock;
   beforeEach(() => live.mockReset().mockResolvedValue(null));

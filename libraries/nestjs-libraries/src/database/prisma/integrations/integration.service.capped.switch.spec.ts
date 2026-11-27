@@ -33,6 +33,11 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
 
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 
+// MeasurementService never throws; these flows only need it to answer
+const measurement = {
+  channelConnected: jest.fn(async () => undefined),
+};
+
 const makeService = (
   existing: { providerIdentifier: string; deletedAt?: Date } | null
 ) => {
@@ -51,7 +56,9 @@ const makeService = (
     {} as any,
     {} as any,
     {} as any,
-    {} as any
+    {} as any,
+    {} as any,
+    measurement as any
   );
   return Object.assign(service, { repository });
 };
@@ -154,7 +161,8 @@ describe('IntegrationService.enableChannel', () => {
       {} as any,
       {} as any,
       {} as any,
-      comments as any
+      comments as any,
+      measurement as any
     );
     return { service, repository, comments };
   };
@@ -290,7 +298,9 @@ describe('IntegrationService.saveProviderPage channel limit', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
     return { service, repository };
   };
@@ -347,7 +357,9 @@ describe('IntegrationService.changeActiveCron', () => {
       {} as any,
       {} as any,
       temporal as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
 
     expect(await service.changeActiveCron('org')).toBe(true);
@@ -365,7 +377,9 @@ describe('IntegrationService.changeActiveCron', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
     expect(await service.changeActiveCron('org')).toBe(false);
   });
@@ -391,7 +405,8 @@ describe('IntegrationService.createOrUpdateIntegration comment rules', () => {
       {} as any,
       {} as any,
       {} as any,
-      comments as any
+      comments as any,
+      measurement as any
     );
     const saved = await service.createOrUpdateIntegration(
       undefined,

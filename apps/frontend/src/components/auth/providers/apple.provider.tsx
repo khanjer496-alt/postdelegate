@@ -1,5 +1,7 @@
 'use client';
 
+import { acquisitionQuery } from '@gitroom/helpers/consent/acquisition.consent';
+
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -10,7 +12,7 @@ export const AppleProvider = () => {
   const toaster = useToaster();
   const gotoLogin = useCallback(async () => {
     try {
-      const response = await fetch('/auth/oauth/APPLE');
+      const response = await fetch('/auth/oauth/APPLE' + acquisitionQuery());
       // an error body is not a sign-in link
       if (!response.ok) {
         throw new Error(

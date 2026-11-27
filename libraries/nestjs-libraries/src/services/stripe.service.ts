@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import Stripe from 'stripe';
 import * as Sentry from '@sentry/nestjs';
 import { BadRequestException } from '@nestjs/common';
@@ -315,6 +316,17 @@ export const subscriptionStateOf = (
   };
 };
 
+// Billing-only telemetry context; the shared status-sync helper keeps its existing shape.
+const measuredSubscriptionStateOf = (
+  subscription: Stripe.Subscription
+): SubscriptionProviderState => ({
+  ...subscriptionStateOf(subscription),
+  measurementSubscriptionId: subscription.id,
+  ...(subscription.trial_start
+    ? { trialStartsAt: new Date(subscription.trial_start * 1000) }
+    : {}),
+});
+
 // In a trial for the workspace: Stripe has it trialing, or the first charge
 // after the trial failed and Stripe is retrying it (past_due in the period
 // that started when the trial ended), so it has never paid. A past_due
@@ -618,7 +630,8 @@ export class StripeService extends PaymentProviderAbstract {
     private _userService: UsersService,
     private _trackService: TrackService,
     private _affiliateService: AffiliateService,
-    private _notificationService: NotificationService
+    private _notificationService: NotificationService,
+    private _measurementService: MeasurementService
   ) {
     super();
   }
@@ -887,7 +900,7 @@ export class StripeService extends PaymentProviderAbstract {
       current.cancel_at,
       undefined,
       undefined,
-      subscriptionStateOf(current)
+      measuredSubscriptionStateOf(current)
     );
     // not stored: Stripe sends the event again, the notices go out then
     if (result?.retry) {
@@ -950,7 +963,7 @@ export class StripeService extends PaymentProviderAbstract {
       current.cancel_at,
       undefined,
       undefined,
-      subscriptionStateOf(current)
+      measuredSubscriptionStateOf(current)
     );
   }
 
@@ -1023,7 +1036,7 @@ export class StripeService extends PaymentProviderAbstract {
       survivor.cancel_at,
       undefined,
       undefined,
-      subscriptionStateOf(survivor)
+      measuredSubscriptionStateOf(survivor)
     );
   }
 
@@ -2569,7 +2582,7 @@ export class StripeService extends PaymentProviderAbstract {
       updated.cancel_at,
       undefined,
       undefined,
-      subscriptionStateOf(updated)
+      measuredSubscriptionStateOf(updated)
     );
 
     return {
@@ -2638,7 +2651,28 @@ export class StripeService extends PaymentProviderAbstract {
     // only feeds the Facebook pixel, it runs in the background so it can
     // never fail or slow down the webhook
     this.trackConversion(event.data.object).catch((err) => {});
-    return this.recordAffiliateCommission(event.data.object);
+    const invoice = event.data.object;
+    const subscription =
+      invoice.parent?.subscription_details?.subscription ||
+      (invoice as any).subscription;
+    const subscriptionId =
+      typeof subscription === 'string' ? subscription : subscription?.id;
+    const customer =
+      typeof invoice.customer === 'string'
+        ? invoice.customer
+        : invoice.customer?.id;
+    if (customer && subscriptionId && invoice.status === 'paid')
+      await this._measurementService.payment(
+        customer,
+        subscriptionId,
+        invoice.id!,
+        invoice.amount_paid,
+        invoice.currency,
+        new Date(
+          (invoice.status_transitions?.paid_at || invoice.created) * 1000
+        )
+      );
+    return this.recordAffiliateCommission(invoice);
   }
 
   // A failed financial write stays retryable; the row is unique per invoice.

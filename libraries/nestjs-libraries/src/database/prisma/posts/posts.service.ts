@@ -1,3 +1,4 @@
+import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { McpDispatchUnconfirmed } from './mcp.dispatch.status';
 import { getContext } from '../../../chat/async.storage';
 import { hostname } from 'os';
@@ -125,7 +126,8 @@ export class PostsService {
     private _approvalPolicyService: ApprovalPolicyService,
     private _activityLogService: ActivityLogService,
     private _subscriptionService: SubscriptionService,
-    private _paymentService: PaymentService
+    private _paymentService: PaymentService,
+    private _measurementService: MeasurementService
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -2220,6 +2222,11 @@ export class PostsService {
         }
       }
 
+      await this._measurementService.postAccepted(
+        orgId,
+        posts[0].id,
+        actor?.type === 'user'
+      );
       Sentry.metrics.count('post_created', 1);
       postList.push({
         postId: posts[0].id,

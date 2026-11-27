@@ -39,6 +39,13 @@ export class CreateOrgUserDto {
   @MaxLength(128)
   company: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.length <= 2500 ? value : undefined
+  )
+  @IsOptional()
+  @IsString()
+  acquisition?: string;
+
   datafast_visitor_id: string;
 
   // the ?ref= code of the sign-up page, sent when the visitor did not allow

@@ -22,6 +22,11 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 import { YoutubeSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/youtube.settings.dto';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 
+// MeasurementService never throws; these flows only need it to answer
+const measurement = {
+  postAccepted: jest.fn(async () => undefined),
+};
+
 const previousMcpAdmission = process.env.MCP_V114_ADMISSION_ENABLED;
 beforeAll(() => { process.env.MCP_V114_ADMISSION_ENABLED = 'true'; });
 afterAll(() => { if (previousMcpAdmission === undefined) delete process.env.MCP_V114_ADMISSION_ENABLED; else process.env.MCP_V114_ADMISSION_ENABLED = previousMcpAdmission; });
@@ -54,7 +59,9 @@ const makeService = (integrationManager: any = {}) => {
     {} as any,
     {} as any,
     {} as any,
-    {} as any
+    {} as any,
+    {} as any,
+    measurement as any
   );
   return { service, postRepository, mediaService };
 };
@@ -233,7 +240,9 @@ describe('PostsService approvals on save', () => {
       {} as any,
       policy as any,
       { recordPublished: jest.fn() } as any,
-      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
+      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any,
+      {} as any,
+      measurement as any
     );
     jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
@@ -427,7 +436,9 @@ describe('PostsService TikTok Direct Post outside the composer', () => {
         notifyApprovers: jest.fn().mockResolvedValue(undefined),
       } as any,
       { recordPublished: jest.fn() } as any,
-      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
+      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any,
+      {} as any,
+      measurement as any
     );
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
     jest.spyOn(service, 'detachStaleAnchors').mockResolvedValue(undefined as any);
@@ -592,7 +603,9 @@ describe('PostsService status and date changes', () => {
       {} as any,
       policy as any,
       { recordPublished: jest.fn() } as any,
-      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any
+      { getProviderPostsLimits: jest.fn().mockResolvedValue(null) } as any,
+      {} as any,
+      measurement as any
     );
     jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
@@ -879,7 +892,9 @@ describe('PostsService status and date changes', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
     const error = jest
       .spyOn((service as any)._logger, 'error')
@@ -952,7 +967,8 @@ describe('PostsService monthly cap on one network', () => {
       {} as any,
       {} as any,
       subscriptionService as any,
-      paymentService as any
+      paymentService as any,
+      measurement as any
     );
     jest.spyOn(service, 'validatePosts').mockResolvedValue([{ emptyContent: false, valid: true, errors: true, tooLong: false, disabled: false }] as any);
     jest.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
@@ -1622,7 +1638,9 @@ describe('PostsService.validatePosts post date context', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
     return { service, integrationService };
   };
@@ -1739,7 +1757,9 @@ describe('PostsService.validatePosts text for the provider rules', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
 
     const [result] = await service.validatePosts('org-1', [
@@ -1794,7 +1814,9 @@ describe('PostsService.validatePosts counts the visible text of an X post', () =
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      {} as any,
+      measurement as any
     );
     return service;
   };
@@ -1895,7 +1917,8 @@ describe('PostsService posting limits', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      measurement as any
     );
     return { service, postRepository, integrationService };
   };
@@ -2345,7 +2368,9 @@ describe('PostsService optional comments permission', () => {
       { getIntegrationById: async () => ({
         id: 'review-channel', name: 'Reviewer', providerIdentifier: 'instagram', additionalSettings: '[]',
       }) } as any,
-      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any,
+      measurement as any
     );
     const [result] = await service.validatePosts('review-org', [{
       integration: { id: 'review-channel' },
@@ -2367,7 +2392,10 @@ describe('saved composition optional-reply compatibility', () => {
     const service = new PostsService(repo as any,
       { getSocialIntegration: () => ({ plugsAvailable: false, checkValidity: async () => true, maxLength: () => 2200, editor: 'normal' }) } as any,
       { getIntegrationById: async () => ({ id: 'channel-1', name: 'Review', providerIdentifier: 'instagram', additionalSettings: '[]' }) } as any,
-      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any,
+      measurement as any
+    );
     return { service, repo };
   };
   it('allows existing saved entries to be edited/rescheduled without dropping content', async () => {

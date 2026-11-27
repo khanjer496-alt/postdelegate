@@ -195,6 +195,15 @@ describe('SubscriptionService plan writes', () => {
     ).toEqual({});
   });
 
+  it('keeps an applied entitlement acknowledged when telemetry fails', async () => {
+    const { service, repository } = make({ provider: 'stripe', subscriptionTier: 'PRO' });
+    (service as any)._measurementService = {
+      entitlement: jest.fn().mockRejectedValue(new Error('telemetry down')),
+    };
+    expect(await service.createOrUpdateSubscription('stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null, undefined, 'org_1')).toBeUndefined();
+    expect(repository.createOrUpdateSubscription).toHaveBeenCalled();
+  });
+
   it('counts only connected channels when a plan shrinks', async () => {
     const { service, integrations } = make(
       { provider: 'stripe', subscriptionTier: 'PRO', totalChannels: 30 },
