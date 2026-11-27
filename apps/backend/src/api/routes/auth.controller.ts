@@ -54,7 +54,7 @@ export class AuthController {
     private _authService: AuthService,
     private _emailService: EmailService,
     private _usersService: UsersService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
 
   // The invite in the cookie: its workspace opens, or the app says why it
@@ -124,7 +124,7 @@ export class AuthController {
     @UserAgent() userAgent: string
   ) {
     const identity = req?.headers?.['x-measurement-event'];
-    await this._measurement?.signupAttempt(
+    await this._measurementService.signupAttempt(
       body.acquisition,
       typeof identity === 'string' && /^[a-f0-9-]{36}$/.test(identity)
         ? identity
@@ -273,7 +273,7 @@ export class AuthController {
       expires: new Date(Date.now() + 1000 * 60 * 10),
     });
 
-    await this._measurement?.rememberHandoff(state, query?.acquisition);
+    await this._measurementService.rememberHandoff(state, query?.acquisition);
     return this._authService.oauthLink(provider, { ...query, state });
   }
 
@@ -407,7 +407,7 @@ export class AuthController {
     if (token) {
       return response.json({
         token,
-        acquisition: await this._measurement?.handoff(state),
+        acquisition: await this._measurementService.handoff(state),
       });
     }
 

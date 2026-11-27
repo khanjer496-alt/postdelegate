@@ -20,7 +20,7 @@ export class OrganizationService {
   constructor(
     private _organizationRepository: OrganizationRepository,
     private _notificationsService: NotificationService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
   async createOrgAndUser(
     body: Omit<CreateOrgUserDto, 'providerToken'> & { providerId?: string },
@@ -33,7 +33,11 @@ export class OrganizationService {
       ip,
       userAgent
     );
-    await this._measurement?.registration(created.id, body.acquisition, !!created.users[0]?.user.activated);
+    await this._measurementService.registration(
+      created.id,
+      body.acquisition,
+      !!created.users[0]?.user.activated
+    );
     return created;
   }
 

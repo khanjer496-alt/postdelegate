@@ -54,7 +54,7 @@ export class SubscriptionService {
     private readonly _subscriptionRepository: SubscriptionRepository,
     private readonly _integrationService: IntegrationService,
     private readonly _organizationService: OrganizationService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
 
   processPaymentEvent(provider: string, eventId: string, handle: () => Promise<any>) {
@@ -351,11 +351,21 @@ export class SubscriptionService {
         org ? { id: org } : undefined,
         state
       );
-      if (this._measurement) {
-        try {
-          const workspace = org || (await this._organizationService.getOrgByCustomerId(customerId))?.id;
-          if (workspace) await this._measurement.entitlement(workspace, state?.trialStartsAt, state?.measurementSubscriptionId, identifier);
-        } catch { console.error('measurement_write_failed; entitlement applied successfully'); }
+      try {
+        const workspace =
+          org ||
+          (await this._organizationService.getOrgByCustomerId(customerId))?.id;
+        if (workspace)
+          await this._measurementService.entitlement(
+            workspace,
+            state?.trialStartsAt,
+            state?.measurementSubscriptionId,
+            identifier
+          );
+      } catch {
+        console.error(
+          'measurement_write_failed; entitlement applied successfully'
+        );
       }
       return undefined;
     } catch (e) {

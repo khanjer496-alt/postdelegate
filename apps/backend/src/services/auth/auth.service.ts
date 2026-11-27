@@ -45,7 +45,7 @@ export class AuthService {
     private _providerManager: AuthProviderManager,
     private _affiliateService: AffiliateService,
     private _loginLockoutService: LoginLockoutService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
   async canRegister(provider: string) {
     if (
@@ -425,7 +425,7 @@ export class AuthService {
     }
 
     await this._userService.activateUser(user.id);
-    await this._measurement?.activated(user.id);
+    await this._measurementService.activated(user.id);
     this._track('register', user.email, tracking).catch((err) => {});
     await NewsletterService.register(user.email);
     return { jwt: await this.jwt(user), userId: user.id };

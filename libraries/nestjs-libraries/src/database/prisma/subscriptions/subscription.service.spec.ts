@@ -197,7 +197,9 @@ describe('SubscriptionService plan writes', () => {
 
   it('keeps an applied entitlement acknowledged when telemetry fails', async () => {
     const { service, repository } = make({ provider: 'stripe', subscriptionTier: 'PRO' });
-    (service as any)._measurement = { entitlement: jest.fn().mockRejectedValue(new Error('telemetry down')) };
+    (service as any)._measurementService = {
+      entitlement: jest.fn().mockRejectedValue(new Error('telemetry down')),
+    };
     expect(await service.createOrUpdateSubscription('stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null, undefined, 'org_1')).toBeUndefined();
     expect(repository.createOrUpdateSubscription).toHaveBeenCalled();
   });

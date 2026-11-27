@@ -77,7 +77,7 @@ export class IntegrationService {
     private _authorizationLifecycle: IntegrationAuthorizationLifecycleService,
     @Inject(forwardRef(() => CommentsService))
     private _commentsService: CommentsService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
 
   // A plan without AutoPost stops every running feed. Each one is also marked
@@ -261,7 +261,7 @@ export class IntegrationService {
       !!policy
     );
     if (integration?.id)
-      await this._measurement?.channelConnected(org, integration.id);
+      await this._measurementService.channelConnected(org, integration.id);
 
     // a reconnect brings the channel's comment rules back (a one time token
     // also reconnects the channels that share it); Temporal is not awaited,
@@ -694,7 +694,7 @@ export class IntegrationService {
       token: getIntegrationInformation.access_token,
       profile: getIntegrationInformation.username,
     }, !!provider.authorizationPolicy, !!provider.authorizationPolicy?.useRemoteAvatar);
-    await this._measurement?.channelConnected(org, id);
+    await this._measurementService.channelConnected(org, id);
 
     return { success: true };
   }

@@ -15,6 +15,11 @@ import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org
 import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto';
 import { AuthService as Tokens } from '@gitroom/helpers/auth/auth.service';
 
+// MeasurementService never throws; these flows only need it to answer
+const measurement = {
+  activated: jest.fn(async () => undefined),
+};
+
 const localUser = (over: Record<string, unknown> = {}) => ({
   id: 'u1',
   email: 'a@example.com',
@@ -44,7 +49,8 @@ const setup = (user: any) => {
     emails as any,
     {} as any,
     {} as any,
-    lockout as any
+    lockout as any,
+    measurement as any
   );
   return { service, users, emails, lockout };
 };
@@ -287,7 +293,8 @@ describe('AuthService affiliate attribution at registration', () => {
       emails as any,
       providers as any,
       affiliates as any,
-      { isLocked: jest.fn(async () => false), recordFailure: jest.fn(), clear: jest.fn() } as any
+      { isLocked: jest.fn(async () => false), recordFailure: jest.fn(), clear: jest.fn() } as any,
+      measurement as any
     );
     return { service, affiliates };
   };
@@ -437,7 +444,8 @@ describe('AuthService login lockout', () => {
       getUserById: jest.fn(async () => user),
     };
     const service = new AuthService(
-      users as any, {} as any, {} as any, {} as any, {} as any, lockout
+      users as any, {} as any, {} as any, {} as any, {} as any, lockout,
+      measurement as any
     );
     const login = (email: string, password: string) =>
       service.routeAuth(
@@ -523,7 +531,8 @@ describe('AuthService invites and provider accounts', () => {
       {} as any,
       providers as any,
       {} as any,
-      { isLocked: jest.fn(async () => false), recordFailure: jest.fn(), clear: jest.fn() } as any
+      { isLocked: jest.fn(async () => false), recordFailure: jest.fn(), clear: jest.fn() } as any,
+      measurement as any
     );
     return { service, organizations };
   };
@@ -600,7 +609,7 @@ describe('disabled crypto login entry points', () => {
     const resolve = jest.fn();
     const createOrgAndUser = jest.fn();
     const manager = new AuthProviderManager({ get: resolve } as any);
-    const service = new AuthService({} as any, { createOrgAndUser } as any, {} as any, manager, {} as any, {} as any);
+    const service = new AuthService({} as any, { createOrgAndUser } as any, {} as any, manager, {} as any, {} as any, measurement as any);
     expect(() => service.oauthLink(provider, { publicKey: 'example' })).toThrow('sign-in method is disabled');
     await expect(service.checkExists(provider, 'example-token')).rejects.toThrow('sign-in method is disabled');
     const body = Object.assign(new CreateOrgUserDto(), { provider, providerToken: 'example-token' });
@@ -614,7 +623,7 @@ describe('disabled crypto login entry points', () => {
     const resolve = jest.fn();
     const manager = new AuthProviderManager({ get: resolve } as any);
     const { users, emails, lockout } = setup(localUser({ password: Tokens.hashPassword('example-password') }));
-    const service = new AuthService(users as any, {} as any, emails as any, manager, {} as any, lockout as any);
+    const service = new AuthService(users as any, {} as any, emails as any, manager, {} as any, lockout as any, measurement as any);
     const body = Object.assign(new LoginUserDto(), { provider: 'LOCAL', email: 'a@example.com', password: 'example-password' });
     await expect(service.routeAuth('LOCAL' as any, body, '127.0.0.1', 'unit-test')).resolves.toMatchObject({ addedOrg: false, jwt: expect.any(String) });
     expect(resolve).not.toHaveBeenCalled();

@@ -127,7 +127,7 @@ export class PostsService {
     private _activityLogService: ActivityLogService,
     private _subscriptionService: SubscriptionService,
     private _paymentService: PaymentService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -2222,7 +2222,11 @@ export class PostsService {
         }
       }
 
-      await this._measurement?.postAccepted(orgId, posts[0].id, actor?.type === 'user');
+      await this._measurementService.postAccepted(
+        orgId,
+        posts[0].id,
+        actor?.type === 'user'
+      );
       Sentry.metrics.count('post_created', 1);
       postList.push({
         postId: posts[0].id,

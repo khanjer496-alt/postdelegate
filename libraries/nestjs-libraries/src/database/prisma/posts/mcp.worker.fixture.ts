@@ -457,6 +457,14 @@ pg(
         },
       }
     );
+    // funnel measurement is out of scope here; the real service never throws either
+    const measurement = new Proxy(
+      {},
+      {
+        get: (_target, key) =>
+          key === 'then' ? undefined : () => Promise.resolve(),
+      }
+    );
     const factory = (model: any) => ({ model });
     const modelProxy = (tx: any) =>
       new Proxy(tx, {
@@ -721,7 +729,8 @@ pg(
         factory(db) as any
       );
       const log = new ActivityLogService(
-        new ActivityLogRepository(factory(db) as any, factory(db) as any)
+        new ActivityLogRepository(factory(db) as any, factory(db) as any),
+        measurement as any
       );
       const approvalRepo = new ApprovalsRepository(
         factory(db) as any,
@@ -754,7 +763,9 @@ pg(
         deniedTransport as any,
         deniedTransport as any,
         temporalService as any,
-        deniedTransport as any
+        deniedTransport as any,
+        deniedTransport as any,
+        measurement as any
       );
       const subscriptions = new SubscriptionService(
         new SubscriptionRepository(
@@ -766,7 +777,8 @@ pg(
           transaction as any
         ),
         integrations,
-        deniedTransport as any
+        deniedTransport as any,
+        measurement as any
       );
       const media = new MediaService(
         new MediaRepository(factory(db) as any),
@@ -787,7 +799,8 @@ pg(
         policy,
         log,
         subscriptions,
-        deniedTransport as any
+        deniedTransport as any,
+        measurement as any
       );
       activity = new PostActivity(
         posts,

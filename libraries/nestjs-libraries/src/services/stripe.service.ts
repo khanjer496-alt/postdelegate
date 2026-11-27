@@ -317,9 +317,14 @@ export const subscriptionStateOf = (
 };
 
 // Billing-only telemetry context; the shared status-sync helper keeps its existing shape.
-const measuredSubscriptionStateOf = (subscription: Stripe.Subscription): SubscriptionProviderState => ({
-  ...subscriptionStateOf(subscription), measurementSubscriptionId: subscription.id,
-  ...(subscription.trial_start ? { trialStartsAt: new Date(subscription.trial_start * 1000) } : {}),
+const measuredSubscriptionStateOf = (
+  subscription: Stripe.Subscription
+): SubscriptionProviderState => ({
+  ...subscriptionStateOf(subscription),
+  measurementSubscriptionId: subscription.id,
+  ...(subscription.trial_start
+    ? { trialStartsAt: new Date(subscription.trial_start * 1000) }
+    : {}),
 });
 
 // In a trial for the workspace: Stripe has it trialing, or the first charge
@@ -626,7 +631,7 @@ export class StripeService extends PaymentProviderAbstract {
     private _trackService: TrackService,
     private _affiliateService: AffiliateService,
     private _notificationService: NotificationService,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {
     super();
   }
@@ -2657,7 +2662,7 @@ export class StripeService extends PaymentProviderAbstract {
         ? invoice.customer
         : invoice.customer?.id;
     if (customer && subscriptionId && invoice.status === 'paid')
-      await this._measurement?.payment(
+      await this._measurementService.payment(
         customer,
         subscriptionId,
         invoice.id!,

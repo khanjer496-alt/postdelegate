@@ -12,7 +12,7 @@ const PAGE_SIZE = 30;
 export class ActivityLogService {
   constructor(
     private _activityLogRepository: ActivityLogRepository,
-    private _measurement?: MeasurementService
+    private _measurementService: MeasurementService
   ) {}
 
   record(entry: ActivityEntry) {
@@ -28,7 +28,7 @@ export class ActivityLogService {
         entry.postId &&
         ['USER', 'CLIENT'].includes(entry.actorType)
       )
-        await this._measurement?.postAccepted(
+        await this._measurementService.postAccepted(
           entry.organizationId,
           entry.postId,
           true
@@ -43,7 +43,7 @@ export class ActivityLogService {
       if (!post) {
         return;
       }
-      await this._measurement?.published(postId);
+      await this._measurementService.published(postId);
       await this._activityLogRepository.create({
         organizationId: post.organizationId,
         postId: post.id,
