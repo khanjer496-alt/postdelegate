@@ -71,7 +71,7 @@
 .orbit-core b{font-size:clamp(9px,2.1cqw,12px);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#d1bfff}
 .orbit-card{position:absolute;display:flex;text-align:left;align-items:center;gap:11px;padding:11px 16px 11px 11px;border:1px solid #ffffff1f;border-radius:16px;background:#18171ccc;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 20px 40px -10px #000c;white-space:nowrap}
 .orbit-card b{display:block;font-size:13px;font-weight:700;color:#fff}
-.orbit-card small{display:block;margin-top:2px;font-size:11px;color:#a8a8a8}
+.orbit-card small{display:block;margin-top:2px;font-size:12px;color:#a8a8a8}
 .orbit-card i{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:10px;font-style:normal;font-weight:800}
 .card-check{background:#c8ff4d;color:#0d0d0d;font-size:15px}
 .card-spark{background:#7357ff;color:#fff;font-size:16px}
@@ -129,7 +129,7 @@
 .demo-frame{position:relative;border:1px solid #363636;overflow:hidden;border-radius:22px;background:#111;box-shadow:0 50px 120px -30px #000,0 0 0 8px #ffffff06}
 .demo-browser{display:flex;align-items:center;gap:7px;height:38px;background:#1b1b1b;border-bottom:1px solid #333;padding:0 17px}
 .demo-browser>span:not([class]){height:8px;width:8px;background:#515151;border-radius:50%}
-.demo-address{color:#8f8f8f;font-size:11px;margin-left:19px;padding:4px 14px;border-radius:7px;background:#121212}
+.demo-address{color:#8f8f8f;font-size:12px;margin-left:19px;padding:4px 14px;border-radius:7px;background:#121212}
 .demo-frame img{display:block;width:100%;height:auto;aspect-ratio:16/10}
 
 /* ---------- Bring your own AI ---------- */
@@ -198,11 +198,11 @@
  .home-hero .hero-star-one{width:38px;right:10px;top:4px;opacity:.6}
  .orbit-card{padding:8px 11px 8px 8px;gap:8px;border-radius:12px}
  .orbit-card i{width:24px;height:24px;border-radius:8px;font-size:12px}
- .orbit-card b{font-size:11px}
- .orbit-card small{font-size:10px}
+ .orbit-card b{font-size:12px}
+ .orbit-card small{font-size:12px}
  .orbit{margin-block:66px 72px}
  .orbit-card-scheduled,.orbit-card-draft{left:50%;right:auto;transform:translateX(-50%)}
- .orbit-legend{font-size:11px;gap:6px 14px}
+ .orbit-legend{font-size:12px;gap:6px 14px}
  .relay-section{padding-top:20px}
  .relay-title{margin-bottom:26px}
  .relay{grid-template-columns:1fr;gap:26px;max-width:320px;margin-inline:auto}
@@ -223,7 +223,7 @@
  .feature-calendar p{font-size:16px}
  .demo-browser{height:26px;padding:0 10px;gap:4px}
  .demo-browser>span:not([class]){width:6px;height:6px}
- .demo-address{font-size:8px;margin-left:8px;padding:2px 8px}
+ .demo-address{font-size:12px;margin-left:8px;padding:2px 8px}
  .ai-section{padding-top:56px}
  .ai-panel{padding:48px 20px;border-radius:24px}
  .ai-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -234,7 +234,7 @@
  .switch-band{margin-top:40px}
  .switch-band p{font-size:15px;padding-block:20px}
  .switch-band b{display:block;margin:0 0 4px}
- .support-bubble{bottom:14px;right:13px;font-size:11px;padding:10px 14px 10px 12px;gap:8px;border-radius:14px}
+ .support-bubble{bottom:14px;right:13px;font-size:12px;padding:10px 14px 10px 12px;gap:8px;border-radius:14px}
  .support-bubble svg{width:16px;height:16px}
 }
 @media(max-width:359px){

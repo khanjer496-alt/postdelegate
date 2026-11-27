@@ -126,7 +126,9 @@ export const OG_CARDS = {
   '/tools/twitch-image-resizer': { kicker: 'Free tool', title: 'Twitch image resizer' },
   '/tools/dribbble-image-resizer': { kicker: 'Free tool', title: 'Dribbble image resizer' },
 
-  '/pricing': { kicker: 'Pricing', title: 'Flat plans, every channel included' },
+  // the page's own h1 (pricingPage.h1 in src/i18n/locales/en.ts); the price and trial length
+  // are typed here, so update them with plans.ts
+  '/pricing': { kicker: 'Pricing', title: 'Plans from $19. Try any of them free for 7 days.' },
   '/platforms': { kicker: 'Networks', title: 'Every network PostDelegate posts to' },
   '/mcp': { kicker: 'For agents', title: 'The MCP server for social media' },
   '/agents': { kicker: 'For agents', title: 'Let your AI assistant run your social media' },
@@ -138,6 +140,13 @@ export const OG_CARDS = {
   '/best': { kicker: 'Best of', title: 'Best-of lists with a source for every fact' },
   '/tools': { kicker: 'Free tools', title: 'Free tools for social media posts' },
   '/docs': { kicker: 'Documentation', title: 'PostDelegate documentation' },
+
+  // The most visited network pages from src/pages/[scheduler].astro, each with its h1 from
+  // schedulers.ts. The other network pages keep the brand card.
+  '/facebook-scheduler': { kicker: 'Scheduler', title: 'Schedule Facebook Page posts from one calendar.' },
+  '/tiktok-scheduler': { kicker: 'Scheduler', title: 'Schedule TikTok videos from one calendar.' },
+  '/youtube-scheduler': { kicker: 'Scheduler', title: 'Schedule YouTube videos from one calendar.' },
+  '/bluesky-scheduler': { kicker: 'Scheduler', title: 'Schedule Bluesky posts and threads.' },
 };
 
 // The card file for a page, or undefined when it keeps the brand card.

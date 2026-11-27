@@ -41,7 +41,9 @@ MCP directories and clients that discover servers on their own read the server c
 
 Other addresses exist for directory listings of specific assistants (`/mcp-oauth-claude`, `/mcp-oauth-chatgpt`, `/mcp-oauth`) and a legacy server-sent-events address (`/sse/YOUR_API_KEY`). You should not need them.
 
-## Two ways to sign in
+## Three ways to sign in
+
+For an assistant that should only draft, or only see some channels, use a [scoped agent credential](#scoped-agent-credentials). It is the safer choice for anything that runs on its own.
 
 ### Sign in with PostDelegate (OAuth)
 
@@ -53,14 +55,39 @@ You add the server address to your assistant. The assistant opens a PostDelegate
 
 ### API key
 
-Use the workspace [API key](/docs/api#authentication) from **Settings > Agents / Dev**. This works anywhere, but the key is as powerful as your account, so prefer OAuth where the client supports it. At `/mcp` send it as `Authorization: Bearer YOUR_API_KEY`. The bare key, the way the REST API takes it, works at `/mcp` too.
+Use the workspace [API key](/docs/api#authentication) from **Settings > Agents / Dev**. This works anywhere, but the key is as powerful as your account: it can schedule, publish and delete on every channel, and it does not expire. Prefer a [scoped agent credential](#scoped-agent-credentials), or OAuth where the client supports it. At `/mcp` send it as `Authorization: Bearer YOUR_API_KEY`. The bare key, the way the REST API takes it, works at `/mcp` too.
 
 Rotating the key invalidates it everywhere.
+
+### Scoped agent credentials
+
+A scoped agent credential is a separate MCP key for one assistant, with only the access you give it. Workspace admins create them in **Settings > Global Settings > Agent access**:
+
+1. Enter a **Name** (up to 80 characters), for example the assistant or the job it does.
+2. Choose a **Role**: **Analyst**, **Draft-only** (the default) or **Publisher**. See the table below.
+3. Choose an **Expiry**: **30 days** (the default), a date you choose, or **No expiry**.
+4. Keep **All channels**, or untick it and tick the channels the assistant may use. With no channel ticked it can use none.
+5. Choose **Create agent key** and copy the key straight away. It starts with `mca_` and is shown once. PostDelegate keeps only a hash of it, so it cannot be shown again.
+
+Send the key as `Authorization: Bearer mca_...` to `https://app.postdelegate.com/api/mcp`. It only works as a header: not inside the address (`/api/mcp/KEY` or `/sse/KEY`), and not as a [REST API](/docs/api) key.
+
+| Role | What the assistant can do |
+| --- | --- |
+| **Analyst** | Read only: list channels and their rules, list posts, read stored analytics and the best time to post, check a post with `postPreflightTool`, and plan drafts from results with `resultsToReviewedDraftsTool`. |
+| **Draft-only** | Everything Analyst can do, plus create drafts, edit drafts and their settings, and submit drafts for review. Every post it creates must be a draft, and it can only edit posts that are still drafts. |
+| **Publisher** | Everything Draft-only can do, plus schedule and publish posts, delete, unschedule and recover posts, add media from a public URL, and run a channel's helper lookups. |
+
+Whatever an agent credential creates or changes is held to the workspace rules in **Settings > Approvals**: the channels agents may post to, the daily limit on agent posts, and whether agent posts need approval. No credential can approve a post, so a Publisher whose posts need approval sends them for review. The media library, the upload widget, Studio and customer groups are not available to agent credentials; a Publisher adds media from a public URL instead.
+
+A channel restriction applies to reads as well as writes: channel and post lists only show the permitted channels, and workspace-wide totals, which cannot be split by channel, are refused. Live network analytics (`channelAnalyticsTool`) return UNKNOWN for every agent credential, because that path can refresh a channel's login; the stored history tools still work. Posts an agent credential creates are labelled **MCP agent**.
+
+The list under the form shows each credential's name, role, expiry and channels. Choose **Revoke** to cut one off. Once it is revoked or expired, its next call is refused, including tools reached through `ask_postdelegate`. Posts it already scheduled stay scheduled, and posts waiting for review keep waiting: revoking does not unschedule or approve anything. Existing workspace API keys and OAuth connections keep working as before.
 
 ## Staying in control
 
 An assistant connected over MCP can do what the tools allow, which includes scheduling, publishing and deleting posts on your connected channels.
 
+- Give an assistant that runs on its own a [scoped agent credential](#scoped-agent-credentials) with the Draft-only role, so it cannot schedule or publish.
 - Ask for a **draft** first and check it in the calendar before anything is scheduled.
 - Keep your assistant's tool approval prompts on, so you confirm each action that changes something.
 - Each post an assistant creates returns a preview link, `https://app.postdelegate.com/p/POST_ID?share=true`, for you to inspect.
@@ -78,11 +105,7 @@ The API key and MCP setup live in **Settings > Agents / Dev**, which appears whe
 - **"redirect_uri host is not a verified domain".** A web client is trying to register a callback outside the allowed list. Use a local client or the API key address.
 - **A tool is missing.** The server lists only the tools your connection address offers. See [MCP tools](/docs/mcp/tools).
 
-## Give each assistant its own access
-
-Workspace admins can issue a named credential in Settings. New credentials default to **Draft-only** and **30 days**. Choose Analyst for permitted reads and checks, Draft-only for draft creation/editing and review submission, or Publisher for permitted scheduling and recovery. Publisher still follows workspace review rules, channel restrictions and daily limits; it cannot approve a post. Channel restrictions apply to reads as well as writes. Unfilterable workspace totals are unavailable to channel-restricted credentials.
-
-Copy the new secret once and send it only in the Authorization header on the canonical MCP endpoint. It cannot be read back and is not a REST API key or a secret-in-URL credential. Existing workspace keys and OAuth clients keep their current connection behavior. Expiry or revocation blocks subsequent calls, including nested agent actions. Already accepted approved schedules remain workspace jobs; changing credentials does not unschedule them or release review holds.
+## Weekly drafts from your results
 
 For an evidence-based weekly draft plan, ask the assistant to use `resultsToReviewedDraftsTool`: inspect a bounded recent period, cite real posts and dated metrics, qualify sparse/missing history, propose channel-specific experiments, check with `postPreflightTool`, then create reviewed drafts and return draft IDs plus IN_REVIEW receipts. Media generation is optional. Reviewed or queued does not mean publicly published.
 
