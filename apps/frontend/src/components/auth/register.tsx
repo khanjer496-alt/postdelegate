@@ -175,7 +175,11 @@ export function RegisterAfter({
     try {
       const response = await fetchData('/auth/register', {
         method: 'POST',
-        headers: { 'x-measurement-event': crypto.randomUUID() },
+        // older Safari and plain-HTTP origins have no randomUUID; the server falls back
+        ...(typeof crypto !== 'undefined' &&
+        typeof crypto.randomUUID === 'function'
+          ? { headers: { 'x-measurement-event': crypto.randomUUID() } }
+          : {}),
         body: JSON.stringify({
           ...data,
           datafast_visitor_id,
