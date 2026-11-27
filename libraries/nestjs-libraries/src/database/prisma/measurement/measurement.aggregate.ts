@@ -128,10 +128,25 @@ export const aggregateMeasurement = (
   >();
   // A workspace enters its first observed trial cohort once, even after provider replays/replacements.
   const firstTrials = new Map<string, MeasurementEvent>();
-  for (const row of events.filter(row => row.kind === 'trial_started').sort((a,b) => a.occurredAt.getTime()-b.occurredAt.getTime())) {
-    if (!firstTrials.has(row.organizationId)) firstTrials.set(row.organizationId,row);
+  // The schedules and payments of each workspace, so a trial only scans its own rows.
+  const byOrganization = new Map<string, MeasurementEvent[]>();
+  for (const row of events) {
+    if (row.kind === 'trial_started') {
+      const first = firstTrials.get(row.organizationId);
+      if (!first || row.occurredAt < first.occurredAt)
+        firstTrials.set(row.organizationId, row);
+    } else if (
+      row.kind === 'qualifying_schedule' ||
+      row.kind === 'nonzero_payment'
+    ) {
+      const list = byOrganization.get(row.organizationId) || [];
+      list.push(row);
+      byOrganization.set(row.organizationId, list);
+    }
   }
-  const trials = [...firstTrials.values()].filter(row => row.occurredAt >= from && row.occurredAt < to);
+  const trials = [...firstTrials.values()].filter(
+    (row) => row.occurredAt >= from && row.occurredAt < to
+  );
   for (const trial of trials) {
     const eligibility = trial.internalOrTest
       ? 'internal_or_test'
@@ -159,9 +174,8 @@ export const aggregateMeasurement = (
     if (observed && asOf.getTime() >= after48) {
       cohort.fully_observed_48h_trials++;
       if (
-        events.some(
+        (byOrganization.get(trial.organizationId) || []).some(
           (row) =>
-            row.organizationId === trial.organizationId &&
             row.kind === 'qualifying_schedule' &&
             eligible(row) &&
             row.occurredAt >= trial.occurredAt &&
@@ -175,9 +189,8 @@ export const aggregateMeasurement = (
       : null;
     if (observed && mature && asOf.getTime() >= mature) {
       cohort.fully_observed_trial_end_plus_7d_trials++;
-      const payments = events.filter(
+      const payments = (byOrganization.get(trial.organizationId) || []).filter(
         (row) =>
-          row.organizationId === trial.organizationId &&
           row.reference === trial.reference &&
           paid(row) &&
           row.occurredAt >= trial.occurredAt

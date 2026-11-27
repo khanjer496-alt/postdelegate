@@ -10,6 +10,12 @@ export interface Acquisition {
   internal_or_test: boolean;
   nonce: string;
 }
+// Only the path of the landing page is kept: a query or fragment can carry ids,
+// tokens or an email, so they are cut and anything that still looks personal is dropped.
+const entryPath = (value: string) => {
+  const path = value.split(/[?#]/)[0].slice(0, 200);
+  return path.startsWith('/') && !path.includes('@') ? path : 'unknown';
+};
 // This verification never controls authentication, entitlements or redirects.
 export const acquisitionFromToken = (
   token: unknown,
@@ -59,7 +65,7 @@ export const acquisitionFromToken = (
       )
         return null;
     }
-    return value;
+    return { ...value, entry_page: entryPath(value.entry_page) };
   } catch {
     return null;
   }

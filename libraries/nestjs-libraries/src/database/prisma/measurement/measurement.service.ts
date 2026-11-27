@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MeasurementRepository } from './measurement.repository';
+import {
+  MEASUREMENT_EXPORT_CAP,
+  MeasurementRepository,
+} from './measurement.repository';
 import { acquisitionFromToken, measurementHash } from './acquisition';
 import { aggregateMeasurement } from './measurement.aggregate';
 import {
@@ -39,32 +42,41 @@ export class MeasurementService {
   ) {
     await this.safe(async () => {
       const touch = await this.repository.acquisition(org);
-      await this.repository.save({
-        // Invoice identity survives workspace mapping changes on webhook replay.
-        // Attribution/classification remains on the first receipt via repository upsert.
-        key: measurementHash(
-          (kind === 'nonzero_payment' ? '' : org) + '|' + kind + '|' + identity
-        ),
-        organizationId: org,
-        kind,
-        occurredAt: extra.occurredAt || new Date(),
-        reference: extra.reference ? measurementHash(extra.reference) : '',
-        amountMinor: extra.amountMinor || 0,
-        currency: extra.currency || 'unknown',
-        trialEndsAt: extra.trialEndsAt,
-        acceptedPublishAt: extra.acceptedPublishAt,
-        humanApproval: extra.humanApproval,
-        evidenceType: extra.evidenceType,
-        source: touch?.source || 'unknown',
-        campaign: touch?.campaign || 'unknown',
-        medium: touch?.medium || 'unknown',
-        term: touch?.term || 'unknown',
-        content: touch?.content || 'unknown',
-        entryPage: touch?.entryPage || 'unknown',
-        device: touch?.device || 'unknown',
-        internalOrTest: this.diagnosticOnly() || touch?.internalOrTest || false,
-        matchedTouch: touch?.matchedTouch || false,
-      });
+      await this.repository.save(
+        {
+          // Invoice identity survives workspace mapping changes on webhook replay.
+          // Attribution/classification remains on the first receipt via repository upsert.
+          key: measurementHash(
+            (kind === 'nonzero_payment' ? '' : org) +
+              '|' +
+              kind +
+              '|' +
+              identity
+          ),
+          organizationId: org,
+          kind,
+          occurredAt: extra.occurredAt || new Date(),
+          reference: extra.reference ? measurementHash(extra.reference) : '',
+          amountMinor: extra.amountMinor || 0,
+          currency: extra.currency || 'unknown',
+          trialEndsAt: extra.trialEndsAt,
+          acceptedPublishAt: extra.acceptedPublishAt,
+          humanApproval: extra.humanApproval,
+          evidenceType: extra.evidenceType,
+          source: touch?.source || 'unknown',
+          campaign: touch?.campaign || 'unknown',
+          medium: touch?.medium || 'unknown',
+          term: touch?.term || 'unknown',
+          content: touch?.content || 'unknown',
+          entryPage: touch?.entryPage || 'unknown',
+          device: touch?.device || 'unknown',
+          internalOrTest:
+            this.diagnosticOnly() || touch?.internalOrTest || false,
+          matchedTouch: touch?.matchedTouch || false,
+        },
+        // 'first' milestones are recorded on every qualifying action, only one is kept
+        identity !== 'first'
+      );
     });
   }
   async rememberHandoff(state: string, token: unknown) {
@@ -266,22 +278,24 @@ export class MeasurementService {
     });
   }
   async export(from: Date, to: Date) {
+    const asOf = new Date();
     const [rows, lifetime, first] = await Promise.all([
-      this.repository.rows(from, new Date(Math.max(to.getTime(), Date.now()))),
+      this.repository.rows(from, to, asOf),
       this.repository.lifetimeOrgs(),
       this.repository.firstEvent(),
     ]);
-    if (rows.length > 100000)
+    if (rows.length > MEASUREMENT_EXPORT_CAP)
       return {
         status: 'unavailable',
-        reason: 'Export exceeds 100000 rows; request a smaller date window',
+        reason: `Export exceeds ${MEASUREMENT_EXPORT_CAP} rows; request a smaller date window`,
       };
     const report = aggregateMeasurement(
       rows,
       new Set(lifetime.map((row) => row.organizationId)),
       from,
       to,
-      first?.receivedAt || null
+      first?.receivedAt || null,
+      asOf
     );
     return {
       ...report,
