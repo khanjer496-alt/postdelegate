@@ -22,7 +22,7 @@ const dict: Dict = {
     ctaNote: 'Sem cartão de crédito',
     skipToContent: 'Pular para o conteúdo',
     homeLabel: 'Página inicial do PostDelegate',
-    ogImageAlt: 'Logotipo do PostDelegate e a frase “Your social media, all in one place.” sobre um fundo escuro',
+    ogImageAlt: 'Logotipo do PostDelegate e a frase “Your AI drafts. You approve.” sobre um fundo escuro',
   },
   header: {
     mainNav: 'Navegação principal',
@@ -137,7 +137,7 @@ const dict: Dict = {
   },
   perks: {
     team: 'Membros da equipe ilimitados',
-    solo: 'Só você', soloNote: 'Sem vagas de equipe neste plano',
+    solo: 'Só você', soloNote: 'Sem membros da equipe neste plano',
     posts: 'Posts ilimitados por mês',
     agent: 'Claude, ChatGPT e scripts', agentNote: 'Servidor MCP e API REST pública',
     webhooks: (count: string) => `${count} webhooks`, webhooksNote: 'Avise suas ferramentas quando um post for publicado',
@@ -147,7 +147,7 @@ const dict: Dict = {
   pricing: {
     eyebrow: 'Planos',
     heading: (lowest: number) => `A partir de $${lowest} por mês. API, MCP e Studio em todos os planos.`,
-    intro: (days: number) => `Os planos mudam em canais, vagas de equipe e webhooks. Teste qualquer um por ${days} dias sem cartão de crédito e adicione um antes do fim do teste para manter seu plano.`,
+    intro: (days: number) => `Os planos mudam em canais, membros da equipe e webhooks. Teste qualquer um por ${days} dias sem cartão de crédito e adicione um antes do fim do teste para manter seu plano.`,
     billingPeriod: 'Período de cobrança',
     monthly: 'Mensal',
     yearly: 'Anual',
@@ -269,11 +269,12 @@ const dict: Dict = {
     description: (price: number, days: number) => `Planos do PostDelegate a partir de $${price} por mês, com canais, membros da equipe e webhooks comparados por plano. Teste grátis de ${days} dias, sem cartão.`,
     eyebrow: 'Planos',
     h1: (price: number, days: number) => `Planos a partir de $${price}. Teste qualquer um grátis por ${days} dias.`,
-    lead: 'Você paga por canais, vagas de equipe e webhooks. O calendário, o servidor MCP, a API REST e o Content Studio vêm em todos os planos.',
+    lead: 'Escolha o plano pelo número de canais de que você precisa. Team, Pro e Ultimate incluem membros da equipe ilimitados sem cobrança por usuário, e o calendário, o servidor MCP, a API REST e o Content Studio vêm em todos os planos.',
     billingGuide: 'Ler o guia de cobrança',
     trialNote: (note: string) => `${note} · Um teste por e-mail`,
     heroNetworks: (count: number) => `Publique em <b>${count} redes disponíveis</b> em todos os planos`,
     compareTitle: 'Comparar planos',
+    compareScrollHint: 'Deslize para o lado para ver todos os planos',
     feature: 'Recurso', yes: 'Sim', no: 'Não',
     rowMonthly: 'Preço mensal',
     rowYearly: 'Preço anual',
@@ -354,7 +355,7 @@ const dict: Dict = {
     body: '<h2>Da conversa ao rascunho</h2><p>Um cliente compatível descobre as ferramentas que o servidor oferece e as usa para listar seus canais, ler as regras de cada rede, enviar mídias e criar rascunhos. O melhor ponto de partida é um único rascunho que você pode conferir no calendário antes de qualquer agendamento.</p><h2>Configuração</h2><p>O endereço do servidor é <code>https://app.postdelegate.com/mcp-oauth-dynamic</code>. Adicione-o ao seu assistente e entre com sua conta do PostDelegate. Há guias passo a passo para o <a href="/docs/mcp/claude">Claude</a>, o <a href="/docs/mcp/chatgpt">ChatGPT</a> e o <a href="/docs/mcp/clients">Claude Code, Cursor e outros clientes</a>.</p><h2>O que verificar primeiro</h2><ol><li>O cliente está conectado ao espaço de trabalho certo do PostDelegate.</li><li>Você sabe quais ferramentas podem alterar ou publicar conteúdo. A <a href="/docs/mcp/tools">referência de ferramentas</a> lista todas.</li><li>Um rascunho aparece no app e o canal de destino está correto.</li></ol><aside class="doc-note">O PostDelegate não oferece uma IA própria e não afirma ter listagem oficial em diretórios do Claude ou do ChatGPT. Você adiciona o servidor como conector personalizado. O servidor MCP está incluído em todos os planos.</aside><p>Relacionados: <a href="/api">API REST</a> · <a href="/codex">Codex</a> · <a href="/claude-cowork">Claude e Cowork</a>.</p>',
   },
   claudePage: {
-    title: 'Claude e Cowork — PostDelegate',
+    title: 'Claude e Cowork para suas redes sociais — PostDelegate',
     description: 'Conecte o Claude ao PostDelegate como conector personalizado e transforme uma conversa em rascunhos e posts agendados, sempre com a sua revisão.',
     eyebrow: 'Claude e Cowork',
     h1: 'Transforme uma boa conversa em conteúdo.',
@@ -372,7 +373,7 @@ const dict: Dict = {
     body: '<h2>Um post de lançamento é uma ótima primeira tarefa</h2><p>Peça à sua ferramenta de código para preparar um anúncio curto de lançamento e as mídias de apoio. Revise o texto no PostDelegate e escolha você mesmo um canal disponível e o horário.</p><h2>Depois que o agente estiver conectado</h2><p>Comece descobrindo o espaço de trabalho e as contas conectadas, depois crie um rascunho. Confirme que o rascunho chegou antes de permitir que um fluxo agende conteúdo.</p><h2>Use as instruções de conexão certas</h2><p>Codex, Cursor, Claude Code e outras ferramentas de código se conectam ao PostDelegate pelo MCP ou chamam a API REST diretamente. O <a href="/docs/mcp/clients">guia de configuração de clientes</a> traz a configuração de cada ferramenta com o endereço do servidor do PostDelegate. Ferramentas e endpoints de outros serviços não estão conectados ao PostDelegate.</p><p>Veja a <a href="/agents">visão geral dos agentes</a>, o <a href="/mcp">MCP</a> e a <a href="/api">API REST</a>.</p>',
   },
   apiPage: {
-    title: 'API REST — PostDelegate',
+    title: 'API REST para agendar posts — PostDelegate',
     description: 'A API REST do PostDelegate para canais, posts e mídias. Autentique com uma chave de API, agende posts pelo seu próprio código e veja limites e exemplos.',
     eyebrow: 'API REST',
     h1: 'Construa em torno do seu fluxo de publicação.',

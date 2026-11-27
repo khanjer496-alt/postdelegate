@@ -42,6 +42,8 @@ export const GET: APIRoute = () => {
 ## Connect over MCP (copy and paste)
 Server address (sign in with PostDelegate, OAuth): https://app.postdelegate.com/mcp-oauth-dynamic
 With an API key instead: https://app.postdelegate.com/api/mcp and the header "Authorization: Bearer YOUR_API_KEY". Full setup: ${SITE.url}/docs/mcp/clients
+The server card (https://app.postdelegate.com/.well-known/mcp/server-card.json) lists 29 tools: ${SITE.url}/docs/mcp/tools
+Safer for an assistant that runs on its own: a scoped agent credential (an mca_ key sent as a Bearer header to https://app.postdelegate.com/api/mcp), created by a workspace admin in Settings > Global Settings > Agent access with the role Analyst (read only), Draft-only (the default: drafts and review submissions) or Publisher (scheduling and publishing within the workspace's approval rules), an expiry (30 days by default) and optional channel limits, and revocable there. Details: ${SITE.url}/docs/mcp#scoped-agent-credentials
 
 Claude Code:
 \`\`\`bash

@@ -59,6 +59,7 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   <section class="section"><div class="container"><Pricing heading={false} lang={lang} /></div></section>
   <section class="plan-compare" id="compare-plans"><div class="container">
     <h2>{p.compareTitle}</h2>
+    <p class="compare-hint" aria-hidden="true"><span>↔</span> {p.compareScrollHint}</p>
     <div class="compare-scroll" role="region" aria-label={p.compareTitle} tabindex="0">
       <table>
         <thead><tr><th scope="col"><span class="sr-only">{p.feature}</span></th>{PLANS.map((plan) => <th scope="col">{plan.name}</th>)}</tr></thead>
@@ -98,12 +99,20 @@ const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity
   .plan-compare { padding: 0 0 100px; background: var(--bg, #0d0d0d); }
   .compare-links { max-width: 880px; margin: 22px auto 0; color: var(--muted, #b9b9b9); font-size: 15px; line-height: 1.8; text-align: center; }
   .compare-links :global(a) { color: var(--text, #fff); text-decoration: underline; text-underline-offset: 4px; }
-  .compare-scroll { position: relative; max-width: 880px; margin: auto; overflow-x: auto; border: 1px solid #303030; border-radius: 22px; background: #171717; }
+  /* On a phone the table is wider than the screen. The hint says so, the plan names stay
+     put, and a shade on the edge shows there is more to scroll to; it fades as the
+     table reaches its end (the "local" backgrounds scroll with it and cover it). */
+  .compare-hint { display: none; align-items: center; justify-content: center; gap: 8px; margin: -20px auto 14px; color: var(--muted, #b9b9b9); font-size: 13px; font-weight: 600; }
+  .compare-hint span { color: #c8ff4d; font-size: 16px; }
+  .compare-scroll { position: relative; max-width: 880px; margin: auto; overflow-x: auto; border: 1px solid #303030; border-radius: 22px; background: linear-gradient(to left, #171717 40%, #17171700) right / 48px 100% no-repeat local, radial-gradient(farthest-side at 100% 50%, #c8ff4d40, #c8ff4d00) right / 18px 100% no-repeat scroll, #171717; }
+  :global([dir=rtl]) .compare-scroll { background: linear-gradient(to right, #171717 40%, #17171700) left / 48px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, #c8ff4d40, #c8ff4d00) left / 18px 100% no-repeat scroll, #171717; }
+  tbody th, thead th:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: #171717; box-shadow: inset -1px 0 #303030; }
+  :global([dir=rtl]) tbody th, :global([dir=rtl]) thead th:first-child { box-shadow: inset 1px 0 #303030; }
   table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; }
   thead th { color: var(--text, #fff); font-size: 15px; font-weight: 750; }
   th, td { padding: 15px 18px; border-bottom: 1px solid #303030; text-align: start; }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
   tbody th { color: var(--muted, #b9b9b9); font-weight: 600; }
   td { color: var(--text, #fff); }
-  @media (max-width: 600px) { .question-grid { grid-template-columns: 1fr; gap: 26px; } }
+  @media (max-width: 600px) { .question-grid { grid-template-columns: 1fr; gap: 26px; } th, td { padding: 13px 14px; } tbody th { min-width: 120px; } .compare-hint { display: flex; } }
 </style>

@@ -35,11 +35,13 @@ It also does not include an AI. The assistant is yours, and so are its costs. An
 
 ## How sign-in works
 
-There are two ways to connect an assistant to PostDelegate's MCP server.
+There are three ways to connect an assistant to PostDelegate's MCP server.
 
 **Sign in with PostDelegate (OAuth).** You add the server address `https://app.postdelegate.com/mcp-oauth-dynamic` to your assistant. It opens a PostDelegate page in your browser, you sign in and approve, and the assistant gets its own token for your workspace. You never copy a key. The client registers itself with dynamic client registration and PKCE, and the scopes are `mcp:read` and `mcp:write`. This is the recommended route for Claude, ChatGPT, Claude Code, Cursor and any client that can register itself.
 
 **API key.** For clients that cannot do OAuth, the workspace API key works at `https://app.postdelegate.com/api/mcp` as `Authorization: Bearer YOUR_API_KEY`, or inside the address for clients that can only take a URL. The key is as powerful as your account, so prefer OAuth where it is supported. Rotating the key invalidates it everywhere.
+
+**Scoped agent credential.** The safer key for an assistant that runs on its own. A workspace admin creates it in **Settings > Global Settings > Agent access** with a role (Analyst reads, Draft-only drafts and submits for review, Publisher also schedules and publishes), an expiry and, if you like, a list of channels, and can revoke it there. It works as `Authorization: Bearer mca_...` at `https://app.postdelegate.com/api/mcp`. See [scoped agent credentials](/docs/mcp#scoped-agent-credentials).
 
 Approvals show under **Settings > Apps > Approved Apps**, where **Revoke** cuts an assistant off. The API key and MCP setup live in **Settings > Agents / Dev**, and every plan includes the public API and MCP.
 

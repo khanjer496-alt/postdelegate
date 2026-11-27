@@ -4,7 +4,7 @@ title: MCP tools
 description: "Every tool the PostDelegate MCP server offers for channels, posts, media and AI media: what each does, whether it changes anything and what an assistant sees."
 ---
 
-Your assistant discovers these tools by itself when it connects. You do not call them directly. This page explains what each one does so you know what an assistant can and cannot do. Tool names are shown exactly as the server reports them. To teach an assistant how to use them well, give it one of the [agent files](/docs/mcp/agent-files).
+The server card lists 29 tools, and every one of them is on this page. Your assistant discovers them by itself when it connects. You do not call them directly. This page explains what each one does so you know what an assistant can and cannot do. Tool names are shown exactly as the server reports them. To teach an assistant how to use them well, give it one of the [agent files](/docs/mcp/agent-files).
 
 ## Channels and settings
 
@@ -57,6 +57,18 @@ To post a Studio video, the assistant still goes through `integrationSchedulePos
 The server also defines tools for generating images and video and for turning long YouTube videos into short clips: `generateImageTool`, `generateVideoOptions`, `videoFunctionTool`, `generateVideoTool`, `videoStatusTool`, `clippingTool`, `clippingStatusTool` and `clippingWidgetTicketTool`.
 
 PostDelegate does not provide AI generation of its own. `generateImageTool` needs your workspace's own OpenAI key, added by an admin in Settings → AI. The video and clipping tools are only listed when the service is set up for them, which it is not today. You can also use your own assistant's image and video features, then bring the result into PostDelegate with `uploadFromUrlTool`.
+
+## What a scoped agent credential can use
+
+A [scoped agent credential](/docs/mcp#scoped-agent-credentials) can only use the tools of its role, on its permitted channels. The assistant still sees every tool, and a call outside the role is refused with "This agent credential cannot perform this action."
+
+| Role | Tools |
+| --- | --- |
+| **Analyst** | `integrationList`, `integrationSchema`, `postsListTool`, `analyticsMetricsTool`, `analyticsTopPostsTool`, `bestTimeToPostTool`, `channelAnalyticsTool`, `postPreflightTool`, `resultsToReviewedDraftsTool` |
+| **Draft-only** | Analyst's tools, plus `integrationSchedulePostTool` (drafts only), `createPostForReviewTool`, `sendPostForReviewTool`, `postUpdateTool` and `postSettingsTool` (on drafts) |
+| **Publisher** | Draft-only's tools without the draft-only limits, plus `deletePostTool`, `postUnscheduleTool`, `postResumeTool`, `triggerTool` and `uploadFromUrlTool` |
+
+`groupList`, the media library, upload widget and Studio tools are not available to agent credentials. `channelAnalyticsTool` answers UNKNOWN for every agent credential, because live analytics can refresh a channel's login; the stored history tools work.
 
 ## What an assistant sees
 

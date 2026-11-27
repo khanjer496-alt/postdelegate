@@ -99,7 +99,9 @@ const server = http.createServer((req, res) => {
         return send(req, res, target.file);
       }
       if (![301, 302, 303, 307, 308].includes(status)) return reply(res, 500, 'Unsupported redirect rule', req.method);
-      res.writeHead(status, { Location: matched.destination });
+      // Pages keeps the request's query string when the destination has none of its own
+      // (checked on postdelegate.com/auth?utm_source=x, November 2026)
+      res.writeHead(status, { Location: matched.destination.includes('?') ? matched.destination : matched.destination + url.search });
       return res.end();
     }
     // Cloudflare serves file-style HTML through extensionless URLs.
