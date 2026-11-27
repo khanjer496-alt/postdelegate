@@ -60,6 +60,7 @@ export const aggregateMeasurement = (
   type Group = {
     date: string;
     source: string;
+    medium: string;
     campaign: string;
     entry_page: string;
     device: string;
@@ -73,9 +74,12 @@ export const aggregateMeasurement = (
   for (const row of events) {
     if (row.occurredAt < from || row.occurredAt >= to || !field[row.kind])
       continue;
+    // An unmatched or zero invoice adds nothing, so it must not open an all-zero group.
+    if (row.kind === 'nonzero_payment' && !paid(row)) continue;
     const dims = {
       date: date(row.occurredAt),
       source: row.source,
+      medium: row.medium,
       campaign: row.campaign,
       entry_page: row.entryPage,
       device: row.device,
@@ -92,7 +96,6 @@ export const aggregateMeasurement = (
       } as Group);
     const group = groups.get(key)!;
     const name = field[row.kind];
-    if (row.kind === 'nonzero_payment' && !paid(row)) continue;
     // Diagnostic segments stay visible; never add them to the eligible commercial denominator.
     if (name.endsWith('_workspaces')) {
       const identity = key + '|' + name + '|' + row.organizationId;
@@ -103,12 +106,10 @@ export const aggregateMeasurement = (
     } else group[name]++;
     if (row.kind === 'nonzero_payment') {
       group.revenue_minor += row.amountMinor;
-      if (paid(row)) {
-        const identity = key + '|paid|' + row.organizationId;
-        if (!seen.has(identity)) {
-          group.paid_subscription_workspaces++;
-          seen.add(identity);
-        }
+      const identity = key + '|paid|' + row.organizationId;
+      if (!seen.has(identity)) {
+        group.paid_subscription_workspaces++;
+        seen.add(identity);
       }
     }
   }

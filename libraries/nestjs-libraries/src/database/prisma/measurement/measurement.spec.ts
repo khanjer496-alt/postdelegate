@@ -118,7 +118,32 @@ it('qualifies paid only for the same subscription with applied entitlement; $0, 
   ).toBe(1);
   expect(report.rows.reduce((n, r) => n + r.revenue_minor, 0)).toBe(1000);
   expect(report.reconciliation.unmatched_subscription_payments).toBe(4);
-  expect(JSON.stringify(report)).not.toMatch(/org|sub-hash|invoice|11111111/);
+  expect(JSON.stringify(report)).not.toMatch(/\borg\b|sub-hash|invoice|11111111/);
+});
+it('exports medium as a day dimension and opens no all-zero group for an unpaid invoice', () => {
+  const report = aggregateMeasurement(
+    [
+      row('registration'),
+      row('nonzero_payment', {
+        key: 'unmatched',
+        medium: 'cpc',
+        reference: 'other-sub',
+        amountMinor: 2000,
+        currency: 'usd',
+      }),
+    ],
+    new Set(),
+    new Date(now - 2 * 86400000),
+    new Date(now + 1),
+    new Date(now - 2 * 86400000),
+    new Date(now)
+  );
+  expect(report.rows).toHaveLength(1);
+  expect(report.rows[0]).toMatchObject({
+    medium: 'organic',
+    confirmed_new_owner_workspaces: 1,
+  });
+  expect(report.reconciliation.unmatched_subscription_payments).toBe(1);
 });
 it('uses Dubai dates, cohort maturity and null visitor metrics with unavailable historical coverage', () => {
   const start = new Date(now - 10 * 86400000);

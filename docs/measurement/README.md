@@ -30,7 +30,7 @@ Super-admin only: `GET /admin/measurement?from=<ISO instant>&to=<ISO instant>`. 
 
 Daily workspace rows contain the binding baseline fields:
 
-`date, source, campaign, entry_page, device, internal_or_test, lifetime, eligible_visitor_ids, signup_attempts, confirmed_new_owner_workspaces, eligible_trial_workspaces, confirmed_trial_starts, channel_connected_workspaces, first_draft_workspaces, approved_accepted_future_schedule_workspaces, provider_confirmed_publications, paid_subscription_workspaces, nonzero_subscription_payments, entitlement_applied_workspaces, revenue_minor, currency`.
+`date, source, medium, campaign, entry_page, device, internal_or_test, lifetime, eligible_visitor_ids, signup_attempts, confirmed_new_owner_workspaces, eligible_trial_workspaces, confirmed_trial_starts, channel_connected_workspaces, first_draft_workspaces, approved_accepted_future_schedule_workspaces, provider_confirmed_publications, paid_subscription_workspaces, nonzero_subscription_payments, entitlement_applied_workspaces, revenue_minor, currency`.
 
 `eligible_visitor_ids:null` is unavailable in the workspace table. The companion Pulse `/api/measurement` provides the separate visitor-unit table. Unknown dimensions stay `unknown`; no email, account/user/workspace/post/invoice identifiers or person-level rows are exported. Currency rows remain separate; never sum currencies or overlapping workspace dimensions. Internal/test and lifetime diagnostic classes remain visible and must be excluded from commercial denominators. Diagnostic raw payments remain in the internal ledger; unmatched/test/lifetime payments never become qualified revenue.
 
