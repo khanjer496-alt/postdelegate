@@ -133,7 +133,7 @@ export class AdminStatsService {
     const organizationIds = [
       ...new Set(
         users
-          .map((user) => user.organizations[0]?.organization.id)
+          .map((user) => this.membershipsOf(user)[0]?.organization.id)
           .filter((id): id is string => !!id)
       ),
     ];
@@ -144,7 +144,7 @@ export class AdminStatsService {
     const now = Date.now();
 
     const items = users.map((user): AdminUserRow => {
-      const [membership, ...others] = user.organizations;
+      const [membership, ...others] = this.membershipsOf(user);
       const organization = membership?.organization;
       const orgPosts = organization
         ? posts.filter((row) => row.organizationId === organization.id)
@@ -195,11 +195,24 @@ export class AdminStatsService {
     };
   }
 
+  // The workspace a sign-in opens first leads, like the auth middleware: one
+  // with a plan, then the oldest membership
+  private membershipsOf(user: ListedUser) {
+    const hasPlan = (membership: ListedUser['organizations'][number]) =>
+      !!membership.organization.subscription &&
+      !membership.organization.subscription.deletedAt;
+    return [
+      ...user.organizations.filter(hasPlan),
+      ...user.organizations.filter((membership) => !hasPlan(membership)),
+    ];
+  }
+
   // Same reading of a workspace as the rest of billing: in a trial while the
   // subscription is trialing (or the flag says its first charge is being
-  // retried), an admin plan is stored under the web provider with a member's
-  // id as the paymentId, and an ended plan's row is deleted, which also turns
-  // allowTrial off (a workspace that never subscribed keeps it)
+  // retried), an admin plan has an admin_ identifier (older ones a member's
+  // id as the paymentId, under the web provider), and an ended plan's row is
+  // deleted, which also turns allowTrial off (a workspace that never
+  // subscribed keeps it)
   private planOf(
     organization: ListedOrganization,
     adminProvider: string,
@@ -242,8 +255,11 @@ export class AdminStatsService {
       };
     }
     if (
-      subscription.provider === adminProvider &&
-      organization.users.some((user) => user.userId === organization.paymentId)
+      subscription.identifier?.startsWith('admin_') ||
+      (subscription.provider === adminProvider &&
+        organization.users.some(
+          (user) => user.userId === organization.paymentId
+        ))
     ) {
       return { ...plan, state: 'comped' };
     }

@@ -23,6 +23,7 @@ const subscription = (overrides: any = {}) => ({
   subscriptionTier: 'PRO',
   period: 'MONTHLY',
   provider: 'stripe',
+  identifier: 'sub_1',
   isLifetime: false,
   status: 'active',
   trialEndsAt: null,
@@ -108,7 +109,16 @@ describe('AdminStatsService users', () => {
       )
     ).toMatchObject({ state: 'lifetime', tier: 'PRO' });
 
-    // add-subscription: a member's user id as the paymentId
+    // add-subscription marks the plan with an admin_ identifier
+    expect(
+      await planOf(
+        organization({
+          subscription: subscription({ identifier: 'admin_abcde', status: null }),
+        })
+      )
+    ).toMatchObject({ state: 'comped', tier: 'PRO' });
+
+    // older admin plans: a member's user id as the paymentId
     expect(
       await planOf(
         organization({
@@ -182,6 +192,28 @@ describe('AdminStatsService users', () => {
     });
   });
 
+  it('leads with the workspace that has a plan, like a sign-in does', async () => {
+    const { service, repository } = makeService([
+      user(organization(), {
+        organizations: [
+          { id: 'm1', role: 'SUPERADMIN', organization: organization({ name: 'Empty' }) },
+          {
+            id: 'm2',
+            role: 'USER',
+            organization: organization({ id: 'o2', name: 'Team', subscription: subscription() }),
+          },
+        ],
+      }),
+    ]);
+
+    const [row] = (await service.listUsers({ page: 0 })).items;
+
+    expect(repository.getPostsPerState).toHaveBeenCalledWith(['o2']);
+    expect(row.workspace).toMatchObject({ membershipId: 'm2', name: 'Team' });
+    expect(row.workspace!.plan.state).toBe('paying');
+    expect(row.otherWorkspaces).toBe(1);
+  });
+
   it('has no more pages on the last one', async () => {
     const { service } = makeService([user(organization())], [], 101);
     expect((await service.listUsers({ page: 2 })).hasMore).toBe(false);
@@ -224,7 +256,7 @@ describe('AdminStatsService users', () => {
       ].sort()
     );
     const json = JSON.stringify(row);
-    for (const secret of ['hash', 'google-id', 'cus_1', 'paymentId', 'password']) {
+    for (const secret of ['hash', 'google-id', 'cus_1', 'sub_1', 'paymentId', 'password']) {
       expect(json).not.toContain(secret);
     }
   });

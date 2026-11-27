@@ -594,6 +594,7 @@ export class AdminStatsRepository {
               {
                 organizations: {
                   some: {
+                    disabled: false,
                     organization: {
                       deletedAt: null,
                       name: { contains: q, mode: 'insensitive' },
@@ -639,6 +640,8 @@ export class AdminStatsRepository {
                       subscriptionTier: true,
                       period: true,
                       provider: true,
+                      // admin_ marks a plan an admin set, never returned
+                      identifier: true,
                       isLifetime: true,
                       status: true,
                       trialEndsAt: true,

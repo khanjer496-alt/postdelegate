@@ -11,7 +11,13 @@ import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { fromUtc } from '@gitroom/frontend/components/layout/set.timezone';
 import { useViewAs } from '@gitroom/frontend/components/layout/impersonate';
 
-type PlanState = 'trial' | 'paying' | 'comped' | 'lifetime' | 'expired' | 'none';
+type PlanState =
+  | 'trial'
+  | 'paying'
+  | 'comped'
+  | 'lifetime'
+  | 'expired'
+  | 'none';
 
 interface UserPlan {
   state: PlanState;
@@ -104,7 +110,9 @@ const planText = (plan: UserPlan) => {
             plan.trialDaysLeft === 1 ? 'day' : 'days'
           } left`;
     case 'paying':
-      return `${tierOf(plan)}${plan.status && plan.status !== 'active' ? ` · ${plan.status}` : ''}`;
+      return `${tierOf(plan)}${
+        plan.status && plan.status !== 'active' ? ` · ${plan.status}` : ''
+      }`;
     case 'comped':
       return `${tierOf(plan)} · given by admin`;
     case 'lifetime':
@@ -122,7 +130,11 @@ const PlanBadge: FC<{ plan: UserPlan }> = ({ plan }) => (
       'inline-flex px-[8px] rounded-[4px] text-[12px] border whitespace-nowrap',
       planBadge[plan.state]
     )}
-    title={plan.cancelAt ? `Cancels ${fromUtc(plan.cancelAt).format('D MMM YYYY')}` : undefined}
+    title={
+      plan.cancelAt
+        ? `Cancels ${fromUtc(plan.cancelAt).format('D MMM YYYY')}`
+        : undefined
+    }
   >
     {planText(plan)}
     {plan.cancelAt ? ' · cancels' : ''}
@@ -148,7 +160,7 @@ const ViewAsButton: FC<{ row: UserRow; self: boolean }> = ({ row, self }) => {
       title={`Open PostDelegate as ${row.email} in ${row.workspace.name}`}
       onClick={async () => {
         setLoading(true);
-        if (!(await viewAs(row.workspace!.membershipId))) {
+        if (!(await viewAs(row.workspace!.membershipId, true))) {
           setLoading(false);
         }
       }}
@@ -203,7 +215,7 @@ export const AdminUsersComponent: FC = () => {
             setInput(e.target.value);
           }}
           placeholder="name@example.com or Acme"
-          className="bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] text-textColor w-full max-w-[420px] outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
+          className="bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] mobile:text-[16px] text-textColor w-full max-w-[420px] outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
         />
       </div>
 
@@ -264,7 +276,9 @@ export const AdminUsersComponent: FC = () => {
                       </div>
                     )}
                   </div>
-                  <div title={fromUtc(row.createdAt).format('D MMM YYYY HH:mm')}>
+                  <div
+                    title={fromUtc(row.createdAt).format('D MMM YYYY HH:mm')}
+                  >
                     {fromUtc(row.createdAt).format('D MMM YYYY')}
                   </div>
                   <div>{signInLabel[row.signInMethod] || row.signInMethod}</div>
@@ -284,14 +298,18 @@ export const AdminUsersComponent: FC = () => {
                       <span className="text-textItemBlur">No workspace</span>
                     )}
                   </div>
-                  <div>{row.workspace && <PlanBadge plan={row.workspace.plan} />}</div>
+                  <div>
+                    {row.workspace && <PlanBadge plan={row.workspace.plan} />}
+                  </div>
                   <div>{row.workspace?.channels ?? '—'}</div>
                   <div>
                     {row.workspace
                       ? `${row.workspace.postsScheduled} / ${row.workspace.postsPublished}`
                       : '—'}
                   </div>
-                  <div title={fromUtc(row.lastActiveAt).format('D MMM YYYY HH:mm')}>
+                  <div
+                    title={fromUtc(row.lastActiveAt).format('D MMM YYYY HH:mm')}
+                  >
                     {fromUtc(row.lastActiveAt).fromNow()}
                   </div>
                   <div className="flex justify-end">
@@ -339,12 +357,15 @@ export const AdminUsersComponent: FC = () => {
                     <div className="grid grid-cols-3 gap-[8px] text-[12px]">
                       <div>
                         <div className="text-textItemBlur">Channels</div>
-                        <div className="text-[14px]">{row.workspace.channels}</div>
+                        <div className="text-[14px]">
+                          {row.workspace.channels}
+                        </div>
                       </div>
                       <div>
                         <div className="text-textItemBlur">Posts sch / pub</div>
                         <div className="text-[14px]">
-                          {row.workspace.postsScheduled} / {row.workspace.postsPublished}
+                          {row.workspace.postsScheduled} /{' '}
+                          {row.workspace.postsPublished}
                         </div>
                       </div>
                       <div>

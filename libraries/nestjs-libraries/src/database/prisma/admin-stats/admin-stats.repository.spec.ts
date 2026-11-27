@@ -163,6 +163,7 @@ describe('AdminStatsRepository users', () => {
         {
           organizations: {
             some: {
+              disabled: false,
               organization: {
                 deletedAt: null,
                 name: { contains: 'Acme', mode: 'insensitive' },
@@ -190,7 +191,6 @@ describe('AdminStatsRepository users', () => {
       'apiKeyHash',
       'token',
       'refreshToken',
-      'identifier',
       'ip',
       'agent',
       'sessionVersion',

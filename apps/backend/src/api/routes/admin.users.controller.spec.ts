@@ -72,6 +72,7 @@ describe('AdminUsersDto', () => {
     expect(await check({ page: '-1' })).toHaveLength(1);
     expect(await check({ page: '1.5' })).toHaveLength(1);
     expect(await check({ page: 'abc' })).toHaveLength(1);
+    expect(await check({ page: '10001' })).toHaveLength(1);
     expect(await check({ q: 'x'.repeat(201) })).toHaveLength(1);
   });
 });

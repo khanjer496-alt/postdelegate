@@ -868,7 +868,9 @@ export const useViewAs = () => {
 const FindUser = () => {
   const t = useT();
   const viewAs = useViewAs();
+  const pathname = usePathname();
   const [name, setName] = useState('');
+  const [opening, setOpening] = useState(false);
   const [query] = useDebounce(name.trim(), 300);
   const { data, isLoading } = useUserSearch('impersonate', query);
   const rows = useMemo(() => (data || []).map(toSearchRow), [data]);
@@ -885,7 +887,7 @@ const FindUser = () => {
           'find_a_user_placeholder',
           'Email, name, workspace or post id'
         )}
-        className="bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] text-textColor w-full outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
+        className="bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] mobile:text-[16px] text-textColor w-full outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
       />
       {!!query && !isLoading && !rows.length && (
         <div className="px-[10px] text-[12px] text-textItemBlur">
@@ -898,7 +900,17 @@ const FindUser = () => {
             <SearchResult
               key={item.id}
               item={item}
-              onClick={() => viewAs(item.id)}
+              onClick={async () => {
+                if (opening) {
+                  return;
+                }
+                setOpening(true);
+                // an admin page would show the admin list again, so open the
+                // app itself; anywhere else stay on the same page
+                if (!(await viewAs(item.id, pathname.startsWith('/admin')))) {
+                  setOpening(false);
+                }
+              }}
             />
           ))}
         </div>
@@ -936,7 +948,7 @@ const SwitchUser = () => {
       !(await deleteDialog(
         t(
           'swap_logins_confirm',
-          "{{current}} will sign in to {{target}}'s account, and {{target}} will sign in to {{current}}'s account. Their email addresses and passwords trade places, and the billing customer emails update to match. This is not \"view as\": use the impersonation box for that. You can undo it by swapping again.",
+          '{{current}} will sign in to {{target}}\'s account, and {{target}} will sign in to {{current}}\'s account. Their email addresses and passwords trade places, and the billing customer emails update to match. This is not "view as": use the impersonation box for that. You can undo it by swapping again.',
           {
             current: currentUser?.email,
             target: selected.email,
@@ -965,7 +977,10 @@ const SwitchUser = () => {
     } catch {
       setSwitching(false);
       toaster.show(
-        t('switch_user_failed', 'The user switch failed and nothing was changed'),
+        t(
+          'switch_user_failed',
+          'The user switch failed and nothing was changed'
+        ),
         'warning'
       );
     }
@@ -1000,7 +1015,7 @@ const SwitchUser = () => {
             setSelected(null);
             setName(e.target.value);
           }}
-          className="flex-1 min-w-0 bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] text-textColor outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
+          className="flex-1 min-w-0 bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] mobile:text-[16px] text-textColor outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
         />
         <Button
           onClick={doSwitch}
@@ -1072,7 +1087,10 @@ export const AdminMenu = () => {
     { href: '/admin/users', label: t('admin_menu_users', 'Users') },
     { href: '/admin/stats', label: t('admin_menu_stats', 'Stats') },
     { href: '/admin/errors', label: t('admin_menu_errors', 'Errors') },
-    { href: '/admin/affiliates', label: t('admin_menu_affiliates', 'Affiliates') },
+    {
+      href: '/admin/affiliates',
+      label: t('admin_menu_affiliates', 'Affiliates'),
+    },
     { href: '/admin/reviews', label: t('admin_menu_reviews', 'Reviews') },
   ];
 
@@ -1116,7 +1134,7 @@ export const AdminMenu = () => {
               {pages.map((page) => (
                 <Link
                   key={page.href}
-                                    href={page.href}
+                  href={page.href}
                   onClick={() => setOpen(false)}
                   className={clsx(
                     menuItem,
@@ -1134,7 +1152,7 @@ export const AdminMenu = () => {
             </MenuSection>
             <MenuSection title={t('admin_menu_tools', 'Tools')}>
               <button
-                                type="button"
+                type="button"
                 className={menuItem}
                 onClick={openTool({
                   title: t('add_announcement', 'Add Announcement'),
@@ -1144,7 +1162,7 @@ export const AdminMenu = () => {
                 {t('add_announcement', 'Add Announcement')}
               </button>
               <button
-                                type="button"
+                type="button"
                 className={menuItem}
                 onClick={openTool({
                   title: t('import_debug_post', 'Import Debug Post'),
@@ -1169,7 +1187,7 @@ export const AdminMenu = () => {
                 )}
                 {!!user?.tier?.team_members && (
                   <button
-                                        type="button"
+                    type="button"
                     className={menuItem}
                     onClick={openTool({
                       title: t('add_team_member', 'Add Team Member'),
@@ -1181,7 +1199,7 @@ export const AdminMenu = () => {
                 )}
                 {billingEnabled && (
                   <button
-                                        type="button"
+                    type="button"
                     className={menuItem}
                     onClick={openTool({
                       title: t('manage_billing', 'Manage Billing'),
@@ -1246,7 +1264,7 @@ export const Impersonate = () => {
   return (
     <div
       role="status"
-      className="flex items-center gap-[10px] px-[16px] mobile:px-[12px] py-[6px] min-h-[44px] bg-amber-500/15 border-b border-amber-500/40 text-newTextColor text-[13px]"
+      className="flex items-center gap-[10px] px-[16px] mobile:px-[12px] h-[44px] bg-amber-500/15 border-b border-amber-500/40 text-newTextColor text-[13px]"
     >
       <span className="text-amber-500 shrink-0">
         <Icon name="eye" size={16} />
