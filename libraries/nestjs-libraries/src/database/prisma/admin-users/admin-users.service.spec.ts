@@ -1,14 +1,18 @@
-// the real integration service pulls in every social provider
+// the real services pull in every social provider and payment provider
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service',
   () => ({ IntegrationService: class {} })
 );
+jest.mock('@gitroom/nestjs-libraries/services/payment/payment.service', () => ({
+  PaymentService: class {},
+}));
 
 import {
   AdminUsersService,
   contentPreviewOf,
   errorTextOf,
   lastActiveOf,
+  lastPostOf,
   planStateOf,
   userMatchesFilter,
   WorkspaceSignals,
@@ -145,6 +149,23 @@ describe('planStateOf', () => {
         now
       )
     ).toBe('comped');
+  });
+
+  it('reads an older admin plan, a member id as the paymentId, as comped', () => {
+    const older = workspace({
+      paymentId: 'u1',
+      users: [{ userId: 'u1' }],
+      subscription: subscription({
+        provider: 'stripe',
+        identifier: 'sub_x',
+        status: null,
+      }),
+    });
+    expect(planStateOf(older, now, 'stripe')).toBe('comped');
+    // a Stripe customer id is not a member
+    expect(
+      planStateOf({ ...older, paymentId: 'cus_123' } as any, now, 'stripe')
+    ).toBe('paying');
   });
 
   it('reads a subscription that grants nothing as unpaid', () => {
@@ -320,6 +341,33 @@ describe('lastActiveOf and contentPreviewOf', () => {
     expect(lastActiveOf({ createdAt, lastOnline: later })).toBe(later);
   });
 
+  it('falls back to the newest post of a live workspace the user owns', () => {
+    const member = (organizationId: string, over: object = {}) => ({
+      organizationId,
+      role: 'SUPERADMIN',
+      disabled: false,
+      organization: { deletedAt: null },
+      ...over,
+    });
+    const posts = [
+      { organizationId: 'own', lastCreatedAt: new Date('2026-11-10') },
+      { organizationId: 'own', lastCreatedAt: new Date('2026-11-12') },
+      { organizationId: 'team', lastCreatedAt: new Date('2026-11-20') },
+      { organizationId: 'gone', lastCreatedAt: new Date('2026-11-25') },
+    ];
+    expect(
+      lastPostOf(
+        [
+          member('own'),
+          member('team', { role: 'USER' }),
+          member('gone', { organization: { deletedAt: new Date() } }),
+        ],
+        posts
+      )
+    ).toEqual(new Date('2026-11-12'));
+    expect(lastPostOf([member('team', { role: 'USER' })], posts)).toBeNull();
+  });
+
   it('previews a post as one line of plain text', () => {
     expect(contentPreviewOf('<p>Hello&nbsp;<strong>world</strong></p>\n<p>again</p>')).toBe(
       'Hello world again'
@@ -417,7 +465,9 @@ describe('AdminUsersService.list', () => {
       ]),
     };
     return {
-      service: new AdminUsersService(repository as any, {} as any),
+      service: new AdminUsersService(repository as any, {} as any, {
+        getDefaultProviderName: () => 'stripe',
+      } as any),
       repository,
     };
   };

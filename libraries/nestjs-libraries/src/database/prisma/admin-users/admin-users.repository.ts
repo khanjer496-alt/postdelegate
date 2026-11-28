@@ -9,10 +9,14 @@ const workspacePlanSelect = {
   deletedAt: true,
   isTrailing: true,
   allowTrial: true,
+  // older admin plans: a member's id as the paymentId (planStateOf)
+  paymentId: true,
+  users: { select: { userId: true } },
   subscription: {
     select: {
       subscriptionTier: true,
       period: true,
+      provider: true,
       identifier: true,
       status: true,
       trialEndsAt: true,
@@ -249,11 +253,13 @@ export class AdminUsersRepository {
       by: ['organizationId', 'state'],
       where: { organizationId: { in: organizationIds }, ...countedPosts },
       _count: { _all: true },
+      _max: { createdAt: true },
     });
     return groups.map((group) => ({
       organizationId: group.organizationId,
       state: group.state,
       count: group._count._all,
+      lastCreatedAt: group._max.createdAt,
     }));
   }
 
@@ -342,14 +348,15 @@ export class AdminUsersRepository {
     });
   }
 
-  // The workspace's measured milestones, one row per kind (a kind like
-  // publication is recorded once per post), and where the workspace came
+  // The workspace's measured milestones, one row per kind, network and
+  // failure category (a kind like publication is recorded once per post),
+  // and where the workspace came
   // from: every event carries the workspace's first touch, the first one
   // stands for them all
   async getJourney(organizationId: string) {
     const [kinds, first] = await Promise.all([
       this._measurementEvent.model.measurementEvent.groupBy({
-        by: ['kind'],
+        by: ['kind', 'provider', 'reason'],
         where: { organizationId },
         _min: { occurredAt: true },
         _max: { occurredAt: true },
@@ -370,6 +377,8 @@ export class AdminUsersRepository {
       first,
       kinds: kinds.map((group) => ({
         kind: group.kind,
+        provider: group.provider,
+        reason: group.reason,
         firstAt: group._min.occurredAt,
         lastAt: group._max.occurredAt,
         count: group._count._all,

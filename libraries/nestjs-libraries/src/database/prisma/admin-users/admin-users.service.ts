@@ -6,6 +6,7 @@ import {
   AdminUsersRepository,
 } from '@gitroom/nestjs-libraries/database/prisma/admin-users/admin-users.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import {
   AdminUserFilter,
@@ -25,7 +26,10 @@ export type PlanState =
 interface PlanSource {
   isTrailing: boolean;
   allowTrial: boolean;
+  paymentId?: string | null;
+  users?: { userId: string }[];
   subscription: {
+    provider?: string;
     identifier: string | null;
     status: string | null;
     trialEndsAt: Date | null;
@@ -43,7 +47,9 @@ const NOT_PAID = ['incomplete', 'incomplete_expired', 'unpaid', 'paused', 'cance
 // without one that has allowTrial off had a plan once: only a stored
 // subscription turns allowTrial off (see endedTrialFlags in the
 // subscription repository). A plan a super admin set has an `admin_`
-// identifier and nobody pays for it (addSubscription). In a trial like
+// identifier and nobody pays for it (addSubscription); older ones are
+// stored under the web provider (`adminProvider`) with a member's id as the
+// workspace's paymentId, like getCompedSubscriptions reads them. In a trial like
 // billing reads it: the provider has it trialing, or it is not active yet
 // and its trial is still running or the workspace is flagged trialing (the
 // first charge after the trial being retried). A trial with a cancel date
@@ -51,7 +57,8 @@ const NOT_PAID = ['incomplete', 'incomplete_expired', 'unpaid', 'paused', 'cance
 // provider status yet (rows from before it was stored) is read as paying
 export const planStateOf = (
   workspace: PlanSource,
-  now = new Date()
+  now = new Date(),
+  adminProvider?: string
 ): PlanState => {
   const subscription = workspace.subscription;
   if (!subscription || subscription.deletedAt) {
@@ -60,7 +67,13 @@ export const planStateOf = (
   if (subscription.isLifetime) {
     return 'lifetime';
   }
-  if (subscription.identifier?.startsWith('admin_')) {
+  if (
+    subscription.identifier?.startsWith('admin_') ||
+    (!!adminProvider &&
+      subscription.provider === adminProvider &&
+      !!workspace.paymentId &&
+      !!workspace.users?.some((user) => user.userId === workspace.paymentId))
+  ) {
     return 'comped';
   }
   if (
@@ -165,6 +178,35 @@ export const contentPreviewOf = (content: string, length = 140) => {
   return text.length > length ? `${text.slice(0, length - 1)}…` : text;
 };
 
+// Before lastOnline was written (or for a user not seen since), the newest
+// post created in a live workspace they own stands in for their activity
+export const lastPostOf = (
+  memberships: {
+    organizationId: string;
+    role: string;
+    disabled: boolean;
+    organization: { deletedAt: Date | null };
+  }[],
+  posts: { organizationId: string; lastCreatedAt: Date | null }[]
+) => {
+  const owned = new Set(
+    memberships
+      .filter(
+        (member) => isOwnerOf(member) && !member.organization.deletedAt
+      )
+      .map((member) => member.organizationId)
+  );
+  return posts.reduce<Date | null>(
+    (latest, group) =>
+      owned.has(group.organizationId) &&
+      group.lastCreatedAt &&
+      (!latest || group.lastCreatedAt > latest)
+        ? group.lastCreatedAt
+        : latest,
+    null
+  );
+};
+
 const shorten = (value: string | null, length: number) =>
   value && value.length > length ? `${value.slice(0, length - 1)}…` : value;
 
@@ -210,9 +252,10 @@ const fullName = (user: { name: string | null; lastName: string | null }) =>
 
 const planOf = (
   organization: AdminUserRow['organizations'][number]['organization'],
-  now: Date
+  now: Date,
+  adminProvider: string
 ) => ({
-  state: planStateOf(organization, now),
+  state: planStateOf(organization, now, adminProvider),
   tier: organization.subscription?.subscriptionTier || null,
   period: organization.subscription?.period || null,
   status: organization.subscription?.status || null,
@@ -229,8 +272,14 @@ type WorkspaceSummary = Awaited<
 export class AdminUsersService {
   constructor(
     private _adminUsersRepository: AdminUsersRepository,
-    private _integrationService: IntegrationService
+    private _integrationService: IntegrationService,
+    private _paymentService: PaymentService
   ) {}
+
+  // the provider admin plans are stored under (add-subscription)
+  private adminProvider() {
+    return this._paymentService.getDefaultProviderName('web');
+  }
 
   // The workspaces that need attention for a reason only the database knows
   // (channels, failed posts), read for all workspaces: only a few have one.
@@ -258,7 +307,7 @@ export class AdminUsersService {
         ({ organizationId, organization, ...member }) => ({
           deleted: !!organization.deletedAt,
           owner: isOwnerOf(member),
-          plan: planStateOf(organization, now),
+          plan: planStateOf(organization, now, this.adminProvider()),
           status: organization.subscription?.status || null,
           trialEndsAt: organization.subscription?.trialEndsAt || null,
           channelIssues: !!attention?.channelIssues.has(organizationId),
@@ -359,6 +408,7 @@ export class AdminUsersService {
       ),
     ];
     const since = dayjs(now).subtract(RECENT_FAILURE_DAYS, 'day').toDate();
+    const adminProvider = this.adminProvider();
     const [channels, posts, failures] = await Promise.all([
       this._adminUsersRepository.getChannelCounts(organizationIds),
       this._adminUsersRepository.getPostCounts(organizationIds),
@@ -402,7 +452,8 @@ export class AdminUsersService {
       providerName: user.providerName,
       activated: user.activated,
       createdAt: user.createdAt,
-      lastActive: lastActiveOf(user),
+      lastActive:
+        lastActiveOf(user) || lastPostOf(user.organizations, posts),
       isSuperAdmin: user.isSuperAdmin,
       deletedAt: user.deletedAt,
       // live workspaces first, the ones they own first, then in the order
@@ -421,7 +472,7 @@ export class AdminUsersService {
           role: member.role,
           disabled: member.disabled,
           deletedAt: member.organization.deletedAt,
-          plan: planOf(member.organization, now),
+          plan: planOf(member.organization, now, adminProvider),
           channels: channelsOf(member.organizationId),
           posts: postsOf(member.organizationId),
         })),

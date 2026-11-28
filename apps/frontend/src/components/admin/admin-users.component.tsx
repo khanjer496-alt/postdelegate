@@ -17,6 +17,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
+import { useViewAs } from '@gitroom/frontend/components/layout/impersonate';
 
 export type PlanState =
   | 'trialing'
@@ -225,7 +226,7 @@ export const UserTags: FC<{ user: AdminUserSummary }> = ({ user }) => (
       <Tag className="text-orange-500 border-orange-500/40">Not verified</Tag>
     )}
     {user.isSuperAdmin && (
-      <Tag className="text-purple-500 border-purple-500/40">Admin</Tag>
+      <Tag className="text-purple-500 border-purple-500/40">Super admin</Tag>
     )}
     <Tag className="text-textItemBlur">{signInMethodOf(user.providerName)}</Tag>
   </span>
@@ -335,7 +336,7 @@ const useAdminUsersList = (params: {
 };
 
 const GRID =
-  'grid grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-[12px]';
+  'grid grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_96px] gap-[12px]';
 
 const Column: FC<{ label: string; children: ReactNode }> = ({
   label,
@@ -349,28 +350,66 @@ const Column: FC<{ label: string; children: ReactNode }> = ({
   </div>
 );
 
-const UserRow: FC<{ user: AdminUserSummary; listQuery: string }> = ({
-  user,
-  listQuery,
+// "View as": the app opens on its home page as this membership's user, like
+// the Admin menu's search does from an admin page
+export const ViewAsButton: FC<{ userOrganizationId: string; title?: string }> = ({
+  userOrganizationId,
+  title,
 }) => {
+  const viewAs = useViewAs();
+  const [loading, setLoading] = useState(false);
+  return (
+    <Button
+      secondary={true}
+      loading={loading}
+      title={title}
+      onClick={async () => {
+        setLoading(true);
+        if (!(await viewAs(userOrganizationId, true))) {
+          setLoading(false);
+        }
+      }}
+      className="rounded-[8px] h-[34px] px-[12px] text-[13px] whitespace-nowrap"
+    >
+      View as
+    </Button>
+  );
+};
+
+// a membership that can be viewed as: a live user, workspace and access
+export const viewableOf = (
+  user: { deletedAt: string | null },
+  workspace?: AdminWorkspace
+) => !!workspace && !user.deletedAt && !workspace.deletedAt && !workspace.disabled;
+
+const UserRow: FC<{
+  user: AdminUserSummary;
+  listQuery: string;
+  self: boolean;
+}> = ({ user, listQuery, self }) => {
   const [workspace] = user.workspaces;
   const more = user.workspaces.length - 1;
   const href = `/admin/users/${user.id}${
     listQuery ? `?list=${encodeURIComponent(listQuery)}` : ''
   }`;
 
+  // the name's link covers the whole row, the View as button sits above it
   return (
-    <Link
-      href={href}
+    <div
       className={clsx(
         GRID,
-        'px-[12px] py-[12px] text-[13px] border-b border-newTableBorder last:border-b-0 items-start hover:bg-boxHover transition-colors',
+        'relative px-[12px] py-[12px] text-[13px] border-b border-newTableBorder last:border-b-0 items-start hover:bg-boxHover transition-colors',
         'mobile:flex mobile:flex-col mobile:gap-[6px]',
         !!user.deletedAt && 'opacity-60'
       )}
     >
       <div className="min-w-0 flex flex-col gap-[4px]">
-        <div className="font-[600] truncate">{user.name || user.email}</div>
+        <Link
+          href={href}
+          className="font-[600] truncate outline-none after:absolute after:inset-0 focus-visible:underline"
+        >
+          {user.name || user.email}
+        </Link>
         {!!user.name && (
           <div className="text-textItemBlur truncate">{user.email}</div>
         )}
@@ -397,7 +436,7 @@ const UserRow: FC<{ user: AdminUserSummary; listQuery: string }> = ({
             <span className="text-[12px] text-textItemBlur truncate max-w-full">
               {workspace.name}
               {!!workspace.deletedAt && ' (deleted)'}
-              {more > 0 && ` · +${plural(more, 'workspace')}`}
+              {more > 0 && ` · +${more} more`}
             </span>
           </span>
         ) : (
@@ -410,7 +449,15 @@ const UserRow: FC<{ user: AdminUserSummary; listQuery: string }> = ({
       <Column label="Posts">
         {workspace ? <PostsLine posts={workspace.posts} /> : '—'}
       </Column>
-    </Link>
+      <div className="relative z-[1] flex justify-end mobile:justify-start">
+        {!self && viewableOf(user, workspace) && (
+          <ViewAsButton
+            userOrganizationId={workspace.userOrganizationId}
+            title={`Open PostDelegate as ${user.email} in ${workspace.name}`}
+          />
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -593,9 +640,15 @@ export const AdminUsersComponent: FC = () => {
             <div>Plan</div>
             <div>Channels</div>
             <div>Posts</div>
+            <div />
           </div>
           {data.items.map((row) => (
-            <UserRow key={row.id} user={row} listQuery={listQuery} />
+            <UserRow
+              key={row.id}
+              user={row}
+              listQuery={listQuery}
+              self={row.id === user.id}
+            />
           ))}
         </div>
       )}

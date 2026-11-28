@@ -1,13 +1,12 @@
 'use client';
 
-import React, { FC, ReactNode, useCallback, useState } from 'react';
+import React, { FC, ReactNode } from 'react';
 import useSWR from 'swr';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
-import { useToaster } from '@gitroom/react/toaster/toaster';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
@@ -26,6 +25,7 @@ import {
   Tag,
   tierLabelOf,
   UserTags,
+  ViewAsButton,
 } from '@gitroom/frontend/components/admin/admin-users.component';
 
 interface Channel {
@@ -73,6 +73,8 @@ interface TeamMember {
 
 interface JourneyEvent {
   kind: string;
+  provider: string;
+  reason: string;
   firstAt: string;
   lastAt: string;
   count: number;
@@ -192,7 +194,10 @@ const JOURNEY_WORDS: Record<string, string> = {
   registration: 'Signed up',
   trial_eligible: 'Could start a trial',
   trial_started: 'Started trial',
-  channel_connected: 'Connected first channel',
+  channel_connected: 'Connected a channel',
+  channel_connect_failed: 'Channel connect failed',
+  publish_failed: 'Post failed',
+  subscription_ended: 'Plan ended',
   first_draft: 'Wrote first draft',
   qualifying_schedule: 'Scheduled first post',
   publication: 'Published a post',
@@ -200,7 +205,16 @@ const JOURNEY_WORDS: Record<string, string> = {
   nonzero_payment: 'Payment received',
 };
 
-const journeyLabelOf = (event: JourneyEvent) => {
+const readable = (value: string) => value.replace(/[_-]+/g, ' ').trim();
+
+// the kind in words, then the network and the failure category if any:
+// "Channel connect failed · instagram · token expired"
+const journeyLabelOf = (event: JourneyEvent) =>
+  [kindLabelOf(event), event.provider, event.reason && readable(event.reason)]
+    .filter((part) => !!part && part !== 'unknown')
+    .join(' · ');
+
+const kindLabelOf = (event: JourneyEvent) => {
   if (event.kind === 'nonzero_payment') {
     return event.count === 1 ? 'First payment' : 'Payments received';
   }
@@ -559,7 +573,7 @@ const Journey: FC<{ journey: JourneyDetail }> = ({ journey }) => {
       <div className="flex flex-col border-s-2 border-newTableBorder ms-[6px]">
         {journey.events.map((event) => (
           <div
-            key={event.kind}
+            key={`${event.kind}|${event.provider}|${event.reason}`}
             className="relative ps-[16px] pb-[12px] last:pb-0"
           >
             <span className="absolute -start-[6px] top-[5px] w-[10px] h-[10px] rounded-full bg-btnPrimary" />
@@ -581,37 +595,6 @@ const Journey: FC<{ journey: JourneyDetail }> = ({ journey }) => {
         ))}
       </div>
     </div>
-  );
-};
-
-// the same switch as the admin bar, then the app as this user sees it
-const ViewAsButton: FC<{ userOrganizationId: string }> = ({
-  userOrganizationId,
-}) => {
-  const fetch = useFetch();
-  const toaster = useToaster();
-  const [opening, setOpening] = useState(false);
-
-  const viewAs = useCallback(async () => {
-    setOpening(true);
-    const res = await fetch(`/user/impersonate`, {
-      method: 'POST',
-      body: JSON.stringify({
-        id: userOrganizationId,
-      }),
-    });
-    if (!res.ok) {
-      setOpening(false);
-      toaster.show('Could not switch to this user, please try again', 'warning');
-      return;
-    }
-    window.location.href = '/launches';
-  }, [fetch, toaster, userOrganizationId]);
-
-  return (
-    <Button onClick={viewAs} loading={opening}>
-      View as this user
-    </Button>
   );
 };
 
