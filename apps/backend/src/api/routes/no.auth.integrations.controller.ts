@@ -625,29 +625,37 @@ export class NoAuthIntegrationsController {
 
   // The network sent the person back without a code: they cancelled on its
   // page or it refused before asking. Nothing of the state is spent, the
-  // failure is only recorded for the workspace that started the connect
+  // failure is only recorded for the workspace that started the connect, on
+  // the network the connect was started for (never the one in the URL), and
+  // only by whoever may finish it. The answer is the same either way, so the
+  // route says nothing about a state
   @Post('/social-connect/:integration/declined')
   async declinedConnect(
-    @Param('integration') integration: string,
-    @Body() body: DeclinedIntegrationDto
+    @Body() body: DeclinedIntegrationDto,
+    @Req() req: Request
   ) {
-    if (
-      !this._integrationManager
-        .getAllowedSocialsIntegrations()
-        .includes(integration)
-    ) {
-      throw new HttpException('Integration not allowed', 400);
-    }
-    const organization = await ioRedis.get(`organization:${body.state}`);
-    if (organization) {
+    try {
+      const [organization, provider] = await Promise.all([
+        ioRedis.get(`organization:${body.state}`),
+        ioRedis.get(`provider:${body.state}`),
+      ]);
+      if (!organization || !provider) {
+        return { ok: true };
+      }
+      const binding = await readConnectBinding(body.state);
+      if (binding) {
+        await this.checkConnectBinding(req, body.state, binding, organization);
+      }
       await this._measurementService.channelConnectFailed(
         organization,
-        integration,
+        provider,
         'cancelled',
         body.state
       );
+    } catch (err) {
+      // another browser, or a state that is gone: nothing is recorded
     }
-    return { recorded: !!organization };
+    return { ok: true };
   }
 
   // "Cancel" on the confirmation of a shared link: the state is dropped so

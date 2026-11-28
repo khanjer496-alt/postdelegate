@@ -2,6 +2,11 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 import { Injectable } from '@nestjs/common';
 import { CHANNEL_CONNECTED } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
+// Publish failures the workflows record for a lapsed trial or a channel
+// turned off (MeasurementService.publishFailed): they fail every queued post
+// the same way, so they are neither an email per post nor a blocker count
+export const QUIET_PUBLISH_FAILURES = ['channel_disabled', 'no_subscription'];
+
 // a launch-stage list, the digest and the admin table never page
 export const TRIALS_LIMIT = 500;
 export const ANSWERS_LIMIT = 50;
@@ -206,6 +211,10 @@ export class OwnerAlertsRepository {
         },
         kind: {
           in: ['channel_connect_failed', 'publish_failed'],
+        },
+        // a lapsed trial or a channel turned off is not a blocker to act on
+        reason: {
+          notIn: QUIET_PUBLISH_FAILURES,
         },
         occurredAt: {
           gte: since,

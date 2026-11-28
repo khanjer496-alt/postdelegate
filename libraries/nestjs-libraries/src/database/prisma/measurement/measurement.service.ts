@@ -20,6 +20,27 @@ export type ChannelConnectFailure =
   | 'token_exchange'
   | 'no_account';
 
+// Why a plan ended, decided by SubscriptionService from the stored plan and
+// what its caller knows (an account deletion, a failed payment)
+export type SubscriptionEndReason =
+  | 'trial_expired'
+  | 'trial_cancelled'
+  | 'cancelled'
+  | 'payment_failed'
+  | 'account_deleted';
+
+// The errors the post workflows set themselves rather than a network's
+// answer. null: not a failure at all (a duplicate run of a post that went
+// out, a post deleted meanwhile), nothing is recorded
+const WORKFLOW_FAILURES: Record<string, string | null> = {
+  'Already posted': null,
+  'No Post': null,
+  'Refresh channel needed': 'refresh_needed',
+  'Channel disabled': 'channel_disabled',
+  'This post was not published because the organization has no active subscription.':
+    'no_subscription',
+};
+
 // The first line of a provider error, short enough for an email subject line
 // and without anything that looks like an email address or a token
 const readError = (err: unknown): string => {
@@ -267,6 +288,11 @@ export class MeasurementService {
   // workflow retry) is one failure; the error text goes to the alert only.
   async publishFailed(id: string, err: unknown) {
     await this.safe(async () => {
+      const workflow =
+        typeof err === 'string' && err in WORKFLOW_FAILURES
+          ? WORKFLOW_FAILURES[err]
+          : undefined;
+      if (workflow === null) return;
       const post = await this.repository.failedPost(id);
       if (!post) return;
       const detail = shortError(err);
@@ -275,19 +301,21 @@ export class MeasurementService {
       await this.record(post.organizationId, 'publish_failed', thread + '|' + detail, {
         reference: thread,
         provider: post.integration?.providerIdentifier || 'unknown',
+        reason: workflow || 'provider_error',
         detail,
       });
     });
   }
-  // The plan is gone: a trial that ended without paying, or a cancelled plan
+  // The plan is gone; the reason says how (an account deletion is recorded
+  // and never alerted)
   async subscriptionEnded(
     org: string,
-    trial: boolean,
+    reason: SubscriptionEndReason,
     identity: string,
     plan: string
   ) {
     await this.record(org, 'subscription_ended', identity, {
-      reason: trial ? 'trial_expired' : 'cancelled',
+      reason,
       detail: plan,
     });
   }

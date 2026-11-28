@@ -138,10 +138,10 @@ describe('MeasurementService owner alerts', () => {
     expect(repo.save).not.toHaveBeenCalled();
   });
 
-  it('records an ended plan as a trial that expired or a cancel', async () => {
+  it('records an ended plan with the reason it was given', async () => {
     const { service, repo } = make();
-    await service.subscriptionEnded('org', true, 'sub_1', 'STANDARD');
-    await service.subscriptionEnded('org', false, 'sub_2', 'TEAM');
+    await service.subscriptionEnded('org', 'trial_expired', 'sub_1', 'STANDARD');
+    await service.subscriptionEnded('org', 'cancelled', 'sub_2', 'TEAM');
     expect(repo.save).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ kind: 'subscription_ended', reason: 'trial_expired' }),
@@ -152,6 +152,36 @@ describe('MeasurementService owner alerts', () => {
       expect.objectContaining({ kind: 'subscription_ended', reason: 'cancelled' }),
       true
     );
+  });
+});
+
+describe('MeasurementService workflow failures', () => {
+  it('records nothing for a duplicate run or a post deleted meanwhile', async () => {
+    const { service, repo } = make();
+    await service.publishFailed('post-1', 'Already posted');
+    await service.publishFailed('post-1', 'No Post');
+    expect(repo.failedPost).not.toHaveBeenCalled();
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('tells a reconnect, a channel turned off and a lapsed plan from a network error', async () => {
+    const { service, repo } = make();
+    await service.publishFailed('a', 'Refresh channel needed');
+    await service.publishFailed('b', 'Channel disabled');
+    await service.publishFailed(
+      'c',
+      'This post was not published because the organization has no active subscription.'
+    );
+    await service.publishFailed('d', '{"message":"Rate limited"}');
+    const reasons = (repo.save.mock.calls as unknown as [{ reason: string }][]).map(
+      ([data]) => data.reason
+    );
+    expect(reasons).toEqual([
+      'refresh_needed',
+      'channel_disabled',
+      'no_subscription',
+      'provider_error',
+    ]);
   });
 });
 

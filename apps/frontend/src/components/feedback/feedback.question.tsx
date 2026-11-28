@@ -14,7 +14,9 @@ const TEXT_MAX = 500;
 // A one-question survey in the corner, like the review card: never a blocker,
 // asked once. The server decides which question (after sign-up, or after a
 // trial or plan ended) and the close button is a skip, so it is not asked again.
-export const FeedbackQuestion: FC = () => {
+// `inline` is the billing screen: the card sits in the page below the plans,
+// never fixed over the checkout and its payment fields.
+export const FeedbackQuestion: FC<{ inline?: boolean }> = ({ inline }) => {
   const t = useT();
   const fetch = useFetch();
   const user = useUser();
@@ -148,7 +150,12 @@ export const FeedbackQuestion: FC = () => {
     <div
       role="complementary"
       aria-label={content.title}
-      className="fixed bottom-[20px] start-[108px] mobile:start-[12px] mobile:end-[12px] mobile:bottom-[84px] z-[400] w-[360px] mobile:w-auto rounded-[12px] border border-newTableBorder bg-newBgColorInner shadow-previewShadow p-[16px] flex flex-col gap-[12px] text-newTextColor"
+      className={clsx(
+        'rounded-[12px] border border-newTableBorder bg-newBgColorInner p-[16px] flex flex-col gap-[12px] text-newTextColor',
+        inline
+          ? 'w-full max-w-[560px] mx-auto mt-[24px] mb-[24px]'
+          : 'fixed bottom-[20px] start-[108px] mobile:start-[12px] mobile:end-[12px] mobile:bottom-[84px] z-[400] w-[360px] mobile:w-auto shadow-previewShadow'
+      )}
     >
       <div className="flex items-start gap-[8px]">
         <div className="flex-1 flex flex-col gap-[4px]">

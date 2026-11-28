@@ -219,19 +219,23 @@ export const LayoutComponent = ({
                 {t('skip_to_content', 'Skip to content')}
               </a>
               <div>{user?.admin ? <Impersonate /> : <div />}</div>
-              {/* asked on the billing screen too: a trial that ended lands there */}
-              <FeedbackQuestion />
               {user.tier === 'FREE' &&
               !user.freePlan &&
               isGeneral &&
               billingEnabled ? (
-                <FirstBillingComponent />
+                <>
+                  <FirstBillingComponent />
+                  {/* a trial that ended lands here: asked below the plans,
+                      never over the checkout */}
+                  <FeedbackQuestion inline={true} />
+                </>
               ) : (
                 <>
                   <AnnouncementBanner />
                   <div className="flex-1 flex gap-[8px] mobile:gap-0">
                     <Support />
                     <ReviewPrompt />
+                    <FeedbackQuestion />
                     {menuOpen && (
                       <div
                         className="hidden mobile:block fixed inset-0 bg-newBackdrop opacity-60 z-[490]"

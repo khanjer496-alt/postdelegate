@@ -166,18 +166,28 @@ describe('NoAuthIntegrationsController state keys', () => {
     expect(measurement.channelConnectFailed).not.toHaveBeenCalled();
   });
 
-  it('records a cancelled connect for the workspace of the state, without spending it', async () => {
+  it('records a cancelled connect on the network of the state, without spending it', async () => {
     const { controller, measurement } = make({ ...authenticated });
-    expect(await controller.declinedConnect('demo', { state: 's1' })).toEqual({ recorded: true });
-    expect(measurement.channelConnectFailed).toHaveBeenCalledWith('org-1', 'demo', 'cancelled', 's1');
+    const req = { method: 'POST', cookies: {}, headers: {} } as any;
+    redis.data.set('provider:s1', 'linkedin');
+    expect(await controller.declinedConnect({ state: 's1' }, req)).toEqual({ ok: true });
+    // the stored network, whatever the URL said
+    expect(measurement.channelConnectFailed).toHaveBeenCalledWith('org-1', 'linkedin', 'cancelled', 's1');
     expect(redis.data.get('organization:s1')).toBe('org-1');
     expect(redis.data.get('login:s1')).toBe('verifier');
+  });
 
-    measurement.channelConnectFailed.mockClear();
-    expect(await controller.declinedConnect('demo', { state: 'unknown' })).toEqual({ recorded: false });
-    expect(measurement.channelConnectFailed).not.toHaveBeenCalled();
+  it('answers the same and records nothing for an unknown state, one without a network or another browser', async () => {
+    const { controller, measurement } = make({ ...authenticated });
+    const req = { method: 'POST', cookies: {}, headers: {} } as any;
+    expect(await controller.declinedConnect({ state: 'unknown' }, req)).toEqual({ ok: true });
+    // started before the network was stored with the state
+    expect(await controller.declinedConnect({ state: 's1' }, req)).toEqual({ ok: true });
 
-    await expect(controller.declinedConnect('other', { state: 's1' })).rejects.toThrow('Integration not allowed');
+    redis.data.set('provider:s1', 'linkedin');
+    await saveConnectBinding('s1', { type: 'session', orgId: 'org-1', userId: 'u1' });
+    // a connect started in the app, but this browser has no nonce cookie
+    expect(await controller.declinedConnect({ state: 's1' }, req)).toEqual({ ok: true });
     expect(measurement.channelConnectFailed).not.toHaveBeenCalled();
   });
 

@@ -244,13 +244,16 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                 {t('skip_to_content', 'Skip to content')}
               </a>
               <div>{user?.admin ? <Impersonate /> : <div />}</div>
-              {/* asked on the billing screen too: a trial that ended lands there */}
-              <FeedbackQuestion />
               {user.tier === 'FREE' &&
               !user.freePlan &&
               isGeneral &&
               billingEnabled ? (
-                <FirstBillingComponent />
+                <>
+                  <FirstBillingComponent />
+                  {/* a trial that ended lands here: asked below the plans,
+                      never over the checkout */}
+                  <FeedbackQuestion inline={true} />
+                </>
               ) : (
                 <>
                   <AnnouncementBanner />
@@ -258,6 +261,7 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                   <div className="flex-1 flex">
                     <Support />
                     <ReviewPrompt />
+                    <FeedbackQuestion />
                     {menuOpen && (
                       <div
                         className="hidden mobile:block fixed inset-0 bg-newBackdrop opacity-60 z-[490]"

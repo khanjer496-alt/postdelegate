@@ -193,6 +193,7 @@ export const deleteConnectState = async (state: string) => {
     'redirect',
     'external',
     'webhookUrl',
+    'provider',
   ]) {
     await ioRedis.del(`${key}:${state}`);
   }

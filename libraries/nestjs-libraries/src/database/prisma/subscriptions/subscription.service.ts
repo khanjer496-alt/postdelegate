@@ -1,4 +1,7 @@
-import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
+import {
+  MeasurementService,
+  SubscriptionEndReason,
+} from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { Injectable } from '@nestjs/common';
 import {
   pricing,
@@ -48,6 +51,27 @@ export const planMonth = (anchor: Date, at: Date | string = new Date()) => {
   };
 };
 
+// What a caller of deleteSubscription knows about why the plan goes
+export type SubscriptionEndCause = 'account_deleted' | 'payment_failed';
+
+// How a plan ended, for the owner's alert. A trial is "expired" only once its
+// end date passed; removed before that, it was cancelled.
+export const subscriptionEndReason = (
+  current: { status: string | null; trialEndsAt: Date | null },
+  cause?: SubscriptionEndCause,
+  now = new Date()
+): SubscriptionEndReason => {
+  if (cause) {
+    return cause;
+  }
+  if (current.status === 'trialing') {
+    return current.trialEndsAt && current.trialEndsAt <= now
+      ? 'trial_expired'
+      : 'trial_cancelled';
+  }
+  return 'cancelled';
+};
+
 @Injectable()
 export class SubscriptionService {
   constructor(
@@ -90,9 +114,11 @@ export class SubscriptionService {
 
   // Reached from payment webhooks: never throws. A lifetime plan is never
   // removed by a customer-keyed cancellation, like deleteSubscriptionByOrgId
+  // cause: what the caller knows about why the plan goes, when it knows
   async deleteSubscription(
     customerId: string,
-    provider: string
+    provider: string,
+    cause?: SubscriptionEndCause
   ): Promise<{ count: number; retry?: boolean }> {
     try {
       const current =
@@ -113,7 +139,7 @@ export class SubscriptionService {
           provider
         );
       if (deleted.count && current) {
-        await this.measureEnded(current);
+        await this.measureEnded(current, cause);
       }
       return deleted;
     } catch (err) {
@@ -147,17 +173,21 @@ export class SubscriptionService {
   }
 
   // The plan is removed already: a measurement failure never undoes it
-  private async measureEnded(current: {
-    id: string;
-    organizationId: string;
-    status: string | null;
-    identifier: string | null;
-    subscriptionTier: string;
-  }) {
+  private async measureEnded(
+    current: {
+      id: string;
+      organizationId: string;
+      status: string | null;
+      identifier: string | null;
+      subscriptionTier: string;
+      trialEndsAt: Date | null;
+    },
+    cause?: SubscriptionEndCause
+  ) {
     try {
       await this._measurementService.subscriptionEnded(
         current.organizationId,
-        current.status === 'trialing',
+        subscriptionEndReason(current, cause),
         current.identifier || current.id,
         current.subscriptionTier
       );

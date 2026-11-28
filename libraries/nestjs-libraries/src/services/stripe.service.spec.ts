@@ -222,7 +222,8 @@ describe('StripeService failed payments', () => {
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
       'cus_1',
-      'stripe'
+      'stripe',
+      undefined
     );
   });
 
@@ -260,9 +261,11 @@ describe('StripeService failed payments', () => {
     async (status) => {
       await service.dispatchWebhook(event(status));
 
+      // unpaid is a failed payment; a paused plan ended some other way
       expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
         'cus_1',
-        'stripe'
+        'stripe',
+        status === 'unpaid' ? 'payment_failed' : undefined
       );
       expect(
         subscriptionService.createOrUpdateSubscription
@@ -361,7 +364,8 @@ describe('StripeService failed payments', () => {
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
       'cus_1',
-      'stripe'
+      'stripe',
+      'payment_failed'
     );
     expect(
       subscriptionService.createOrUpdateSubscription
@@ -1659,7 +1663,8 @@ describe('StripeService cardless trial', () => {
 
     expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
       'cus_1',
-      'stripe'
+      'stripe',
+      undefined
     );
     expect(notificationService.inAppNotification).toHaveBeenCalledWith(
       'org_1',
@@ -1790,6 +1795,27 @@ describe('isTrialing', () => {
     expect(mockStripe.subscriptions.list).not.toHaveBeenCalled();
     expect(mockStripe.billingPortal.sessions.create).not.toHaveBeenCalled();
     expect(mockStripe.charges.list).not.toHaveBeenCalled();
+  });
+
+  it('removes the plan as an account deletion when everything is cancelled', async () => {
+    const subscriptionService = { deleteSubscription: jest.fn(async () => ({ count: 1 })) };
+    const deleting = new StripeService(
+      subscriptionService as any,
+      organizationService as any,
+      {} as any,
+      {} as any
+    );
+    live('active');
+    const key = process.env.STRIPE_PUBLISHABLE_KEY;
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    await deleting.cancelAllSubscriptions('org_1');
+    if (key === undefined) delete process.env.STRIPE_PUBLISHABLE_KEY;
+    else process.env.STRIPE_PUBLISHABLE_KEY = key;
+    expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
+      'cus_1',
+      'stripe',
+      'account_deleted'
+    );
   });
 
   it('is not a trial without a Stripe customer', async () => {
@@ -2193,7 +2219,8 @@ describe('extra channels', () => {
       ).not.toHaveBeenCalled();
       expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
         'cus_1',
-        'stripe'
+        'stripe',
+      undefined
       );
     });
 
@@ -2252,7 +2279,8 @@ describe('extra channels', () => {
       ).not.toHaveBeenCalled();
       expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
         'cus_1',
-        'stripe'
+        'stripe',
+      'payment_failed'
       );
     });
 
@@ -2919,7 +2947,8 @@ describe('extra channels', () => {
       expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith('sub_1');
       expect(subscriptionService.deleteSubscription).toHaveBeenCalledWith(
         'cus_1',
-        'stripe'
+        'stripe',
+      'payment_failed'
       );
     });
   });

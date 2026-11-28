@@ -9,6 +9,14 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
         data.set(key, value);
         return 'OK';
       }),
+      incr: jest.fn(async (key: string) => {
+        const next = (Number(data.get(key)) || 0) + 1;
+        data.set(key, String(next));
+        return next;
+      }),
+      ttl: jest.fn(async () => 7200),
+      expire: jest.fn(async () => 1),
+      del: jest.fn(async (key: string) => data.delete(key)),
     },
   };
 });
@@ -16,6 +24,8 @@ jest.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
 import { Logger } from '@nestjs/common';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import {
+  DIGEST_ROWS,
+  OWNER_ALERTS_PER_HOUR,
   OwnerAlertsService,
   TrialFacts,
   buildTrialRow,
@@ -102,6 +112,15 @@ describe('ownerAlertEmail', () => {
         { name: 'Acme' }
       )!.subject
     ).toBe('Plan cancelled: Acme');
+    const ended = (reason: string) =>
+      ownerAlertEmail(
+        { organizationId: 'o', kind: 'subscription_ended', internalOrTest: false, reason },
+        { name: 'Acme' }
+      );
+    expect(ended('trial_cancelled')!.subject).toBe('Trial cancelled: Acme');
+    expect(ended('payment_failed')!.subject).toBe('Payment failed, plan ended: Acme');
+    // an account deletion is recorded, never emailed
+    expect(ended('account_deleted')).toBeUndefined();
   });
 
   it('says what failed and the amount paid', () => {
@@ -254,6 +273,32 @@ describe('OwnerAlertsService.funnelEvent', () => {
     ).toHaveLength(2);
   });
 
+  it('emails no publish failure for a channel turned off or a lapsed plan', async () => {
+    const { service, email } = make();
+    await service.funnelEvent(alert('publish_failed', { provider: 'x', reason: 'channel_disabled' }));
+    await service.funnelEvent(alert('publish_failed', { provider: 'x', reason: 'no_subscription' }));
+    expect(email.sendEmail).not.toHaveBeenCalled();
+    await service.funnelEvent(alert('publish_failed', { provider: 'x', reason: 'refresh_needed' }));
+    expect(email.sendEmail).toHaveBeenCalledWith(
+      'owner@postdelegate.test',
+      'Post failed to publish: Acme',
+      expect.stringContaining('The channel needs a reconnect'),
+      'bottom'
+    );
+  });
+
+  it('pauses alert emails over the hourly cap with one notice', async () => {
+    process.env.OWNER_ALERT_EMAILS = 'owner@postdelegate.test';
+    const { service, email } = make();
+    for (let i = 0; i < OWNER_ALERTS_PER_HOUR + 5; i++) {
+      await service.funnelEvent(alert('trial_started', { key: `event-${i}` }));
+    }
+    const subjects = email.sendEmail.mock.calls.map((call: unknown[]) => call[1]);
+    expect(subjects.filter((s: string) => s === 'Trial started: Acme')).toHaveLength(OWNER_ALERTS_PER_HOUR);
+    expect(subjects.filter((s: string) => s === 'Owner alerts paused for this hour')).toHaveLength(1);
+    expect(subjects).toHaveLength(OWNER_ALERTS_PER_HOUR + 1);
+  });
+
   it('never throws when the database or the email fails', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const broken = make({
@@ -379,6 +424,25 @@ describe('ownerDigestEmail', () => {
     ).toBeUndefined();
   });
 
+  it('lists the most stuck first and links the rest', () => {
+    const rows = Array.from({ length: DIGEST_ROWS + 3 }, (_, i) =>
+      buildTrialRow(
+        facts({
+          id: `org-${i}`,
+          name: `Workspace ${i}`,
+          subscription: null,
+          createdAt: new Date(now.getTime() - (i + 1) * HOUR),
+        }),
+        now
+      )
+    );
+    const email = ownerDigestEmail(rows, 'https://app.test')!;
+    expect(email.subject).toContain(`Trials: ${DIGEST_ROWS + 3} workspaces`);
+    expect(email.html).toContain(`Workspace ${DIGEST_ROWS + 2}<`);
+    expect(email.html).not.toContain('Workspace 0<');
+    expect(email.html).toContain('+3 more');
+  });
+
   it('lists each workspace with its step, counts and failures', () => {
     const email = ownerDigestEmail(
       [
@@ -448,7 +512,11 @@ describe('OwnerAlertsService.trials', () => {
       new Date(now.getTime() - 14 * 24 * HOUR)
     );
 
+    redis.data.clear();
     expect(await service.sendDailyDigest(now)).toEqual({ workspaces: 1, sent: true });
+    expect(email.sendEmail).toHaveBeenCalledTimes(1);
+    // a retried activity the same day sends nobody the digest again
+    await service.sendDailyDigest(now);
     expect(email.sendEmail).toHaveBeenCalledTimes(1);
 
     repo.getTrials.mockResolvedValue([]);

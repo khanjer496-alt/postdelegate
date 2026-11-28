@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { capitalize, escape } from 'lodash';
-import { OwnerAlertsRepository } from '@gitroom/nestjs-libraries/database/prisma/owner-alerts/owner.alerts.repository';
+import {
+  OwnerAlertsRepository,
+  QUIET_PUBLISH_FAILURES,
+} from '@gitroom/nestjs-libraries/database/prisma/owner-alerts/owner.alerts.repository';
 import {
   EmailService,
   emailButton,
@@ -16,6 +19,13 @@ export const FAILURE_ALERT_HOURS = 6;
 // how long a sent event is remembered against a simultaneous second receipt
 const SENT_ALERT_HOURS = 24;
 const REPEATED_FAILURES = ['publish_failed', 'channel_connect_failed'];
+// Alert emails share the email provider and its quota with the customers'
+// verification and reset emails: over this many in a clock hour the rest wait
+// for the digest and the admin page, and one notice says so
+export const OWNER_ALERTS_PER_HOUR = 30;
+// the digest lists this many workspaces, the admin page has them all (Gmail
+// clips a long email)
+export const DIGEST_ROWS = 50;
 // the trials table and the digest: signed up in the last 14 days, failures of
 // the last 7
 export const TRIALS_SIGNED_UP_DAYS = 14;
@@ -63,6 +73,17 @@ export interface AlertWorkspace {
   method?: string;
   plan?: string;
 }
+
+const PUBLISH_FAILURES: Record<string, string> = {
+  refresh_needed: 'The channel needs a reconnect',
+};
+
+const PLAN_ENDINGS: Record<string, string> = {
+  trial_expired: 'Trial expired without paying',
+  trial_cancelled: 'Trial cancelled',
+  payment_failed: 'Payment failed, plan ended',
+  cancelled: 'Plan cancelled',
+};
 
 const CONNECT_FAILURES: Record<string, string> = {
   cancelled: "Cancelled on the network's page",
@@ -136,7 +157,7 @@ export const ownerAlertEmail = (
     case 'publish_failed':
       return body(`Post failed to publish: ${name}`, [
         line('Network', alert.provider),
-        line('Error', alert.detail),
+        line('Error', PUBLISH_FAILURES[alert.reason || ''] || alert.detail),
       ]);
     case 'nonzero_payment':
       return body(`Became paying: ${name}`, [
@@ -144,16 +165,27 @@ export const ownerAlertEmail = (
         line('Amount', money(alert.amountMinor, alert.currency)),
       ]);
     case 'subscription_ended':
-      return body(
-        alert.reason === 'trial_expired'
-          ? `Trial expired without paying: ${name}`
-          : `Plan cancelled: ${name}`,
-        [line('Plan', known(alert.detail) && planName(alert.detail))]
-      );
+      // an account deletion is recorded, never alerted
+      if (!PLAN_ENDINGS[alert.reason || '']) {
+        return undefined;
+      }
+      return body(`${PLAN_ENDINGS[alert.reason || '']}: ${name}`, [
+        line('Plan', known(alert.detail) && planName(alert.detail)),
+      ]);
     default:
       return undefined;
   }
 };
+
+export const ownerAlertsPausedEmail = (
+  app = process.env.FRONTEND_URL || ''
+) => ({
+  subject: 'Owner alerts paused for this hour',
+  html: [
+    `<p style="margin:0 0 8px">More than ${OWNER_ALERTS_PER_HOUR} alerts this hour. The rest are not emailed: they are in the daily digest and on Admin Stats, Trials &amp; blockers. Alerts start again next hour.</p>`,
+    emailButton(`${app}/admin/stats#trials`, 'Open Trials & blockers'),
+  ].join(''),
+});
 
 export const FEEDBACK_QUESTIONS: Record<string, string> = {
   use_case: 'What do you want to use PostDelegate for?',
@@ -336,17 +368,25 @@ export const ownerDigestEmail = (
   all: TrialRow[],
   app = process.env.FRONTEND_URL || ''
 ) => {
-  const rows = all.filter((row) => !row.internal);
-  if (!rows.length) {
+  const listed = all.filter((row) => !row.internal);
+  if (!listed.length) {
     return undefined;
   }
-  const stuck = rows.filter((row) => row.hoursStuck >= 24).length;
+  // the most stuck first, the rest are on the admin page
+  const rows = [...listed]
+    .sort((a, b) => b.hoursStuck - a.hoursStuck)
+    .slice(0, DIGEST_ROWS);
+  const more = listed.length - rows.length;
   const cell = (html: string) =>
     `<td style="padding:6px 8px;border-bottom:1px solid #e7e5ef;vertical-align:top">${html}</td>`;
   const failures = (count: number, providers: string[]) =>
     count ? `${count} (${escape(providers.join(', '))})` : '0';
   return {
-    subject: `Trials: ${rows.length} workspace${rows.length === 1 ? '' : 's'}, ${stuck} stuck for a day or more`,
+    subject: `Trials: ${listed.length} workspace${
+      listed.length === 1 ? '' : 's'
+    }, ${
+      listed.filter((row) => row.hoursStuck >= 24).length
+    } stuck for a day or more`,
     html: [
       `<p style="margin:0 0 16px">Workspaces in a trial or signed up in the last ${TRIALS_SIGNED_UP_DAYS} days without a plan. Failures are of the last ${TRIALS_FAILURE_DAYS} days.</p>`,
       '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:13px;line-height:1.4">',
@@ -380,6 +420,13 @@ export const ownerDigestEmail = (
             .join('')}</tr>`
       ),
       '</table>',
+      ...(more
+        ? [
+            `<p style="margin:16px 0 0">+${more} more, <a href="${escape(
+              `${app}/admin/stats#trials`
+            )}" target="_blank">open the admin page</a> for all of them.</p>`,
+          ]
+        : []),
       emailButton(`${app}/admin/stats#trials`, 'Open Trials & blockers'),
     ].join(''),
   };
@@ -410,6 +457,26 @@ export class OwnerAlertsService {
     }
   }
 
+  // One window per clock hour, counted like the other limits on Redis. The
+  // email over the cap is skipped (the event stays in the digest and the
+  // admin page); the first one over it sends the only notice of the hour
+  private async withinHourlyCap(now = Date.now()) {
+    const key = `owner-alert:hour:${Math.floor(now / HOUR)}`;
+    const count = await ioRedis.incr(key);
+    // also when an earlier expire was lost, or the key would never reset
+    if (count === 1 || (await ioRedis.ttl(key)) < 0) {
+      await ioRedis.expire(key, 2 * 60 * 60);
+    }
+    if (count <= OWNER_ALERTS_PER_HOUR) {
+      return true;
+    }
+    if (count === OWNER_ALERTS_PER_HOUR + 1) {
+      const notice = ownerAlertsPausedEmail();
+      await this.send(notice.subject, notice.html);
+    }
+    return false;
+  }
+
   // ours or a test: a super admin is a member, or Measurement marked it
   private isInternal(workspace: {
     users: { user: { isSuperAdmin: boolean } }[];
@@ -428,6 +495,14 @@ export class OwnerAlertsService {
         alert.organizationId
       );
       if (!workspace || workspace.deletedAt || this.isInternal(workspace)) {
+        return;
+      }
+      // a lapsed trial or a channel turned off fails every queued post: in
+      // the digest and the admin page, never an email per post
+      if (
+        alert.kind === 'publish_failed' &&
+        QUIET_PUBLISH_FAILURES.includes(alert.reason || '')
+      ) {
         return;
       }
       // every paid invoice is an event, the owner hears about the first
@@ -467,7 +542,7 @@ export class OwnerAlertsService {
           ? planName(workspace.subscription.subscriptionTier)
           : undefined,
       });
-      if (!email) {
+      if (!email || !(await this.withinHourlyCap())) {
         return;
       }
       await this.send(email.subject, email.html);
@@ -504,6 +579,9 @@ export class OwnerAlertsService {
         return;
       }
       const email = feedbackAlertEmail(orgId, workspace.name, kind, choice, text);
+      if (!(await this.withinHourlyCap())) {
+        return;
+      }
       await this.send(email.subject, email.html);
     } catch (err) {
       this._logger.warn(
@@ -611,7 +689,26 @@ export class OwnerAlertsService {
     if (!email) {
       return { workspaces: 0, sent: false };
     }
-    await this.send(email.subject, email.html);
+    // once per recipient and day: a retried activity skips who got it
+    const day = now.toISOString().slice(0, 10);
+    for (const address of ownerAlertRecipients()) {
+      const key = `owner-digest:${day}:${address}`;
+      if ((await ioRedis.set(key, '1', 'EX', 36 * 60 * 60, 'NX')) !== 'OK') {
+        continue;
+      }
+      try {
+        await this._emailService.sendEmail(
+          address,
+          email.subject,
+          email.html,
+          'bottom'
+        );
+      } catch (err) {
+        // not sent: the retry may try this one again
+        await ioRedis.del(key).catch(() => undefined);
+        throw err;
+      }
+    }
     return { workspaces: rows.filter((row) => !row.internal).length, sent: true };
   }
 }
