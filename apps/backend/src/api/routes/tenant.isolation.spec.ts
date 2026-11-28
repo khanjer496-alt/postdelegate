@@ -52,6 +52,7 @@ const EXEMPT: Record<string, string> = {
   // superadmin only, and the resources are global rather than per-tenant
   'admin.controller.ts#markAffiliatePaid': 'superadmin, global resource',
   'admin.controller.ts#setReviewStatus': 'superadmin, global resource',
+  'admin.users.controller.ts#getUser': 'superadmin, platform-wide user lookup',
   'announcements.controller.ts#deleteAnnouncement': 'superadmin, global resource',
   'monitor.controller.ts#getMessagesGroup': 'superadmin queue monitor, global resource',
   // the id is a provider identifier, not a tenant-owned resource

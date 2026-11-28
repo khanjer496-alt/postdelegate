@@ -33,6 +33,31 @@ export class UsersService {
     return this._usersRepository.getUserById(id);
   }
 
+  // The last time the user used the app, for the admin pages. Written at most
+  // once every 15 minutes, and on the first request after signing up (it
+  // starts at the sign-up time). Never awaited: a request never waits for
+  // it, and a failed write only leaves an older date
+  updateLastOnline(user: {
+    id: string;
+    lastOnline?: Date | null;
+    createdAt?: Date | null;
+  }) {
+    const before = new Date(Date.now() - 15 * 60 * 1000);
+    const signUpUntil = user.createdAt
+      ? new Date(user.createdAt.getTime() + 1000)
+      : undefined;
+    if (
+      user.lastOnline &&
+      user.lastOnline >= before &&
+      !(signUpUntil && user.lastOnline <= signUpUntil)
+    ) {
+      return;
+    }
+    this._usersRepository
+      .updateLastOnline(user.id, before, signUpUntil)
+      .catch(() => undefined);
+  }
+
   // One free trial per owner email, across all the logins and workspaces that
   // share it
   async canStartTrial(organization: { id: string; allowTrial: boolean }) {

@@ -1,68 +1,330 @@
 'use client';
 
-import React, { FC, useState } from 'react';
-import clsx from 'clsx';
+import React, {
+  FC,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import useSWR from 'swr';
-import { useDebounce } from 'use-debounce';
+import clsx from 'clsx';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
-import { fromUtc } from '@gitroom/frontend/components/layout/set.timezone';
+import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useViewAs } from '@gitroom/frontend/components/layout/impersonate';
 
-type PlanState =
-  | 'trial'
+export type PlanState =
+  | 'trialing'
   | 'paying'
-  | 'comped'
+  | 'cancelling'
   | 'lifetime'
-  | 'expired'
-  | 'none';
+  | 'comped'
+  | 'unpaid'
+  | 'no_plan'
+  | 'ended';
 
-interface UserPlan {
+export interface AdminPlan {
   state: PlanState;
   tier: string | null;
   period: string | null;
   status: string | null;
-  trialDaysLeft: number | null;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
   cancelAt: string | null;
 }
 
-interface UserRow {
+export interface AdminWorkspace {
+  userOrganizationId: string;
+  organizationId: string;
+  name: string;
+  role: string;
+  disabled: boolean;
+  deletedAt: string | null;
+  plan: AdminPlan;
+  channels: { active: number; needsAttention: number; disabled: number };
+  posts: {
+    scheduled: number;
+    published: number;
+    failed: number;
+    failedLast7d: number;
+  };
+}
+
+export interface AdminUserSummary {
   id: string;
-  email: string;
   name: string | null;
-  signInMethod: string;
+  email: string;
+  providerName: string;
   activated: boolean;
-  isSuperAdmin: boolean;
   createdAt: string;
-  lastActiveAt: string;
-  workspace: {
-    membershipId: string;
-    id: string;
-    name: string;
-    role: string;
-    plan: UserPlan;
-    channels: number;
-    postsScheduled: number;
-    postsPublished: number;
-  } | null;
-  otherWorkspaces: number;
+  lastActive: string | null;
+  isSuperAdmin: boolean;
+  deletedAt: string | null;
+  workspaces: AdminWorkspace[];
 }
 
 interface UsersResponse {
-  items: UserRow[];
+  items: AdminUserSummary[];
   total: number;
   page: number;
   limit: number;
   hasMore: boolean;
 }
 
-const useAdminUsers = (page: number, q: string) => {
+interface UsersSummary {
+  total: number;
+  trialing: number;
+  paying: number;
+  cancelling: number;
+  noPlan: number;
+  needsAttention: number;
+}
+
+const FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'trialing', label: 'On trial' },
+  { value: 'paying', label: 'Paying' },
+  { value: 'cancelling', label: 'Cancelling' },
+  { value: 'no_plan', label: 'No plan' },
+  { value: 'needs_attention', label: 'Needs attention' },
+];
+
+const PAGE_SIZE = 25;
+
+const SIGN_IN_METHODS: Record<string, string> = {
+  LOCAL: 'Email',
+  GOOGLE: 'Google',
+  GITHUB: 'GitHub',
+  APPLE: 'Apple',
+  FARCASTER: 'Farcaster',
+  WALLET: 'Wallet',
+  GENERIC: 'Single sign-on',
+};
+
+export const signInMethodOf = (provider: string) =>
+  SIGN_IN_METHODS[provider] || provider;
+
+const capitalize = (value: string) =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : '';
+
+export const shortDate = (date: string) => newDayjs(date).format('D MMM YYYY');
+export const fullDate = (date: string) =>
+  newDayjs(date).format('D MMM YYYY, HH:mm');
+export const relativeDate = (date: string) => newDayjs(date).fromNow();
+
+// "in 3 days", "today", "tomorrow"
+const daysUntil = (date: string) => {
+  const days = Math.ceil(newDayjs(date).diff(newDayjs(), 'hour') / 24);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  return `in ${days} days`;
+};
+
+export const tierLabelOf = (plan: AdminPlan) =>
+  [plan.tier && capitalize(plan.tier), plan.period && plan.period.toLowerCase()]
+    .filter(Boolean)
+    .join(' ');
+
+// The plan of a workspace in a few words
+export const planLabelOf = (plan: AdminPlan) => {
+  switch (plan.state) {
+    case 'trialing':
+      return plan.trialEndsAt
+        ? `Trial · ends ${daysUntil(plan.trialEndsAt)}`
+        : 'Trial';
+    case 'paying':
+      return ['Paying', tierLabelOf(plan)].filter(Boolean).join(' · ');
+    case 'cancelling':
+      return plan.cancelAt
+        ? `Cancels ${newDayjs(plan.cancelAt).format('D MMM')}`
+        : 'Cancelling';
+    case 'lifetime':
+      return ['Lifetime', plan.tier && capitalize(plan.tier)]
+        .filter(Boolean)
+        .join(' · ');
+    case 'comped':
+      return ['Free', plan.tier && capitalize(plan.tier), 'set by admin']
+        .filter(Boolean)
+        .join(' · ');
+    case 'unpaid':
+      return 'Not paid';
+    case 'ended':
+      return 'Plan ended';
+    default:
+      return 'No plan';
+  }
+};
+
+const PLAN_COLORS: Record<PlanState, string> = {
+  trialing: 'bg-blue-500/15 text-blue-500',
+  paying: 'bg-green-500/15 text-green-500',
+  cancelling: 'bg-orange-500/15 text-orange-500',
+  lifetime: 'bg-purple-500/15 text-purple-500',
+  comped: 'bg-purple-500/15 text-purple-500',
+  unpaid: 'bg-red-500/15 text-red-500',
+  no_plan: 'bg-newBgLineColor text-textItemBlur',
+  ended: 'bg-newBgLineColor text-textItemBlur',
+};
+
+// a provider status that means the last charge did not go through
+export const PAYMENT_PROBLEMS = ['past_due', 'unpaid', 'incomplete'];
+
+export const Pill: FC<{ className?: string; children: ReactNode }> = ({
+  className,
+  children,
+}) => (
+  <span
+    className={clsx(
+      'inline-flex items-center rounded-full px-[8px] py-[2px] text-[12px] font-[500]',
+      className
+    )}
+  >
+    {children}
+  </span>
+);
+
+export const PlanPill: FC<{ plan: AdminPlan }> = ({ plan }) => (
+  <span className="inline-flex flex-wrap gap-[4px]">
+    <Pill className={PLAN_COLORS[plan.state]}>{planLabelOf(plan)}</Pill>
+    {!!plan.cancelAt && plan.state !== 'cancelling' && (
+      <Pill className={PLAN_COLORS.cancelling}>
+        Cancels {newDayjs(plan.cancelAt).format('D MMM')}
+      </Pill>
+    )}
+    {!!plan.status && PAYMENT_PROBLEMS.includes(plan.status) && (
+      <Pill className="bg-red-500/15 text-red-500">Payment failing</Pill>
+    )}
+  </span>
+);
+
+export const Tag: FC<{ className?: string; children: ReactNode }> = ({
+  className,
+  children,
+}) => (
+  <span
+    className={clsx(
+      'inline-flex items-center rounded-[4px] border border-newTableBorder px-[6px] text-[11px] leading-[18px] whitespace-nowrap',
+      className
+    )}
+  >
+    {children}
+  </span>
+);
+
+export const UserTags: FC<{ user: AdminUserSummary }> = ({ user }) => (
+  <span className="inline-flex flex-wrap gap-[4px]">
+    {!!user.deletedAt && (
+      <Tag className="text-red-500 border-red-500/40">Deleted</Tag>
+    )}
+    {!user.activated && (
+      <Tag className="text-orange-500 border-orange-500/40">Not verified</Tag>
+    )}
+    {user.isSuperAdmin && (
+      <Tag className="text-purple-500 border-purple-500/40">Super admin</Tag>
+    )}
+    <Tag className="text-textItemBlur">{signInMethodOf(user.providerName)}</Tag>
+  </span>
+);
+
+const plural = (count: number, word: string) =>
+  `${count} ${word}${count === 1 ? '' : 's'}`;
+
+export const ChannelsLine: FC<{ channels: AdminWorkspace['channels'] }> = ({
+  channels,
+}) => (
+  <span className="flex flex-col">
+    <span className={clsx(!channels.active && 'text-textItemBlur')}>
+      {channels.active ? `${channels.active} connected` : 'None connected'}
+    </span>
+    {!!channels.needsAttention && (
+      <span className="text-red-500 text-[12px]">
+        {channels.needsAttention} {channels.needsAttention === 1 ? 'needs' : 'need'}{' '}
+        reconnect
+      </span>
+    )}
+    {!!channels.disabled && (
+      <span className="text-textItemBlur text-[12px]">
+        {channels.disabled} turned off
+      </span>
+    )}
+  </span>
+);
+
+export const PostsLine: FC<{ posts: AdminWorkspace['posts'] }> = ({
+  posts,
+}) => (
+  <span className="flex flex-col">
+    <span
+      className={clsx(
+        !posts.scheduled && !posts.published && 'text-textItemBlur'
+      )}
+    >
+      {!posts.scheduled && !posts.published
+        ? 'No posts yet'
+        : `${posts.scheduled} scheduled · ${posts.published} published`}
+    </span>
+    {!!posts.failed && (
+      <span className="text-red-500 text-[12px]">
+        {posts.failed} failed
+        {posts.failedLast7d ? ` (${posts.failedLast7d} this week)` : ''}
+      </span>
+    )}
+  </span>
+);
+
+const SummaryCard: FC<{
+  label: string;
+  value?: number;
+  active: boolean;
+  onClick: () => void;
+}> = ({ label, value, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={clsx(
+      'text-start border rounded-[8px] p-[16px] bg-newBgColorInner outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+      active ? 'border-btnPrimary' : 'border-newTableBorder hover:bg-boxHover'
+    )}
+  >
+    <div className="text-[12px] opacity-70">{label}</div>
+    <div className="text-[28px] font-[600]">
+      {value === undefined ? '—' : value.toLocaleString()}
+    </div>
+  </button>
+);
+
+const useAdminUsersSummary = () => {
+  const fetch = useFetch();
+  return useSWR<UsersSummary>('/admin/users/summary', async (url: string) => {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error('Failed to load the summary');
+    }
+    const body = await res.json();
+    if (typeof body?.total !== 'number') {
+      throw new Error('Failed to load the summary');
+    }
+    return body;
+  }, { revalidateOnFocus: false });
+};
+
+const useAdminUsersList = (params: {
+  search: string;
+  filter: string;
+  page: number;
+}) => {
   const fetch = useFetch();
   const query = new URLSearchParams({
-    page: String(page),
-    ...(q ? { q } : {}),
+    page: String(params.page),
+    limit: String(PAGE_SIZE),
+    filter: params.filter,
+    ...(params.search ? { search: params.search } : {}),
   });
   return useSWR<UsersResponse>(
     `/admin/users?${query.toString()}`,
@@ -71,96 +333,47 @@ const useAdminUsers = (page: number, q: string) => {
       if (!res.ok) {
         throw new Error('Failed to load users');
       }
-      return res.json();
+      const body = await res.json();
+      if (!Array.isArray(body?.items)) {
+        throw new Error('Failed to load users');
+      }
+      return body;
     },
     { keepPreviousData: true, revalidateOnFocus: false }
   );
 };
 
-const signInLabel: Record<string, string> = {
-  LOCAL: 'Email',
-  GOOGLE: 'Google',
-  GITHUB: 'GitHub',
-  APPLE: 'Apple',
-  FARCASTER: 'Farcaster',
-  WALLET: 'Wallet',
-  GENERIC: 'SSO',
-};
+const GRID =
+  'grid grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_96px] gap-[12px]';
 
-const planBadge: Record<PlanState, string> = {
-  trial: 'border-blue-600 text-blue-500',
-  paying: 'border-green-600 text-green-500',
-  comped: 'border-teal-600 text-teal-500',
-  lifetime: 'border-purple-600 text-purple-400',
-  expired: 'border-red-600 text-red-400',
-  none: 'border-newTableBorder text-textItemBlur',
-};
-
-const tierOf = (plan: UserPlan) =>
-  [plan.tier, plan.period?.toLowerCase()].filter(Boolean).join(' · ');
-
-const planText = (plan: UserPlan) => {
-  switch (plan.state) {
-    case 'trial':
-      return plan.trialDaysLeft === null
-        ? `Trial · ${tierOf(plan)}`
-        : plan.trialDaysLeft === 0
-        ? 'Trial · ends today'
-        : `Trial · ${plan.trialDaysLeft} ${
-            plan.trialDaysLeft === 1 ? 'day' : 'days'
-          } left`;
-    case 'paying':
-      return `${tierOf(plan)}${
-        plan.status && plan.status !== 'active' ? ` · ${plan.status}` : ''
-      }`;
-    case 'comped':
-      return `${tierOf(plan)} · given by admin`;
-    case 'lifetime':
-      return `Lifetime · ${plan.tier}`;
-    case 'expired':
-      return 'Expired';
-    default:
-      return 'No plan';
-  }
-};
-
-const PlanBadge: FC<{ plan: UserPlan }> = ({ plan }) => (
-  <span
-    className={clsx(
-      'inline-flex px-[8px] rounded-[4px] text-[12px] border whitespace-nowrap',
-      planBadge[plan.state]
-    )}
-    title={
-      plan.cancelAt
-        ? `Cancels ${fromUtc(plan.cancelAt).format('D MMM YYYY')}`
-        : undefined
-    }
-  >
-    {planText(plan)}
-    {plan.cancelAt ? ' · cancels' : ''}
-  </span>
+const Column: FC<{ label: string; children: ReactNode }> = ({
+  label,
+  children,
+}) => (
+  <div className="min-w-0 mobile:flex mobile:gap-[8px] mobile:items-start">
+    <div className="hidden mobile:block text-[12px] opacity-60 w-[90px] shrink-0">
+      {label}
+    </div>
+    <div className="min-w-0">{children}</div>
+  </div>
 );
 
-const SuperAdminBadge = () => (
-  <span className="px-[6px] rounded-[4px] text-[11px] font-[600] bg-forth text-white whitespace-nowrap">
-    Super admin
-  </span>
-);
-
-const ViewAsButton: FC<{ row: UserRow; self: boolean }> = ({ row, self }) => {
+// "View as": the app opens on its home page as this membership's user, like
+// the Admin menu's search does from an admin page
+export const ViewAsButton: FC<{ userOrganizationId: string; title?: string }> = ({
+  userOrganizationId,
+  title,
+}) => {
   const viewAs = useViewAs();
   const [loading, setLoading] = useState(false);
-  if (!row.workspace || self) {
-    return null;
-  }
   return (
     <Button
       secondary={true}
       loading={loading}
-      title={`Open PostDelegate as ${row.email} in ${row.workspace.name}`}
+      title={title}
       onClick={async () => {
         setLoading(true);
-        if (!(await viewAs(row.workspace!.membershipId, true))) {
+        if (!(await viewAs(userOrganizationId, true))) {
           setLoading(false);
         }
       }}
@@ -171,16 +384,150 @@ const ViewAsButton: FC<{ row: UserRow; self: boolean }> = ({ row, self }) => {
   );
 };
 
-const GRID =
-  'grid grid-cols-[minmax(220px,1.6fr)_110px_80px_minmax(150px,1fr)_minmax(150px,1fr)_80px_110px_110px_100px] gap-[12px]';
+// a membership that can be viewed as: a live user, workspace and access
+export const viewableOf = (
+  user: { deletedAt: string | null },
+  workspace?: AdminWorkspace
+) => !!workspace && !user.deletedAt && !workspace.deletedAt && !workspace.disabled;
 
-// Every user, newest first. On phones each row is a card
+const UserRow: FC<{
+  user: AdminUserSummary;
+  listQuery: string;
+  self: boolean;
+}> = ({ user, listQuery, self }) => {
+  const [workspace] = user.workspaces;
+  const more = user.workspaces.length - 1;
+  const href = `/admin/users/${user.id}${
+    listQuery ? `?list=${encodeURIComponent(listQuery)}` : ''
+  }`;
+
+  // the name's link covers the whole row, the View as button sits above it
+  return (
+    <div
+      className={clsx(
+        GRID,
+        'relative px-[12px] py-[12px] text-[13px] border-b border-newTableBorder last:border-b-0 items-start hover:bg-boxHover transition-colors',
+        'mobile:flex mobile:flex-col mobile:gap-[6px]',
+        !!user.deletedAt && 'opacity-60'
+      )}
+    >
+      <div className="min-w-0 flex flex-col gap-[4px]">
+        <Link
+          href={href}
+          className="font-[600] truncate outline-none after:absolute after:inset-0 focus-visible:underline"
+        >
+          {user.name || user.email}
+        </Link>
+        {!!user.name && (
+          <div className="text-textItemBlur truncate">{user.email}</div>
+        )}
+        <UserTags user={user} />
+      </div>
+      <Column label="Signed up">
+        <span title={fullDate(user.createdAt)}>
+          {relativeDate(user.createdAt)}
+        </span>
+      </Column>
+      <Column label="Last active">
+        {user.lastActive ? (
+          <span title={fullDate(user.lastActive)}>
+            {relativeDate(user.lastActive)}
+          </span>
+        ) : (
+          <span className="text-textItemBlur">Not seen yet</span>
+        )}
+      </Column>
+      <Column label="Plan">
+        {workspace ? (
+          <span className="flex flex-col gap-[4px] items-start">
+            <PlanPill plan={workspace.plan} />
+            <span className="text-[12px] text-textItemBlur truncate max-w-full">
+              {workspace.name}
+              {!!workspace.deletedAt && ' (deleted)'}
+              {more > 0 && ` · +${more} more`}
+            </span>
+          </span>
+        ) : (
+          <span className="text-textItemBlur">No workspace</span>
+        )}
+      </Column>
+      <Column label="Channels">
+        {workspace ? <ChannelsLine channels={workspace.channels} /> : '—'}
+      </Column>
+      <Column label="Posts">
+        {workspace ? <PostsLine posts={workspace.posts} /> : '—'}
+      </Column>
+      <div className="relative z-[1] flex justify-end mobile:justify-start">
+        {!self && viewableOf(user, workspace) && (
+          <ViewAsButton
+            userOrganizationId={workspace.userOrganizationId}
+            title={`Open PostDelegate as ${user.email} in ${workspace.name}`}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const AdminUsersComponent: FC = () => {
   const user = useUser();
-  const [page, setPage] = useState(0);
-  const [input, setInput] = useState('');
-  const [q] = useDebounce(input.trim(), 400);
-  const { data, isLoading, error } = useAdminUsers(page, q);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const search = searchParams.get('search') || '';
+  const filterParam = searchParams.get('filter') || 'all';
+  const filter = FILTERS.some((item) => item.value === filterParam)
+    ? filterParam
+    : 'all';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+
+  const [searchInput, setSearchInput] = useState(search);
+  // the search the box last wrote to the address
+  const written = useRef(search);
+
+  // the address changed on its own (a tab, back): the box follows it
+  useEffect(() => {
+    if (search === written.current) {
+      return;
+    }
+    written.current = search;
+    setSearchInput(search);
+  }, [search]);
+
+  // search, filter and page live in the address, so a link shows the same list
+  const setQuery = useCallback(
+    (next: { search?: string; filter?: string; page?: number }) => {
+      const params = new URLSearchParams();
+      const values = { search, filter, page, ...next };
+      if (values.search) params.set('search', values.search);
+      if (values.filter && values.filter !== 'all')
+        params.set('filter', values.filter);
+      if (values.page > 1) params.set('page', String(values.page));
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname);
+    },
+    [search, filter, page, pathname, router]
+  );
+
+  useEffect(() => {
+    const value = searchInput.trim();
+    if (value === search) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      written.current = value;
+      setQuery({ search: value, page: 1 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, search, setQuery]);
+
+  const { data: summary } = useAdminUsersSummary();
+  const { data, isLoading, error } = useAdminUsersList({
+    search,
+    filter,
+    page,
+  });
 
   if (!user?.isSuperAdmin) {
     return (
@@ -190,229 +537,150 @@ export const AdminUsersComponent: FC = () => {
     );
   }
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
+  const listQuery = searchParams.toString();
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
     <div className="flex flex-col gap-[16px] text-textColor">
       <div className="flex items-center justify-between gap-[12px]">
         <div className="text-[20px] font-[600]">Users</div>
         <div className="text-[13px] opacity-70">
-          {data ? `${data.total} ${q ? 'found' : 'total'}` : ''}
+          {data ? plural(data.total, 'user') : ''}
         </div>
       </div>
 
-      <div className="flex flex-col gap-[6px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[12px]">
-        <label htmlFor="admin-users-filter" className="text-[12px] opacity-70">
-          Email or workspace name
-        </label>
-        <input
-          id="admin-users-filter"
-          type="search"
-          autoComplete="off"
-          value={input}
-          onChange={(e) => {
-            setPage(0);
-            setInput(e.target.value);
-          }}
-          placeholder="name@example.com or Acme"
-          className="bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] mobile:text-[16px] text-textColor w-full max-w-[420px] outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
+      <div className="grid grid-cols-4 mobile:grid-cols-2 gap-[12px]">
+        <SummaryCard
+          label="All users"
+          value={summary?.total}
+          active={filter === 'all'}
+          onClick={() => setQuery({ filter: 'all', page: 1 })}
+        />
+        <SummaryCard
+          label="On trial"
+          value={summary?.trialing}
+          active={filter === 'trialing'}
+          onClick={() => setQuery({ filter: 'trialing', page: 1 })}
+        />
+        <SummaryCard
+          label="Paying"
+          value={summary?.paying}
+          active={filter === 'paying'}
+          onClick={() => setQuery({ filter: 'paying', page: 1 })}
+        />
+        <SummaryCard
+          label="Needs attention"
+          value={summary?.needsAttention}
+          active={filter === 'needs_attention'}
+          onClick={() => setQuery({ filter: 'needs_attention', page: 1 })}
         />
       </div>
 
-      {isLoading && !data ? (
+      <div className="flex flex-col gap-[12px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[12px]">
+        <input
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search name, email, workspace, Stripe or record id"
+          aria-label="Search users"
+          className="bg-newBgColorInner h-[38px] border border-newTableBorder rounded-[8px] px-[10px] text-[14px] text-textColor w-full"
+        />
+        <div className="flex flex-wrap gap-[8px]">
+          {FILTERS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setQuery({ filter: item.value, page: 1 })}
+              aria-pressed={filter === item.value}
+              className={clsx(
+                'h-[30px] px-[12px] rounded-full border text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary',
+                filter === item.value
+                  ? 'bg-btnPrimary border-btnPrimary text-white'
+                  : 'border-newTableBorder hover:bg-boxHover'
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
         <LoadingComponent />
       ) : error ? (
         <div className="text-red-400">Failed to load users.</div>
       ) : !data || data.items.length === 0 ? (
-        <div className="opacity-70">No users found.</div>
-      ) : (
-        <>
-          {/* desktop: a table */}
-          <div className="mobile:hidden border border-newTableBorder rounded-[8px] overflow-x-auto">
-            <div className="min-w-[1180px]">
-              <div
-                className={clsx(
-                  GRID,
-                  'px-[12px] py-[10px] bg-newBgColorInner text-[12px] uppercase opacity-70 border-b border-newTableBorder'
-                )}
-              >
-                <div>User</div>
-                <div>Signed up</div>
-                <div>Sign-in</div>
-                <div>Workspace</div>
-                <div>Plan</div>
-                <div>Channels</div>
-                <div title="Scheduled / published top-level posts">
-                  Posts sch / pub
-                </div>
-                <div title="Newest of: the user record changing (opening notifications, settings, password or email) and a post created in the workspace">
-                  Last active
-                </div>
-                <div />
-              </div>
-              {data.items.map((row) => (
-                <div
-                  key={row.id}
-                  className={clsx(
-                    GRID,
-                    'px-[12px] py-[10px] text-[13px] border-b border-newTableBorder last:border-b-0 items-center'
-                  )}
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-[6px] min-w-0">
-                      <span className="truncate" title={row.email}>
-                        {row.email}
-                      </span>
-                      {row.isSuperAdmin && <SuperAdminBadge />}
-                    </div>
-                    {(!!row.name || !row.activated) && (
-                      <div className="text-[12px] text-textItemBlur truncate">
-                        {row.name}
-                        {!row.activated && (
-                          <span className="text-amber-500">
-                            {row.name ? ' · ' : ''}email not confirmed
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    title={fromUtc(row.createdAt).format('D MMM YYYY HH:mm')}
-                  >
-                    {fromUtc(row.createdAt).format('D MMM YYYY')}
-                  </div>
-                  <div>{signInLabel[row.signInMethod] || row.signInMethod}</div>
-                  <div className="min-w-0">
-                    {row.workspace ? (
-                      <>
-                        <div className="truncate" title={row.workspace.name}>
-                          {row.workspace.name}
-                        </div>
-                        {row.otherWorkspaces > 0 && (
-                          <div className="text-[12px] text-textItemBlur">
-                            +{row.otherWorkspaces} more
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-textItemBlur">No workspace</span>
-                    )}
-                  </div>
-                  <div>
-                    {row.workspace && <PlanBadge plan={row.workspace.plan} />}
-                  </div>
-                  <div>{row.workspace?.channels ?? '—'}</div>
-                  <div>
-                    {row.workspace
-                      ? `${row.workspace.postsScheduled} / ${row.workspace.postsPublished}`
-                      : '—'}
-                  </div>
-                  <div
-                    title={fromUtc(row.lastActiveAt).format('D MMM YYYY HH:mm')}
-                  >
-                    {fromUtc(row.lastActiveAt).fromNow()}
-                  </div>
-                  <div className="flex justify-end">
-                    <ViewAsButton row={row} self={row.id === user.id} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* phones: a card per user */}
-          <div className="hidden mobile:flex flex-col gap-[8px]">
-            {data.items.map((row) => (
-              <div
-                key={row.id}
-                className="flex flex-col gap-[8px] p-[12px] text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px]"
-              >
-                <div className="flex items-start justify-between gap-[8px]">
-                  <div className="min-w-0">
-                    <div className="font-[600] break-all">{row.email}</div>
-                    <div className="text-[12px] text-textItemBlur">
-                      {signInLabel[row.signInMethod] || row.signInMethod}
-                      {' · signed up '}
-                      {fromUtc(row.createdAt).format('D MMM YYYY')}
-                      {!row.activated && (
-                        <span className="text-amber-500"> · not confirmed</span>
-                      )}
-                    </div>
-                  </div>
-                  {row.isSuperAdmin && <SuperAdminBadge />}
-                </div>
-                {row.workspace ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-[8px]">
-                      <span className="font-[600] break-all">
-                        {row.workspace.name}
-                      </span>
-                      {row.otherWorkspaces > 0 && (
-                        <span className="text-[12px] text-textItemBlur">
-                          +{row.otherWorkspaces} more
-                        </span>
-                      )}
-                      <PlanBadge plan={row.workspace.plan} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-[8px] text-[12px]">
-                      <div>
-                        <div className="text-textItemBlur">Channels</div>
-                        <div className="text-[14px]">
-                          {row.workspace.channels}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-textItemBlur">Posts sch / pub</div>
-                        <div className="text-[14px]">
-                          {row.workspace.postsScheduled} /{' '}
-                          {row.workspace.postsPublished}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-textItemBlur">Last active</div>
-                        <div className="text-[14px]">
-                          {fromUtc(row.lastActiveAt).fromNow()}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-textItemBlur">No workspace</div>
-                )}
-                <div className="flex justify-end">
-                  <ViewAsButton row={row} self={row.id === user.id} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {!!data && data.total > data.limit && (
-        <div className="flex items-center justify-between gap-[12px]">
+        <div className="flex flex-col items-center gap-[12px] py-[48px] border border-newTableBorder rounded-[8px] text-center">
+          <div className="text-[15px] font-[600]">No users found</div>
           <div className="text-[13px] opacity-70">
-            Page {page + 1} of {totalPages}
+            {page > 1
+              ? 'This page is past the end of the list.'
+              : search || filter !== 'all'
+              ? 'Nobody matches this search or filter.'
+              : 'Nobody has signed up yet.'}
           </div>
-          <div className="flex gap-[8px]">
+          {page > 1 ? (
+            <Button secondary onClick={() => setQuery({ page: 1 })}>
+              Go to the first page
+            </Button>
+          ) : (search || filter !== 'all') && (
             <Button
               secondary
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="rounded-[8px] h-[36px] px-[16px]"
+              onClick={() => {
+                setSearchInput('');
+                setQuery({ search: '', filter: 'all', page: 1 });
+              }}
             >
-              Previous
+              Clear search and filter
             </Button>
-            <Button
-              secondary
-              disabled={!data.hasMore}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-[8px] h-[36px] px-[16px]"
-            >
-              Next
-            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="border border-newTableBorder rounded-[8px] overflow-hidden">
+          <div
+            className={clsx(
+              GRID,
+              'px-[12px] py-[10px] bg-newBgColorInner text-[12px] uppercase opacity-70 border-b border-newTableBorder mobile:hidden'
+            )}
+          >
+            <div>User</div>
+            <div>Signed up</div>
+            <div>Last active</div>
+            <div>Plan</div>
+            <div>Channels</div>
+            <div>Posts</div>
+            <div />
           </div>
+          {data.items.map((row) => (
+            <UserRow
+              key={row.id}
+              user={row}
+              listQuery={listQuery}
+              self={row.id === user.id}
+            />
+          ))}
         </div>
       )}
+
+      <div className="flex items-center justify-between">
+        <div className="text-[13px] opacity-70">
+          Page {page} of {totalPages}
+        </div>
+        <div className="flex gap-[8px]">
+          <Button
+            secondary
+            disabled={page <= 1}
+            onClick={() => setQuery({ page: Math.max(1, page - 1) })}
+          >
+            Previous
+          </Button>
+          <Button
+            disabled={!data?.hasMore}
+            onClick={() => setQuery({ page: page + 1 })}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

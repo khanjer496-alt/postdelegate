@@ -50,6 +50,7 @@ import {
 } from '@gitroom/backend/api/routes/oauth.controller';
 import { AnnouncementsController } from '@gitroom/backend/api/routes/announcements.controller';
 import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
+import { AdminUsersController } from '@gitroom/backend/api/routes/admin.users.controller';
 import { AffiliatesController } from '@gitroom/backend/api/routes/affiliates.controller';
 import { ReviewsController } from '@gitroom/backend/api/routes/reviews.controller';
 import { FeedbackController } from '@gitroom/backend/api/routes/feedback.controller';
@@ -98,6 +99,7 @@ const authenticatedController = [
   OAuthAuthorizedController,
   AnnouncementsController,
   AdminController,
+  AdminUsersController,
   AffiliatesController,
   ReviewsController,
   FeedbackController,

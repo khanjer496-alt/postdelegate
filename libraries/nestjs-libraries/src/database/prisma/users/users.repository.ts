@@ -115,6 +115,23 @@ export class UsersRepository {
     });
   }
 
+  // Only a lastOnline older than `before`, or one still at the sign-up time
+  // (`signUpUntil`), is written, so requests racing each other write it once
+  updateLastOnline(id: string, before: Date, signUpUntil?: Date) {
+    return this._user.model.user.updateMany({
+      where: {
+        id,
+        OR: [
+          { lastOnline: { lt: before } },
+          ...(signUpUntil ? [{ lastOnline: { lte: signUpUntil } }] : []),
+        ],
+      },
+      data: {
+        lastOnline: new Date(),
+      },
+    });
+  }
+
   getUserByEmail(email: string) {
     return this._user.model.user.findFirst({
       where: {

@@ -21,7 +21,10 @@ const user = {
 const org = { id: 'o1', apiKey: 'k', users: [{ disabled: false, role: 'USER' }] };
 
 const setup = (found: any = user) => {
-  const users = { getUserById: jest.fn(async () => (found ? { ...found } : null)) };
+  const users = {
+    getUserById: jest.fn(async () => (found ? { ...found } : null)),
+    updateLastOnline: jest.fn(),
+  };
   const orgs = {
     getOrgsByUserId: jest.fn(async () => [org]),
     updateApiKey: jest.fn(),
@@ -171,6 +174,27 @@ describe('AuthMiddleware', () => {
     expect(request.user.id).toBe('u1');
     expect(request.user.password).toBeUndefined();
     expect(request.org.id).toBe('o1');
+  });
+
+  it('records the user as active on their own session', async () => {
+    const { middleware, users } = setup();
+    await run(middleware, { headers: { auth: session() } });
+    expect(users.updateLastOnline).toHaveBeenCalledTimes(1);
+    expect(users.updateLastOnline.mock.calls[0][0]).toMatchObject({ id: 'u1' });
+  });
+
+  it('never records the user an admin is viewing as', async () => {
+    const { middleware, users } = setup({ ...user, isSuperAdmin: true });
+    (middleware as any)._organizationService.getUserOrg.mockResolvedValue({
+      user: { id: 'u2', email: 'b@example.com', password: 'x' },
+      organization: { id: 'o2', users: [{ userId: 'u2' }] },
+    });
+    const { allowed, request } = await run(middleware, {
+      headers: { auth: session(), impersonate: 'uo-2' },
+    });
+    expect(allowed).toBe(true);
+    expect(request.user.id).toBe('u2');
+    expect(users.updateLastOnline).not.toHaveBeenCalled();
   });
 
   describe('CSRF on cookie authentication', () => {
