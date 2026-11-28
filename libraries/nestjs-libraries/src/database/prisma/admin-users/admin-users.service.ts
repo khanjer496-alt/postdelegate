@@ -17,6 +17,8 @@ export type PlanState =
   | 'paying'
   | 'cancelling'
   | 'lifetime'
+  | 'comped'
+  | 'unpaid'
   | 'no_plan'
   | 'ended';
 
@@ -24,6 +26,7 @@ interface PlanSource {
   isTrailing: boolean;
   allowTrial: boolean;
   subscription: {
+    identifier: string | null;
     status: string | null;
     trialEndsAt: Date | null;
     cancelAt: Date | null;
@@ -32,14 +35,19 @@ interface PlanSource {
   } | null;
 }
 
+// Provider statuses of a subscription that grants no paid plan right now
+const NOT_PAID = ['incomplete', 'incomplete_expired', 'unpaid', 'paused', 'canceled'];
+
 // The plan state of a workspace in words the admin pages show, the only
 // place it is derived. Ended subscriptions are deleted rows, so a workspace
 // without one that has allowTrial off had a plan once: only a stored
 // subscription turns allowTrial off (see endedTrialFlags in the
-// subscription repository). In a trial like billing reads it: the provider
-// has it trialing, its trial is still running, or the workspace is flagged
-// trialing (the first charge after the trial being retried) and the
-// provider does not have it active
+// subscription repository). A plan a super admin set has an `admin_`
+// identifier and nobody pays for it (addSubscription). In a trial like
+// billing reads it: the provider has it trialing, or it is not active yet
+// and its trial is still running or the workspace is flagged trialing (the
+// first charge after the trial being retried). A plan with no provider
+// status yet (rows from before it was stored) is read as paying
 export const planStateOf = (
   workspace: PlanSource,
   now = new Date()
@@ -51,35 +59,56 @@ export const planStateOf = (
   if (subscription.isLifetime) {
     return 'lifetime';
   }
+  if (subscription.identifier?.startsWith('admin_')) {
+    return 'comped';
+  }
   if (subscription.cancelAt) {
     return 'cancelling';
   }
   if (
     subscription.status === 'trialing' ||
-    (!!subscription.trialEndsAt && subscription.trialEndsAt > now) ||
-    (workspace.isTrailing && subscription.status !== 'active')
+    (subscription.status !== 'active' &&
+      ((!!subscription.trialEndsAt && subscription.trialEndsAt > now) ||
+        workspace.isTrailing))
   ) {
     return 'trialing';
+  }
+  if (subscription.status && NOT_PAID.includes(subscription.status)) {
+    return 'unpaid';
   }
   return 'paying';
 };
 
 // A plan someone has right now
-const LIVE_PLANS: PlanState[] = ['trialing', 'paying', 'cancelling', 'lifetime'];
+const LIVE_PLANS: PlanState[] = [
+  'trialing',
+  'paying',
+  'cancelling',
+  'lifetime',
+  'comped',
+];
 
 export interface WorkspaceSignals {
   deleted: boolean;
+  // the user owns it (and still has access): a team member is not the
+  // customer, so their workspaces never count for them in the filters
+  owner: boolean;
   plan: PlanState;
+  status: string | null;
   trialEndsAt: Date | null;
   channelIssues: boolean;
   failedRecently: boolean;
 }
 
+export const isOwnerOf = (member: { role: string; disabled: boolean }) =>
+  member.role === 'SUPERADMIN' && !member.disabled;
+
 export const TRIAL_ENDING_DAYS = 2;
 export const RECENT_FAILURE_DAYS = 7;
 
 // Something the admin should look at: a channel to reconnect, a post that
-// failed this week, or a trial about to end. Deleted workspaces never do
+// failed this week, a payment that failed, or a trial about to end.
+// Deleted workspaces never do
 export const workspaceNeedsAttention = (
   workspace: WorkspaceSignals,
   now = new Date()
@@ -87,19 +116,24 @@ export const workspaceNeedsAttention = (
   !workspace.deleted &&
   (workspace.channelIssues ||
     workspace.failedRecently ||
+    workspace.plan === 'unpaid' ||
+    workspace.status === 'past_due' ||
     (workspace.plan === 'trialing' &&
       !!workspace.trialEndsAt &&
       workspace.trialEndsAt <=
         dayjs(now).add(TRIAL_ENDING_DAYS, 'day').toDate()));
 
-// A user matches when one of their live workspaces does. "No plan" is the
-// other way round: none of their live workspaces has a plan right now
+// A user matches when one of the live workspaces they own does, so a paying
+// workspace counts once, for its owner. "No plan" is the other way round:
+// none of them has a plan right now (team members only are there too)
 export const userMatchesFilter = (
   workspaces: WorkspaceSignals[],
   filter: AdminUserFilter,
   now = new Date()
 ) => {
-  const live = workspaces.filter((workspace) => !workspace.deleted);
+  const live = workspaces.filter(
+    (workspace) => !workspace.deleted && workspace.owner
+  );
   switch (filter) {
     case 'trialing':
     case 'paying':
@@ -115,7 +149,8 @@ export const userMatchesFilter = (
 };
 
 // lastOnline starts at the sign-up time and is bumped by the app's requests
-// (UsersService.updateLastOnline). Still at its sign-up value: never seen
+// (UsersService.updateLastOnline). Still within a minute of the sign-up:
+// never seen since
 export const lastActiveOf = (user: { createdAt: Date; lastOnline: Date }) =>
   Math.abs(user.lastOnline.getTime() - user.createdAt.getTime()) < 60000
     ? null
@@ -132,7 +167,7 @@ export const contentPreviewOf = (content: string, length = 140) => {
 const shorten = (value: string | null, length: number) =>
   value && value.length > length ? `${value.slice(0, length - 1)}…` : value;
 
-// Where a channel stands, the first thing the customer has to fix first
+// Where a channel stands, what the customer has to fix first
 export const channelStatusOf = (channel: {
   disabled: boolean;
   refreshNeeded: boolean;
@@ -173,15 +208,14 @@ export class AdminUsersService {
     private _integrationService: IntegrationService
   ) {}
 
-  // The workspaces of these users that need attention for a reason only the
-  // database knows (channels, failed posts). The trial end is in the plan
-  private async attentionSignals(organizationIds: string[], now: Date) {
+  // The workspaces that need attention for a reason only the database knows
+  // (channels, failed posts), read for all workspaces: only a few have one.
+  // The plan's reasons are in the plan
+  private async attentionSignals(now: Date) {
     const since = dayjs(now).subtract(RECENT_FAILURE_DAYS, 'day').toDate();
     const [channelIssues, failures] = await Promise.all([
-      this._adminUsersRepository.getWorkspacesWithChannelIssues(
-        organizationIds
-      ),
-      this._adminUsersRepository.getRecentFailures(organizationIds, since),
+      this._adminUsersRepository.getWorkspacesWithChannelIssues(),
+      this._adminUsersRepository.getRecentFailures(since),
     ]);
     return {
       channelIssues: new Set(channelIssues),
@@ -197,25 +231,17 @@ export class AdminUsersService {
     return candidates.map((candidate) => ({
       id: candidate.id,
       workspaces: candidate.organizations.map(
-        ({ organizationId, organization }) => ({
+        ({ organizationId, organization, ...member }) => ({
           deleted: !!organization.deletedAt,
+          owner: isOwnerOf(member),
           plan: planStateOf(organization, now),
+          status: organization.subscription?.status || null,
           trialEndsAt: organization.subscription?.trialEndsAt || null,
           channelIssues: !!attention?.channelIssues.has(organizationId),
           failedRecently: !!attention?.failedRecently.has(organizationId),
         })
       ),
     }));
-  }
-
-  private organizationIdsOf(candidates: AdminUserCandidate[]) {
-    return [
-      ...new Set(
-        candidates.flatMap((candidate) =>
-          candidate.organizations.map((member) => member.organizationId)
-        )
-      ),
-    ];
   }
 
   async list(query: AdminUsersListDto) {
@@ -229,7 +255,7 @@ export class AdminUsersService {
     );
     const attention =
       filter === 'needs_attention'
-        ? await this.attentionSignals(this.organizationIdsOf(candidates), now)
+        ? await this.attentionSignals(now)
         : undefined;
     const matched = this.signalsOf(candidates, now, attention).filter((user) =>
       userMatchesFilter(user.workspaces, filter, now)
@@ -252,10 +278,7 @@ export class AdminUsersService {
   async summary() {
     const now = new Date();
     const candidates = await this._adminUsersRepository.findCandidates();
-    const attention = await this.attentionSignals(
-      this.organizationIdsOf(candidates),
-      now
-    );
+    const attention = await this.attentionSignals(now);
     const users = this.signalsOf(candidates, now, attention);
     const count = (filter: AdminUserFilter) =>
       users.filter((user) => userMatchesFilter(user.workspaces, filter, now))
@@ -291,18 +314,22 @@ export class AdminUsersService {
     const [channels, posts, failures] = await Promise.all([
       this._adminUsersRepository.getChannelCounts(organizationIds),
       this._adminUsersRepository.getPostCounts(organizationIds),
-      this._adminUsersRepository.getRecentFailures(organizationIds, since),
+      this._adminUsersRepository.getRecentFailures(since, organizationIds),
     ]);
 
     const channelsOf = (organizationId: string) => {
       const groups = channels.filter(
         (group) => group.organizationId === organizationId
       );
-      const total = (needsAttention: boolean) =>
+      const total = (...statuses: string[]) =>
         groups
-          .filter((group) => group.needsAttention === needsAttention)
+          .filter((group) => statuses.includes(channelStatusOf(group)))
           .reduce((sum, group) => sum + group.count, 0);
-      return { active: total(false), needsAttention: total(true) };
+      return {
+        active: total('connected'),
+        needsAttention: total('needs_reconnect', 'setup_unfinished'),
+        disabled: total('disabled'),
+      };
     };
     const postsOf = (organizationId: string) => {
       const total = (state: string) =>
@@ -330,12 +357,14 @@ export class AdminUsersService {
       lastActive: lastActiveOf(user),
       isSuperAdmin: user.isSuperAdmin,
       deletedAt: user.deletedAt,
-      // live workspaces first, each group in the order the user joined
+      // live workspaces first, the ones they own first, then in the order
+      // the user joined
       workspaces: [...user.organizations]
         .sort(
           (a, b) =>
             Number(!!a.organization.deletedAt) -
-            Number(!!b.organization.deletedAt)
+              Number(!!b.organization.deletedAt) ||
+            Number(!isOwnerOf(a)) - Number(!isOwnerOf(b))
         )
         .map((member) => ({
           userOrganizationId: member.id,

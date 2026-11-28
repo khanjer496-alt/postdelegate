@@ -18,6 +18,7 @@ const now = new Date('2026-11-28T12:00:00Z');
 const inDays = (days: number) => new Date(now.getTime() + days * 86400000);
 
 const subscription = (over: object = {}) => ({
+  identifier: 'sub_123',
   status: 'active',
   trialEndsAt: null,
   cancelAt: null,
@@ -125,9 +126,42 @@ describe('planStateOf', () => {
     ).toBe('trialing');
   });
 
+  it('reads a plan an admin set as comped, not paying', () => {
+    expect(
+      planStateOf(
+        workspace({
+          subscription: subscription({ identifier: 'admin_ab12c', status: null }),
+        }),
+        now
+      )
+    ).toBe('comped');
+  });
+
+  it('reads a subscription that grants nothing as unpaid', () => {
+    for (const status of ['incomplete', 'unpaid', 'paused', 'canceled']) {
+      expect(
+        planStateOf(workspace({ subscription: subscription({ status }) }), now)
+      ).toBe('unpaid');
+    }
+  });
+
   it('reads an active plan as paying, even with a trial flag lagging behind', () => {
     expect(planStateOf(workspace(), now)).toBe('paying');
     expect(planStateOf(workspace({ isTrailing: true }), now)).toBe('paying');
+    expect(
+      planStateOf(
+        workspace({ subscription: subscription({ trialEndsAt: inDays(2) }) }),
+        now
+      )
+    ).toBe('paying');
+    // a renewal being retried is still a paying customer
+    expect(
+      planStateOf(workspace({ subscription: subscription({ status: 'past_due' }) }), now)
+    ).toBe('paying');
+    // a row from before the provider status was stored
+    expect(
+      planStateOf(workspace({ subscription: subscription({ status: null }) }), now)
+    ).toBe('paying');
     expect(
       planStateOf(
         workspace({
@@ -141,7 +175,9 @@ describe('planStateOf', () => {
 
 const signals = (over: Partial<WorkspaceSignals> = {}): WorkspaceSignals => ({
   deleted: false,
+  owner: true,
   plan: 'paying',
+  status: 'active',
   trialEndsAt: null,
   channelIssues: false,
   failedRecently: false,
@@ -171,6 +207,15 @@ describe('workspaceNeedsAttention', () => {
     ).toBe(false);
   });
 
+  it('flags a failed payment', () => {
+    expect(workspaceNeedsAttention(signals({ status: 'past_due' }), now)).toBe(
+      true
+    );
+    expect(
+      workspaceNeedsAttention(signals({ plan: 'unpaid', status: 'unpaid' }), now)
+    ).toBe(true);
+  });
+
   it('never flags a deleted workspace', () => {
     expect(
       workspaceNeedsAttention(
@@ -187,6 +232,19 @@ describe('userMatchesFilter', () => {
     expect(userMatchesFilter(workspaces, 'trialing', now)).toBe(true);
     expect(userMatchesFilter(workspaces, 'paying', now)).toBe(false);
     expect(userMatchesFilter(workspaces, 'all', now)).toBe(true);
+  });
+
+  it('counts a workspace for its owner only, not for its team', () => {
+    const member = [signals({ plan: 'paying', owner: false })];
+    expect(userMatchesFilter(member, 'paying', now)).toBe(false);
+    expect(userMatchesFilter(member, 'no_plan', now)).toBe(true);
+    expect(
+      userMatchesFilter(
+        [signals({ owner: false, channelIssues: true })],
+        'needs_attention',
+        now
+      )
+    ).toBe(false);
   });
 
   it('leaves deleted workspaces out', () => {
@@ -210,6 +268,9 @@ describe('userMatchesFilter', () => {
         'no_plan',
         now
       )
+    ).toBe(false);
+    expect(
+      userMatchesFilter([signals({ plan: 'comped' })], 'no_plan', now)
     ).toBe(false);
   });
 
@@ -249,12 +310,18 @@ describe('AdminUsersService.list', () => {
   const candidate = (
     id: string,
     organizationId: string,
-    plan: { allowTrial?: boolean; subscription?: object | null } = {}
+    plan: {
+      allowTrial?: boolean;
+      subscription?: object | null;
+      role?: string;
+    } = {}
   ) => ({
     id,
     organizations: [
       {
         organizationId,
+        role: plan.role || 'SUPERADMIN',
+        disabled: false,
         organization: {
           id: organizationId,
           name: organizationId,
@@ -273,6 +340,14 @@ describe('AdminUsersService.list', () => {
         },
       },
     ],
+  });
+
+  const channelGroup = (over: object) => ({
+    organizationId: 'org-b',
+    disabled: false,
+    refreshNeeded: false,
+    inBetweenSteps: false,
+    ...over,
   });
 
   const makeService = (candidates: any[]) => {
@@ -294,8 +369,6 @@ describe('AdminUsersService.list', () => {
             .find((c) => c.id === id)
             .organizations.map((member: any) => ({
               id: `uo-${id}`,
-              role: 'SUPERADMIN',
-              disabled: false,
               createdAt: now,
               ...member,
             })),
@@ -304,8 +377,10 @@ describe('AdminUsersService.list', () => {
       getWorkspacesWithChannelIssues: jest.fn().mockResolvedValue(['org-b']),
       getRecentFailures: jest.fn().mockResolvedValue([]),
       getChannelCounts: jest.fn().mockResolvedValue([
-        { organizationId: 'org-b', needsAttention: false, count: 2 },
-        { organizationId: 'org-b', needsAttention: true, count: 1 },
+        channelGroup({ count: 2 }),
+        channelGroup({ refreshNeeded: true, count: 1 }),
+        channelGroup({ inBetweenSteps: true, disabled: true, count: 1 }),
+        channelGroup({ disabled: true, count: 3 }),
       ]),
       getPostCounts: jest.fn().mockResolvedValue([
         { organizationId: 'org-b', state: 'QUEUE', count: 4 },
@@ -347,25 +422,28 @@ describe('AdminUsersService.list', () => {
     expect(result.items[0].workspaces[0]).toMatchObject({
       userOrganizationId: 'uo-u-b',
       plan: { state: 'paying', tier: 'PRO', period: 'MONTHLY' },
-      channels: { active: 2, needsAttention: 1 },
+      channels: { active: 2, needsAttention: 2, disabled: 3 },
       posts: { scheduled: 4, published: 0, failed: 1, failedLast7d: 0 },
     });
   });
 
-  it('counts each filter for the summary', async () => {
-    const { service } = makeService([
+  it('counts each filter for the summary, a team member is not a customer', async () => {
+    const { service, repository } = makeService([
       candidate('u-a', 'org-a', { subscription: { status: 'trialing' } }),
       candidate('u-b', 'org-b'),
       candidate('u-c', 'org-c', { allowTrial: true, subscription: null }),
+      candidate('u-d', 'org-b', { role: 'USER' }),
     ]);
 
     expect(await service.summary()).toEqual({
-      total: 3,
+      total: 4,
       trialing: 1,
       paying: 1,
       cancelling: 0,
-      noPlan: 1,
+      noPlan: 2,
       needsAttention: 1,
     });
+    // the attention signals are read for every workspace, without a list
+    expect(repository.getRecentFailures.mock.calls[0]).toHaveLength(1);
   });
 });

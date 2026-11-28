@@ -13,6 +13,7 @@ const workspacePlanSelect = {
     select: {
       subscriptionTier: true,
       period: true,
+      identifier: true,
       status: true,
       trialEndsAt: true,
       currentPeriodEnd: true,
@@ -57,17 +58,20 @@ export type AdminUserCandidate = Prisma.UserGetPayload<{
     organizations: {
       select: {
         organizationId: true;
+        role: true;
+        disabled: true;
         organization: { select: typeof workspacePlanSelect };
       };
     };
   };
 }>;
 
-// A channel the customer has to act on: turned off, its login expired, or
-// its connection never finished
+// A channel the customer has to act on: its login expired, or its
+// connection never finished. One turned off (by the customer or a plan
+// limit) is a choice, not a problem
 const channelIssue: Prisma.IntegrationWhereInput = {
   deletedAt: null,
-  OR: [{ disabled: true }, { refreshNeeded: true }, { inBetweenSteps: true }],
+  OR: [{ refreshNeeded: true }, { inBetweenSteps: true }],
 };
 
 // Posts as the customer counts them: not deleted, no thread or comment parts
@@ -137,6 +141,8 @@ export class AdminUsersRepository {
         organizations: {
           select: {
             organizationId: true,
+            role: true,
+            disabled: true,
             organization: { select: workspacePlanSelect },
           },
         },
@@ -161,28 +167,26 @@ export class AdminUsersRepository {
     });
   }
 
-  // Workspaces (of the given ones) with a channel that needs the customer
-  async getWorkspacesWithChannelIssues(organizationIds: string[]) {
-    if (!organizationIds.length) {
-      return [];
-    }
+  // Workspaces with a channel that needs the customer (only a few have one)
+  async getWorkspacesWithChannelIssues() {
     const groups = await this._integration.model.integration.groupBy({
       by: ['organizationId'],
-      where: { organizationId: { in: organizationIds }, ...channelIssue },
+      where: channelIssue,
       _count: { _all: true },
     });
     return groups.map((group) => group.organizationId);
   }
 
-  // Failed posts per workspace since the date
-  async getRecentFailures(organizationIds: string[], since: Date) {
-    if (!organizationIds.length) {
+  // Failed posts per workspace since the date, of the given workspaces or of
+  // every workspace
+  async getRecentFailures(since: Date, organizationIds?: string[]) {
+    if (organizationIds && !organizationIds.length) {
       return [];
     }
     const groups = await this._post.model.post.groupBy({
       by: ['organizationId'],
       where: {
-        organizationId: { in: organizationIds },
+        ...(organizationIds ? { organizationId: { in: organizationIds } } : {}),
         ...countedPosts,
         state: 'ERROR',
         updatedAt: { gte: since },
@@ -195,7 +199,7 @@ export class AdminUsersRepository {
     }));
   }
 
-  // Live channels per workspace, split by the flags that make one need action
+  // Live channels per workspace, split by the flags of their status
   async getChannelCounts(organizationIds: string[]) {
     if (!organizationIds.length) {
       return [];
@@ -207,8 +211,9 @@ export class AdminUsersRepository {
     });
     return groups.map((group) => ({
       organizationId: group.organizationId,
-      needsAttention:
-        group.disabled || group.refreshNeeded || group.inBetweenSteps,
+      disabled: group.disabled,
+      refreshNeeded: group.refreshNeeded,
+      inBetweenSteps: group.inBetweenSteps,
       count: group._count._all,
     }));
   }

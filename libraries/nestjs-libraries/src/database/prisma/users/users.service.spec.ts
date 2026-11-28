@@ -108,6 +108,15 @@ describe('UsersService.updateLastOnline', () => {
     expect(Date.now() - before.getTime()).toBeGreaterThanOrEqual(15 * 60 * 1000 - 50);
   });
 
+  it('writes a first visit made right after signing up', () => {
+    const write = jest.fn(async () => ({ count: 1 }));
+    const createdAt = new Date(Date.now() - 5 * 60 * 1000);
+    make(write).updateLastOnline({ id: 'u1', createdAt, lastOnline: createdAt });
+    expect(write).toHaveBeenCalledTimes(1);
+    const [, before] = write.mock.calls[0] as unknown as [string, Date];
+    expect(before.getTime()).toBe(createdAt.getTime() + 60 * 1000);
+  });
+
   it('skips a recent one', () => {
     const write = jest.fn(async () => ({ count: 1 }));
     make(write).updateLastOnline({

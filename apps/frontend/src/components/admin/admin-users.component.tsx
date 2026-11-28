@@ -1,6 +1,13 @@
 'use client';
 
-import React, { FC, ReactNode, useCallback, useEffect, useState } from 'react';
+import React, {
+  FC,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import useSWR from 'swr';
 import clsx from 'clsx';
 import Link from 'next/link';
@@ -16,6 +23,8 @@ export type PlanState =
   | 'paying'
   | 'cancelling'
   | 'lifetime'
+  | 'comped'
+  | 'unpaid'
   | 'no_plan'
   | 'ended';
 
@@ -37,7 +46,7 @@ export interface AdminWorkspace {
   disabled: boolean;
   deletedAt: string | null;
   plan: AdminPlan;
-  channels: { active: number; needsAttention: number };
+  channels: { active: number; needsAttention: number; disabled: number };
   posts: {
     scheduled: number;
     published: number;
@@ -138,6 +147,12 @@ export const planLabelOf = (plan: AdminPlan) => {
       return ['Lifetime', plan.tier && capitalize(plan.tier)]
         .filter(Boolean)
         .join(' · ');
+    case 'comped':
+      return ['Free', plan.tier && capitalize(plan.tier), 'set by admin']
+        .filter(Boolean)
+        .join(' · ');
+    case 'unpaid':
+      return 'Not paid';
     case 'ended':
       return 'Plan ended';
     default:
@@ -150,6 +165,8 @@ const PLAN_COLORS: Record<PlanState, string> = {
   paying: 'bg-green-500/15 text-green-500',
   cancelling: 'bg-orange-500/15 text-orange-500',
   lifetime: 'bg-purple-500/15 text-purple-500',
+  comped: 'bg-purple-500/15 text-purple-500',
+  unpaid: 'bg-red-500/15 text-red-500',
   no_plan: 'bg-newBgLineColor text-textItemBlur',
   ended: 'bg-newBgLineColor text-textItemBlur',
 };
@@ -223,6 +240,11 @@ export const ChannelsLine: FC<{ channels: AdminWorkspace['channels'] }> = ({
       <span className="text-red-500 text-[12px]">
         {channels.needsAttention} {channels.needsAttention === 1 ? 'needs' : 'need'}{' '}
         reconnect
+      </span>
+    )}
+    {!!channels.disabled && (
+      <span className="text-textItemBlur text-[12px]">
+        {channels.disabled} turned off
       </span>
     )}
   </span>
@@ -401,6 +423,17 @@ export const AdminUsersComponent: FC = () => {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
 
   const [searchInput, setSearchInput] = useState(search);
+  // the search the box last wrote to the address
+  const written = useRef(search);
+
+  // the address changed on its own (a tab, back): the box follows it
+  useEffect(() => {
+    if (search === written.current) {
+      return;
+    }
+    written.current = search;
+    setSearchInput(search);
+  }, [search]);
 
   // search, filter and page live in the address, so a link shows the same list
   const setQuery = useCallback(
@@ -422,7 +455,10 @@ export const AdminUsersComponent: FC = () => {
     if (value === search) {
       return;
     }
-    const timer = setTimeout(() => setQuery({ search: value, page: 1 }), 300);
+    const timer = setTimeout(() => {
+      written.current = value;
+      setQuery({ search: value, page: 1 });
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchInput, search, setQuery]);
 
@@ -516,11 +552,17 @@ export const AdminUsersComponent: FC = () => {
         <div className="flex flex-col items-center gap-[12px] py-[48px] border border-newTableBorder rounded-[8px] text-center">
           <div className="text-[15px] font-[600]">No users found</div>
           <div className="text-[13px] opacity-70">
-            {search || filter !== 'all'
+            {page > 1
+              ? 'This page is past the end of the list.'
+              : search || filter !== 'all'
               ? 'Nobody matches this search or filter.'
               : 'Nobody has signed up yet.'}
           </div>
-          {(search || filter !== 'all') && (
+          {page > 1 ? (
+            <Button secondary onClick={() => setQuery({ page: 1 })}>
+              Go to the first page
+            </Button>
+          ) : (search || filter !== 'all') && (
             <Button
               secondary
               onClick={() => {

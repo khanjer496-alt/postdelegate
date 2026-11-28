@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
@@ -122,6 +123,8 @@ const PLAN_WORDS: Record<string, string> = {
   paying: 'Paying customer',
   cancelling: 'Cancelling, the plan stops on its end date',
   lifetime: 'Lifetime deal, no renewals',
+  comped: 'Free plan an admin set, nobody pays for it',
+  unpaid: 'Has a subscription but it is not paid',
   no_plan: 'No plan yet',
   ended: 'Had a plan, it has ended',
 };
@@ -484,10 +487,11 @@ const ErrorsList: FC<{ errors: RecentError[] }> = ({ errors }) =>
     </List>
   );
 
-const TeamList: FC<{ team: TeamMember[]; userId: string }> = ({
-  team,
-  userId,
-}) => (
+const TeamList: FC<{
+  team: TeamMember[];
+  userId: string;
+  listQuery: string;
+}> = ({ team, userId, listQuery }) => (
   <List>
     {team.map((member) => (
       <ListRow
@@ -501,7 +505,9 @@ const TeamList: FC<{ team: TeamMember[]; userId: string }> = ({
             </span>
           ) : (
             <Link
-              href={`/admin/users/${member.userId}`}
+              href={`/admin/users/${member.userId}${
+                listQuery ? `?list=${encodeURIComponent(listQuery)}` : ''
+              }`}
               className="font-[600] truncate hover:underline"
             >
               {member.name || member.email}
@@ -571,21 +577,28 @@ const WorkspaceSection: FC<{
   workspace: WorkspaceDetail;
   userId: string;
   canViewAs: boolean;
-}> = ({ workspace, userId, canViewAs }) => {
+  listQuery: string;
+}> = ({ workspace, userId, canViewAs, listQuery }) => {
   const fetch = useFetch();
+  const toaster = useToaster();
   const [opening, setOpening] = useState(false);
 
   // the same switch as the admin bar, then the app as this user sees it
   const viewAs = useCallback(async () => {
     setOpening(true);
-    await fetch(`/user/impersonate`, {
+    const res = await fetch(`/user/impersonate`, {
       method: 'POST',
       body: JSON.stringify({
         id: workspace.userOrganizationId,
       }),
     });
+    if (!res.ok) {
+      setOpening(false);
+      toaster.show('Could not switch to this user, please try again', 'warning');
+      return;
+    }
     window.location.href = '/launches';
-  }, [fetch, workspace.userOrganizationId]);
+  }, [fetch, toaster, workspace.userOrganizationId]);
 
   return (
     <div className="flex flex-col gap-[16px] border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[12px]">
@@ -642,7 +655,11 @@ const WorkspaceSection: FC<{
 
       <div className="grid grid-cols-2 mobile:grid-cols-1 gap-[16px]">
         <Section title="Team" count={workspace.team.length}>
-          <TeamList team={workspace.team} userId={userId} />
+          <TeamList
+            team={workspace.team}
+            userId={userId}
+            listQuery={listQuery}
+          />
         </Section>
         <Section title="Journey">
           <Journey events={workspace.journey} />
@@ -740,6 +757,7 @@ export const AdminUserDetailComponent: FC = () => {
             workspace={workspace}
             userId={data.id}
             canViewAs={!data.deletedAt}
+            listQuery={list || ''}
           />
         ))
       )}

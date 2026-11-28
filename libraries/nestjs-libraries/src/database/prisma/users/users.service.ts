@@ -34,10 +34,20 @@ export class UsersService {
   }
 
   // The last time the user used the app, for the admin pages. Written at most
-  // once every 15 minutes and never awaited: a request never waits for it,
-  // and a failed write only leaves an older date
-  updateLastOnline(user: { id: string; lastOnline?: Date | null }) {
-    const before = new Date(Date.now() - 15 * 60 * 1000);
+  // once every 15 minutes, and once more right after the first minute so a
+  // first visit doesn't still read as the sign-up time. Never awaited: a
+  // request never waits for it, and a failed write only leaves an older date
+  updateLastOnline(user: {
+    id: string;
+    lastOnline?: Date | null;
+    createdAt?: Date | null;
+  }) {
+    const before = new Date(
+      Math.max(
+        Date.now() - 15 * 60 * 1000,
+        user.createdAt ? user.createdAt.getTime() + 60 * 1000 : 0
+      )
+    );
     if (user.lastOnline && user.lastOnline >= before) {
       return;
     }
