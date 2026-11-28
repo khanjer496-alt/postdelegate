@@ -130,11 +130,34 @@ export class AdminUsersRepository {
     };
   }
 
-  // Every matching user with only what the filters read, newest sign-up
-  // first. The page itself is loaded with getUsersByIds
-  findCandidates(search?: string): Promise<AdminUserCandidate[]> {
-    return this._user.model.user.findMany({
+  // One page of the matching users, newest sign-up first, for the list
+  // without a plan filter
+  async getUserIdsPage(search: string | undefined, skip: number, take: number) {
+    const users = await this._user.model.user.findMany({
       where: this.searchWhere(search),
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      skip,
+      take,
+      select: { id: true },
+    });
+    return users.map((user) => user.id);
+  }
+
+  countUsers(search?: string) {
+    return this._user.model.user.count({ where: this.searchWhere(search) });
+  }
+
+  // Every matching user with only what the plan filters read, newest sign-up
+  // first. The page itself is loaded with getUsersByIds
+  findCandidates(
+    search?: string,
+    withoutDeleted = false
+  ): Promise<AdminUserCandidate[]> {
+    return this._user.model.user.findMany({
+      where: {
+        ...this.searchWhere(search),
+        ...(withoutDeleted ? { deletedAt: null } : {}),
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       select: {
         id: true,
@@ -177,8 +200,8 @@ export class AdminUsersRepository {
     return groups.map((group) => group.organizationId);
   }
 
-  // Failed posts per workspace since the date, of the given workspaces or of
-  // every workspace
+  // Failed posts per workspace that were due since the date, of the given
+  // workspaces or of every workspace. A post fails when it is due
   async getRecentFailures(since: Date, organizationIds?: string[]) {
     if (organizationIds && !organizationIds.length) {
       return [];
@@ -189,7 +212,7 @@ export class AdminUsersRepository {
         ...(organizationIds ? { organizationId: { in: organizationIds } } : {}),
         ...countedPosts,
         state: 'ERROR',
-        updatedAt: { gte: since },
+        publishDate: { gte: since },
       },
       _count: { _all: true },
     });
@@ -319,20 +342,38 @@ export class AdminUsersRepository {
     });
   }
 
-  // The workspace's measured milestones, oldest first
-  getJourney(organizationId: string, take: number) {
-    return this._measurementEvent.model.measurementEvent.findMany({
-      where: { organizationId },
-      orderBy: { occurredAt: 'asc' },
-      take,
-      select: {
-        kind: true,
-        occurredAt: true,
-        source: true,
-        medium: true,
-        campaign: true,
-        internalOrTest: true,
-      },
-    });
+  // The workspace's measured milestones, one row per kind (a kind like
+  // publication is recorded once per post), and where the workspace came
+  // from: every event carries the workspace's first touch, the first one
+  // stands for them all
+  async getJourney(organizationId: string) {
+    const [kinds, first] = await Promise.all([
+      this._measurementEvent.model.measurementEvent.groupBy({
+        by: ['kind'],
+        where: { organizationId },
+        _min: { occurredAt: true },
+        _max: { occurredAt: true },
+        _count: { _all: true },
+      }),
+      this._measurementEvent.model.measurementEvent.findFirst({
+        where: { organizationId },
+        orderBy: { occurredAt: 'asc' },
+        select: {
+          source: true,
+          medium: true,
+          campaign: true,
+          internalOrTest: true,
+        },
+      }),
+    ]);
+    return {
+      first,
+      kinds: kinds.map((group) => ({
+        kind: group.kind,
+        firstAt: group._min.occurredAt,
+        lastAt: group._max.occurredAt,
+        count: group._count._all,
+      })),
+    };
   }
 }

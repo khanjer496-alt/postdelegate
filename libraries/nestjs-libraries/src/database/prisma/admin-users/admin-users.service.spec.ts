@@ -7,6 +7,7 @@ jest.mock(
 import {
   AdminUsersService,
   contentPreviewOf,
+  errorTextOf,
   lastActiveOf,
   planStateOf,
   userMatchesFilter,
@@ -73,7 +74,16 @@ describe('planStateOf', () => {
     ).toBe('lifetime');
   });
 
-  it('reads a plan with a cancel date as cancelling, even in its trial', () => {
+  it('reads a paid plan with a cancel date as cancelling', () => {
+    expect(
+      planStateOf(
+        workspace({ subscription: subscription({ cancelAt: inDays(3) }) }),
+        now
+      )
+    ).toBe('cancelling');
+  });
+
+  it('keeps a cancelled trial a trial, it still ends like one', () => {
     expect(
       planStateOf(
         workspace({
@@ -85,7 +95,7 @@ describe('planStateOf', () => {
         }),
         now
       )
-    ).toBe('cancelling');
+    ).toBe('trialing');
   });
 
   it('reads a trial like billing does', () => {
@@ -286,6 +296,20 @@ describe('userMatchesFilter', () => {
   });
 });
 
+describe('errorTextOf', () => {
+  it('reads the message of a stored error before cutting it', () => {
+    const stored = JSON.stringify({
+      message: 'Token expired',
+      body: 'x'.repeat(1000),
+    });
+    expect(errorTextOf(stored, 300)).toBe('Token expired');
+    expect(errorTextOf('plain text', 300)).toBe('plain text');
+    expect(errorTextOf(null, 300)).toBeNull();
+    const long = errorTextOf(JSON.stringify({ message: 'y'.repeat(400) }), 300);
+    expect(long).toHaveLength(300);
+  });
+});
+
 describe('lastActiveOf and contentPreviewOf', () => {
   it('reads a last activity still at the sign-up time as never seen', () => {
     const createdAt = new Date('2026-11-01T10:00:00Z');
@@ -353,6 +377,11 @@ describe('AdminUsersService.list', () => {
   const makeService = (candidates: any[]) => {
     const repository = {
       findCandidates: jest.fn().mockResolvedValue(candidates),
+      getUserIdsPage: jest.fn(
+        async (_search: string, skip: number, take: number) =>
+          candidates.slice(skip, skip + take).map((c) => c.id)
+      ),
+      countUsers: jest.fn().mockResolvedValue(candidates.length),
       getUsersByIds: jest.fn(async (ids: string[]) =>
         ids.map((id) => ({
           id,
@@ -392,6 +421,22 @@ describe('AdminUsersService.list', () => {
       repository,
     };
   };
+
+  it('pages the whole list in the database', async () => {
+    const { service, repository } = makeService([
+      candidate('u-a', 'org-a'),
+      candidate('u-b', 'org-b'),
+      candidate('u-c', 'org-c'),
+    ]);
+
+    const result = await service.list({ search: 'acme', page: 2, limit: 2 });
+
+    expect(repository.getUserIdsPage).toHaveBeenCalledWith('acme', 2, 2);
+    expect(repository.countUsers).toHaveBeenCalledWith('acme');
+    expect(repository.findCandidates).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ total: 3, page: 2, hasMore: false });
+    expect(result.items.map((item) => item.id)).toEqual(['u-c']);
+  });
 
   it('filters on the derived plan and pages the matches', async () => {
     const { service, repository } = makeService([
@@ -445,5 +490,7 @@ describe('AdminUsersService.list', () => {
     });
     // the attention signals are read for every workspace, without a list
     expect(repository.getRecentFailures.mock.calls[0]).toHaveLength(1);
+    // deleted users are left out of the counts
+    expect(repository.findCandidates).toHaveBeenCalledWith(undefined, true);
   });
 });

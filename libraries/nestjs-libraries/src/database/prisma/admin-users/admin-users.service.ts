@@ -46,8 +46,9 @@ const NOT_PAID = ['incomplete', 'incomplete_expired', 'unpaid', 'paused', 'cance
 // identifier and nobody pays for it (addSubscription). In a trial like
 // billing reads it: the provider has it trialing, or it is not active yet
 // and its trial is still running or the workspace is flagged trialing (the
-// first charge after the trial being retried). A plan with no provider
-// status yet (rows from before it was stored) is read as paying
+// first charge after the trial being retried). A trial with a cancel date
+// is still a trial, the cancel date shows next to it. A plan with no
+// provider status yet (rows from before it was stored) is read as paying
 export const planStateOf = (
   workspace: PlanSource,
   now = new Date()
@@ -62,9 +63,6 @@ export const planStateOf = (
   if (subscription.identifier?.startsWith('admin_')) {
     return 'comped';
   }
-  if (subscription.cancelAt) {
-    return 'cancelling';
-  }
   if (
     subscription.status === 'trialing' ||
     (subscription.status !== 'active' &&
@@ -72,6 +70,9 @@ export const planStateOf = (
         workspace.isTrailing))
   ) {
     return 'trialing';
+  }
+  if (subscription.cancelAt) {
+    return 'cancelling';
   }
   if (subscription.status && NOT_PAID.includes(subscription.status)) {
     return 'unpaid';
@@ -167,6 +168,24 @@ export const contentPreviewOf = (content: string, length = 140) => {
 const shorten = (value: string | null, length: number) =>
   value && value.length > length ? `${value.slice(0, length - 1)}…` : value;
 
+// The readable part of a stored error (often a serialized error object),
+// cut to `length`
+export const errorTextOf = (message: string | null, length: number) => {
+  if (!message) {
+    return null;
+  }
+  let text = message;
+  try {
+    const parsed = JSON.parse(message);
+    if (typeof parsed === 'string') text = parsed;
+    else if (typeof parsed?.message === 'string') text = parsed.message;
+    else if (typeof parsed?.error === 'string') text = parsed.error;
+  } catch {
+    // not JSON, kept as stored
+  }
+  return shorten(text, length);
+};
+
 // Where a channel stands, what the customer has to fix first
 export const channelStatusOf = (channel: {
   disabled: boolean;
@@ -183,7 +202,8 @@ export const channelStatusOf = (channel: {
 
 const RECENT_POSTS = 10;
 const RECENT_ERRORS = 10;
-const JOURNEY_EVENTS = 200;
+// workspaces of the user page read at the same time
+const WORKSPACE_BATCH = 3;
 
 const fullName = (user: { name: string | null; lastName: string | null }) =>
   [user.name, user.lastName].filter(Boolean).join(' ') || null;
@@ -200,6 +220,10 @@ const planOf = (
   currentPeriodEnd: organization.subscription?.currentPeriodEnd || null,
   cancelAt: organization.subscription?.cancelAt || null,
 });
+
+type WorkspaceSummary = Awaited<
+  ReturnType<AdminUsersService['summaries']>
+>[number]['workspaces'][number];
 
 @Injectable()
 export class AdminUsersService {
@@ -250,6 +274,26 @@ export class AdminUsersService {
     const page = query.page || 1;
     const limit = query.limit || 25;
 
+    // no plan filter: the database pages the list
+    if (filter === 'all') {
+      const [ids, total] = await Promise.all([
+        this._adminUsersRepository.getUserIdsPage(
+          query.search,
+          (page - 1) * limit,
+          limit
+        ),
+        this._adminUsersRepository.countUsers(query.search),
+      ]);
+      return {
+        items: await this.summaries(ids, now),
+        total,
+        page,
+        limit,
+        hasMore: page * limit < total,
+      };
+    }
+
+    // a plan filter reads the state derived from each plan, in memory
     const candidates = await this._adminUsersRepository.findCandidates(
       query.search
     );
@@ -274,10 +318,14 @@ export class AdminUsersService {
     };
   }
 
-  // The number of users behind each filter, with no search
+  // The number of users behind each filter, with no search. Deleted users
+  // are left out (the list still finds them, tagged)
   async summary() {
     const now = new Date();
-    const candidates = await this._adminUsersRepository.findCandidates();
+    const candidates = await this._adminUsersRepository.findCandidates(
+      undefined,
+      true
+    );
     const attention = await this.attentionSignals(now);
     const users = this.signalsOf(candidates, now, attention);
     const count = (filter: AdminUserFilter) =>
@@ -296,7 +344,7 @@ export class AdminUsersService {
 
   // One row per user, in the order of the ids, with the counts of each of
   // their workspaces read in a few grouped queries for the whole page
-  private async summaries(ids: string[], now: Date) {
+  async summaries(ids: string[], now: Date) {
     const users = await this._adminUsersRepository.getUsersByIds(ids);
     const byId = new Map(users.map((user) => [user.id, user]));
     const ordered = ids
@@ -380,7 +428,96 @@ export class AdminUsersService {
     }));
   }
 
-  // Everything about one user, null when there is no such user
+  // Everything about one workspace the user owns, for the user page
+  private async workspaceDetail(workspace: WorkspaceSummary) {
+    const organizationId = workspace.organizationId;
+    const [extra, health, pictures, posts, errors, team, journey] =
+      await Promise.all([
+        this._adminUsersRepository.getWorkspaceExtra(organizationId),
+        this._integrationService.getChannelHealth(organizationId),
+        this._adminUsersRepository.getChannelPictures(organizationId),
+        this._adminUsersRepository.getRecentPosts(organizationId, RECENT_POSTS),
+        this._adminUsersRepository.getRecentErrors(
+          organizationId,
+          RECENT_ERRORS
+        ),
+        this._adminUsersRepository.getTeamMembers(organizationId),
+        this._adminUsersRepository.getJourney(organizationId),
+      ]);
+    const pictureOf = new Map(pictures.map((item) => [item.id, item]));
+
+    return {
+      ...workspace,
+      full: true as const,
+      createdAt: extra?.createdAt || null,
+      stripeCustomerId: extra?.paymentId || null,
+      subscription: extra?.subscription
+        ? {
+            ...workspace.plan,
+            provider: extra.subscription.provider,
+            totalChannels: extra.subscription.totalChannels,
+            createdAt: extra.subscription.createdAt,
+          }
+        : null,
+      channelList: health
+        .filter((channel) => !channel.deletedAt)
+        .map((channel) => ({
+          id: channel.id,
+          name: pictureOf.get(channel.id)?.customName || channel.name,
+          providerIdentifier: channel.providerIdentifier,
+          picture: pictureOf.get(channel.id)?.picture || null,
+          status: channelStatusOf(channel),
+          tokenExpiration: channel.tokenExpiration,
+          createdAt: channel.createdAt,
+          lastPublishedAt: channel.lastPublishedAt,
+          lastPublishedUrl: channel.lastPublishedUrl,
+          lastErrorAt: channel.lastErrorAt,
+          lastError: errorTextOf(channel.lastError, 300),
+        })),
+      recentPosts: posts.map((post) => ({
+        id: post.id,
+        state: post.state,
+        publishDate: post.publishDate,
+        createdAt: post.createdAt,
+        preview: contentPreviewOf(post.content),
+        error: errorTextOf(post.error, 300),
+        url: post.releaseURL,
+        channel: post.integration,
+      })),
+      recentErrors: errors.map((error) => ({
+        ...error,
+        message: errorTextOf(error.message, 500),
+      })),
+      team: team.map((member) => ({
+        userId: member.user.id,
+        name: fullName(member.user),
+        email: member.user.email,
+        role: member.role,
+        disabled: member.disabled,
+        deletedAt: member.user.deletedAt,
+        joinedAt: member.createdAt,
+      })),
+      journey: {
+        from: journey.first
+          ? {
+              source: journey.first.source,
+              medium: journey.first.medium,
+              campaign: journey.first.campaign,
+            }
+          : null,
+        internalOrTest: !!journey.first?.internalOrTest,
+        // in the order each milestone first happened
+        events: [...journey.kinds].sort(
+          (a, b) =>
+            (a.firstAt?.getTime() || 0) - (b.firstAt?.getTime() || 0)
+        ),
+      },
+    };
+  }
+
+  // Everything about one user, null when there is no such user. Only the
+  // live workspaces the user owns are read in full, a few at a time: the
+  // others (deleted, or where they are a team member) keep their summary
   async getUser(id: string) {
     const now = new Date();
     const [summary] = await this.summaries([id], now);
@@ -388,87 +525,20 @@ export class AdminUsersService {
       return null;
     }
 
-    const workspaces = await Promise.all(
-      summary.workspaces.map(async (workspace) => {
-        const [extra, health, pictures, posts, errors, team, journey] =
-          await Promise.all([
-            this._adminUsersRepository.getWorkspaceExtra(
-              workspace.organizationId
-            ),
-            this._integrationService.getChannelHealth(workspace.organizationId),
-            this._adminUsersRepository.getChannelPictures(
-              workspace.organizationId
-            ),
-            this._adminUsersRepository.getRecentPosts(
-              workspace.organizationId,
-              RECENT_POSTS
-            ),
-            this._adminUsersRepository.getRecentErrors(
-              workspace.organizationId,
-              RECENT_ERRORS
-            ),
-            this._adminUsersRepository.getTeamMembers(workspace.organizationId),
-            this._adminUsersRepository.getJourney(
-              workspace.organizationId,
-              JOURNEY_EVENTS
-            ),
-          ]);
-        const pictureOf = new Map(pictures.map((item) => [item.id, item]));
-
-        return {
-          ...workspace,
-          createdAt: extra?.createdAt || null,
-          stripeCustomerId: extra?.paymentId || null,
-          subscription: extra?.subscription
-            ? {
-                ...workspace.plan,
-                provider: extra.subscription.provider,
-                totalChannels: extra.subscription.totalChannels,
-                createdAt: extra.subscription.createdAt,
-              }
-            : null,
-          channelList: health
-            .filter((channel) => !channel.deletedAt)
-            .map((channel) => ({
-              id: channel.id,
-              name: pictureOf.get(channel.id)?.customName || channel.name,
-              providerIdentifier: channel.providerIdentifier,
-              picture: pictureOf.get(channel.id)?.picture || null,
-              status: channelStatusOf(channel),
-              tokenExpiration: channel.tokenExpiration,
-              createdAt: channel.createdAt,
-              lastPublishedAt: channel.lastPublishedAt,
-              lastPublishedUrl: channel.lastPublishedUrl,
-              lastErrorAt: channel.lastErrorAt,
-              lastError: shorten(channel.lastError, 300),
-            })),
-          recentPosts: posts.map((post) => ({
-            id: post.id,
-            state: post.state,
-            publishDate: post.publishDate,
-            createdAt: post.createdAt,
-            preview: contentPreviewOf(post.content),
-            error: shorten(post.error, 300),
-            url: post.releaseURL,
-            channel: post.integration,
-          })),
-          recentErrors: errors.map((error) => ({
-            ...error,
-            message: shorten(error.message, 500),
-          })),
-          team: team.map((member) => ({
-            userId: member.user.id,
-            name: fullName(member.user),
-            email: member.user.email,
-            role: member.role,
-            disabled: member.disabled,
-            deletedAt: member.user.deletedAt,
-            joinedAt: member.createdAt,
-          })),
-          journey,
-        };
-      })
-    );
+    const workspaces = [];
+    for (let i = 0; i < summary.workspaces.length; i += WORKSPACE_BATCH) {
+      workspaces.push(
+        ...(await Promise.all(
+          summary.workspaces
+            .slice(i, i + WORKSPACE_BATCH)
+            .map((workspace) =>
+              !workspace.deletedAt && isOwnerOf(workspace)
+                ? this.workspaceDetail(workspace)
+                : Promise.resolve({ ...workspace, full: false as const })
+            )
+        ))
+      );
+    }
 
     return { ...summary, workspaces };
   }

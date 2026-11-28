@@ -191,6 +191,11 @@ export const Pill: FC<{ className?: string; children: ReactNode }> = ({
 export const PlanPill: FC<{ plan: AdminPlan }> = ({ plan }) => (
   <span className="inline-flex flex-wrap gap-[4px]">
     <Pill className={PLAN_COLORS[plan.state]}>{planLabelOf(plan)}</Pill>
+    {!!plan.cancelAt && plan.state !== 'cancelling' && (
+      <Pill className={PLAN_COLORS.cancelling}>
+        Cancels {newDayjs(plan.cancelAt).format('D MMM')}
+      </Pill>
+    )}
     {!!plan.status && PAYMENT_PROBLEMS.includes(plan.status) && (
       <Pill className="bg-red-500/15 text-red-500">Payment failing</Pill>
     )}
@@ -301,7 +306,7 @@ const useAdminUsersSummary = () => {
       throw new Error('Failed to load the summary');
     }
     return res.json();
-  });
+  }, { revalidateOnFocus: false });
 };
 
 const useAdminUsersList = (params: {
@@ -325,7 +330,7 @@ const useAdminUsersList = (params: {
       }
       return res.json();
     },
-    { keepPreviousData: true }
+    { keepPreviousData: true, revalidateOnFocus: false }
   );
 };
 

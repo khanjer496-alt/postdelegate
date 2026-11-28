@@ -73,14 +73,24 @@ interface TeamMember {
 
 interface JourneyEvent {
   kind: string;
-  occurredAt: string;
-  source: string;
-  medium: string;
-  campaign: string;
-  internalOrTest: boolean;
+  firstAt: string;
+  lastAt: string;
+  count: number;
 }
 
-interface WorkspaceDetail extends AdminWorkspace {
+interface JourneyDetail {
+  from: { source: string; medium: string; campaign: string } | null;
+  internalOrTest: boolean;
+  events: JourneyEvent[];
+}
+
+// a workspace the user doesn't own, or a deleted one: its summary only
+interface WorkspaceCompact extends AdminWorkspace {
+  full: false;
+}
+
+interface WorkspaceFull extends AdminWorkspace {
+  full: true;
   createdAt: string | null;
   stripeCustomerId: string | null;
   subscription:
@@ -94,8 +104,13 @@ interface WorkspaceDetail extends AdminWorkspace {
   recentPosts: RecentPost[];
   recentErrors: RecentError[];
   team: TeamMember[];
-  journey: JourneyEvent[];
+  journey: JourneyDetail;
 }
+
+type WorkspaceDetail = WorkspaceFull | WorkspaceCompact;
+
+const isFull = (workspace: WorkspaceDetail): workspace is WorkspaceFull =>
+  workspace.full;
 
 interface UserDetail extends Omit<AdminUserSummary, 'workspaces'> {
   workspaces: WorkspaceDetail[];
@@ -185,10 +200,11 @@ const JOURNEY_WORDS: Record<string, string> = {
   nonzero_payment: 'Payment received',
 };
 
-const journeyLabelOf = (kind: string, firstPayment: boolean) => {
-  if (kind === 'nonzero_payment' && firstPayment) {
-    return 'First payment';
+const journeyLabelOf = (event: JourneyEvent) => {
+  if (event.kind === 'nonzero_payment') {
+    return event.count === 1 ? 'First payment' : 'Payments received';
   }
+  const kind = event.kind;
   if (JOURNEY_WORDS[kind]) {
     return JOURNEY_WORDS[kind];
   }
@@ -198,18 +214,8 @@ const journeyLabelOf = (kind: string, firstPayment: boolean) => {
 
 const known = (value: string) => !!value && value !== 'unknown';
 
-// The readable part of a stored error (often a serialized error object)
-const errorTextOf = (message: string) => {
-  try {
-    const parsed = JSON.parse(message);
-    if (typeof parsed === 'string') return parsed;
-    if (typeof parsed?.message === 'string') return parsed.message;
-    if (typeof parsed?.error === 'string') return parsed.error;
-  } catch {
-    // not JSON, shown as stored
-  }
-  return message;
-};
+// a published post's address, only when it is a web link
+const isWebLink = (url: string | null) => !!url && /^https?:\/\//i.test(url);
 
 const Section: FC<{ title: string; count?: number; children: ReactNode }> = ({
   title,
@@ -270,7 +276,7 @@ const DateWithAgo: FC<{ date: string }> = ({ date }) => (
   </span>
 );
 
-const PlanCard: FC<{ workspace: WorkspaceDetail }> = ({ workspace }) => {
+const PlanCard: FC<{ workspace: WorkspaceFull }> = ({ workspace }) => {
   const plan = workspace.subscription || workspace.plan;
   return (
     <div className="border border-newTableBorder rounded-[8px] p-[16px] bg-newBgColorInner flex flex-col gap-[12px]">
@@ -406,7 +412,7 @@ const ChannelsList: FC<{ channels: Channel[] }> = ({ channels }) =>
                   {channel.lastErrorAt
                     ? ` ${relativeDate(channel.lastErrorAt)}`
                     : ''}
-                  : {errorTextOf(channel.lastError)}
+                  : {channel.lastError}
                 </div>
               )}
             </div>
@@ -438,9 +444,9 @@ const PostsList: FC<{ posts: RecentPost[] }> = ({ posts }) =>
                     {shortDate(post.publishDate)}
                   </span>
                 </span>
-                {!!post.url && (
+                {isWebLink(post.url) && (
                   <a
-                    href={post.url}
+                    href={post.url!}
                     target="_blank"
                     rel="noreferrer"
                     className="text-[12px] underline text-textItemBlur hover:text-textColor"
@@ -456,7 +462,7 @@ const PostsList: FC<{ posts: RecentPost[] }> = ({ posts }) =>
               </div>
               {!!post.error && (
                 <div className="text-[12px] text-red-500 break-words">
-                  {errorTextOf(post.error)}
+                  {post.error}
                 </div>
               )}
             </div>
@@ -480,7 +486,7 @@ const ErrorsList: FC<{ errors: RecentError[] }> = ({ errors }) =>
             · {error.platform}
           </div>
           <div className="break-words font-mono text-[12px]">
-            {errorTextOf(error.message)}
+            {error.message}
           </div>
         </ListRow>
       ))}
@@ -533,63 +539,65 @@ const TeamList: FC<{
   </List>
 );
 
-const Journey: FC<{ events: JourneyEvent[] }> = ({ events }) => {
-  if (events.length === 0) {
+const Journey: FC<{ journey: JourneyDetail }> = ({ journey }) => {
+  if (journey.events.length === 0) {
     return <Empty>No milestones recorded yet.</Empty>;
   }
-  const firstPayment = events.findIndex(
-    (event) => event.kind === 'nonzero_payment'
-  );
+  const from = journey.from
+    ? [journey.from.source, journey.from.medium, journey.from.campaign].filter(
+        known
+      )
+    : [];
   return (
-    <div className="flex flex-col border-s-2 border-newTableBorder ms-[6px]">
-      {events.map((event, index) => {
-        const from = [event.source, event.medium, event.campaign].filter(
-          known
-        );
-        return (
+    <div className="flex flex-col gap-[8px]">
+      {(!!from.length || journey.internalOrTest) && (
+        <div className="flex flex-wrap items-center gap-[8px] text-[12px] text-textItemBlur">
+          {!!from.length && <span>Came from {from.join(' · ')}</span>}
+          {journey.internalOrTest && <Tag>Test</Tag>}
+        </div>
+      )}
+      <div className="flex flex-col border-s-2 border-newTableBorder ms-[6px]">
+        {journey.events.map((event) => (
           <div
-            key={`${event.kind}-${event.occurredAt}-${index}`}
+            key={event.kind}
             className="relative ps-[16px] pb-[12px] last:pb-0"
           >
             <span className="absolute -start-[6px] top-[5px] w-[10px] h-[10px] rounded-full bg-btnPrimary" />
             <div className="flex flex-wrap items-center gap-[8px] text-[13px]">
-              <span className="font-[600]">
-                {journeyLabelOf(event.kind, index === firstPayment)}
+              <span className="font-[600]">{journeyLabelOf(event)}</span>
+              <span className="text-textItemBlur" title={fullDate(event.firstAt)}>
+                {shortDate(event.firstAt)}
               </span>
-              <span className="text-textItemBlur" title={fullDate(event.occurredAt)}>
-                {shortDate(event.occurredAt)}
-              </span>
-              {event.internalOrTest && <Tag>Test</Tag>}
             </div>
-            {!!from.length && (
+            {event.count > 1 && (
               <div className="text-[12px] text-textItemBlur">
-                From {from.join(' · ')}
+                {event.count} times, last{' '}
+                <span title={fullDate(event.lastAt)}>
+                  {shortDate(event.lastAt)}
+                </span>
               </div>
             )}
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 };
 
-const WorkspaceSection: FC<{
-  workspace: WorkspaceDetail;
-  userId: string;
-  canViewAs: boolean;
-  listQuery: string;
-}> = ({ workspace, userId, canViewAs, listQuery }) => {
+// the same switch as the admin bar, then the app as this user sees it
+const ViewAsButton: FC<{ userOrganizationId: string }> = ({
+  userOrganizationId,
+}) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const [opening, setOpening] = useState(false);
 
-  // the same switch as the admin bar, then the app as this user sees it
   const viewAs = useCallback(async () => {
     setOpening(true);
     const res = await fetch(`/user/impersonate`, {
       method: 'POST',
       body: JSON.stringify({
-        id: workspace.userOrganizationId,
+        id: userOrganizationId,
       }),
     });
     if (!res.ok) {
@@ -598,8 +606,58 @@ const WorkspaceSection: FC<{
       return;
     }
     window.location.href = '/launches';
-  }, [fetch, toaster, workspace.userOrganizationId]);
+  }, [fetch, toaster, userOrganizationId]);
 
+  return (
+    <Button onClick={viewAs} loading={opening}>
+      View as this user
+    </Button>
+  );
+};
+
+const WorkspaceTags: FC<{ workspace: AdminWorkspace }> = ({ workspace }) => (
+  <div className="flex flex-wrap gap-[4px]">
+    <Tag>{ROLES[workspace.role] || workspace.role}</Tag>
+    {!!workspace.deletedAt && (
+      <Tag className="text-red-500 border-red-500/40">Workspace deleted</Tag>
+    )}
+    {workspace.disabled && (
+      <Tag className="text-orange-500 border-orange-500/40">
+        Access turned off
+      </Tag>
+    )}
+  </div>
+);
+
+// a workspace the user is only a member of, or a deleted one
+const WorkspaceRow: FC<{ workspace: WorkspaceCompact; canViewAs: boolean }> = ({
+  workspace,
+  canViewAs,
+}) => (
+  <div className="flex flex-wrap items-center gap-[12px] border border-newTableBorder rounded-[12px] px-[16px] py-[12px] mobile:px-[12px]">
+    <div className="flex flex-col gap-[4px] min-w-0 flex-1">
+      <div className="text-[15px] font-[600] break-words">{workspace.name}</div>
+      <WorkspaceTags workspace={workspace} />
+    </div>
+    <PlanPill plan={workspace.plan} />
+    <div className="text-[13px] min-w-[140px]">
+      <ChannelsLine channels={workspace.channels} />
+    </div>
+    <div className="text-[13px] min-w-[160px]">
+      <PostsLine posts={workspace.posts} />
+    </div>
+    {canViewAs && (
+      <ViewAsButton userOrganizationId={workspace.userOrganizationId} />
+    )}
+  </div>
+);
+
+const WorkspaceSection: FC<{
+  workspace: WorkspaceFull;
+  userId: string;
+  canViewAs: boolean;
+  listQuery: string;
+}> = ({ workspace, userId, canViewAs, listQuery }) => {
   return (
     <div className="flex flex-col gap-[16px] border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[12px]">
       <div className="flex flex-wrap items-center justify-between gap-[12px]">
@@ -607,24 +665,10 @@ const WorkspaceSection: FC<{
           <div className="text-[18px] font-[600] break-words">
             {workspace.name}
           </div>
-          <div className="flex flex-wrap gap-[4px]">
-            <Tag>{ROLES[workspace.role] || workspace.role}</Tag>
-            {!!workspace.deletedAt && (
-              <Tag className="text-red-500 border-red-500/40">
-                Workspace deleted
-              </Tag>
-            )}
-            {workspace.disabled && (
-              <Tag className="text-orange-500 border-orange-500/40">
-                Access turned off
-              </Tag>
-            )}
-          </div>
+          <WorkspaceTags workspace={workspace} />
         </div>
-        {canViewAs && !workspace.deletedAt && (
-          <Button onClick={viewAs} loading={opening}>
-            View as this user
-          </Button>
+        {canViewAs && (
+          <ViewAsButton userOrganizationId={workspace.userOrganizationId} />
         )}
       </div>
 
@@ -662,7 +706,7 @@ const WorkspaceSection: FC<{
           />
         </Section>
         <Section title="Journey">
-          <Journey events={workspace.journey} />
+          <Journey journey={workspace.journey} />
         </Section>
       </div>
     </div>
@@ -751,15 +795,27 @@ export const AdminUserDetailComponent: FC = () => {
       {data.workspaces.length === 0 ? (
         <Empty>This user is not in any workspace.</Empty>
       ) : (
-        data.workspaces.map((workspace) => (
-          <WorkspaceSection
-            key={workspace.userOrganizationId}
-            workspace={workspace}
-            userId={data.id}
-            canViewAs={!data.deletedAt}
-            listQuery={list || ''}
-          />
-        ))
+        data.workspaces.map((workspace) => {
+          // a deleted user, a deleted workspace or a turned off access has
+          // nothing to view
+          const canViewAs =
+            !data.deletedAt && !workspace.deletedAt && !workspace.disabled;
+          return isFull(workspace) ? (
+            <WorkspaceSection
+              key={workspace.userOrganizationId}
+              workspace={workspace}
+              userId={data.id}
+              canViewAs={canViewAs}
+              listQuery={list || ''}
+            />
+          ) : (
+            <WorkspaceRow
+              key={workspace.userOrganizationId}
+              workspace={workspace as WorkspaceCompact}
+              canViewAs={canViewAs}
+            />
+          );
+        })
       )}
     </div>
   );
