@@ -43,7 +43,10 @@ import { InviteError } from '@gitroom/frontend/components/layout/invite.error';
 import { ContextWrapper } from '@gitroom/frontend/components/layout/user.context';
 import { CopilotKit } from '@copilotkit/react-core';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
-import { Impersonate } from '@gitroom/frontend/components/layout/impersonate';
+import {
+  AdminMenu,
+  Impersonate,
+} from '@gitroom/frontend/components/layout/impersonate';
 import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announcement.banner';
 import { FreePlanBanner } from '@gitroom/frontend/components/features/free-plan/free.plan.banner';
 import { TitleV2 } from './title.v2';
@@ -332,6 +335,8 @@ export const LayoutComponentV2 = ({ children }: { children: ReactNode }) => {
                           />
                         </div>
                         <div className="flex gap-[6px] mobile:gap-[4px] items-center text-textItemBlur">
+                          {/* while viewing as someone the tools sit in that strip */}
+                          {user?.admin && !user?.impersonate && <AdminMenu />}
                           <span className="hidden mobile:flex">
                             <TrialPillV2 compact={true} />
                           </span>

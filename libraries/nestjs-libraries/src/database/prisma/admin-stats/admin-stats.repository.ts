@@ -2,6 +2,7 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import dayjs from 'dayjs';
+import { CHANNEL_CONNECTED } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.state';
 
 export interface StatsParams {
   from: Date;
@@ -73,6 +74,14 @@ export interface SignUpsResponse {
   // every day of the range, days without sign-ups included
   perDay: { date: string; count: number }[];
 }
+
+export interface ListUsersParams {
+  page: number;
+  q?: string;
+}
+
+// the admin Users page shows 50 users a page
+export const ADMIN_USERS_PAGE_SIZE = 50;
 
 const sortDesc = (list: PerSocial[]) =>
   list.sort((a, b) => b.count - a.count || a.provider.localeCompare(b.provider));
@@ -569,6 +578,109 @@ export class AdminStatsRepository {
         )
       ).length,
     };
+  }
+
+  // Every user, newest first, with their workspaces (oldest membership
+  // first). Only what the admin Users page shows is selected: never a
+  // password, a token, an API key or a provider id
+  async listUsers(params: ListUsersParams) {
+    const q = params.q?.trim();
+    const where: Prisma.UserWhereInput = {
+      deletedAt: null,
+      ...(q
+        ? {
+            OR: [
+              { email: { contains: q, mode: 'insensitive' } },
+              {
+                organizations: {
+                  some: {
+                    disabled: false,
+                    organization: {
+                      deletedAt: null,
+                      name: { contains: q, mode: 'insensitive' },
+                    },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [users, total] = await Promise.all([
+      this._user.model.user.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: params.page * ADMIN_USERS_PAGE_SIZE,
+        take: ADMIN_USERS_PAGE_SIZE,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          providerName: true,
+          activated: true,
+          isSuperAdmin: true,
+          createdAt: true,
+          updatedAt: true,
+          organizations: {
+            where: { disabled: false, organization: { deletedAt: null } },
+            orderBy: { createdAt: 'asc' },
+            select: {
+              id: true,
+              role: true,
+              organization: {
+                select: {
+                  id: true,
+                  name: true,
+                  isTrailing: true,
+                  allowTrial: true,
+                  paymentId: true,
+                  subscription: {
+                    select: {
+                      subscriptionTier: true,
+                      period: true,
+                      provider: true,
+                      // admin_ marks a plan an admin set, never returned
+                      identifier: true,
+                      isLifetime: true,
+                      status: true,
+                      trialEndsAt: true,
+                      cancelAt: true,
+                      deletedAt: true,
+                    },
+                  },
+                  users: { select: { userId: true } },
+                  _count: {
+                    select: { Integration: { where: CHANNEL_CONNECTED } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this._user.model.user.count({ where }),
+    ]);
+
+    return { users, total };
+  }
+
+  // Top-level posts of these workspaces per state, and when the newest of
+  // each state was created
+  getPostsPerState(organizationIds: string[]) {
+    if (!organizationIds.length) {
+      return Promise.resolve([]);
+    }
+    return this._post.model.post.groupBy({
+      by: ['organizationId', 'state'],
+      where: {
+        organizationId: { in: organizationIds },
+        parentPostId: null,
+        deletedAt: null,
+      },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
   }
 
   async getStats(params: StatsParams): Promise<StatsResponse> {

@@ -38,7 +38,10 @@ import { InviteError } from '@gitroom/frontend/components/layout/invite.error';
 import { ContextWrapper } from '@gitroom/frontend/components/layout/user.context';
 import { CopilotKit } from '@copilotkit/react-core';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
-import { Impersonate } from '@gitroom/frontend/components/layout/impersonate';
+import {
+  AdminMenu,
+  Impersonate,
+} from '@gitroom/frontend/components/layout/impersonate';
 import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announcement.banner';
 import { Title } from '@gitroom/frontend/components/layout/title';
 import { TopMenu } from '@gitroom/frontend/components/layout/top.menu';
@@ -255,7 +258,8 @@ export const LayoutComponent = ({
                         id="left-menu"
                         className={clsx(
                           'fixed h-full w-[64px] start-[20px] flex flex-1 top-0 mobile:static mobile:h-auto mobile:min-h-full mobile:mx-auto',
-                          user?.admin && 'pt-[52px] max-h-[1000px]:w-[500px]'
+                          // clears the "Viewing as" strip above the page
+                          user?.impersonate && 'pt-[44px] mobile:pt-0'
                         )}
                       >
                         <div className="flex flex-col h-full gap-[32px] mobile:gap-[16px] flex-1 pt-[12px] pb-[20px] mobile:pb-[12px]">
@@ -299,6 +303,8 @@ export const LayoutComponent = ({
                           <Title />
                         </div>
                         <div className="flex gap-[20px] mobile:gap-[4px] items-center text-textItemBlur">
+                          {/* while viewing as someone the tools sit in that strip */}
+                          {user?.admin && !user?.impersonate && <AdminMenu />}
                           <CommandPalette />
                           <TrialCountdown />
                           <TopBarMore>
