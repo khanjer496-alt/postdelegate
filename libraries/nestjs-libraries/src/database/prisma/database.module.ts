@@ -1,5 +1,9 @@
 import { MeasurementService } from '@gitroom/nestjs-libraries/database/prisma/measurement/measurement.service';
 import { MeasurementRepository } from './measurement/measurement.repository';
+import { OwnerAlertsService } from '@gitroom/nestjs-libraries/database/prisma/owner-alerts/owner.alerts.service';
+import { OwnerAlertsRepository } from '@gitroom/nestjs-libraries/database/prisma/owner-alerts/owner.alerts.repository';
+import { FeedbackService } from '@gitroom/nestjs-libraries/database/prisma/feedback/feedback.service';
+import { FeedbackRepository } from '@gitroom/nestjs-libraries/database/prisma/feedback/feedback.repository';
 import { AgentCredentialService } from '../../chat/agent-credential.service';
 import { AgentCredentialRepository } from './agent-credentials/agent.credential.repository';
 import { Global, Module } from '@nestjs/common';
@@ -104,6 +108,10 @@ import { ApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/appr
   providers: [
     MeasurementService,
     MeasurementRepository,
+    OwnerAlertsService,
+    OwnerAlertsRepository,
+    FeedbackService,
+    FeedbackRepository,
     PrismaService,
     AgentCredentialService,
     AgentCredentialRepository,

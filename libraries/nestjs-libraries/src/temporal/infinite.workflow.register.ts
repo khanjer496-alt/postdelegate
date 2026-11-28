@@ -36,6 +36,9 @@ export class InfiniteWorkflowRegister implements OnModuleInit {
             taskQueue: 'main',
           });
       } catch (err) {}
+      // the owner's daily trials digest; the activity does nothing without
+      // OWNER_ALERT_EMAILS or an email provider
+      await this.startSingleton('ownerDigestWorkflowV1', 'owner-digest-workflow-v1');
     }
     if (process.env.INTEGRATION_AUTHORIZATION_LIFECYCLE_ENABLED === 'true') {
       try {

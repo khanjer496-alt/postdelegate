@@ -194,6 +194,24 @@ export const ContinueIntegration: FC<{
     // Consume before the network call: failure, cancellation or an abandoned
     // confirmation must not leave credentials in sessionStorage.
     clearExtensionCode(modifiedParams.state);
+
+    // The network sent the person back without a code: they cancelled on its
+    // page. There is nothing to exchange, the attempt is only recorded
+    if (!extensionCode && !modifiedParams.code && modifiedParams.state) {
+      await fetch(`/integrations/social-connect/${provider}/declined`, {
+        method: 'POST',
+        body: JSON.stringify({ state: modifiedParams.state }),
+      }).catch(() => undefined);
+      clearConnectHandoff();
+      setState({
+        status: 'error',
+        message: t(
+          'connect_cancelled',
+          'The connection was cancelled. Connect the channel again when you are ready.'
+        ),
+      });
+      return;
+    }
     const body = JSON.stringify({
       ...modifiedParams,
       ...(extensionCode ? { code: extensionCode } : {}),
@@ -359,7 +377,7 @@ export const ContinueIntegration: FC<{
       'success',
       confirmed
     );
-  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName, clearConnectHandoff, fetch, showScopeWarning]);
+  }, [modifiedParams, provider, Provider, navigateOrShow, providerDisplayName, clearConnectHandoff, fetch, showScopeWarning, t]);
 
   useEffect(() => {
     if (!stripConnectCodeFromHistory()) {

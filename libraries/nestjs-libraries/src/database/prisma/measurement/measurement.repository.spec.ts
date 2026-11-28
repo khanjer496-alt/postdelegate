@@ -32,8 +32,13 @@ describe('MeasurementRepository.rows', () => {
 
     expect(rows).toHaveLength(5);
     expect(measurementEvent.findMany).toHaveBeenCalledTimes(2);
+    // the owner's operational events (connect and publish failures, ended
+    // plans) never reach the funnel export
     expect(measurementEvent.findMany.mock.calls[0][0].where).toEqual({
       occurredAt: { gte: from, lt: to },
+      kind: {
+        notIn: ['channel_connect_failed', 'publish_failed', 'subscription_ended'],
+      },
     });
     const joins = measurementEvent.findMany.mock.calls[1][0].where;
     expect(joins.organizationId).toEqual({ in: ['org-1', 'org-2'] });

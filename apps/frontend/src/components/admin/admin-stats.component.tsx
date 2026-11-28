@@ -8,6 +8,7 @@ import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { capitalize } from 'lodash';
+import { TrialsSection } from '@gitroom/frontend/components/admin/admin-trials.component';
 
 interface PerSocial {
   provider: string;
@@ -789,6 +790,8 @@ export const AdminStatsComponent: FC = () => {
       </div>
 
       <GrowthSection range={range} />
+
+      <TrialsSection />
 
       <WebsiteSection range={range} />
 

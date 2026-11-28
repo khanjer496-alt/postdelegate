@@ -3,7 +3,10 @@ import Stripe from 'stripe';
 import * as Sentry from '@sentry/nestjs';
 import { BadRequestException } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import {
+  SubscriptionEndCause,
+  SubscriptionService,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { SubscriptionProviderState } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -948,7 +951,12 @@ export class StripeService extends PaymentProviderAbstract {
     // it is now decides: a late or retried event can say unpaid of one that
     // has paid since, so without the re-read Stripe sends it again instead
     if (NOT_ENTITLED_STATUSES.includes(current.status)) {
-      return fresh ? this.deleteSubscription(event) : { retry: true };
+      return fresh
+        ? this.deleteSubscription(
+            event,
+            current.status === 'unpaid' ? 'payment_failed' : undefined
+          )
+        : { retry: true };
     }
     const { uniqueId, billing, period, extraChannels } = await this.validatedPlan(current);
 
@@ -967,10 +975,12 @@ export class StripeService extends PaymentProviderAbstract {
     );
   }
 
+  // cause: why the plan goes when the caller knows (an unpaid subscription)
   async deleteSubscription(
     event:
       | Stripe.CustomerSubscriptionDeletedEvent
-      | Stripe.CustomerSubscriptionUpdatedEvent
+      | Stripe.CustomerSubscriptionUpdatedEvent,
+    cause?: SubscriptionEndCause
   ) {
     const customer = event.data.object.customer as string;
     // nothing is written before this read: a failed one asks Stripe for the
@@ -993,9 +1003,14 @@ export class StripeService extends PaymentProviderAbstract {
         !NOT_ENTITLED_STATUSES.includes(f.status)
     );
     if (!survivor) {
+      // an unpaid subscription, or one Stripe cancelled after its retries
       const deleted = await this._subscriptionService.deleteSubscription(
         customer,
-        STRIPE_PROVIDER
+        STRIPE_PROVIDER,
+        cause ||
+          (event.data.object.cancellation_details?.reason === 'payment_failed'
+            ? 'payment_failed'
+            : undefined)
       );
       // not applied: Stripe sends the event again
       if (deleted?.retry) {
@@ -1519,7 +1534,8 @@ export class StripeService extends PaymentProviderAbstract {
       }
       await this._subscriptionService.deleteSubscription(
         customer,
-        STRIPE_PROVIDER
+        STRIPE_PROVIDER,
+        'payment_failed'
       );
 
       return {
@@ -1576,7 +1592,8 @@ export class StripeService extends PaymentProviderAbstract {
 
     await this._subscriptionService.deleteSubscription(
       customer,
-      STRIPE_PROVIDER
+      STRIPE_PROVIDER,
+      'account_deleted'
     );
   }
 

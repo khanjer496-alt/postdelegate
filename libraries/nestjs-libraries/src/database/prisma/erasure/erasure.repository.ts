@@ -301,6 +301,11 @@ const organizationSteps = (org: string): Step[] => [
   { table: 'OAuthApp', model: 'oAuthApp', where: { organizationId: org } },
   { table: 'Review', model: 'review', where: { organizationId: org } },
   {
+    table: 'FeedbackAnswer',
+    model: 'feedbackAnswer',
+    where: { organizationId: org },
+  },
+  {
     table: 'ActivityLog',
     model: 'activityLog',
     where: { organizationId: org },
@@ -427,6 +432,11 @@ const userSteps = (user: string): Step[] => [
   },
   { table: 'Review', model: 'review', where: { userId: user } },
   { table: 'ReviewPrompt', model: 'reviewPrompt', where: { userId: user } },
+  {
+    table: 'FeedbackAnswer',
+    model: 'feedbackAnswer',
+    where: { userId: user },
+  },
   {
     table: 'UserOrganization',
     model: 'userOrganization',

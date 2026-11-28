@@ -2585,6 +2585,10 @@ model MeasurementEvent {
   acceptedPublishAt DateTime?
   humanApproval Boolean @default(false)
   evidenceType String @default("")
+  // the network of a channel milestone or failure (providerIdentifier), and a
+  // short failure category (never a token, a provider payload or personal data)
+  provider String @default("")
+  reason   String @default("")
 
   @@index([occurredAt, kind])
   @@index([organizationId, kind])
@@ -2595,4 +2599,22 @@ model MeasurementHandoff {
   nonceHash String @id
   token     String
   expiresAt DateTime
+}
+
+// One-question surveys: what a new owner wants to use the app for, and what
+// stopped a trial or a plan that ended. One answer per person, workspace and
+// question; "skipped" is an answer too, so a question is shown once.
+// No FK like MeasurementEvent: an answer never constrains a workspace write.
+model FeedbackAnswer {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  kind           String
+  choice         String
+  text           String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, userId, kind])
+  @@index([kind, createdAt])
+  @@index([userId])
 }

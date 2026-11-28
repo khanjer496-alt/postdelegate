@@ -1409,7 +1409,10 @@ export class PostsService {
   }
 
   async failMcpSegment(orgId: string, rootId: string, segmentId: string, generation: number, revisionHash: string, err?: any) {
-    return this._postRepository.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash, err);
+    const failed = await this._postRepository.failMcpSegment(orgId, rootId, segmentId, generation, revisionHash, err);
+    // recorded only when the segment really went to ERROR (publishFailed checks)
+    await this._measurementService.publishFailed(segmentId, err);
+    return failed;
   }
 
   async mcpPlan(orgId: string, rootId: string, generation: number, revisionHash: string) {
@@ -3016,7 +3019,16 @@ export class PostsService {
   }
 
   async changeState(id: string, state: State, err?: any, body?: any) {
-    return this._postRepository.changeState(id, state, err, body);
+    const changed = await this._postRepository.changeState(
+      id,
+      state,
+      err,
+      body
+    );
+    if (state === 'ERROR') {
+      await this._measurementService.publishFailed(id, err);
+    }
+    return changed;
   }
 
   async changePostStatus(
@@ -3687,7 +3699,7 @@ export class PostsService {
     return this._postRepository.deleteTag(id, orgId);
   }
 
-  changeStateIf(
+  async changeStateIf(
     id: string,
     expectedStates: State[],
     state: State,
@@ -3695,7 +3707,7 @@ export class PostsService {
     body?: any,
     release?: { releaseId: string; releaseURL?: string }
   ) {
-    return this._postRepository.changeStateIf(
+    const changed = await this._postRepository.changeStateIf(
       id,
       expectedStates,
       state,
@@ -3703,5 +3715,9 @@ export class PostsService {
       body,
       release
     );
+    if (changed && state === 'ERROR') {
+      await this._measurementService.publishFailed(id, err);
+    }
+    return changed;
   }
 }

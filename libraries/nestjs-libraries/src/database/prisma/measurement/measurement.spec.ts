@@ -10,6 +10,8 @@ jest.mock('./measurement.repository', () => ({
 jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
   IntegrationManager: class {},
 }));
+// owner alerts are off unless a spec turns them on
+const alerts = { watches: () => false, funnelEvent: jest.fn() };
 const now = Date.parse('2026-11-09T12:00:00Z'),
   secret = 'test-only-not-a-secret-'.repeat(3);
 const payload = {
@@ -93,7 +95,7 @@ it('does not count another save of a first-time milestone as a duplicate', async
     acquisition: jest.fn().mockResolvedValue(null),
     save: jest.fn().mockResolvedValue({ key: 'k' }),
   };
-  const service = new MeasurementService(repository as never);
+  const service = new MeasurementService(repository as never, alerts as never);
   await service.record('org', 'first_draft', 'first');
   await service.record('org', 'publication', 'post|release');
   expect(repository.save.mock.calls[0][1]).toBe(false);
@@ -257,7 +259,7 @@ it('only records a human future accepted schedule on a connected available chann
     acquisition: jest.fn().mockResolvedValue(null),
     save: jest.fn().mockResolvedValue({ key: 'k' }),
   };
-  const service = new MeasurementService(repository as never);
+  const service = new MeasurementService(repository as never, alerts as never);
   await service.postAccepted('org', 'post', false);
   expect(repository.save).not.toHaveBeenCalled();
   await service.postAccepted('org', 'post', true);
@@ -280,7 +282,7 @@ it('keeps an unverified registration out of confirmed registrations and trials',
     acquisition: jest.fn().mockResolvedValue(null),
     save: jest.fn().mockResolvedValue({ key: 'k' }),
   };
-  const service = new MeasurementService(repository as never);
+  const service = new MeasurementService(repository as never, alerts as never);
   await service.registration('org', undefined, false);
   expect(repository.save).toHaveBeenCalledTimes(1);
   expect(repository.save).toHaveBeenCalledWith(
@@ -300,7 +302,7 @@ it('quarantines identifier-free staging outcomes without inventing acquisition',
     lifetimeOrgs: jest.fn().mockResolvedValue([]),
     firstEvent: jest.fn(async () => ({ receivedAt: saved[0].receivedAt })),
   };
-  const service = new MeasurementService(repository as never);
+  const service = new MeasurementService(repository as never, alerts as never);
   await service.signupAttempt(undefined, 'test-request');
   await service.registration('test-org', undefined, true);
   await service.record('test-org', 'channel_connected', 'first');
@@ -353,7 +355,7 @@ it.each(['missing customer', 'deleted workspace'])(
       lifetimeOrgs: jest.fn().mockResolvedValue([]),
       firstEvent: jest.fn(async () => ({ receivedAt: new Date(now) })),
     };
-    const service = new MeasurementService(repository as never);
+    const service = new MeasurementService(repository as never, alerts as never);
     for (let replay = 0; replay < 2; replay++)
       await service.payment(
         'cus_synthetic',
@@ -421,7 +423,7 @@ it.each([
       lifetimeOrgs: jest.fn().mockResolvedValue([]),
       firstEvent: jest.fn(async () => ({ receivedAt: new Date(now) })),
     };
-    const service = new MeasurementService(repository as never);
+    const service = new MeasurementService(repository as never, alerts as never);
     await service.payment(
       'cus_synthetic',
       'sub_synthetic',

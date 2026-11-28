@@ -506,6 +506,13 @@ export class IntegrationsController {
       }
 
       await ioRedis.set(`organization:${state}`, org.id, 'EX', ttl);
+      // the network a cancelled connect is recorded for (declinedConnect)
+      await ioRedis.set(
+        `provider:${state}`,
+        integrationProvider.identifier,
+        'EX',
+        ttl
+      );
       await ioRedis.set(`login:${state}`, codeVerifier, 'EX', ttl);
       await ioRedis.set(
         `external:${state}`,
