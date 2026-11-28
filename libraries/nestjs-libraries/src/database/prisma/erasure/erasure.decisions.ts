@@ -204,6 +204,10 @@ export const ERASURE_DECISIONS: Record<string, ErasureDecision> = {
     note: 'deleted (text, displayName, roleCompany)',
   },
   ReviewPrompt: { scope: 'user', note: 'deleted' },
+  FeedbackAnswer: {
+    scope: 'org+user',
+    note: 'deleted (choice and the free text of a one-question survey)',
+  },
   ApprovalSettings: {
     scope: 'org',
     note: 'deleted; approverIds may name the person, the row goes with the organization',

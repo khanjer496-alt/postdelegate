@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import {
   planMonth,
   SubscriptionService,
+  subscriptionEndReason,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 
 describe('planMonth', () => {
@@ -202,6 +203,45 @@ describe('SubscriptionService plan writes', () => {
     };
     expect(await service.createOrUpdateSubscription('stripe', false, 'u1', 'cus_1', 30, 'PRO', 'MONTHLY', null, undefined, 'org_1')).toBeUndefined();
     expect(repository.createOrUpdateSubscription).toHaveBeenCalled();
+  });
+
+  it('records an ended trial or plan, and keeps the removal when telemetry fails', async () => {
+    const { service } = make({
+      id: 'sub_row',
+      organizationId: 'org_1',
+      provider: 'stripe',
+      subscriptionTier: 'STANDARD',
+      status: 'trialing',
+      trialEndsAt: new Date(Date.now() - 1000),
+      identifier: 'standard_monthly',
+      totalChannels: 5,
+    });
+    const subscriptionEnded = jest.fn(async () => undefined);
+    (service as any)._measurementService = { subscriptionEnded };
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({ count: 1 });
+    expect(subscriptionEnded).toHaveBeenCalledWith('org_1', 'trial_expired', 'standard_monthly', 'STANDARD');
+    // what the caller knows wins: an account deletion is never a churned trial
+    await service.deleteSubscription('cus_1', 'stripe', 'account_deleted');
+    expect(subscriptionEnded).toHaveBeenLastCalledWith('org_1', 'account_deleted', 'standard_monthly', 'STANDARD');
+
+    subscriptionEnded.mockRejectedValue(new Error('telemetry down'));
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await service.deleteSubscription('cus_1', 'stripe')).toEqual({ count: 1 });
+    error.mockRestore();
+  });
+
+  it('names how a plan ended: a trial expires only once its end date passed', () => {
+    const now = new Date('2026-11-28T12:00:00Z');
+    const trial = (end: string | null) => ({
+      status: 'trialing',
+      trialEndsAt: end ? new Date(end) : null,
+    });
+    expect(subscriptionEndReason(trial('2026-11-28T11:00:00Z'), undefined, now)).toBe('trial_expired');
+    expect(subscriptionEndReason(trial('2026-11-30T00:00:00Z'), undefined, now)).toBe('trial_cancelled');
+    expect(subscriptionEndReason(trial(null), undefined, now)).toBe('trial_cancelled');
+    expect(subscriptionEndReason({ status: 'active', trialEndsAt: null }, undefined, now)).toBe('cancelled');
+    expect(subscriptionEndReason({ status: 'past_due', trialEndsAt: null }, 'payment_failed', now)).toBe('payment_failed');
+    expect(subscriptionEndReason(trial('2026-11-28T11:00:00Z'), 'account_deleted', now)).toBe('account_deleted');
   });
 
   it('counts only connected channels when a plan shrinks', async () => {

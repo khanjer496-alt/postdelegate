@@ -32,6 +32,7 @@ import { Toaster } from '@gitroom/react/toaster/toaster';
 import { ShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
 import { Support } from '@gitroom/frontend/components/layout/support';
 import { ReviewPrompt } from '@gitroom/frontend/components/reviews/review.prompt';
+import { FeedbackQuestion } from '@gitroom/frontend/components/feedback/feedback.question';
 import { ContinueProvider } from '@gitroom/frontend/components/layout/continue.provider';
 import { InviteError } from '@gitroom/frontend/components/layout/invite.error';
 import { ContextWrapper } from '@gitroom/frontend/components/layout/user.context';
@@ -225,13 +226,19 @@ export const LayoutComponent = ({
               !user.freePlan &&
               isGeneral &&
               billingEnabled ? (
-                <FirstBillingComponent />
+                <>
+                  <FirstBillingComponent />
+                  {/* a trial that ended lands here: asked below the plans,
+                      never over the checkout */}
+                  <FeedbackQuestion inline={true} />
+                </>
               ) : (
                 <>
                   <AnnouncementBanner />
                   <div className="flex-1 flex gap-[8px] mobile:gap-0">
                     <Support />
                     <ReviewPrompt />
+                    <FeedbackQuestion />
                     {menuOpen && (
                       <div
                         className="hidden mobile:block fixed inset-0 bg-newBackdrop opacity-60 z-[490]"

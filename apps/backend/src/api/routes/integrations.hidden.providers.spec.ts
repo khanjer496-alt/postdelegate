@@ -171,7 +171,8 @@ const setup = (providerExtras: object = {}) => {
     { getOrgById: jest.fn(getOrg) } as any,
     // the plan's channel limit is covered by its own specs
     { canAddChannel: jest.fn(async () => true) } as any,
-    {} as any
+    {} as any,
+    { channelConnectFailed: jest.fn(async () => undefined) } as any
   );
   const enterprise = new EnterpriseController(
     manager,

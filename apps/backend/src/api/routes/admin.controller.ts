@@ -19,6 +19,8 @@ import { MarkAffiliatePaidDto } from '@gitroom/nestjs-libraries/dtos/affiliates/
 import { ReviewService } from '@gitroom/nestjs-libraries/database/prisma/reviews/review.service';
 import { UpdateReviewStatusDto } from '@gitroom/nestjs-libraries/dtos/reviews/update.review.status.dto';
 import { MeasurementExportDto } from '@gitroom/nestjs-libraries/dtos/measurement/measurement.export.dto';
+import { OwnerAlertsService } from '@gitroom/nestjs-libraries/database/prisma/owner-alerts/owner.alerts.service';
+import { AdminTrialsDto } from '@gitroom/nestjs-libraries/dtos/owner-alerts/admin.trials.dto';
 import dayjs from 'dayjs';
 
 @ApiTags('Admin')
@@ -29,7 +31,8 @@ export class AdminController {
     private _adminStatsService: AdminStatsService,
     private _affiliateService: AffiliateService,
     private _reviewService: ReviewService,
-    private _measurementService: MeasurementService
+    private _measurementService: MeasurementService,
+    private _ownerAlertsService: OwnerAlertsService
   ) {}
 
   private assertSuperAdmin(user: User) {
@@ -118,6 +121,17 @@ export class AdminController {
       from: fromDate.startOf('day').toDate(),
       to: toDate.endOf('day').toDate(),
     });
+  }
+
+  // Trials & blockers: every workspace in a trial or signed up lately without
+  // a plan, the step it reached and what failed, plus the survey answers
+  @Get('/stats/trials')
+  async getTrials(
+    @GetUserFromRequest() user: User,
+    @Query() query: AdminTrialsDto
+  ) {
+    this.assertSuperAdmin(user);
+    return this._ownerAlertsService.trialsReport(query.workspace);
   }
 
   // Visitors and Google search of the marketing site, same range as /stats

@@ -120,6 +120,13 @@ export class EnterpriseController {
       await ioRedis.set(`webhookUrl:${state}`, load.webhookUrl, 'EX', ttl);
       await ioRedis.set(`redirect:${state}`, load.redirectUrl, 'EX', ttl);
       await ioRedis.set(`organization:${state}`, org.id, 'EX', ttl);
+      // the network a cancelled connect is recorded for (declinedConnect)
+      await ioRedis.set(
+        `provider:${state}`,
+        integrationProvider.identifier,
+        'EX',
+        ttl
+      );
       await ioRedis.set(`login:${state}`, codeVerifier, 'EX', ttl);
 
       return url;

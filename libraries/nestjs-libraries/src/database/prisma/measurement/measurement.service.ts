@@ -9,11 +9,76 @@ import {
   isChannelConnected,
   isPubliclyAvailableProvider,
 } from '../integrations/integration.state';
+import { OwnerAlertsService } from '../owner-alerts/owner.alerts.service';
+
+// Why a channel connect failed, a category only: never the provider's message,
+// a token or anything the person typed
+export type ChannelConnectFailure =
+  | 'cancelled'
+  | 'missing_permissions'
+  | 'provider_error'
+  | 'token_exchange'
+  | 'no_account';
+
+// Why a plan ended, decided by SubscriptionService from the stored plan and
+// what its caller knows (an account deletion, a failed payment)
+export type SubscriptionEndReason =
+  | 'trial_expired'
+  | 'trial_cancelled'
+  | 'cancelled'
+  | 'payment_failed'
+  | 'account_deleted';
+
+// The errors the post workflows set themselves rather than a network's
+// answer. null: not a failure at all (a duplicate run of a post that went
+// out, a post deleted meanwhile), nothing is recorded
+const WORKFLOW_FAILURES: Record<string, string | null> = {
+  'Already posted': null,
+  'No Post': null,
+  'Refresh channel needed': 'refresh_needed',
+  'Channel disabled': 'channel_disabled',
+  'This post was not published because the organization has no active subscription.':
+    'no_subscription',
+};
+
+// The first line of a provider error, short enough for an email subject line
+// and without anything that looks like an email address or a token
+const readError = (err: unknown): string => {
+  if (err === undefined || err === null) return '';
+  if (typeof err === 'string') {
+    if (!err.trim().startsWith('{')) return err;
+    try {
+      return readError(JSON.parse(err));
+    } catch {
+      return err;
+    }
+  }
+  const value = err as {
+    message?: unknown;
+    error?: { message?: unknown } | string;
+  } | null;
+  if (typeof value?.message === 'string') return value.message;
+  if (typeof value?.error === 'string') return value.error;
+  if (typeof value?.error?.message === 'string') return value.error.message;
+  return JSON.stringify(err);
+};
+
+export const shortError = (err: unknown) => {
+  const text = readError(err)
+    .split(/\r?\n/)[0]
+    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]')
+    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[redacted]')
+    .trim();
+  return (text || 'unknown error').slice(0, 160);
+};
 
 @Injectable()
 export class MeasurementService {
   private logger = new Logger(MeasurementService.name);
-  constructor(private repository: MeasurementRepository) {}
+  constructor(
+    private repository: MeasurementRepository,
+    private alerts: OwnerAlertsService
+  ) {}
   // Deployment-owned staging quarantine; never inferred from consent or identity.
   private diagnosticOnly() {
     return process.env.MEASUREMENT_INTERNAL_ONLY === 'true';
@@ -38,21 +103,27 @@ export class MeasurementService {
       acceptedPublishAt?: Date;
       humanApproval?: boolean;
       evidenceType?: string;
+      provider?: string;
+      reason?: string;
+      // shown in the owner alert only, never stored (a short provider error)
+      detail?: string;
     } = {}
   ) {
     await this.safe(async () => {
       const touch = await this.repository.acquisition(org);
+      // Invoice identity survives workspace mapping changes on webhook replay.
+      // Attribution/classification remains on the first receipt via repository upsert.
+      const key = measurementHash(
+        (kind === 'nonzero_payment' ? '' : org) + '|' + kind + '|' + identity
+      );
+      const internalOrTest =
+        this.diagnosticOnly() || touch?.internalOrTest || false;
+      // the owner hears about the first receipt of an event, never a replay
+      const watched = this.alerts.watches(kind);
+      const known = watched && !!(await this.repository.exists(key));
       await this.repository.save(
         {
-          // Invoice identity survives workspace mapping changes on webhook replay.
-          // Attribution/classification remains on the first receipt via repository upsert.
-          key: measurementHash(
-            (kind === 'nonzero_payment' ? '' : org) +
-              '|' +
-              kind +
-              '|' +
-              identity
-          ),
+          key,
           organizationId: org,
           kind,
           occurredAt: extra.occurredAt || new Date(),
@@ -63,6 +134,8 @@ export class MeasurementService {
           acceptedPublishAt: extra.acceptedPublishAt,
           humanApproval: extra.humanApproval,
           evidenceType: extra.evidenceType,
+          provider: extra.provider,
+          reason: extra.reason,
           source: touch?.source || 'unknown',
           campaign: touch?.campaign || 'unknown',
           medium: touch?.medium || 'unknown',
@@ -70,13 +143,27 @@ export class MeasurementService {
           content: touch?.content || 'unknown',
           entryPage: touch?.entryPage || 'unknown',
           device: touch?.device || 'unknown',
-          internalOrTest:
-            this.diagnosticOnly() || touch?.internalOrTest || false,
+          internalOrTest,
           matchedTouch: touch?.matchedTouch || false,
         },
         // 'first' milestones are recorded on every qualifying action, only one is kept
         identity !== 'first'
       );
+      if (watched && !known)
+        this.alerts
+          .funnelEvent({
+            key,
+            organizationId: org,
+            kind,
+            internalOrTest,
+            source: touch?.source || 'unknown',
+            provider: extra.provider,
+            reason: extra.reason,
+            amountMinor: extra.amountMinor,
+            currency: extra.currency,
+            detail: extra.detail,
+          })
+          .catch(() => {});
     });
   }
   async rememberHandoff(state: string, token: unknown) {
@@ -179,7 +266,57 @@ export class MeasurementService {
         isChannelConnected(channel) &&
         isPubliclyAvailableProvider(channel.providerIdentifier)
       )
-        await this.record(org, 'channel_connected', 'first');
+        await this.record(org, 'channel_connected', 'first', {
+          provider: channel.providerIdentifier,
+        });
+    });
+  }
+  // A connect that came back without a channel. The identity is the connect
+  // attempt (its OAuth state), so a retried callback is the same failure.
+  async channelConnectFailed(
+    org: string,
+    provider: string,
+    reason: ChannelConnectFailure,
+    attempt: string
+  ) {
+    await this.record(org, 'channel_connect_failed', attempt, {
+      provider,
+      reason,
+    });
+  }
+  // A post the provider refused. The same error of the same post again (a
+  // workflow retry) is one failure; the error text goes to the alert only.
+  async publishFailed(id: string, err: unknown) {
+    await this.safe(async () => {
+      const workflow =
+        typeof err === 'string' && err in WORKFLOW_FAILURES
+          ? WORKFLOW_FAILURES[err]
+          : undefined;
+      if (workflow === null) return;
+      const post = await this.repository.failedPost(id);
+      if (!post) return;
+      const detail = shortError(err);
+      // a thread's comments fail with their post: one failure of the thread
+      const thread = post.parentPostId || id;
+      await this.record(post.organizationId, 'publish_failed', thread + '|' + detail, {
+        reference: thread,
+        provider: post.integration?.providerIdentifier || 'unknown',
+        reason: workflow || 'provider_error',
+        detail,
+      });
+    });
+  }
+  // The plan is gone; the reason says how (an account deletion is recorded
+  // and never alerted)
+  async subscriptionEnded(
+    org: string,
+    reason: SubscriptionEndReason,
+    identity: string,
+    plan: string
+  ) {
+    await this.record(org, 'subscription_ended', identity, {
+      reason,
+      detail: plan,
     });
   }
   async postAccepted(org: string, id: string, human: boolean) {
