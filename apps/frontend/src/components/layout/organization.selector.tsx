@@ -13,7 +13,11 @@ export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
   const t = useT();
   const user = useUser();
   const load = useCallback(async () => {
-    return await (await fetch('/user/organizations')).json();
+    const organizations = await (await fetch('/user/organizations')).json();
+    if (!Array.isArray(organizations)) {
+      throw new Error('Could not load organizations');
+    }
+    return organizations;
   }, []);
   const { isLoading, data } = useSWR('organizations', load, {
     revalidateIfStale: false,
@@ -40,7 +44,7 @@ export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
     },
     []
   );
-  if (isLoading || (!isLoading && data?.length === 1)) {
+  if (isLoading || !data || data.length === 1) {
     return null;
   }
   return (
