@@ -306,7 +306,11 @@ const useAdminUsersSummary = () => {
     if (!res.ok) {
       throw new Error('Failed to load the summary');
     }
-    return res.json();
+    const body = await res.json();
+    if (typeof body?.total !== 'number') {
+      throw new Error('Failed to load the summary');
+    }
+    return body;
   }, { revalidateOnFocus: false });
 };
 
@@ -329,7 +333,11 @@ const useAdminUsersList = (params: {
       if (!res.ok) {
         throw new Error('Failed to load users');
       }
-      return res.json();
+      const body = await res.json();
+      if (!Array.isArray(body?.items)) {
+        throw new Error('Failed to load users');
+      }
+      return body;
     },
     { keepPreviousData: true, revalidateOnFocus: false }
   );

@@ -130,7 +130,11 @@ const useAdminUser = (id: string) => {
       if (!res.ok) {
         throw new Error('Failed to load the user');
       }
-      return res.json();
+      const body = await res.json();
+      if (!Array.isArray(body?.workspaces)) {
+        throw new Error('Failed to load the user');
+      }
+      return body;
     }
   );
 };
@@ -779,10 +783,13 @@ export const AdminUserDetailComponent: FC = () => {
         <Empty>This user is not in any workspace.</Empty>
       ) : (
         data.workspaces.map((workspace) => {
-          // a deleted user, a deleted workspace or a turned off access has
-          // nothing to view
+          // yourself, a deleted user, a deleted workspace or a turned off
+          // access has nothing to view
           const canViewAs =
-            !data.deletedAt && !workspace.deletedAt && !workspace.disabled;
+            data.id !== user?.id &&
+            !data.deletedAt &&
+            !workspace.deletedAt &&
+            !workspace.disabled;
           return isFull(workspace) ? (
             <WorkspaceSection
               key={workspace.userOrganizationId}
